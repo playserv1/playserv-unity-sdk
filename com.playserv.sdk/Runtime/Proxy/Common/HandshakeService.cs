@@ -1,0 +1,111 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.Logging;
+
+namespace Playserv.Proxy.Common
+{
+    public sealed class HandshakeService : IDisposable
+    {
+        private const int HandshakeTimeoutMs = 10000;
+
+        private readonly ITransport _transport;
+        private readonly ILogger _logger;
+        private IDisposable _responseSubscription;
+        private TaskCompletionSource<HandshakeResult> _handshakeTcs;
+
+        public event Action<TransportError> OnError;
+
+        public HandshakeService(ITransport transport, ILogger logger)
+        {
+            _transport = transport;
+            _logger = logger;
+        }
+
+        public async Task<HandshakeResult> PerformHandshakeAsync(
+            string gameAccessToken,
+            string gameVersion,
+            string sdkVersion,
+            CancellationToken cancellationToken = default)
+        {
+            _handshakeTcs = new TaskCompletionSource<HandshakeResult>();
+
+            _responseSubscription?.Dispose();
+            _responseSubscription = _transport
+                .OnReceive<HandshakeResponse>()
+                .Subscribe(OnHandshakeResponse, OnHandshakeError, null);
+
+            var request = new HandshakeRequest
+            {
+                GameAccessToken = gameAccessToken,
+                SdkVersion = sdkVersion,
+                GameVersion = gameVersion
+            };
+
+            _logger.Log($"Sending handshake request: SDK={sdkVersion}, Game={gameVersion}");
+            await _transport.Send(request);
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(HandshakeTimeoutMs);
+
+            try
+            {
+                var timeoutTask = Task.Delay(HandshakeTimeoutMs, cts.Token);
+                var completedTask = await Task.WhenAny(_handshakeTcs.Task, timeoutTask);
+
+                if (completedTask == timeoutTask && !_handshakeTcs.Task.IsCompleted)
+                {
+                    _logger.LogError("Handshake timed out.");
+                    return HandshakeResult.Failed(new TransportError(TransportErrorCode.None, "Handshake timed out."));
+                }
+
+                return await _handshakeTcs.Task;
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogError("Handshake cancelled.");
+                return HandshakeResult.Failed(new TransportError(TransportErrorCode.None, "Handshake cancelled."));
+            }
+            finally
+            {
+                _responseSubscription?.Dispose();
+                _responseSubscription = null;
+            }
+        }
+
+        private void OnHandshakeResponse(HandshakeResponse response)
+        {
+            if (response.success)
+            {
+                _logger.Log("Handshake successful.");
+                _handshakeTcs?.TrySetResult(HandshakeResult.Successful());
+                return;
+            }
+
+            var error = TransportError.FromCode(response.ErrorCode);
+            _logger.LogError($"Handshake failed: {error}");
+
+            HandleError(error);
+            _handshakeTcs?.TrySetResult(HandshakeResult.Failed(error));
+        }
+
+        private void OnHandshakeError(Exception ex)
+        {
+            var error = new TransportError(TransportErrorCode.None, ex.Message);
+            _logger.LogError($"Handshake error: {ex.Message}");
+            _handshakeTcs?.TrySetException(ex);
+        }
+
+        private void HandleError(TransportError error)
+        {
+            OnError?.Invoke(error);
+        }
+
+        public void Dispose()
+        {
+            _responseSubscription?.Dispose();
+            _responseSubscription = null;
+        }
+    }
+}
