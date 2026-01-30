@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
+using UnityEngine;
 
 namespace Playserv.Wrapper
 {
@@ -14,7 +15,7 @@ namespace Playserv.Wrapper
         event Action? OnKeepAlivePingSent;
         event Action? OnKeepAlivePongReceived;
 
-        void Config(string gameAccessToken, string gameVersion, string? sdkVersion = null);
+        void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null);
         Task<bool> Connect();
 
         IObservable<T> Subscribe<T>();
@@ -23,11 +24,14 @@ namespace Playserv.Wrapper
         void Send<T>(T command);
 
         // NOTE: only for testing purposes
-        Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation();
+        Proxy.Interfaces.ITransportImplementation GetTransportImplementation();
 
         void Publish<T>(T @event);
         void PublishForGroup<T>(string groupName, T @event);
         void PublishForUser<T>(string userId, T @event);
+
+        Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation);
+        Task<GameObject> Spawn(string assetName, Vector3 position);
 
         void Disconnect();
 

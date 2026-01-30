@@ -10,12 +10,6 @@ namespace Playserv.Proxy.Common
 {
     public sealed partial class PlayServImplementation : IDisposable
     {
-#if UNITY_EDITOR
-        private const string ENDPOINT = "ws://localhost:8080/ws/";
-#else
-        private const string ENDPOINT = "wss://playserv-proxy.test.playserv.io/ws";
-#endif
-
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly IEventsAdapter _eventsAdapter;
@@ -25,6 +19,8 @@ namespace Playserv.Proxy.Common
         private readonly KeepAliveManager _keepAliveManager;
 
         private string _gameAccessToken;
+        private string _gameId;
+        private string _userId;
         private string _gameVersion;
         private string _sdkVersion = SdkInfo.Version;
         private bool _disconnectedByServer;
@@ -36,10 +32,11 @@ namespace Playserv.Proxy.Common
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
 
-        public PlayServImplementation()
-            : this(new JsonSerializer(), new RequestIdGenerator(), new ConsoleLogger()) { }
+        public PlayServImplementation(string endpoint)
+            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), new ConsoleLogger()) { }
 
         private PlayServImplementation(
+            string endpoint,
             IMessageSerializer serializer,
             IRequestIdGenerator requestIdGenerator,
             ILogger logger,
@@ -54,6 +51,9 @@ namespace Playserv.Proxy.Common
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
 
+            if (string.IsNullOrWhiteSpace(endpoint))
+                throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
+
             _logger = logger;
 
             if (transportImplementationFactory == null)
@@ -65,7 +65,7 @@ namespace Playserv.Proxy.Common
 #endif
             }
 
-            var implementation = transportImplementationFactory(ENDPOINT);
+            var implementation = transportImplementationFactory(endpoint);
 
             _transport = new Transport(implementation, serializer, requestIdGenerator, logger);
             _eventsAdapter = new PlayServEventsAdapter(_transport, _logger);
@@ -101,6 +101,8 @@ namespace Playserv.Proxy.Common
 
         public void SetConfig(
             string gameAccessToken,
+            string gameId,
+            string userId,
             string gameVersion,
             string sdkVersion = null,
             bool allowMultipleConnections = true,
@@ -110,22 +112,31 @@ namespace Playserv.Proxy.Common
             if (string.IsNullOrWhiteSpace(gameAccessToken))
                 throw new ArgumentException("Game access token cannot be null or empty.", nameof(gameAccessToken));
 
+            if (string.IsNullOrWhiteSpace(gameId))
+                throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
+
             if (string.IsNullOrWhiteSpace(gameVersion))
                 throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
 
             _gameAccessToken = gameAccessToken;
+            _gameId = gameId;
+            _userId = userId;
             _gameVersion = gameVersion;
             _sdkVersion = string.IsNullOrWhiteSpace(sdkVersion) ? SdkInfo.Version : sdkVersion;
             _allowMultipleConnections = allowMultipleConnections;
             _keepAliveManager.PingIntervalMs = keepAlivePingIntervalMs;
             _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
 
-            _logger.Log($"Config set: token={gameAccessToken}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}");
+            _logger.Log($"Config set: token={gameAccessToken}, gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}");
         }
 
         public async Task<bool> Connect()
         {
-            if (string.IsNullOrWhiteSpace(_gameAccessToken) || string.IsNullOrWhiteSpace(_gameVersion))
+            if (string.IsNullOrWhiteSpace(_gameAccessToken) || string.IsNullOrWhiteSpace(_gameId) ||
+                string.IsNullOrWhiteSpace(_userId) || string.IsNullOrWhiteSpace(_gameVersion))
                 throw new InvalidOperationException("SDK is not configured. Call SetConfig() first.");
 
             _disconnectedByServer = false;
@@ -145,7 +156,7 @@ namespace Playserv.Proxy.Common
             State = PlayServState.Handshaking;
             _logger.Log("WebSocket connected. Performing handshake...");
 
-            var handshakeResult = await _handshakeService.PerformHandshakeAsync(_gameAccessToken, _gameVersion, _sdkVersion);
+            var handshakeResult = await _handshakeService.PerformHandshakeAsync(_gameAccessToken, _gameId, _userId, _gameVersion, _sdkVersion);
             if (!handshakeResult.Success)
             {
                 _logger.LogError($"Handshake failed: {handshakeResult.Error}");
@@ -156,6 +167,7 @@ namespace Playserv.Proxy.Common
 
             await SendClientSettingsAsync();
             _keepAliveManager.Start();
+            InitializeSpawnManager();
 
             State = PlayServState.Online;
             _logger.Log("SDK connection established successfully. Ready for login.");
@@ -346,6 +358,8 @@ namespace Playserv.Proxy.Common
 
         public void Dispose()
         {
+            DisposeSpawnManager();
+
             _keepAliveManager.Stop();
             _keepAliveManager.Dispose();
 

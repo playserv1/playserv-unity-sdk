@@ -119,6 +119,14 @@ namespace Playserv.Events
             }
         }
 
+        public bool HasObservers<T>()
+        {
+            lock (_lock)
+            {
+                return _typeObservers.TryGetValue(typeof(T), out var observers) && observers.Count > 0;
+            }
+        }
+
         public void NotifyEvent<T>(T eventData)
         {
             List<IObserver<T>> observers;

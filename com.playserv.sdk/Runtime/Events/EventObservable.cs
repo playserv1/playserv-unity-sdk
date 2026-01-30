@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Playserv.Events.Requests;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
@@ -12,7 +11,6 @@ namespace Playserv.Events
         private readonly EventSubscriptionManager _subscriptionManager;
         private readonly string _eventType;
         private readonly ILogger _logger;
-        private int _isSubscribed;
 
         public EventObservable(ITransport transport, EventSubscriptionManager subscriptionManager, string eventType, ILogger logger)
         {
@@ -27,58 +25,39 @@ namespace Playserv.Events
             if (observer == null)
                 throw new ArgumentNullException(nameof(observer));
 
-            if (Interlocked.CompareExchange(ref _isSubscribed, 1, 0) != 0)
-                throw new InvalidOperationException($"Already subscribed to event type: {_eventType}");
-
-            if (!EnsureSubscription())
-            {
-                Interlocked.Exchange(ref _isSubscribed, 0);
-                throw new InvalidOperationException($"Already subscribed to event type: {_eventType}");
-            }
-
+            EnsureSubscription();
             _subscriptionManager.AddObserver(observer);
 
-            return new Unsubscriber(_subscriptionManager, observer, () =>
-            {
-                if (Interlocked.CompareExchange(ref _isSubscribed, 0, 1) == 1)
-                {
-                    Unsubscribe();
-                }
-            });
+            return new Unsubscriber(_subscriptionManager, observer, TryUnsubscribe);
         }
 
-        private bool EnsureSubscription()
+        private void EnsureSubscription()
         {
             if (_subscriptionManager.IsSubscriptionPending(_eventType))
-            {
-                _logger.Log($"Subscription already pending for event type: {_eventType}");
-                return false;
-            }
+                return;
 
-            var existingSubscriptionId = _subscriptionManager.GetSubscriptionId(_eventType);
-            if (existingSubscriptionId != null)
-            {
-                _logger.Log($"Already subscribed to event type: {_eventType}");
-                return false;
-            }
+            if (_subscriptionManager.GetSubscriptionId(_eventType) != null)
+                return;
 
             _subscriptionManager.AddPendingSubscription(_eventType);
             var request = new EventSubscribeRequest(_eventType);
             _transport.Send(request);
             _logger.Log($"Sent subscription request for event type: {_eventType}");
-            return true;
         }
 
-        private void Unsubscribe()
+        private void TryUnsubscribe()
         {
+            if (_subscriptionManager.HasObservers<T>())
+                return;
+
             var subscriptionId = _subscriptionManager.GetSubscriptionId(_eventType);
-            if (subscriptionId != null)
-            {
-                var request = new EventUnsubscribeRequest(subscriptionId);
-                _transport.Send(request);
-                _subscriptionManager.RemoveSubscription(_eventType);
-                _logger.Log($"Sent unsubscription request for event type: {_eventType}");
-            }
+            if (subscriptionId == null)
+                return;
+
+            var request = new EventUnsubscribeRequest(subscriptionId);
+            _transport.Send(request);
+            _subscriptionManager.RemoveSubscription(_eventType);
+            _logger.Log($"Sent unsubscription request for event type: {_eventType}");
         }
 
         private sealed class Unsubscriber : IDisposable

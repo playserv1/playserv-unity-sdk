@@ -21,24 +21,33 @@ namespace Playserv.Wrapper
         public event Action? OnKeepAlivePingSent;
         public event Action? OnKeepAlivePongReceived;
 
-        public void Config(string gameAccessToken, string gameVersion, string? sdkVersion = null)
+        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null)
         {
             if (string.IsNullOrWhiteSpace(gameAccessToken))
                 throw new ArgumentException("Game access token is required.", nameof(gameAccessToken));
 
+            if (string.IsNullOrWhiteSpace(gameId))
+                throw new ArgumentException("Game ID is required.", nameof(gameId));
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("User ID is required.", nameof(userId));
+
             if (string.IsNullOrWhiteSpace(gameVersion))
                 throw new ArgumentException("Game version is required.", nameof(gameVersion));
 
-            _instance ??= new PlayServImplementation();
-            _instance.SetConfig(gameAccessToken, gameVersion, sdkVersion);
+            var config = GetOrLoadConfig();
+            _instance ??= new PlayServImplementation(config.Endpoint);
+            _instance.SetConfig(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
             SubscribeToInstanceEvents();
         }
+        
 
         public async Task<bool> Connect()
         {
             if (_instance == null)
             {
-                _instance = new PlayServImplementation();
+                var config = GetOrLoadConfig();
+                _instance = new PlayServImplementation(config.Endpoint);
                 SetConfigFromResources();
                 SubscribeToInstanceEvents();
             }
@@ -69,6 +78,12 @@ namespace Playserv.Wrapper
 
         public void PublishForUser<T>(string userId, T @event) =>
             Instance.PublishForUser(userId, @event);
+        
+        public Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
+            Instance.Spawn(assetName, position, rotation);
+
+        public Task<GameObject> Spawn(string assetName, Vector3 position) =>
+            Instance.Spawn(assetName, position);
 
         public void Disconnect()
         {
@@ -109,9 +124,11 @@ namespace Playserv.Wrapper
         private void SetConfigFromResources()
         {
             var config = GetOrLoadConfig();
-            _instance ??= new PlayServImplementation();
+            _instance ??= new PlayServImplementation(config.Endpoint);
             _instance.SetConfig(
                 config.GameAccessToken,
+                config.GameId,
+                config.UserId,
                 config.GameVersion,
                 config.SdkVersion,
                 config.AllowMultipleConnections,

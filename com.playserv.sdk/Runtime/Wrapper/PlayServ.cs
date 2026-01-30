@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
+using UnityEngine;
 
 namespace Playserv.Wrapper
 {
@@ -31,8 +32,8 @@ namespace Playserv.Wrapper
             remove => Api.OnKeepAlivePongReceived -= value;
         }
 
-        public static void Config(string gameAccessToken, string gameVersion, string sdkVersion = null) =>
-            Api.Config(gameAccessToken, gameVersion, sdkVersion);
+        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
+        Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
 
         public static Task<bool> Connect() =>
             Api.Connect();
@@ -61,6 +62,12 @@ namespace Playserv.Wrapper
 
         public static void Disconnect() =>
             Api.Disconnect();
+        
+        public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
+            Api.Spawn(assetName, position, rotation);
+
+        public static Task<GameObject> Spawn(string assetName, Vector3 position) =>
+            Api.Spawn(assetName, position);
 
         public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
             where TEntity : class

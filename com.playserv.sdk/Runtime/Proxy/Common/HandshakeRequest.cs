@@ -8,5 +8,7 @@ namespace Playserv.Proxy.Common
         public string GameAccessToken { get; set; }
         public string SdkVersion { get; set; }
         public string GameVersion { get; set; }
+        public string UserId { get; set; }
+        public string GameId { get; set; }
     }
 }

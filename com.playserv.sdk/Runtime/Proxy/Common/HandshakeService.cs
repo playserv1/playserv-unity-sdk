@@ -25,6 +25,8 @@ namespace Playserv.Proxy.Common
 
         public async Task<HandshakeResult> PerformHandshakeAsync(
             string gameAccessToken,
+            string gameId,
+            string userId,
             string gameVersion,
             string sdkVersion,
             CancellationToken cancellationToken = default)
@@ -39,11 +41,13 @@ namespace Playserv.Proxy.Common
             var request = new HandshakeRequest
             {
                 GameAccessToken = gameAccessToken,
+                GameId = gameId,
+                UserId = userId,
                 SdkVersion = sdkVersion,
                 GameVersion = gameVersion
             };
 
-            _logger.Log($"Sending handshake request: SDK={sdkVersion}, Game={gameVersion}");
+            _logger.Log($"Sending handshake request: SDK={sdkVersion}, Game={gameVersion}, GameId={gameId}, UserId={userId}");
             await _transport.Send(request);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
