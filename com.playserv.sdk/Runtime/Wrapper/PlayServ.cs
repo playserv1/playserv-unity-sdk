@@ -4,6 +4,8 @@ using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
 using UnityEngine;
 
+#nullable enable
+
 namespace Playserv.Wrapper
 {
     public static class PlayServ
@@ -32,7 +34,7 @@ namespace Playserv.Wrapper
             remove => Api.OnKeepAlivePongReceived -= value;
         }
 
-        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
+        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null) =>
         Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
 
         public static Task<bool> Connect() =>
@@ -75,3 +77,5 @@ namespace Playserv.Wrapper
             Api.SelectEntity<TEntity, TDto>(playerId, map);
     }
 }
+
+#nullable restore

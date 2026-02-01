@@ -4,6 +4,8 @@ using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
 using UnityEngine;
 
+#nullable enable
+
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServApi
@@ -21,7 +23,7 @@ namespace Playserv.Wrapper
         public event Action? OnKeepAlivePingSent;
         public event Action? OnKeepAlivePongReceived;
 
-        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null)
+        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null)
         {
             if (string.IsNullOrWhiteSpace(gameAccessToken))
                 throw new ArgumentException("Game access token is required.", nameof(gameAccessToken));
@@ -152,3 +154,5 @@ namespace Playserv.Wrapper
         }
     }
 }
+
+#nullable restore

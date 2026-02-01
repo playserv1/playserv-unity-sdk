@@ -8,6 +8,8 @@ using System.Text;
 using UnityEditor;
 using static System.IO.File;
 
+#nullable enable
+
 namespace Playserv.Events.Editor
 {
     internal static class EventsCodeGenerator
@@ -19,8 +21,8 @@ namespace Playserv.Events.Editor
         //    "Assets/Playserv/Runtime/Generated/PlayServ.EventsApiExtensions.g.cs"
         // or
         // 2) Add an asmdef for Assets/PlayservGenerated and reference Playserv.Runtime.asmdef.
-        private const string ApiExtensionsOutputPath = "Assets/PlayservGenerated/PlayServ.EventsApiExtensions.g.cs";
-        private const string AdapterExtensionsOutputPath = "Assets/PlayservGenerated/EventsAdapterExtensions.g.cs";
+        private const string ApiExtensionsOutputPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
+        private const string AdapterExtensionsOutputPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
 
         [MenuItem("Tools/PlayServ/Generate Events API")]
         public static void Generate()
@@ -344,4 +346,6 @@ namespace Playserv.Events.Editor
         }
     }
 }
+#nullable restore
+
 #endif

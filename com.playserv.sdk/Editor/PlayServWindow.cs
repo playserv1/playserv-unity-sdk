@@ -14,6 +14,8 @@ namespace Playserv.Editor
         private const string PrefKeyAutoCodegen   = "PlayServ.Codegen.AutoGenerate";
 
         private const string PrefFoldCodegen = "PlayServ.Window.Fold.Codegen";
+        private const string PrefFoldEvents = "PlayServ.Window.Fold.Events";
+        private const string PrefFoldModel = "PlayServ.Window.Fold.Model";
         private const string PrefFoldConfig  = "PlayServ.Window.Fold.Config";
 
         private const string MenuPath = "Tools/PlayServ/Settings";
@@ -28,6 +30,8 @@ namespace Playserv.Editor
         private SerializedProperty _pAllowMultipleConnections;
 
         private bool _foldCodegen;
+        private bool _foldEvents;
+        private bool _foldModel;
         private bool _foldConfig;
 
         [MenuItem(MenuPath)]
@@ -84,6 +88,10 @@ namespace Playserv.Editor
 
             DrawCodegenFoldout();
             GUILayout.Space(6);
+            DrawEventsFoldout();
+            GUILayout.Space(6);
+            DrawModelFoldout();
+            GUILayout.Space(6);
             DrawConfigFoldout();
 
             GUILayout.FlexibleSpace();
@@ -125,20 +133,48 @@ namespace Playserv.Editor
                         SharedCodeGenerator.DestroyDTOs();
                     }
                 }
-
-                GUILayout.Space(4);
-
-                if (GUILayout.Button("Generate Events API"))
-                    EventsCodeGenerator.Generate();
-
-                if (GUILayout.Button("Generate Models from JSON Schema"))
-                    SchemaCodeGenerator.GenerateModels();
-
+                
                 EditorGUI.indentLevel--;
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
             EditorPrefs.SetBool(PrefFoldCodegen, _foldCodegen);
+        }
+
+        private void DrawEventsFoldout()
+        {
+            _foldEvents = EditorGUILayout.BeginFoldoutHeaderGroup(_foldEvents, "Events");
+
+            if (_foldEvents)
+            {
+                EditorGUI.indentLevel++;
+                
+                if (GUILayout.Button("Generate Events API"))
+                    EventsCodeGenerator.Generate();
+                
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+            EditorPrefs.SetBool(PrefFoldEvents, _foldEvents);
+        }
+
+        private void DrawModelFoldout()
+        {
+            _foldModel = EditorGUILayout.BeginFoldoutHeaderGroup(_foldModel, "Model");
+
+            if (_foldModel)
+            {
+                EditorGUI.indentLevel++;
+                
+                if (GUILayout.Button("Generate Models from JSON Schema"))
+                    SchemaCodeGenerator.GenerateModels();
+                
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+            EditorPrefs.SetBool(PrefFoldModel, _foldModel);
         }
 
         private void DrawConfigFoldout()

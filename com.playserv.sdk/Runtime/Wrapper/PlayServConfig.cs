@@ -21,7 +21,7 @@ namespace Playserv.Wrapper
         [SerializeField] private int keepAlivePingIntervalMs = 30000;
         [SerializeField] private int keepAlivePongTimeoutMs = 10000;
         [SerializeField] private int networkTransformSyncIntervalMs = 100;
-        [SerializeField] private bool useLocalBackend = true;
+        [SerializeField] private bool useLocalBackend = false;
         [SerializeField] private string localEndpoint = DEFAULT_LOCAL_ENDPOINT;
         [SerializeField] private string remoteEndpoint = DEFAULT_REMOTE_ENDPOINT;
 

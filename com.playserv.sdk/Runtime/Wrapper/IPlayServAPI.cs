@@ -4,6 +4,8 @@ using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
 using UnityEngine;
 
+#nullable enable
+
 namespace Playserv.Wrapper
 {
     public interface IPlayServApi
@@ -15,7 +17,7 @@ namespace Playserv.Wrapper
         event Action? OnKeepAlivePingSent;
         event Action? OnKeepAlivePongReceived;
 
-        void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null);
+        void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null);
         Task<bool> Connect();
 
         IObservable<T> Subscribe<T>();
@@ -40,3 +42,5 @@ namespace Playserv.Wrapper
             where TDto : class, new();
     }
 }
+
+#nullable restore
