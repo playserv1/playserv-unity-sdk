@@ -146,7 +146,7 @@ namespace Playserv.CodeGenerator.Editor
 
             var csFilesAbs = Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories)
                 .Select(p => p.Replace("\\", "/"))
-                .Where(p => !p.Contains("/Shared/Generated/"))
+                .Where(p => !p.Contains("/Shared/Generated/DTOs/", StringComparison.OrdinalIgnoreCase))
                 .Where(p => !p.EndsWith("/Editor/SharedCodeGenerator.cs", StringComparison.OrdinalIgnoreCase))
                 .ToArray();
 
@@ -243,8 +243,14 @@ namespace Playserv.CodeGenerator.Editor
             var content = BuildIsExternalInitContent();
             var outHash = HashUtil.Sha256Hex(content);
 
-            if (cache.OutputHashes.TryGetValue(outFile, out var prevOutHash) && prevOutHash == outHash)
+            // IMPORTANT: cache can say "up-to-date" even if the file was deleted.
+            // Always regenerate if the file is missing.
+            if (File.Exists(outFile) &&
+                cache.OutputHashes.TryGetValue(outFile, out var prevOutHash) &&
+                prevOutHash == outHash)
+            {
                 return;
+            }
 
             try
             {

@@ -17,7 +17,17 @@ namespace Playserv.CodeGenerator.Editor
             TypeIndex typeIndex)
         {
             var rootTypeNameRaw = TypeNameUtil.ExtractTypeofName(rootTypeExpr);
-            var root = string.IsNullOrWhiteSpace(rootTypeNameRaw) ? null : typeIndex.Find(rootTypeNameRaw);
+
+            // IMPORTANT: Keep root type resolution consistent with the generated mapper signature.
+            // If rootTypeExpr is `typeof(Player)` and multiple `Player` exist, we must resolve to the same one everywhere.
+            var rootTypeNameQualified = string.IsNullOrWhiteSpace(rootTypeNameRaw)
+                ? ""
+                : TypeNameUtil.QualifyTypeIfNeeded(rootTypeNameRaw, typeIndex);
+
+            // TypeIndex typically stores names without the `global::` prefix.
+            var rootTypeLookup = StripGlobalPrefix(rootTypeNameQualified);
+
+            var root = string.IsNullOrWhiteSpace(rootTypeLookup) ? null : typeIndex.Find(rootTypeLookup);
 
             var tree = SelectionParser.Parse(selection);
 
@@ -29,7 +39,7 @@ namespace Playserv.CodeGenerator.Editor
                 dtoName: dtoName,
                 selection: tree,
                 rootType: root,
-                rootTypeName: rootTypeNameRaw,
+                rootTypeName: rootTypeLookup,
                 typeIndex: typeIndex,
                 indent: "        ");
 
@@ -40,7 +50,7 @@ namespace Playserv.CodeGenerator.Editor
                 dtoName: dtoName,
                 selection: tree,
                 rootType: root,
-                rootTypeName: rootTypeNameRaw,
+                rootTypeName: rootTypeLookup,
                 typeIndex: typeIndex,
                 indent: "        ");
 
@@ -57,7 +67,7 @@ namespace {ns}
 {{
     // DTO generated from '{Escape(source)}'
     // Key: {Escape(key)}
-    // RootType: {Escape(rootTypeExpr)}
+    // RootType: {Escape(string.IsNullOrWhiteSpace(rootTypeLookup) ? rootTypeExpr : $"typeof({rootTypeLookup})")}
     // Selection: {Escape(selection)}
     public sealed partial class {dtoName}
     {{
@@ -452,6 +462,17 @@ namespace {ns}
                 default:
                     return false;
             }
+        }
+
+        private static string StripGlobalPrefix(string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+                return typeName;
+
+            const string prefix = "global::";
+            return typeName.StartsWith(prefix, StringComparison.Ordinal)
+                ? typeName.Substring(prefix.Length)
+                : typeName;
         }
 
         private static string Escape(string s) => (s ?? "").Replace("\r", "").Replace("\n", " ");
