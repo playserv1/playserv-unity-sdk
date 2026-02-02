@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using UnityEditor;
 using UnityEngine;
 using Playserv.Wrapper;
@@ -10,14 +11,6 @@ namespace Playserv.Editor
 {
     public sealed class PlayServWindow : EditorWindow
     {
-        private const string PrefKeyShowOnStartup = "PlayServ.Window.ShowOnStartup";
-        private const string PrefKeyAutoCodegen   = "PlayServ.Codegen.AutoGenerate";
-
-        private const string PrefFoldCodegen = "PlayServ.Window.Fold.Codegen";
-        private const string PrefFoldEvents = "PlayServ.Window.Fold.Events";
-        private const string PrefFoldModel = "PlayServ.Window.Fold.Model";
-        private const string PrefFoldConfig  = "PlayServ.Window.Fold.Config";
-
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl  = "https://example.com";
 
@@ -40,13 +33,13 @@ namespace Playserv.Editor
         [InitializeOnLoadMethod]
         private static void OnEditorLoad()
         {
-            if (!EditorPrefs.HasKey(PrefKeyShowOnStartup))
-                EditorPrefs.SetBool(PrefKeyShowOnStartup, true);
+            if (!EditorPrefs.HasKey(Const.PrefKeyShowOnStartup))
+                EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, true);
 
-            if (!EditorPrefs.HasKey(PrefKeyAutoCodegen))
-                EditorPrefs.SetBool(PrefKeyAutoCodegen, true);
+            if (!EditorPrefs.HasKey(Const.PrefKeyAutoCodegen))
+                EditorPrefs.SetBool(Const.PrefKeyAutoCodegen, true);
 
-            if (EditorPrefs.GetBool(PrefKeyShowOnStartup, true))
+            if (EditorPrefs.GetBool(Const.PrefKeyShowOnStartup, true))
                 EditorApplication.delayCall += ShowWindow;
         }
 
@@ -60,8 +53,8 @@ namespace Playserv.Editor
 
         private void OnEnable()
         {
-            _foldCodegen = EditorPrefs.GetBool(PrefFoldCodegen, true);
-            _foldConfig  = EditorPrefs.GetBool(PrefFoldConfig, true);
+            _foldCodegen = EditorPrefs.GetBool(Const.PrefFoldCodegen, true);
+            _foldConfig  = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
             EnsureConfig();
         }
 
@@ -109,13 +102,13 @@ namespace Playserv.Editor
             {
                 EditorGUI.indentLevel++;
 
-                bool autoGen = EditorPrefs.GetBool(PrefKeyAutoCodegen, true);
+                bool autoGen = EditorPrefs.GetBool(Const.PrefKeyAutoCodegen, true);
                 bool newAutoGen = EditorGUILayout.ToggleLeft(
                     "Enable automatic DTO generation",
                     autoGen);
 
                 if (newAutoGen != autoGen)
-                    EditorPrefs.SetBool(PrefKeyAutoCodegen, newAutoGen);
+                    EditorPrefs.SetBool(Const.PrefKeyAutoCodegen, newAutoGen);
 
                 GUILayout.Space(6);
 
@@ -138,7 +131,7 @@ namespace Playserv.Editor
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
-            EditorPrefs.SetBool(PrefFoldCodegen, _foldCodegen);
+            EditorPrefs.SetBool(Const.PrefFoldCodegen, _foldCodegen);
         }
 
         private void DrawEventsFoldout()
@@ -156,7 +149,7 @@ namespace Playserv.Editor
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
-            EditorPrefs.SetBool(PrefFoldEvents, _foldEvents);
+            EditorPrefs.SetBool(Const.PrefFoldEvents, _foldEvents);
         }
 
         private void DrawModelFoldout()
@@ -170,6 +163,38 @@ namespace Playserv.Editor
                 if (GUILayout.Button("Load JSON Schema"))
                     SchemaLoader.LoadSchema();
                 
+                if (GUILayout.Button("Check Updates"))
+                    SchemaLoader.CheckNewSchema();
+                
+                GUILayout.Space(6);
+                
+                if (!string.IsNullOrEmpty(EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion)))
+                {
+                    var text = $"Version: {EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion)}";
+                    EditorGUILayout.SelectableLabel(
+                        text,
+                        EditorStyles.textField,
+                        GUILayout.Height(EditorGUIUtility.singleLineHeight)
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(EditorPrefs.GetString(Const.PrefKeyJsonSchemaTimestamp)))
+                {
+                    var time = DateTimeOffset
+                        .Parse(EditorPrefs.GetString(Const.PrefKeyJsonSchemaTimestamp))
+                        .ToLocalTime()
+                        .DateTime;
+                    
+                    var text = $"Timestamp: {time}";
+                    EditorGUILayout.SelectableLabel(
+                        text,
+                        EditorStyles.textField,
+                        GUILayout.Height(EditorGUIUtility.singleLineHeight)
+                    );
+                }
+                
+                GUILayout.Space(6);
+                
                 if (GUILayout.Button("Generate Models from JSON Schema"))
                     SchemaCodeGenerator.GenerateModels();
                 
@@ -177,7 +202,7 @@ namespace Playserv.Editor
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
-            EditorPrefs.SetBool(PrefFoldModel, _foldModel);
+            EditorPrefs.SetBool(Const.PrefFoldModel, _foldModel);
         }
 
         private void DrawConfigFoldout()
@@ -222,7 +247,7 @@ namespace Playserv.Editor
             }
 
             EditorGUILayout.EndFoldoutHeaderGroup();
-            EditorPrefs.SetBool(PrefFoldConfig, _foldConfig);
+            EditorPrefs.SetBool(Const.PrefFoldConfig, _foldConfig);
         }
 
         private void DrawFooter()
@@ -231,13 +256,13 @@ namespace Playserv.Editor
 
             EditorGUILayout.BeginHorizontal();
 
-            bool showOnStartup = EditorPrefs.GetBool(PrefKeyShowOnStartup, true);
+            bool showOnStartup = EditorPrefs.GetBool(Const.PrefKeyShowOnStartup, true);
             bool newShowOnStartup = EditorGUILayout.ToggleLeft(
                 "Show this window on Unity startup",
                 showOnStartup);
 
             if (newShowOnStartup != showOnStartup)
-                EditorPrefs.SetBool(PrefKeyShowOnStartup, newShowOnStartup);
+                EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, newShowOnStartup);
 
             GUILayout.FlexibleSpace();
 

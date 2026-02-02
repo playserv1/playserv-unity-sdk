@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using Playserv.CodeGenerator;
+using Playserv.Editor;
 
 namespace Playserv.ModelGenerator.Editor
 {
@@ -56,6 +57,10 @@ namespace Playserv.ModelGenerator.Editor
 
                     // 2. Deserialize Schema
                     JsonSchema schema = JsonSerializer.Deserialize<JsonSchema>(content, options)!;
+                    
+                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, schema.XTimestamp);
+                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, schema.XVersion);
+                    
                     Debug.Log($"[LOG] Schema Version: {schema.XVersion}");
                     Debug.Log($"[LOG] Timestamp: {schema.XTimestamp}");
                     Debug.Log($"[LOG] Definitions Found: {SchemaUtils.GetAllDefinitions(schema).Count()}");
@@ -105,6 +110,31 @@ namespace Playserv.ModelGenerator.Editor
             File.WriteAllText(fullPath, content);
             
             Debug.Log($"Successfully created C# file at: {fullPath}");
+        }
+
+        public static void CheckNewVersionJsonSchema()
+        {
+            var content = File.ReadAllText(SchemaFilePath);
+
+            try
+            {
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true
+                };
+                
+                JsonSchema schema = JsonSerializer.Deserialize<JsonSchema>(content, options)!;
+                Debug.Log($"[LOG] Schema Version: {schema.XVersion}");
+                Debug.Log($"[LOG] Timestamp: {schema.XTimestamp}");
+                EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, schema.XTimestamp);
+                EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, schema.XVersion);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error: {ex.Message}");
+            }
         }
     }
 }

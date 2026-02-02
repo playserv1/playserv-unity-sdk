@@ -12,10 +12,14 @@ public static class SchemaLoader
         "https://playserv-backoffice.test.playserv.io/api/projects/019c0eb8-4fee-7e46-9609-5da7df640aea/schemas"; 
     private const string SchemaFileName = "schema.json";
     
-    [MenuItem("PlayServ/Download Schema")]
     public static void LoadSchema()
     {
         _ = DownloadSchema();
+    }
+
+    public static void CheckNewSchema()
+    {
+        //_ = CheckSchema();
     }
     
     private static async Task DownloadSchema()
@@ -24,24 +28,9 @@ public static class SchemaLoader
         SchemaCodeGenerator.GenerateModels();
     }
     
-    public static async Task DownloadAndSaveToResourcesAsync(string url)
+    private static async Task DownloadAndSaveToResourcesAsync(string url)
     {
-        using var request = UnityWebRequest.Get(url);
-        request.SetRequestHeader("Accept", "application/json");
-
-        var operation = request.SendWebRequest();
-
-        // await без корутин
-        while (!operation.isDone)
-            await Task.Yield();
-
-        if (request.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"[SchemaDownloader] Error: {request.error}");
-            return;
-        }
-
-        var json = request.downloadHandler.text;
+        var json = await LoadJson(url);
 
         // Assets/Resources/schema.json
         var resourcesDir = Path.Combine(Application.dataPath, "Resources");
@@ -50,11 +39,30 @@ public static class SchemaLoader
 
         var filePath = Path.Combine(resourcesDir, SchemaFileName);
         await File.WriteAllTextAsync(filePath, json);
-
-        // ОНОВИТИ AssetDatabase, інакше Unity не побачить файл
+        
         AssetDatabase.Refresh();
 
         Debug.Log($"[SchemaDownloader] schema.json saved to {filePath}");
+    }
+
+    private static async Task<string> LoadJson(string url)
+    {
+        using var request = UnityWebRequest.Get(url);
+        request.SetRequestHeader("Accept", "application/json");
+
+        var operation = request.SendWebRequest();
+
+        while (!operation.isDone)
+            await Task.Yield();
+
+        if (request.result != UnityWebRequest.Result.Success)
+        {
+            Debug.LogError($"[SchemaDownloader] Error: {request.error}");
+            return null;
+        }
+
+        var json = request.downloadHandler.text;
+        return json;
     }
 }
 #endif
