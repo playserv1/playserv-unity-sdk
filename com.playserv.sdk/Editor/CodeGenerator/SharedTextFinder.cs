@@ -233,7 +233,6 @@ namespace Playserv.CodeGenerator.Editor
 
         private static bool IsModifierToken(string t)
         {
-            // English comment: include common modifiers; safe to extend.
             switch (t)
             {
                 case "public":

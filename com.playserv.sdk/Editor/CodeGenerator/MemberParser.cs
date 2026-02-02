@@ -7,7 +7,6 @@ namespace Playserv.CodeGenerator.Editor
 {
     internal static class MemberParser
     {
-        // English: parse public fields + auto-properties from a type body.
         // Supports:
         // - fields: public T Name; / public T Name = ...;
         // - props:  public T Name { get; set; }
@@ -51,7 +50,7 @@ namespace Playserv.CodeGenerator.Editor
                 var type = ReadType(src, ref i);
                 if (string.IsNullOrWhiteSpace(type))
                 {
-                    // English: ensure forward progress (e.g. when encountering verbatim identifiers like @Class)
+                    // Ensure forward progress (e.g. when encountering verbatim identifiers like @Class)
                     i = Math.Min(i + 1, src.Length);
                     continue;
                 }
@@ -114,7 +113,7 @@ namespace Playserv.CodeGenerator.Editor
 
         private static string ReadType(string s, ref int i)
         {
-            // English: reads a type like:
+            //  Reads a type like:
             //  int
             //  List<Item>
             //  System.Collections.Generic.List<Shared.Generated.Models.Item>
@@ -176,7 +175,7 @@ namespace Playserv.CodeGenerator.Editor
             if (i >= s.Length)
                 return "";
 
-            // English: allow verbatim identifiers like @Class
+            //Allow verbatim identifiers like @Class
             bool hasAt = s[i] == '@';
             if (hasAt)
             {
@@ -310,7 +309,7 @@ namespace Playserv.CodeGenerator.Editor
 
         private static string StripComments(string s)
         {
-            // English: strips both // and /* */ comments, safe enough for parsing signatures.
+            // Strips both // and /* */ comments, safe enough for parsing signatures.
             var sb = new StringBuilder(s.Length);
             bool inString = false;
 
