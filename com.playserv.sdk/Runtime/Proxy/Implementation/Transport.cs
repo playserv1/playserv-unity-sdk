@@ -89,6 +89,8 @@ namespace Playserv.Proxy.Implementation
         {
             if (string.IsNullOrWhiteSpace(commandName))
                 throw new ArgumentException("Command name cannot be null or empty.", nameof(commandName));
+            
+            Debug.Log(commandName);
 
             EnsureSubscription();
 

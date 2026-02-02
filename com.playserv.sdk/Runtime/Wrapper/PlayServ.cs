@@ -48,6 +48,9 @@ namespace Playserv.Wrapper
 
         public static void Send<T>(T command) =>
             Api.Send(command);
+        
+        public static void Send<T>(T command, string moduleName) =>
+            Api.Send(command,  moduleName);
 
         // NOTE: only for testing purposes
         public static Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>

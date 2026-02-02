@@ -24,6 +24,7 @@ namespace Playserv.Wrapper
         IDisposable Subscribe<T>(Action<T> onNext);
 
         void Send<T>(T command);
+        void Send<T>(T command, string moduleName);
 
         // NOTE: only for testing purposes
         Proxy.Interfaces.ITransportImplementation GetTransportImplementation();

@@ -167,6 +167,9 @@ namespace Playserv.Editor
             {
                 EditorGUI.indentLevel++;
                 
+                if (GUILayout.Button("Load JSON Schema"))
+                    SchemaLoader.LoadSchema();
+                
                 if (GUILayout.Button("Generate Models from JSON Schema"))
                     SchemaCodeGenerator.GenerateModels();
                 
