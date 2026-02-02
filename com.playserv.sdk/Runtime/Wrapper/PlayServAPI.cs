@@ -66,7 +66,9 @@ namespace Playserv.Wrapper
         public IDisposable Subscribe<T>(Action<T> onNext) =>
             Instance.Subscribe(onNext);
 
-        public void Send<T>(T command, string moduleName = null) =>
+        public void Send<T>(T command) => Instance.Send(command);
+        
+        public void Send<T>(T command, string moduleName) =>
             Instance.Send(command, moduleName);
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
