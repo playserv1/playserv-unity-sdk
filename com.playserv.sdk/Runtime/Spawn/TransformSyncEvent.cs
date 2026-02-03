@@ -1,43 +1,52 @@
-using System;
 using UnityEngine;
 
 namespace Playserv.Spawn
 {
-    [Serializable]
     public sealed class TransformSyncEvent
     {
         public string NetworkId;
+        public uint Seq;
+
+        // Transform state
         public Vector3 Position;
         public Quaternion Rotation;
         public Vector3 Scale;
+
+        // Velocities for prediction
         public Vector3 Velocity;
-        public Vector3 AngularVelocity;
+        public float AngularVelocityYaw; // degrees/sec around Y axis
         public Vector3 ScaleVelocity;
-        public float Timestamp;
-        public float DeltaTime;
+
+        // Timing
+        public float StepTime;
+
+        // Flags
+        public bool Teleport;
 
         public TransformSyncEvent() { }
 
         public TransformSyncEvent(
             string networkId,
+            uint seq,
             Vector3 position,
             Quaternion rotation,
             Vector3 scale,
-            Vector3 velocity = default,
-            Vector3 angularVelocity = default,
-            Vector3 scaleVelocity = default,
-            float timestamp = 0f,
-            float deltaTime = 0f)
+            Vector3 velocity,
+            float angularVelocityYaw,
+            Vector3 scaleVelocity,
+            float stepTime,
+            bool teleport = false)
         {
             NetworkId = networkId;
+            Seq = seq;
             Position = position;
             Rotation = rotation;
             Scale = scale;
             Velocity = velocity;
-            AngularVelocity = angularVelocity;
+            AngularVelocityYaw = angularVelocityYaw;
             ScaleVelocity = scaleVelocity;
-            Timestamp = timestamp;
-            DeltaTime = deltaTime;
+            StepTime = stepTime;
+            Teleport = teleport;
         }
     }
 }

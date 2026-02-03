@@ -7,6 +7,8 @@ namespace Playserv.Spawn
     [RequireComponent(typeof(NetworkObject))]
     public sealed class NetworkTransform : MonoBehaviour
     {
+        private const int SnapshotBufferSize = 4;
+
         [field: SerializeField]
         public bool SyncPosition { get; set; } = true;
 
@@ -16,66 +18,59 @@ namespace Playserv.Spawn
         [field: SerializeField]
         public bool SyncScale { get; set; }
 
-        [field: SerializeField]
-        public bool UsePrediction { get; set; } = true;
+        [Header("Send Thresholds")]
+        [SerializeField] private float positionThreshold = 0.001f;
+        [SerializeField] private float rotationThreshold = 0.1f;
+        [SerializeField] private float scaleThreshold = 0.001f;
 
-        [SerializeField]
-        private float positionThreshold = 0.001f;
-
-        [SerializeField]
-        private float rotationThreshold = 0.1f;
-
-        [SerializeField]
-        private float scaleThreshold = 0.001f;
-
-        [SerializeField]
-        private float interpolationSpeed = 10f;
+        [Header("Interpolation")]
+        [SerializeField] private float renderDelay = 0.12f;
+        [SerializeField] private float teleportDistance = 3f;
 
         private NetworkObject _networkObject;
         private IDisposable _subscription;
         private float _nextSyncTime;
         private float _syncInterval;
+        private uint _sendSeq;
 
+        // Owner state for velocity calculation
         private Vector3 _lastSentPosition;
         private Quaternion _lastSentRotation;
         private Vector3 _lastSentScale;
+        private float _lastSendTime;
 
-        private Vector3 _previousPosition;
-        private Quaternion _previousRotation;
-        private Vector3 _previousScale;
+        // Snapshot buffer for interpolation
+        private readonly TransformSnapshot[] _snapshotBuffer = new TransformSnapshot[SnapshotBufferSize];
+        private int _snapshotCount;
+        private bool _hasInitialized;
 
-        private Vector3 _velocity;
-        private Vector3 _angularVelocity;
-        private Vector3 _scaleVelocity;
-        private float _lastDeltaTime;
-        private bool _hadNonZeroVelocity;
+        // Debug stats
+        private int _packetsReceived;
+        private int _snapCount;
+        private int _freezeCount;
+        private float _lastDebugTime;
 
-        private Interpolator<Vector3> _positionInterpolator;
-        private Interpolator<Quaternion> _rotationInterpolator;
-        private Interpolator<Vector3> _scaleInterpolator;
-
-        private TransformPredictor _predictor;
+        public bool HasTarget => _hasInitialized;
+        public float TimeSinceLastSnapshot => _snapshotCount > 0
+            ? Time.time - _snapshotBuffer[_snapshotCount - 1].RecvTime
+            : 0f;
 
         private void Awake()
         {
             _networkObject = GetComponent<NetworkObject>();
 
             var config = Resources.Load<PlayServConfig>("PlayServConfig");
-            _syncInterval = config != null ? config.NetworkTransformSyncIntervalMs / 1000f : 0.1f;
+            _syncInterval = config != null ? config.NetworkTransformSyncIntervalMs / 1000f : 0.05f;
 
+            InitializeLocalState();
+        }
+
+        private void InitializeLocalState()
+        {
             _lastSentPosition = transform.position;
             _lastSentRotation = transform.rotation;
             _lastSentScale = transform.localScale;
-
-            _previousPosition = transform.position;
-            _previousRotation = transform.rotation;
-            _previousScale = transform.localScale;
-
-            _positionInterpolator = Interpolator<Vector3>.CreateVector3(transform.position);
-            _rotationInterpolator = Interpolator<Quaternion>.CreateQuaternion(transform.rotation);
-            _scaleInterpolator = Interpolator<Vector3>.CreateVector3(transform.localScale);
-
-            _predictor = new TransformPredictor(interpolationSpeed);
+            _lastSendTime = Time.time;
         }
 
         private void OnEnable()
@@ -91,33 +86,14 @@ namespace Playserv.Spawn
 
         private void Update()
         {
-            CalculateVelocity();
-            TrySendTransformUpdate();
-            InterpolateToTarget();
-        }
-
-        private void CalculateVelocity()
-        {
-            if (!_networkObject.IsLocallyOwned)
-                return;
-
-            float deltaTime = Time.deltaTime;
-            if (deltaTime <= 0f)
-                return;
-
-            _lastDeltaTime = deltaTime;
-            _velocity = (transform.position - _previousPosition) / deltaTime;
-
-            Quaternion deltaRotation = transform.rotation * Quaternion.Inverse(_previousRotation);
-            deltaRotation.ToAngleAxis(out float angle, out Vector3 axis);
-            if (angle > 180f) angle -= 360f;
-            _angularVelocity = axis * (angle / deltaTime);
-
-            _scaleVelocity = (transform.localScale - _previousScale) / deltaTime;
-
-            _previousPosition = transform.position;
-            _previousRotation = transform.rotation;
-            _previousScale = transform.localScale;
+            if (_networkObject.IsLocallyOwned)
+            {
+                TrySendTransformUpdate();
+            }
+            else
+            {
+                UpdateRemoteTransform();
+            }
         }
 
         private void TrySendTransformUpdate()
@@ -125,28 +101,11 @@ namespace Playserv.Spawn
             if (Time.time < _nextSyncTime)
                 return;
 
-            if (!ShouldSendUpdate())
+            if (!HasTransformChanged())
                 return;
 
             SendTransformUpdate();
             _nextSyncTime = Time.time + _syncInterval;
-        }
-
-        private bool ShouldSendUpdate()
-        {
-            bool hasChanged = HasTransformChanged();
-
-            if (hasChanged)
-            {
-                _hadNonZeroVelocity = true;
-                return true;
-            }
-
-            if (_hadNonZeroVelocity && HasNonZeroVelocity())
-                return true;
-
-            _hadNonZeroVelocity = false;
-            return false;
         }
 
         private bool HasTransformChanged()
@@ -163,33 +122,63 @@ namespace Playserv.Spawn
             return false;
         }
 
-        private bool HasNonZeroVelocity() =>
-            (SyncPosition && _velocity.sqrMagnitude > 0.0001f) ||
-            (SyncRotation && _angularVelocity.sqrMagnitude > 0.0001f) ||
-            (SyncScale && _scaleVelocity.sqrMagnitude > 0.0001f);
-
         private void SendTransformUpdate()
         {
             var networkId = _networkObject.NetworkId;
             if (string.IsNullOrEmpty(networkId))
                 return;
 
+            float currentTime = Time.time;
+            float stepTime = currentTime - _lastSendTime;
+            if (stepTime <= 0f)
+                stepTime = _syncInterval;
+
+            Vector3 velocity = Vector3.zero;
+            float angVelYaw = 0f;
+            Vector3 scaleVel = Vector3.zero;
+
+            if (SyncPosition)
+            {
+                velocity = (transform.position - _lastSentPosition) / stepTime;
+            }
+
+            if (SyncRotation)
+            {
+                angVelYaw = CalculateYawVelocity(_lastSentRotation, transform.rotation, stepTime);
+            }
+
+            if (SyncScale)
+            {
+                scaleVel = (transform.localScale - _lastSentScale) / stepTime;
+            }
+
             _lastSentPosition = transform.position;
             _lastSentRotation = transform.rotation;
             _lastSentScale = transform.localScale;
+            _lastSendTime = currentTime;
+            _sendSeq++;
 
             var syncEvent = new TransformSyncEvent(
                 networkId,
+                _sendSeq,
                 SyncPosition ? _lastSentPosition : Vector3.zero,
                 SyncRotation ? _lastSentRotation : Quaternion.identity,
                 SyncScale ? _lastSentScale : Vector3.one,
-                SyncPosition ? _velocity : Vector3.zero,
-                SyncRotation ? _angularVelocity : Vector3.zero,
-                SyncScale ? _scaleVelocity : Vector3.zero,
-                Time.time,
-                _lastDeltaTime);
+                velocity,
+                angVelYaw,
+                scaleVel,
+                stepTime);
 
             PlayServ.Publish(syncEvent);
+        }
+
+        private static float CalculateYawVelocity(Quaternion from, Quaternion to, float deltaTime)
+        {
+            float fromYaw = from.eulerAngles.y;
+            float toYaw = to.eulerAngles.y;
+
+            float deltaYaw = Mathf.DeltaAngle(fromYaw, toYaw);
+            return deltaYaw / deltaTime;
         }
 
         private void OnTransformSyncReceived(TransformSyncEvent syncEvent)
@@ -200,63 +189,245 @@ namespace Playserv.Spawn
             if (_networkObject.IsLocallyOwned)
                 return;
 
-            if (UsePrediction)
-            {
-                _predictor.ApplyServerState(syncEvent);
-            }
-            else
-            {
-                if (SyncPosition)
-                    _positionInterpolator.SetTarget(syncEvent.Position);
+            _packetsReceived++;
 
-                if (SyncRotation)
-                    _rotationInterpolator.SetTarget(syncEvent.Rotation);
+            var snapshot = new TransformSnapshot
+            {
+                RecvTime = Time.time,
+                Position = syncEvent.Position,
+                Rotation = syncEvent.Rotation,
+                Scale = syncEvent.Scale
+            };
 
-                if (SyncScale)
-                    _scaleInterpolator.SetTarget(syncEvent.Scale);
+            if (!_hasInitialized || syncEvent.Teleport)
+            {
+                InitializeWithSnapshot(snapshot);
+                return;
             }
+
+            // Check for teleport (large distance)
+            if (_snapshotCount > 0)
+            {
+                var lastSnapshot = _snapshotBuffer[_snapshotCount - 1];
+                if (Vector3.Distance(lastSnapshot.Position, snapshot.Position) > teleportDistance)
+                {
+                    InitializeWithSnapshot(snapshot);
+                    _snapCount++;
+                    return;
+                }
+            }
+
+            AddSnapshotToBuffer(snapshot);
         }
 
-        private void InterpolateToTarget()
+        private void InitializeWithSnapshot(TransformSnapshot snapshot)
         {
-            if (_networkObject.IsLocallyOwned)
+            // Fill buffer with identical snapshots to avoid interpolation issues
+            for (int i = 0; i < SnapshotBufferSize; i++)
+            {
+                _snapshotBuffer[i] = snapshot;
+            }
+            _snapshotCount = SnapshotBufferSize;
+
+            // Apply immediately
+            if (SyncPosition)
+                transform.position = snapshot.Position;
+            if (SyncRotation)
+                transform.rotation = snapshot.Rotation;
+            if (SyncScale)
+                transform.localScale = snapshot.Scale;
+
+            _hasInitialized = true;
+        }
+
+        private void AddSnapshotToBuffer(TransformSnapshot snapshot)
+        {
+            // Shift buffer left if full
+            if (_snapshotCount >= SnapshotBufferSize)
+            {
+                for (int i = 0; i < SnapshotBufferSize - 1; i++)
+                {
+                    _snapshotBuffer[i] = _snapshotBuffer[i + 1];
+                }
+                _snapshotCount = SnapshotBufferSize - 1;
+            }
+
+            _snapshotBuffer[_snapshotCount] = snapshot;
+            _snapshotCount++;
+        }
+
+        private void UpdateRemoteTransform()
+        {
+            if (!_hasInitialized || _snapshotCount < 1)
                 return;
 
-            if (UsePrediction)
+            float targetTime = Time.time - renderDelay;
+
+            if (!FindSnapshotsForTime(targetTime, out int indexA, out int indexB))
             {
-                _predictor.Update(Time.deltaTime, SyncPosition, SyncRotation, SyncScale);
+                // targetTime is older than oldest snapshot - use oldest
+                ApplySnapshot(_snapshotBuffer[0]);
+                return;
+            }
 
-                if (SyncPosition)
-                    transform.position = _predictor.Position;
+            if (indexA == indexB)
+            {
+                // targetTime is newer than newest snapshot - freeze at newest
+                ApplySnapshot(_snapshotBuffer[indexA]);
+                _freezeCount++;
+                return;
+            }
 
-                if (SyncRotation)
-                    transform.rotation = _predictor.Rotation;
+            // Interpolate between A and B
+            var snapshotA = _snapshotBuffer[indexA];
+            var snapshotB = _snapshotBuffer[indexB];
 
-                if (SyncScale)
-                    transform.localScale = _predictor.Scale;
+            float timeDelta = snapshotB.RecvTime - snapshotA.RecvTime;
+            float t = timeDelta > 0f
+                ? Mathf.Clamp01((targetTime - snapshotA.RecvTime) / timeDelta)
+                : 0f;
+
+            if (SyncPosition)
+                transform.position = Vector3.Lerp(snapshotA.Position, snapshotB.Position, t);
+
+            if (SyncRotation)
+                transform.rotation = Quaternion.Slerp(snapshotA.Rotation, snapshotB.Rotation, t);
+
+            if (SyncScale)
+                transform.localScale = Vector3.Lerp(snapshotA.Scale, snapshotB.Scale, t);
+        }
+
+        private bool FindSnapshotsForTime(float targetTime, out int indexA, out int indexB)
+        {
+            indexA = -1;
+            indexB = -1;
+
+            // Find A: newest snapshot where recvTime <= targetTime
+            for (int i = _snapshotCount - 1; i >= 0; i--)
+            {
+                if (_snapshotBuffer[i].RecvTime <= targetTime)
+                {
+                    indexA = i;
+                    break;
+                }
+            }
+
+            // targetTime is older than all snapshots
+            if (indexA < 0)
+                return false;
+
+            // Find B: next snapshot after A (earliest where recvTime >= targetTime)
+            if (indexA < _snapshotCount - 1)
+            {
+                indexB = indexA + 1;
             }
             else
             {
-                float speed = interpolationSpeed * Time.deltaTime;
-
-                if (SyncPosition && _positionInterpolator.HasTarget)
-                {
-                    _positionInterpolator.Update(speed);
-                    transform.position = _positionInterpolator.Current;
-                }
-
-                if (SyncRotation && _rotationInterpolator.HasTarget)
-                {
-                    _rotationInterpolator.Update(speed);
-                    transform.rotation = _rotationInterpolator.Current;
-                }
-
-                if (SyncScale && _scaleInterpolator.HasTarget)
-                {
-                    _scaleInterpolator.Update(speed);
-                    transform.localScale = _scaleInterpolator.Current;
-                }
+                // No snapshot after A - targetTime is newer than newest
+                indexB = indexA;
             }
+
+            return true;
+        }
+
+        private void ApplySnapshot(TransformSnapshot snapshot)
+        {
+            if (SyncPosition)
+                transform.position = snapshot.Position;
+
+            if (SyncRotation)
+                transform.rotation = snapshot.Rotation;
+
+            if (SyncScale)
+                transform.localScale = snapshot.Scale;
+        }
+
+        public void ForceTeleport(Vector3 position, Quaternion rotation, Vector3 scale)
+        {
+            if (!_networkObject.IsLocallyOwned)
+                return;
+
+            transform.position = position;
+            transform.rotation = rotation;
+            transform.localScale = scale;
+
+            _lastSentPosition = position;
+            _lastSentRotation = rotation;
+            _lastSentScale = scale;
+
+            var networkId = _networkObject.NetworkId;
+            if (string.IsNullOrEmpty(networkId))
+                return;
+
+            _sendSeq++;
+
+            var syncEvent = new TransformSyncEvent(
+                networkId,
+                _sendSeq,
+                position,
+                rotation,
+                scale,
+                Vector3.zero,
+                0f,
+                Vector3.zero,
+                _syncInterval,
+                teleport: true);
+
+            PlayServ.Publish(syncEvent);
+        }
+
+        public void Reset()
+        {
+            InitializeLocalState();
+
+            _snapshotCount = 0;
+            _hasInitialized = false;
+
+            _sendSeq = 0;
+            _packetsReceived = 0;
+            _snapCount = 0;
+            _freezeCount = 0;
+        }
+
+        public DebugInfo GetDebugInfo()
+        {
+            float now = Time.time;
+            float elapsed = now - _lastDebugTime;
+
+            var info = new DebugInfo
+            {
+                PacketsPerSecond = elapsed > 0 ? _packetsReceived / elapsed : 0,
+                SnapshotCount = _snapshotCount,
+                SnapCount = _snapCount,
+                FreezeCount = _freezeCount,
+                TimeSinceLastSnapshot = TimeSinceLastSnapshot,
+                RenderDelay = renderDelay
+            };
+
+            _packetsReceived = 0;
+            _snapCount = 0;
+            _freezeCount = 0;
+            _lastDebugTime = now;
+
+            return info;
+        }
+
+        public struct DebugInfo
+        {
+            public float PacketsPerSecond;
+            public int SnapshotCount;
+            public int SnapCount;
+            public int FreezeCount;
+            public float TimeSinceLastSnapshot;
+            public float RenderDelay;
+        }
+
+        private struct TransformSnapshot
+        {
+            public float RecvTime;
+            public Vector3 Position;
+            public Quaternion Rotation;
+            public Vector3 Scale;
         }
     }
 }
