@@ -56,19 +56,19 @@ namespace Playserv.ModelGenerator.Editor
                     };
 
                     // 2. Deserialize Schema
-                    JsonSchema schema = JsonSerializer.Deserialize<JsonSchema>(content, options)!;
+                    JsonSchemaRoot root = JsonSerializer.Deserialize<JsonSchemaRoot>(content, options)!;
                     
-                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, schema.XTimestamp);
-                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, schema.XVersion);
+                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, root.JsonSchema.XTimestamp);
+                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, root.JsonSchema.XVersion);
                     
-                    Debug.Log($"[LOG] Schema Version: {schema.XVersion}");
-                    Debug.Log($"[LOG] Timestamp: {schema.XTimestamp}");
-                    Debug.Log($"[LOG] Definitions Found: {SchemaUtils.GetAllDefinitions(schema).Count()}");
+                    Debug.Log($"[LOG] Schema Version: {root.JsonSchema.XVersion}");
+                    Debug.Log($"[LOG] Timestamp: {root.JsonSchema.XTimestamp}");
+                    Debug.Log($"[LOG] Definitions Found: {SchemaUtils.GetAllDefinitions(root.JsonSchema).Count()}");
                     Debug.Log("");
 
                     // 3. Generate Code
                     var generator = new DotNetGenerator();
-                    Dictionary<string,string> generatedCode = generator.Generate(schema);
+                    Dictionary<string,string> generatedCode = generator.Generate(root.JsonSchema);
 
                     // 4. Print Result
                     Debug.Log("--- GENERATED C# CLASSES ---");
