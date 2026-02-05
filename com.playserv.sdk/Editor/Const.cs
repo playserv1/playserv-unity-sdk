@@ -12,5 +12,8 @@ namespace Playserv.Editor
         
         internal const string PrefKeyJsonSchemaTimestamp = "PlayServ.JsonSchema.Timestamp";
         internal const string PrefKeyJsonSchemaVersion   = "PlayServ.JsonSchema.Version.";
+        
+        internal const string PrefKeyJsonSchemaLatestTimestamp = "PlayServ.JsonSchema.Latest.Timestamp";
+        internal const string PrefKeyJsonSchemaLatestVersion   = "PlayServ.JsonSchema.Latest.Version";
     }
 }

@@ -10,7 +10,7 @@ public static class SchemaLoader
 {
     private const string Url =
         "https://playserv-backoffice.test.playserv.io/api/projects/019c0eb8-4fee-7e46-9609-5da7df640aea/schemas"; 
-    private const string SchemaFileName = "schema.json";
+    private const string LatestSchemaFileName = "latest-schema.json";
     
     public static void LoadSchema()
     {
@@ -19,13 +19,12 @@ public static class SchemaLoader
 
     public static void CheckNewSchema()
     {
-        //_ = CheckSchema();
+        SchemaCodeGenerator.CheckNewVersionJsonSchema();
     }
     
     private static async Task DownloadSchema()
     {
         await DownloadAndSaveToResourcesAsync(Url);
-        SchemaCodeGenerator.GenerateModels();
     }
     
     private static async Task DownloadAndSaveToResourcesAsync(string url)
@@ -37,7 +36,7 @@ public static class SchemaLoader
         if (!Directory.Exists(resourcesDir))
             Directory.CreateDirectory(resourcesDir);
 
-        var filePath = Path.Combine(resourcesDir, SchemaFileName);
+        var filePath = Path.Combine(resourcesDir, LatestSchemaFileName);
         await File.WriteAllTextAsync(filePath, json);
         
         AssetDatabase.Refresh();

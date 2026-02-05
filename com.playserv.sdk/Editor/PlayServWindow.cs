@@ -12,7 +12,7 @@ namespace Playserv.Editor
     public sealed class PlayServWindow : EditorWindow
     {
         private const string MenuPath = "Tools/PlayServ/Settings";
-        private const string DocsUrl  = "https://example.com";
+        private const string DocsUrl = "https://example.com";
 
         private PlayServConfig _config;
         private SerializedObject _so;
@@ -26,6 +26,8 @@ namespace Playserv.Editor
         private bool _foldEvents;
         private bool _foldModel;
         private bool _foldConfig;
+
+        private bool _showAvailableSchemaInfo;
 
         [MenuItem(MenuPath)]
         public static void ShowFromMenu() => ShowWindow();
@@ -54,7 +56,10 @@ namespace Playserv.Editor
         private void OnEnable()
         {
             _foldCodegen = EditorPrefs.GetBool(Const.PrefFoldCodegen, true);
-            _foldConfig  = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
+            _foldConfig = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
+
+            _showAvailableSchemaInfo = false;
+
             EnsureConfig();
         }
 
@@ -118,15 +123,15 @@ namespace Playserv.Editor
                 if (GUILayout.Button("Remove Generated DTOs"))
                 {
                     if (EditorUtility.DisplayDialog(
-                        "Remove DTOs",
-                        "This will delete all generated DTO files.\nAre you sure?",
-                        "Remove",
-                        "Cancel"))
+                            "Remove DTOs",
+                            "This will delete all generated DTO files.\nAre you sure?",
+                            "Remove",
+                            "Cancel"))
                     {
                         SharedCodeGenerator.DestroyDTOs();
                     }
                 }
-                
+
                 EditorGUI.indentLevel--;
             }
 
@@ -141,10 +146,10 @@ namespace Playserv.Editor
             if (_foldEvents)
             {
                 EditorGUI.indentLevel++;
-                
+
                 if (GUILayout.Button("Generate Events API"))
                     EventsCodeGenerator.Generate();
-                
+
                 EditorGUI.indentLevel--;
             }
 
@@ -159,45 +164,176 @@ namespace Playserv.Editor
             if (_foldModel)
             {
                 EditorGUI.indentLevel++;
-                
-                if (GUILayout.Button("Load JSON Schema"))
-                    SchemaLoader.LoadSchema();
-                
-                if (GUILayout.Button("Check Updates"))
-                    SchemaLoader.CheckNewSchema();
-                
+
                 GUILayout.Space(6);
-                
-                if (!string.IsNullOrEmpty(EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion)))
+
+                string currentVersion = EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "");
+                string currentTimestampRaw = EditorPrefs.GetString(Const.PrefKeyJsonSchemaTimestamp, "");
+
+                string latestVersion = EditorPrefs.GetString(Const.PrefKeyJsonSchemaLatestVersion, "");
+                string latestTimestampRaw = EditorPrefs.GetString(Const.PrefKeyJsonSchemaLatestTimestamp, "");
+
+                static string FormatTimestamp(string raw)
                 {
-                    var text = $"Version: {EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion)}";
-                    EditorGUILayout.SelectableLabel(
-                        text,
-                        EditorStyles.textField,
-                        GUILayout.Height(EditorGUIUtility.singleLineHeight)
-                    );
+                    if (string.IsNullOrEmpty(raw))
+                        return "";
+
+                    if (DateTimeOffset.TryParse(raw, out var dto))
+                        return dto.ToLocalTime().DateTime.ToString("yyyy-MM-dd HH:mm:ss");
+
+                    return raw;
+                }
+                
+                static bool TryParseTimestamp(string raw, out DateTimeOffset value)
+                {
+                    if (string.IsNullOrEmpty(raw))
+                    {
+                        value = default;
+                        return false;
+                    }
+
+                    return DateTimeOffset.TryParse(raw, out value);
                 }
 
-                if (!string.IsNullOrEmpty(EditorPrefs.GetString(Const.PrefKeyJsonSchemaTimestamp)))
+                bool hasCurrent = !string.IsNullOrEmpty(currentVersion) || !string.IsNullOrEmpty(currentTimestampRaw);
+
+                bool hasLatest = _showAvailableSchemaInfo &&
+                                 (!string.IsNullOrEmpty(latestVersion) || !string.IsNullOrEmpty(latestTimestampRaw));
+
+                bool differs = false;
+                bool hasComparableTimestamps = false;
+                bool latestIsNewerByTimestamp = false;
+
+                if (hasLatest &&
+                    TryParseTimestamp(currentTimestampRaw, out var currentTs) &&
+                    TryParseTimestamp(latestTimestampRaw, out var latestTs))
                 {
-                    var time = DateTimeOffset
-                        .Parse(EditorPrefs.GetString(Const.PrefKeyJsonSchemaTimestamp))
-                        .ToLocalTime()
-                        .DateTime;
-                    
-                    var text = $"Timestamp: {time}";
-                    EditorGUILayout.SelectableLabel(
-                        text,
-                        EditorStyles.textField,
-                        GUILayout.Height(EditorGUIUtility.singleLineHeight)
-                    );
+                    hasComparableTimestamps = true;
+                    latestIsNewerByTimestamp = latestTs > currentTs;
                 }
-                
-                GUILayout.Space(6);
-                
-                if (GUILayout.Button("Generate Models from JSON Schema"))
-                    SchemaCodeGenerator.GenerateModels();
-                
+
+                if (hasLatest)
+                {
+                    differs = hasComparableTimestamps
+                        ? latestIsNewerByTimestamp
+                        : (!string.IsNullOrEmpty(latestTimestampRaw) && latestTimestampRaw != currentTimestampRaw);
+                }
+
+                string statusMessage = null;
+                MessageType? statusType = null;
+
+                if (hasLatest)
+                {
+                    if (differs)
+                    {
+                        statusMessage = "A newer schema is available.";
+                        statusType = MessageType.Warning;
+                    }
+                    else
+                    {
+                        statusMessage = "You have the latest schema already.";
+                        statusType = MessageType.Info;
+                    }
+                }
+
+                if (hasCurrent || hasLatest)
+                {
+                    if (statusMessage != null && statusType.HasValue)
+                        EditorGUILayout.HelpBox(statusMessage, statusType.Value);
+
+                    EditorGUILayout.LabelField("Schema details", EditorStyles.boldLabel);
+
+                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(" ", GUILayout.Width(14));
+                    EditorGUILayout.LabelField("Current schema", EditorStyles.miniBoldLabel);
+                    if (_showAvailableSchemaInfo)
+                        EditorGUILayout.LabelField("Latest available schema", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField("V", GUILayout.Width(14));
+                    EditorGUILayout.SelectableLabel(
+                        string.IsNullOrEmpty(currentVersion) ? "—" : currentVersion,
+                        EditorStyles.textField,
+                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
+
+                    if (_showAvailableSchemaInfo)
+                    {
+                        EditorGUILayout.SelectableLabel(
+                            string.IsNullOrEmpty(latestVersion) ? "—" : latestVersion,
+                            EditorStyles.textField,
+                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    }
+
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField("T", GUILayout.Width(14));
+                    EditorGUILayout.SelectableLabel(
+                        string.IsNullOrEmpty(currentTimestampRaw) ? "—" : FormatTimestamp(currentTimestampRaw),
+                        EditorStyles.textField,
+                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
+
+                    if (_showAvailableSchemaInfo)
+                    {
+                        EditorGUILayout.SelectableLabel(
+                            string.IsNullOrEmpty(latestTimestampRaw) ? "—" : FormatTimestamp(latestTimestampRaw),
+                            EditorStyles.textField,
+                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    }
+
+                    EditorGUILayout.EndHorizontal();
+
+                    if (_showAvailableSchemaInfo)
+                    {
+                        GUILayout.Space(6);
+
+                        EditorGUILayout.BeginHorizontal();
+
+                        if (GUILayout.Button("Hide", GUILayout.Width(120)))
+                            _showAvailableSchemaInfo = false;
+
+                        GUILayout.FlexibleSpace();
+
+                        using (new EditorGUI.DisabledScope(!differs))
+                        {
+                            if (GUILayout.Button("Apply New Schema", GUILayout.Width(180)))
+                            {
+                                if (EditorUtility.DisplayDialog(
+                                        "Apply new schema",
+                                        "This will replace the current schema with the latest downloaded one.\nContinue?",
+                                        "Apply",
+                                        "Cancel"))
+                                {
+                                    SchemaCodeGenerator.GenerateModels(true);
+
+                                    _showAvailableSchemaInfo = false;
+                                    EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestVersion);
+                                    EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestTimestamp);
+                                }
+                            }
+                        }
+
+                        EditorGUILayout.EndHorizontal();
+                    }
+
+                    EditorGUILayout.EndVertical();
+
+                    GUILayout.Space(6);
+                }
+
+                if (GUILayout.Button("Check Updates"))
+                {
+                    _showAvailableSchemaInfo = true;
+                    SchemaLoader.LoadSchema();
+                    SchemaLoader.CheckNewSchema(); 
+                }
+
+                if (GUILayout.Button("Re-generate Models from current schema"))
+                    SchemaCodeGenerator.GenerateModels(false);
+
                 EditorGUI.indentLevel--;
             }
 

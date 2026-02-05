@@ -13,8 +13,9 @@ namespace Playserv.ModelGenerator.Editor
     internal static class SchemaCodeGenerator
     {
         private const string RootFolderPath = "/Shared/Generated/Models";
-        private const string SchemaFilePath = "Assets/Resources/schema.json";
-        
+        private const string LatestSchemaFilePath = "Assets/Resources/latest-schema.json";
+        private const string CurrentSchemaFilePath = "Assets/Resources/current-schema.json";
+
         // [MenuItem("Tools/PlayServ/Generate Models from JSON Schema")]
         public static void Generate()
         {
@@ -22,29 +23,36 @@ namespace Playserv.ModelGenerator.Editor
             {
                 GenerateFileClass(file.Key, file.Value);
             }
-            AssetDatabase.Refresh();
-        }
-        
-        public static void GenerateModels()
-        {
-            foreach (var file in GetFilesDataCollection(false))
-            {
-                GenerateFileClass(file.Key, file.Value);
-            }
+
             AssetDatabase.Refresh();
         }
 
-        private static Dictionary<string,string> GetFilesDataCollection(bool selectFile = true)
+        public static void GenerateModels(bool isLatestSchemaUse = true)
+        {
+            if (Directory.Exists(Application.dataPath + RootFolderPath))
+                Directory.Delete(Application.dataPath + RootFolderPath, true);
+
+            foreach (var file in GetFilesDataCollection(false, isLatestSchemaUse))
+            {
+                GenerateFileClass(file.Key, file.Value);
+            }
+
+            AssetDatabase.Refresh();
+        }
+
+        private static Dictionary<string, string> GetFilesDataCollection(bool selectFile = true,
+            bool isLatestSchemaUse = true)
         {
             // Parameters: Title, Directory to start in, Extension (empty string for all)
-            var path = selectFile ? EditorUtility.OpenFilePanel("Select json schema", "", "json") : SchemaFilePath;
-            
+            var path = selectFile ? EditorUtility.OpenFilePanel("Select json schema", "", "json") :
+                isLatestSchemaUse ? LatestSchemaFilePath : CurrentSchemaFilePath;
+
             if (!string.IsNullOrEmpty(path))
             {
                 Debug.Log("Selected json schema File Path: " + path);
-            
+
                 string content = File.ReadAllText(path);
-                
+
                 try
                 {
                     // 1. Setup Deserialization
@@ -57,10 +65,10 @@ namespace Playserv.ModelGenerator.Editor
 
                     // 2. Deserialize Schema
                     JsonSchemaRoot root = JsonSerializer.Deserialize<JsonSchemaRoot>(content, options)!;
-                    
+
                     EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, root.JsonSchema.XTimestamp);
                     EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, root.JsonSchema.XVersion);
-                    
+
                     Debug.Log($"[LOG] Schema Version: {root.JsonSchema.XVersion}");
                     Debug.Log($"[LOG] Timestamp: {root.JsonSchema.XTimestamp}");
                     Debug.Log($"[LOG] Definitions Found: {SchemaUtils.GetAllDefinitions(root.JsonSchema).Count()}");
@@ -68,7 +76,7 @@ namespace Playserv.ModelGenerator.Editor
 
                     // 3. Generate Code
                     var generator = new DotNetGenerator();
-                    Dictionary<string,string> generatedCode = generator.Generate(root.JsonSchema);
+                    Dictionary<string, string> generatedCode = generator.Generate(root.JsonSchema);
 
                     // 4. Print Result
                     Debug.Log("--- GENERATED C# CLASSES ---");
@@ -78,9 +86,17 @@ namespace Playserv.ModelGenerator.Editor
                         Debug.Log(file.Value);
                         Debug.Log(Environment.NewLine);
                     }
-                    Debug.Log( "-----------------------------");
+
+                    Debug.Log("-----------------------------");
 
                     Debug.Log("\nGeneration complete.");
+
+                    if (selectFile || (!selectFile && !isLatestSchemaUse))
+                    {
+                        File.WriteAllText(CurrentSchemaFilePath, content);
+                        Debug.Log("[LOG] Current schema saved/updated.");
+                    }
+
                     return generatedCode;
                 }
                 catch (Exception ex)
@@ -88,7 +104,6 @@ namespace Playserv.ModelGenerator.Editor
                     Debug.LogError($"Error: {ex.Message}");
                     if (ex.InnerException != null) Debug.LogError($"Detail: {ex.InnerException.Message}");
                 }
-            
             }
             else
             {
@@ -97,44 +112,47 @@ namespace Playserv.ModelGenerator.Editor
 
             return null;
         }
+
         private static void GenerateFileClass(string className, string content)
         {
             string folderPath = Application.dataPath + RootFolderPath;
             string fullPath = folderPath + "/" + className + ".cs";
-            
+
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
             }
-            
+
             File.WriteAllText(fullPath, content);
-            
+
             Debug.Log($"Successfully created C# file at: {fullPath}");
         }
 
         public static void CheckNewVersionJsonSchema()
         {
-            var content = File.ReadAllText(SchemaFilePath);
+            if (!File.Exists(LatestSchemaFilePath))
+            {
+                Debug.LogWarning($"[LOG] Latest schema file not found at '{LatestSchemaFilePath}'.");
+                return;
+            }
 
-            try
+            var content = File.ReadAllText(LatestSchemaFilePath);
+
+            var options = new JsonSerializerOptions
             {
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    ReadCommentHandling = JsonCommentHandling.Skip,
-                    AllowTrailingCommas = true
-                };
-                
-                JsonSchema schema = JsonSerializer.Deserialize<JsonSchema>(content, options)!;
-                Debug.Log($"[LOG] Schema Version: {schema.XVersion}");
-                Debug.Log($"[LOG] Timestamp: {schema.XTimestamp}");
-                EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, schema.XTimestamp);
-                EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, schema.XVersion);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"Error: {ex.Message}");
-            }
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+
+            JsonSchemaRoot root = JsonSerializer.Deserialize<JsonSchemaRoot>(content, options)!;
+
+            EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestTimestamp, root.JsonSchema.XTimestamp);
+            EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestVersion, root.JsonSchema.XVersion);
+
+            Debug.Log($"[LOG] Checking New Schema...");
+            Debug.Log($"[LOG] Schema Version: {root.JsonSchema.XVersion}");
+            Debug.Log($"[LOG] Timestamp: {root.JsonSchema.XTimestamp}");
         }
     }
 }
