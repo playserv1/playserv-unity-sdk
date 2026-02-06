@@ -18,6 +18,8 @@ namespace Playserv.Editor
         private SerializedObject _so;
 
         private SerializedProperty _pGameAccessToken;
+        private SerializedProperty _pUserId;
+        private SerializedProperty _pGameId;
         private SerializedProperty _pGameVersion;
         private SerializedProperty _pSdkVersion;
         private SerializedProperty _pAllowMultipleConnections;
@@ -69,6 +71,8 @@ namespace Playserv.Editor
             _so = new SerializedObject(_config);
 
             _pGameAccessToken = _so.FindProperty("gameAccessToken");
+            _pUserId = _so.FindProperty("userId");
+            _pGameId = _so.FindProperty("gameId");
             _pGameVersion = _so.FindProperty("gameVersion");
             _pSdkVersion = _so.FindProperty("sdkVersion");
             _pAllowMultipleConnections = _so.FindProperty("allowMultipleConnections");
@@ -216,7 +220,7 @@ namespace Playserv.Editor
                 {
                     differs = hasComparableTimestamps
                         ? latestIsNewerByTimestamp
-                        : (!string.IsNullOrEmpty(latestTimestampRaw) && latestTimestampRaw != currentTimestampRaw);
+                        : !string.IsNullOrEmpty(latestTimestampRaw) && latestTimestampRaw != currentTimestampRaw;
                 }
 
                 string statusMessage = null;
@@ -327,7 +331,7 @@ namespace Playserv.Editor
                 if (GUILayout.Button("Check Updates"))
                 {
                     _showAvailableSchemaInfo = true;
-                    SchemaLoader.LoadSchema();
+                    SchemaLoader.LoadSchema(_pGameId.stringValue);
                     SchemaLoader.CheckNewSchema(); 
                 }
 
@@ -371,10 +375,20 @@ namespace Playserv.Editor
                     _so.Update();
 
                     EditorGUILayout.PropertyField(_pGameAccessToken);
+                    EditorGUILayout.PropertyField(_pUserId);
+                    EditorGUILayout.PropertyField(_pGameId);
                     EditorGUILayout.PropertyField(_pGameVersion);
-                    EditorGUILayout.PropertyField(_pSdkVersion);
                     EditorGUILayout.PropertyField(_pAllowMultipleConnections);
 
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField("SDK Version", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.SelectableLabel(
+                        _pSdkVersion.stringValue,
+                        EditorStyles.textField,
+                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    EditorGUILayout.EndHorizontal();
+                    
+                    
                     if (_so.ApplyModifiedProperties())
                         EditorUtility.SetDirty(_config);
                 }

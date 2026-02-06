@@ -9,22 +9,21 @@ using UnityEngine.Networking;
 public static class SchemaLoader
 {
     private const string Url =
-        "https://playserv-backoffice.test.playserv.io/api/projects/019c0eb8-4fee-7e46-9609-5da7df640aea/schemas"; 
+        "https://playserv-backoffice.test.playserv.io/api/projects/{0}/schemas"; 
     private const string LatestSchemaFileName = "latest-schema.json";
     
-    public static void LoadSchema()
-    {
-        _ = DownloadSchema();
-    }
+    public static void LoadSchema(string gameId) => _ = DownloadSchema(gameId);
 
     public static void CheckNewSchema()
     {
         SchemaCodeGenerator.CheckNewVersionJsonSchema();
     }
     
-    private static async Task DownloadSchema()
+    private static async Task DownloadSchema(string gameId)
     {
-        await DownloadAndSaveToResourcesAsync(Url);
+        var gameSchemaUrl = string.Format(Url, gameId);
+        
+        await DownloadAndSaveToResourcesAsync(gameSchemaUrl);
     }
     
     private static async Task DownloadAndSaveToResourcesAsync(string url)
