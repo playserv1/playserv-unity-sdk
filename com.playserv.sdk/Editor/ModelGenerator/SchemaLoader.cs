@@ -29,8 +29,7 @@ public static class SchemaLoader
     private static async Task DownloadAndSaveToResourcesAsync(string url)
     {
         var json = await LoadJson(url);
-
-        // Assets/Resources/schema.json
+        
         var resourcesDir = Path.Combine(Application.dataPath, "Resources");
         if (!Directory.Exists(resourcesDir))
             Directory.CreateDirectory(resourcesDir);
