@@ -6,6 +6,7 @@ using Playserv.Wrapper;
 using Playserv.CodeGenerator.Editor;
 using Playserv.Events.Editor;
 using Playserv.ModelGenerator.Editor;
+using Playserv.Editor.Proxy;
 
 namespace Playserv.Editor
 {
@@ -28,8 +29,14 @@ namespace Playserv.Editor
         private bool _foldEvents;
         private bool _foldModel;
         private bool _foldConfig;
+        private bool _foldConnection;
 
         private bool _showAvailableSchemaInfo;
+        
+        private EditorWebSocketTransport _wsTransport;
+        private Vector2 _connectionScrollPos;
+        private string _wsEndpoint = "ws://localhost:8080";
+        private string _testMessage = "{\"type\":\"ping\"}";
 
         [MenuItem(MenuPath)]
         public static void ShowFromMenu() => ShowWindow();
@@ -59,10 +66,19 @@ namespace Playserv.Editor
         {
             _foldCodegen = EditorPrefs.GetBool(Const.PrefFoldCodegen, true);
             _foldConfig = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
+            _foldConnection = EditorPrefs.GetBool(Const.PrefFoldConnection, false);
 
             _showAvailableSchemaInfo = false;
+            
+            _wsEndpoint = EditorPrefs.GetString(Const.PrefKeyWebSocketEndpoint, "wss://playserv-proxy.test.playserv.io/ws");
 
             EnsureConfig();
+        }
+        
+        private void OnDisable()
+        {
+            _wsTransport?.Dispose();
+            _wsTransport = null;
         }
 
         private void EnsureConfig()
@@ -93,6 +109,8 @@ namespace Playserv.Editor
             DrawEventsFoldout();
             GUILayout.Space(6);
             DrawModelFoldout();
+            GUILayout.Space(6);
+            DrawConnectionFoldout();
             GUILayout.Space(6);
             DrawConfigFoldout();
 
@@ -398,6 +416,175 @@ namespace Playserv.Editor
 
             EditorGUILayout.EndFoldoutHeaderGroup();
             EditorPrefs.SetBool(Const.PrefFoldConfig, _foldConfig);
+        }
+
+        private void DrawConnectionFoldout()
+        {
+            _foldConnection = EditorGUILayout.BeginFoldoutHeaderGroup(
+                _foldConnection,
+                "WebSocket Connection");
+
+            if (_foldConnection)
+            {
+                EditorGUI.indentLevel++;
+
+                EditorGUILayout.HelpBox(
+                    "Test WebSocket connection.",
+                    MessageType.Info);
+
+                GUILayout.Space(6);
+
+                EditorGUILayout.LabelField("Connection Settings", EditorStyles.boldLabel);
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Endpoint", GUILayout.Width(80));
+                string newEndpoint = EditorGUILayout.TextField(_wsEndpoint);
+                if (newEndpoint != _wsEndpoint)
+                {
+                    _wsEndpoint = newEndpoint;
+                    EditorPrefs.SetString(Const.PrefKeyWebSocketEndpoint, _wsEndpoint);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                GUILayout.Space(6);
+
+                bool isConnected = _wsTransport != null && _wsTransport.IsConnected;
+                bool isConnecting = _wsTransport != null && _wsTransport.IsConnecting;
+
+                EditorGUILayout.BeginHorizontal();
+
+                using (new EditorGUI.DisabledScope(isConnected || isConnecting))
+                {
+                    if (GUILayout.Button(isConnecting ? "Connecting..." : "Connect", GUILayout.Height(30)))
+                    {
+                        ConnectWebSocket();
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(!isConnected))
+                {
+                    if (GUILayout.Button("Disconnect", GUILayout.Height(30)))
+                    {
+                        DisconnectWebSocket();
+                    }
+                }
+
+                EditorGUILayout.EndHorizontal();
+
+                GUILayout.Space(6);
+
+                EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
+                string statusText = isConnected ? "Connected" : isConnecting ? "Connecting..." : "Disconnected";
+                var statusColor = isConnected ? Color.green : isConnecting ? Color.yellow : Color.gray;
+                
+                var prevColor = GUI.color;
+                GUI.color = statusColor;
+                EditorGUILayout.LabelField("● " + statusText, EditorStyles.boldLabel);
+                GUI.color = prevColor;
+
+                GUILayout.Space(6);
+
+                using (new EditorGUI.DisabledScope(!isConnected))
+                {
+                    EditorGUILayout.LabelField("Send Test Message", EditorStyles.boldLabel);
+                    _testMessage = EditorGUILayout.TextArea(_testMessage, GUILayout.Height(40));
+                    
+                    if (GUILayout.Button("Send Message"))
+                    {
+                        SendTestMessage();
+                    }
+                }
+
+                GUILayout.Space(6);
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Connection Log", EditorStyles.boldLabel);
+                if (GUILayout.Button("Clear", GUILayout.Width(60)))
+                {
+                    _wsTransport?.ClearLogs();
+                    Repaint();
+                }
+                EditorGUILayout.EndHorizontal();
+
+                _connectionScrollPos = EditorGUILayout.BeginScrollView(_connectionScrollPos, GUILayout.Height(200));
+
+                if (_wsTransport != null && _wsTransport.LogMessages.Count > 0)
+                {
+                    foreach (var log in _wsTransport.LogMessages)
+                    {
+                        EditorGUILayout.SelectableLabel(log, EditorStyles.wordWrappedLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No logs yet...", EditorStyles.centeredGreyMiniLabel);
+                }
+
+                EditorGUILayout.EndScrollView();
+
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+            EditorPrefs.SetBool(Const.PrefFoldConnection, _foldConnection);
+        }
+
+        private async void ConnectWebSocket()
+        {
+            if (string.IsNullOrWhiteSpace(_wsEndpoint))
+            {
+                EditorUtility.DisplayDialog("Error", "Endpoint cannot be empty", "OK");
+                return;
+            }
+
+            try
+            {
+                _wsTransport?.Dispose();
+                _wsTransport = new EditorWebSocketTransport(_wsEndpoint);
+
+                _wsTransport.OnConnected += () =>
+                {
+                    Repaint();
+                };
+
+                _wsTransport.OnMessageReceived += (msg) =>
+                {
+                    Repaint();
+                };
+
+                _wsTransport.OnError += (error) =>
+                {
+                    Repaint();
+                };
+
+                _wsTransport.OnDisconnected += () =>
+                {
+                    Repaint();
+                };
+
+                Repaint();
+                await _wsTransport.ConnectAsync();
+                Repaint();
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("Connection Error", ex.Message, "OK");
+            }
+        }
+
+        private void DisconnectWebSocket()
+        {
+            _wsTransport?.Disconnect();
+            Repaint();
+        }
+
+        private async void SendTestMessage()
+        {
+            if (_wsTransport == null || !_wsTransport.IsConnected)
+                return;
+
+            await _wsTransport.SendAsync(_testMessage);
+            Repaint();
         }
 
         private void DrawFooter()
