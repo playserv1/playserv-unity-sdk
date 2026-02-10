@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
 using Playserv.Proxy;
@@ -15,6 +16,14 @@ namespace Playserv.Events
         private readonly EventSubscriptionManager _subscriptionManager;
         private readonly Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
         private readonly object _typeCacheLock = new object();
+
+        private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
+        {
+            // Tweak if needed
+            NullValueHandling = NullValueHandling.Include,
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            DateParseHandling = DateParseHandling.DateTime,
+        };
 
         public PlayServEventsAdapter(ITransport transport, ILogger logger)
         {
@@ -44,8 +53,9 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            var payload = UnityEngine.JsonUtility.ToJson(@event);
+            var payload = JsonConvert.SerializeObject(@event, JsonSettings);
             var eventType = @event.GetType().Name;
+
             var message = new EventMessage(eventType, payload);
             _ = _transport.Send(message);
         }
@@ -58,8 +68,9 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            var payload = UnityEngine.JsonUtility.ToJson(@event);
+            var payload = JsonConvert.SerializeObject(@event, JsonSettings);
             var eventType = @event.GetType().Name;
+
             var message = new GroupEventMessage(groupName, eventType, payload);
             _ = _transport.Send(message);
         }
@@ -72,8 +83,9 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            var payload = UnityEngine.JsonUtility.ToJson(@event);
+            var payload = JsonConvert.SerializeObject(@event, JsonSettings);
             var eventType = @event.GetType().Name;
+
             var message = new UserEventMessage(userId, eventType, payload);
             _ = _transport.Send(message);
         }
@@ -105,13 +117,9 @@ namespace Playserv.Events
                 .Subscribe(response =>
                 {
                     if (response.success)
-                    {
                         _logger.Log("Event unsubscription successful");
-                    }
                     else
-                    {
                         _logger.LogError("Event unsubscription failed");
-                    }
                 });
 
             _transport.OnReceive<EventMessage>()
@@ -132,7 +140,7 @@ namespace Playserv.Events
 
             try
             {
-                var eventInstance = UnityEngine.JsonUtility.FromJson(message.Payload, eventType);
+                var eventInstance = JsonConvert.DeserializeObject(message.Payload, eventType, JsonSettings);
                 if (eventInstance == null)
                 {
                     _logger.LogError($"Failed to deserialize event payload for type: {eventType.Name}");
@@ -151,9 +159,13 @@ namespace Playserv.Events
                 var genericNotify = notifyMethod.MakeGenericMethod(eventType);
                 genericNotify.Invoke(_subscriptionManager, new object[] { eventInstance });
             }
+            catch (JsonException ex)
+            {
+                _logger.LogError($"JSON deserialize error for EventMessage type={eventType.Name}: {ex.Message}");
+            }
             catch (Exception ex)
             {
-                _logger.LogError($"Error handling EventMessage: {ex.Message}");
+                _logger.LogError($"Error handling EventMessage type={eventType.Name}: {ex}");
             }
         }
 
@@ -166,8 +178,10 @@ namespace Playserv.Events
             }
 
             Type foundType = null;
-            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
+                // Fast path: full name match
                 var type = assembly.GetType(typeName);
                 if (type != null)
                 {
@@ -175,6 +189,7 @@ namespace Playserv.Events
                     break;
                 }
 
+                // Fallback: by simple name
                 foreach (var t in assembly.GetTypes())
                 {
                     if (t.Name == typeName)
@@ -191,9 +206,7 @@ namespace Playserv.Events
             lock (_typeCacheLock)
             {
                 if (!_typeCache.ContainsKey(typeName))
-                {
                     _typeCache[typeName] = foundType;
-                }
             }
 
             return foundType;

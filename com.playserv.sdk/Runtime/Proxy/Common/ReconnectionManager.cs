@@ -2,11 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
-using Playserv.Proxy.Logging;
 using ILogger = Playserv.Proxy.Logging.ILogger;
-#if UNITY_EDITOR
-using UnityEngine;
-#endif
 
 namespace Playserv.Proxy.Common
 {
@@ -82,7 +78,7 @@ namespace Playserv.Proxy.Common
             while (!cts.IsCancellationRequested)
             {
 #if UNITY_EDITOR
-                if (!Application.isPlaying)
+                if (!UnityEngine.Application.isPlaying)
                 {
                     lock (_reconnectLock)
                     {

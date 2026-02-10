@@ -1,5 +1,3 @@
-using System;
-
 namespace Playserv.DataSubscription.Exceptions
 {
     public sealed class UpdateDataCorruptionException : DataSubscriptionException

@@ -8,7 +8,6 @@ using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
 using Playserv.Events.Responses;
 using Playserv.Proxy.Common;
-using UnityEngine;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription

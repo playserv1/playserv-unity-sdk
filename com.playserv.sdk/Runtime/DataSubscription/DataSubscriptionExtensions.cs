@@ -1,5 +1,4 @@
 using Playserv.Proxy.Common;
-using Playserv.Proxy.Logging;
 
 namespace Playserv.DataSubscription
 {

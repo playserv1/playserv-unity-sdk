@@ -4,7 +4,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playserv.Proxy.Interfaces;
-using UnityEngine;
 using ISdkLogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.Proxy.Implementation
@@ -90,8 +89,6 @@ namespace Playserv.Proxy.Implementation
             if (string.IsNullOrWhiteSpace(commandName))
                 throw new ArgumentException("Command name cannot be null or empty.", nameof(commandName));
             
-            Debug.Log(commandName);
-
             EnsureSubscription();
 
             lock (_gate)

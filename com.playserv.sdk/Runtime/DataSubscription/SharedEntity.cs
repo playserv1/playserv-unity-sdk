@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.JsonPatch;
-using UnityEngine;
+using Playserv.Proxy.Logging;
 
 namespace Playserv.DataSubscription
 {
@@ -19,6 +19,7 @@ namespace Playserv.DataSubscription
         private readonly string _query;
         private readonly Dictionary<string, object> _variables;
         private bool _isDisposed;
+        private readonly ILogger _logger = new ConsoleLogger();
 
         public T Value { get; private set; } = new();
 
@@ -67,13 +68,13 @@ namespace Playserv.DataSubscription
             }
             catch (UpdateDataCorruptionException ex)
             {
-                Debug.LogWarning($"[SharedEntity] Patch failed, requesting full refresh: {ex.Message}");
+                _logger.LogWarning($"[SharedEntity] Patch failed, requesting full refresh: {ex.Message}");
                 Error?.Invoke(ex);
                 RequestRefreshOnPatchFailure();
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SharedEntity] Unexpected error processing update: {ex.Message}");
+                _logger.LogError($"[SharedEntity] Unexpected error processing update: {ex.Message}");
             }
         }
 
@@ -87,7 +88,7 @@ namespace Playserv.DataSubscription
         {
             if (Value == null)
             {
-                Debug.LogWarning("[SharedEntity] Cannot apply patch to null value, requesting full refresh");
+                _logger.LogWarning("[SharedEntity] Cannot apply patch to null value, requesting full refresh");
                 RequestRefreshOnPatchFailure();
                 return;
             }
@@ -128,11 +129,11 @@ namespace Playserv.DataSubscription
                     break;
 
                 case SubscriptionNotFoundException.Code:
-                    Debug.LogWarning($"[SharedEntity] Subscription not found (race condition): {errorMessage}");
+                    _logger.LogWarning($"[SharedEntity] Subscription not found (race condition): {errorMessage}");
                     break;
 
                 default:
-                    Debug.LogWarning($"[SharedEntity] Unknown error code {errorCode}: {errorMessage}");
+                    _logger.LogWarning($"[SharedEntity] Unknown error code {errorCode}: {errorMessage}");
                     break;
             }
         }
@@ -148,7 +149,7 @@ namespace Playserv.DataSubscription
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SharedEntity] Failed to request full refresh: {ex.Message}");
+                _logger.LogError($"[SharedEntity] Failed to request full refresh: {ex.Message}");
             }
         }
 

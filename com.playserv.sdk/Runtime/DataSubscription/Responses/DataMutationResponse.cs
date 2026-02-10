@@ -20,7 +20,7 @@ namespace Playserv.DataSubscription.Responses
     [Serializable]
     public sealed class DataMutationDetails
     {
-        // OldValues приходит как произвольный JSON-объект
+        // OldValues comes as an arbitrary JSON object
         public object OldValues { get; set; }
     }
 
