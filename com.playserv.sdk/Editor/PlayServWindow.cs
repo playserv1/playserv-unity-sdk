@@ -41,7 +41,6 @@ namespace Playserv.Editor
 
         private bool _showAvailableSchemaInfo;
 
-        // WebSocket
         private EditorWebSocketTransport _wsTransport;
         private Vector2 _connectionScrollPos;
         private string _wsEndpoint = "ws://localhost:8080";
@@ -89,8 +88,6 @@ namespace Playserv.Editor
             _foldCodegen = EditorPrefs.GetBool(Const.PrefFoldCodegen, true);
             _foldConfig = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
             _foldConnection = EditorPrefs.GetBool(Const.PrefFoldConnection, false);
-
-            // NEW
             _foldDeployment = EditorPrefs.GetBool(Const.PrefFoldDeployment, false);
 
             _showAvailableSchemaInfo = false;
@@ -108,7 +105,6 @@ namespace Playserv.Editor
             _wsTransport?.Dispose();
             _wsTransport = null;
 
-            // NEW: stop deployment if window closes
             _deployCts?.Cancel();
             _deployCts?.Dispose();
             _deployCts = null;
@@ -151,8 +147,6 @@ namespace Playserv.Editor
             GUILayout.Space(6);
             DrawConnectionFoldout();
             GUILayout.Space(6);
-
-            // NEW: Deployment foldout inserted here
             DrawDeploymentFoldout();
             GUILayout.Space(6);
 
@@ -161,8 +155,7 @@ namespace Playserv.Editor
             GUILayout.FlexibleSpace();
             DrawFooter();
             GUILayout.Space(6);
-
-            // NEW: keep repainting while deployment runs to update progress UI
+            
             if (_deployRunning)
                 Repaint();
         }
@@ -441,7 +434,7 @@ namespace Playserv.Editor
                 using (new EditorGUI.DisabledScope(isConnected || isConnecting))
                 {
                     if (GUILayout.Button(isConnecting ? "Connecting..." : "Connect", GUILayout.Height(30)))
-                        ConnectWebSocket();
+                        _ = ConnectWebSocket();
                 }
 
                 using (new EditorGUI.DisabledScope(!isConnected))
@@ -471,7 +464,7 @@ namespace Playserv.Editor
                     _testMessage = EditorGUILayout.TextArea(_testMessage, GUILayout.Height(40));
 
                     if (GUILayout.Button("Send Message"))
-                        SendTestMessage();
+                        _ = SendTestMessage();
                 }
 
                 GUILayout.Space(6);
@@ -506,7 +499,7 @@ namespace Playserv.Editor
             EditorPrefs.SetBool(Const.PrefFoldConnection, _foldConnection);
         }
 
-        private async void ConnectWebSocket()
+        private async Task ConnectWebSocket()
         {
             if (string.IsNullOrWhiteSpace(_wsEndpoint))
             {
@@ -540,7 +533,7 @@ namespace Playserv.Editor
             Repaint();
         }
 
-        private async void SendTestMessage()
+        private async Task SendTestMessage()
         {
             if (_wsTransport == null || !_wsTransport.IsConnected)
                 return;
@@ -549,9 +542,7 @@ namespace Playserv.Editor
             Repaint();
         }
 
-        // =========================
-        // NEW: Deployment foldout
-        // =========================
+        
         private void DrawDeploymentFoldout()
         {
             _foldDeployment = EditorGUILayout.BeginFoldoutHeaderGroup(_foldDeployment, "Deployment");
@@ -887,8 +878,7 @@ namespace Playserv.Editor
                     EditorGUILayout.PropertyField(_pGameId);
                     EditorGUILayout.PropertyField(_pGameVersion);
                     EditorGUILayout.PropertyField(_pAllowMultipleConnections);
-
-                    // Make it look like PropertyField: label left, readonly field right
+                    
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         EditorGUILayout.PrefixLabel("SDK Version");
