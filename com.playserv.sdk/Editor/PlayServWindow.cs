@@ -1,9 +1,16 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using Playserv.Wrapper;
 using Playserv.CodeGenerator.Editor;
+using Playserv.Deploy.Editor;
 using Playserv.Events.Editor;
 using Playserv.ModelGenerator.Editor;
 using Playserv.Editor.Proxy;
@@ -30,13 +37,28 @@ namespace Playserv.Editor
         private bool _foldModel;
         private bool _foldConfig;
         private bool _foldConnection;
+        private bool _foldDeployment;
 
         private bool _showAvailableSchemaInfo;
-        
+
+        // WebSocket
         private EditorWebSocketTransport _wsTransport;
         private Vector2 _connectionScrollPos;
         private string _wsEndpoint = "ws://localhost:8080";
         private string _testMessage = "{\"type\":\"ping\"}";
+        
+        private DefaultAsset _deployFolder;
+        private bool _deployIncludeSubfolders = true;
+        private string _deployPattern = "*";
+        private bool _deployKeepRelativePaths = true;
+        private bool _deployShowFileList;
+        private Vector2 _deployFilesScroll;
+        private List<string> _deployFilesPreview = new();
+
+        private bool _deployRunning;
+        private float _deployProgress;
+        private string _deployStatus = "";
+        private CancellationTokenSource _deployCts;
 
         [MenuItem(MenuPath)]
         public static void ShowFromMenu() => ShowWindow();
@@ -57,7 +79,7 @@ namespace Playserv.Editor
         private static void ShowWindow()
         {
             var wnd = GetWindow<PlayServWindow>(utility: true, title: "PlayServ");
-            wnd.minSize = new Vector2(520, 360);
+            wnd.minSize = new Vector2(520, 520);
             wnd.Show();
             wnd.Focus();
         }
@@ -68,17 +90,34 @@ namespace Playserv.Editor
             _foldConfig = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
             _foldConnection = EditorPrefs.GetBool(Const.PrefFoldConnection, false);
 
+            // NEW
+            _foldDeployment = EditorPrefs.GetBool(Const.PrefFoldDeployment, false);
+
             _showAvailableSchemaInfo = false;
-            
-            _wsEndpoint = EditorPrefs.GetString(Const.PrefKeyWebSocketEndpoint, "wss://playserv-proxy.test.playserv.io/ws");
+
+            _wsEndpoint = EditorPrefs.GetString(
+                Const.PrefKeyWebSocketEndpoint,
+                "wss://playserv-proxy.test.playserv.io/ws"
+            );
 
             EnsureConfig();
         }
-        
+
         private void OnDisable()
         {
             _wsTransport?.Dispose();
             _wsTransport = null;
+
+            // NEW: stop deployment if window closes
+            _deployCts?.Cancel();
+            _deployCts?.Dispose();
+            _deployCts = null;
+
+            if (_deployRunning)
+            {
+                _deployRunning = false;
+                EditorUtility.ClearProgressBar();
+            }
         }
 
         private void EnsureConfig()
@@ -112,27 +151,32 @@ namespace Playserv.Editor
             GUILayout.Space(6);
             DrawConnectionFoldout();
             GUILayout.Space(6);
+
+            // NEW: Deployment foldout inserted here
+            DrawDeploymentFoldout();
+            GUILayout.Space(6);
+
             DrawConfigFoldout();
 
             GUILayout.FlexibleSpace();
             DrawFooter();
             GUILayout.Space(6);
+
+            // NEW: keep repainting while deployment runs to update progress UI
+            if (_deployRunning)
+                Repaint();
         }
 
         private void DrawCodegenFoldout()
         {
-            _foldCodegen = EditorGUILayout.BeginFoldoutHeaderGroup(
-                _foldCodegen,
-                "Code Generation");
+            _foldCodegen = EditorGUILayout.BeginFoldoutHeaderGroup(_foldCodegen, "Code Generation");
 
             if (_foldCodegen)
             {
                 EditorGUI.indentLevel++;
 
                 bool autoGen = EditorPrefs.GetBool(Const.PrefKeyAutoCodegen, true);
-                bool newAutoGen = EditorGUILayout.ToggleLeft(
-                    "Enable automatic DTO generation",
-                    autoGen);
+                bool newAutoGen = EditorGUILayout.ToggleLeft("Enable automatic DTO generation", autoGen);
 
                 if (newAutoGen != autoGen)
                     EditorPrefs.SetBool(Const.PrefKeyAutoCodegen, newAutoGen);
@@ -205,7 +249,7 @@ namespace Playserv.Editor
 
                     return raw;
                 }
-                
+
                 static bool TryParseTimestamp(string raw, out DateTimeOffset value)
                 {
                     if (string.IsNullOrEmpty(raw))
@@ -350,7 +394,7 @@ namespace Playserv.Editor
                 {
                     _showAvailableSchemaInfo = true;
                     SchemaLoader.LoadSchema(_pGameId.stringValue);
-                    SchemaLoader.CheckNewSchema(); 
+                    SchemaLoader.CheckNewSchema();
                 }
 
                 if (GUILayout.Button("Re-generate Models from current schema"))
@@ -363,11 +407,457 @@ namespace Playserv.Editor
             EditorPrefs.SetBool(Const.PrefFoldModel, _foldModel);
         }
 
+        private void DrawConnectionFoldout()
+        {
+            _foldConnection = EditorGUILayout.BeginFoldoutHeaderGroup(_foldConnection, "WebSocket Connection");
+
+            if (_foldConnection)
+            {
+                EditorGUI.indentLevel++;
+
+                EditorGUILayout.HelpBox("Test WebSocket connection.", MessageType.Info);
+
+                GUILayout.Space(6);
+
+                EditorGUILayout.LabelField("Connection Settings", EditorStyles.boldLabel);
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Endpoint", GUILayout.Width(80));
+                string newEndpoint = EditorGUILayout.TextField(_wsEndpoint);
+                if (newEndpoint != _wsEndpoint)
+                {
+                    _wsEndpoint = newEndpoint;
+                    EditorPrefs.SetString(Const.PrefKeyWebSocketEndpoint, _wsEndpoint);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                GUILayout.Space(6);
+
+                bool isConnected = _wsTransport != null && _wsTransport.IsConnected;
+                bool isConnecting = _wsTransport != null && _wsTransport.IsConnecting;
+
+                EditorGUILayout.BeginHorizontal();
+
+                using (new EditorGUI.DisabledScope(isConnected || isConnecting))
+                {
+                    if (GUILayout.Button(isConnecting ? "Connecting..." : "Connect", GUILayout.Height(30)))
+                        ConnectWebSocket();
+                }
+
+                using (new EditorGUI.DisabledScope(!isConnected))
+                {
+                    if (GUILayout.Button("Disconnect", GUILayout.Height(30)))
+                        DisconnectWebSocket();
+                }
+
+                EditorGUILayout.EndHorizontal();
+
+                GUILayout.Space(6);
+
+                EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
+                string statusText = isConnected ? "Connected" : isConnecting ? "Connecting..." : "Disconnected";
+                var statusColor = isConnected ? Color.green : isConnecting ? Color.yellow : Color.gray;
+
+                var prevColor = GUI.color;
+                GUI.color = statusColor;
+                EditorGUILayout.LabelField("● " + statusText, EditorStyles.boldLabel);
+                GUI.color = prevColor;
+
+                GUILayout.Space(6);
+
+                using (new EditorGUI.DisabledScope(!isConnected))
+                {
+                    EditorGUILayout.LabelField("Send Test Message", EditorStyles.boldLabel);
+                    _testMessage = EditorGUILayout.TextArea(_testMessage, GUILayout.Height(40));
+
+                    if (GUILayout.Button("Send Message"))
+                        SendTestMessage();
+                }
+
+                GUILayout.Space(6);
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Connection Log", EditorStyles.boldLabel);
+                if (GUILayout.Button("Clear", GUILayout.Width(60)))
+                {
+                    _wsTransport?.ClearLogs();
+                    Repaint();
+                }
+                EditorGUILayout.EndHorizontal();
+
+                _connectionScrollPos = EditorGUILayout.BeginScrollView(_connectionScrollPos, GUILayout.Height(200));
+
+                if (_wsTransport != null && _wsTransport.LogMessages.Count > 0)
+                {
+                    foreach (var log in _wsTransport.LogMessages)
+                        EditorGUILayout.SelectableLabel(log, EditorStyles.wordWrappedLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No logs yet...", EditorStyles.centeredGreyMiniLabel);
+                }
+
+                EditorGUILayout.EndScrollView();
+
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+            EditorPrefs.SetBool(Const.PrefFoldConnection, _foldConnection);
+        }
+
+        private async void ConnectWebSocket()
+        {
+            if (string.IsNullOrWhiteSpace(_wsEndpoint))
+            {
+                EditorUtility.DisplayDialog("Error", "Endpoint cannot be empty", "OK");
+                return;
+            }
+
+            try
+            {
+                _wsTransport?.Dispose();
+                _wsTransport = new EditorWebSocketTransport(_wsEndpoint);
+
+                _wsTransport.OnConnected += () => Repaint();
+                _wsTransport.OnMessageReceived += _ => Repaint();
+                _wsTransport.OnError += _ => Repaint();
+                _wsTransport.OnDisconnected += () => Repaint();
+
+                Repaint();
+                await _wsTransport.ConnectAsync();
+                Repaint();
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("Connection Error", ex.Message, "OK");
+            }
+        }
+
+        private void DisconnectWebSocket()
+        {
+            _wsTransport?.Disconnect();
+            Repaint();
+        }
+
+        private async void SendTestMessage()
+        {
+            if (_wsTransport == null || !_wsTransport.IsConnected)
+                return;
+
+            await _wsTransport.SendAsync(_testMessage);
+            Repaint();
+        }
+
+        // =========================
+        // NEW: Deployment foldout
+        // =========================
+        private void DrawDeploymentFoldout()
+        {
+            _foldDeployment = EditorGUILayout.BeginFoldoutHeaderGroup(_foldDeployment, "Deployment");
+
+            if (_foldDeployment)
+            {
+                EditorGUI.indentLevel++;
+
+                EditorGUILayout.HelpBox(
+                    "Create a ZIP from selected files and upload it to your Deployment API endpoint.",
+                    MessageType.Info);
+
+                _deployFolder = (DefaultAsset)EditorGUILayout.ObjectField(
+                    "Folder",
+                    _deployFolder,
+                    typeof(DefaultAsset),
+                    false);
+
+                _deployIncludeSubfolders = EditorGUILayout.ToggleLeft("Include subfolders", _deployIncludeSubfolders);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("Pattern", GUILayout.Width(EditorGUIUtility.labelWidth));
+                    _deployPattern = EditorGUILayout.TextField(_deployPattern);
+                }
+
+                _deployKeepRelativePaths = EditorGUILayout.ToggleLeft(
+                    "Keep relative paths in ZIP (recommended)",
+                    _deployKeepRelativePaths);
+
+                GUILayout.Space(6);
+
+                using (new EditorGUI.DisabledScope(_deployRunning))
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("Preview Files", GUILayout.Width(120)))
+                        {
+                            _deployFilesPreview = BuildDeployFileList(out var err);
+                            if (!string.IsNullOrEmpty(err))
+                                Debug.LogError($"[PlayServ] {err}");
+                            else
+                                _deployShowFileList = true;
+                        }
+
+                        if (GUILayout.Button("Clear Preview", GUILayout.Width(120)))
+                        {
+                            _deployFilesPreview.Clear();
+                            _deployShowFileList = false;
+                        }
+
+                        GUILayout.FlexibleSpace();
+
+                        if (GUILayout.Button("Deploy Now", GUILayout.Width(140)))
+                            _ = StartDeployAsync();
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(!_deployRunning))
+                {
+                    if (GUILayout.Button("Cancel", GUILayout.Width(120)))
+                        _deployCts?.Cancel();
+                }
+
+                if (_deployShowFileList && _deployFilesPreview.Count > 0)
+                {
+                    GUILayout.Space(6);
+                    EditorGUILayout.LabelField($"Files ({_deployFilesPreview.Count})", EditorStyles.miniBoldLabel);
+
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    {
+                        _deployFilesScroll = EditorGUILayout.BeginScrollView(_deployFilesScroll, GUILayout.Height(140));
+                        foreach (var f in _deployFilesPreview.Take(300))
+                            EditorGUILayout.LabelField(f, EditorStyles.miniLabel);
+                        if (_deployFilesPreview.Count > 300)
+                            EditorGUILayout.LabelField($"...and {_deployFilesPreview.Count - 300} more", EditorStyles.miniLabel);
+                        EditorGUILayout.EndScrollView();
+                    }
+                }
+
+                if (_deployRunning)
+                {
+                    GUILayout.Space(6);
+                    EditorGUILayout.LabelField("Status", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.HelpBox(string.IsNullOrEmpty(_deployStatus) ? "Working..." : _deployStatus, MessageType.None);
+                    EditorGUILayout.Slider("Progress", _deployProgress, 0f, 1f);
+                }
+
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+            EditorPrefs.SetBool(Const.PrefFoldDeployment, _foldDeployment);
+        }
+
+        private List<string> BuildDeployFileList(out string error)
+        {
+            error = null;
+
+            if (_deployFolder == null)
+            {
+                error = "Please select a Folder to deploy.";
+                return new List<string>();
+            }
+
+            var folderPath = AssetDatabase.GetAssetPath(_deployFolder);
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                error = "Selected asset is not a folder.";
+                return new List<string>();
+            }
+
+            var absoluteFolderPath = Path.GetFullPath(folderPath);
+            var option = _deployIncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+
+            var pattern = string.IsNullOrWhiteSpace(_deployPattern) ? "*" : _deployPattern.Trim();
+
+            string[] files;
+            try
+            {
+                files = Directory.GetFiles(absoluteFolderPath, pattern, option);
+            }
+            catch (Exception e)
+            {
+                error = $"Failed to list files: {e.Message}";
+                return new List<string>();
+            }
+
+            var list = files
+                .Where(f => !f.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (list.Count == 0)
+                error = "No files matched the current pattern.";
+
+            return list;
+        }
+
+        private async Task StartDeployAsync()
+        {
+            if (_deployRunning)
+                return;
+
+            if (_config == null)
+            {
+                Debug.LogError("[PlayServ] Please assign DeploymentSettings asset.");
+                return;
+            }
+
+            if (_config == null || _so == null)
+            {
+                Debug.LogError("[PlayServ] Config is not loaded.");
+                return;
+            }
+
+            var gameId = _pGameId?.stringValue;
+            if (string.IsNullOrWhiteSpace(gameId))
+            {
+                Debug.LogError("[PlayServ] GameId is empty. Please set it in PlayServ Config.");
+                return;
+            }
+
+            var files = BuildDeployFileList(out var err);
+            if (!string.IsNullOrEmpty(err))
+            {
+                Debug.LogError($"[PlayServ] {err}");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                    "Deploy",
+                    $"Upload {files.Count} file(s) for GameId '{gameId}'?\n\nEndpoint:\n{_config.DeployApiEndpoint}",
+                    "Deploy",
+                    "Cancel"))
+            {
+                return;
+            }
+
+            _deployRunning = true;
+            _deployProgress = 0.05f;
+            _deployStatus = "Preparing files...";
+            _deployCts = new CancellationTokenSource();
+
+            try
+            {
+                EditorUtility.DisplayProgressBar("PlayServ Deployment", _deployStatus, _deployProgress);
+
+                var api = new DeploymentApiClient(_config);
+
+                if (_deployKeepRelativePaths)
+                {
+                    await DeployWithRelativePathsAsync(api, gameId, files, _deployFolder, _deployCts.Token);
+                }
+                else
+                {
+                    var service = new DeploymentService(api);
+                    await service.DeployAsync(gameId, files, _deployCts.Token);
+                }
+
+                _deployProgress = 1f;
+                _deployStatus = "Done.";
+                Debug.Log("[PlayServ] Deployment completed successfully.");
+            }
+            catch (OperationCanceledException)
+            {
+                _deployStatus = "Cancelled.";
+                Debug.LogWarning("[PlayServ] Deployment cancelled.");
+            }
+            catch (Exception e)
+            {
+                _deployStatus = $"Failed: {e.Message}";
+                Debug.LogError($"[PlayServ] Deployment failed: {e}");
+            }
+            finally
+            {
+                _deployRunning = false;
+                EditorUtility.ClearProgressBar();
+
+                _deployCts?.Dispose();
+                _deployCts = null;
+            }
+        }
+
+        private async Task DeployWithRelativePathsAsync(
+            DeploymentApiClient api,
+            string gameId,
+            List<string> absoluteFiles,
+            DefaultAsset rootFolderAsset,
+            CancellationToken ct)
+        {
+            var rootPath = Path.GetFullPath(AssetDatabase.GetAssetPath(rootFolderAsset));
+
+            _deployStatus = "Creating ZIP...";
+            _deployProgress = 0.15f;
+            EditorUtility.DisplayProgressBar("PlayServ Deployment", _deployStatus, _deployProgress);
+
+            var zipPath = CreateZipWithRelativePaths(rootPath, absoluteFiles);
+
+            try
+            {
+                _deployStatus = "Uploading ZIP...";
+                _deployProgress = 0.55f;
+                EditorUtility.DisplayProgressBar("PlayServ Deployment", _deployStatus, _deployProgress);
+
+                await api.UploadDeploymentAsync(gameId, zipPath, ct);
+
+                _deployStatus = "Upload finished.";
+                _deployProgress = 0.95f;
+                EditorUtility.DisplayProgressBar("PlayServ Deployment", _deployStatus, _deployProgress);
+            }
+            finally
+            {
+                TryDeleteTemp(zipPath);
+            }
+        }
+
+        private static string CreateZipWithRelativePaths(string rootFolderPath, List<string> absoluteFiles)
+        {
+            // Build zip in temp folder
+            var zipPath = Path.Combine(Path.GetTempPath(), $"playserv_deploy_{Guid.NewGuid():N}.zip");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(zipPath)!);
+
+            using (var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                var root = rootFolderPath.Replace('\\', '/').TrimEnd('/');
+
+                foreach (var absFile in absoluteFiles)
+                {
+                    if (!File.Exists(absFile))
+                        continue;
+
+                    var normalized = absFile.Replace('\\', '/');
+
+                    // Make relative entry name
+                    var entry = normalized.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+                        ? normalized.Substring(root.Length).TrimStart('/')
+                        : Path.GetFileName(absFile);
+
+                    if (string.IsNullOrWhiteSpace(entry))
+                        entry = Path.GetFileName(absFile);
+
+                    archive.CreateEntryFromFile(absFile, entry);
+                }
+            }
+
+            return zipPath;
+        }
+
+        private static void TryDeleteTemp(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PlayServ] Failed to delete temp zip: {e.Message}");
+            }
+        }
+
         private void DrawConfigFoldout()
         {
-            _foldConfig = EditorGUILayout.BeginFoldoutHeaderGroup(
-                _foldConfig,
-                "PlayServ Config");
+            _foldConfig = EditorGUILayout.BeginFoldoutHeaderGroup(_foldConfig, "PlayServ Config");
 
             if (_foldConfig)
             {
@@ -398,15 +888,16 @@ namespace Playserv.Editor
                     EditorGUILayout.PropertyField(_pGameVersion);
                     EditorGUILayout.PropertyField(_pAllowMultipleConnections);
 
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("SDK Version", EditorStyles.miniBoldLabel);
-                    EditorGUILayout.SelectableLabel(
-                        _pSdkVersion.stringValue,
-                        EditorStyles.textField,
-                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                    EditorGUILayout.EndHorizontal();
-                    
-                    
+                    // Make it look like PropertyField: label left, readonly field right
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.PrefixLabel("SDK Version");
+                        EditorGUILayout.SelectableLabel(
+                            _pSdkVersion.stringValue,
+                            EditorStyles.textField,
+                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    }
+
                     if (_so.ApplyModifiedProperties())
                         EditorUtility.SetDirty(_config);
                 }
@@ -418,175 +909,6 @@ namespace Playserv.Editor
             EditorPrefs.SetBool(Const.PrefFoldConfig, _foldConfig);
         }
 
-        private void DrawConnectionFoldout()
-        {
-            _foldConnection = EditorGUILayout.BeginFoldoutHeaderGroup(
-                _foldConnection,
-                "WebSocket Connection");
-
-            if (_foldConnection)
-            {
-                EditorGUI.indentLevel++;
-
-                EditorGUILayout.HelpBox(
-                    "Test WebSocket connection.",
-                    MessageType.Info);
-
-                GUILayout.Space(6);
-
-                EditorGUILayout.LabelField("Connection Settings", EditorStyles.boldLabel);
-
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Endpoint", GUILayout.Width(80));
-                string newEndpoint = EditorGUILayout.TextField(_wsEndpoint);
-                if (newEndpoint != _wsEndpoint)
-                {
-                    _wsEndpoint = newEndpoint;
-                    EditorPrefs.SetString(Const.PrefKeyWebSocketEndpoint, _wsEndpoint);
-                }
-                EditorGUILayout.EndHorizontal();
-
-                GUILayout.Space(6);
-
-                bool isConnected = _wsTransport != null && _wsTransport.IsConnected;
-                bool isConnecting = _wsTransport != null && _wsTransport.IsConnecting;
-
-                EditorGUILayout.BeginHorizontal();
-
-                using (new EditorGUI.DisabledScope(isConnected || isConnecting))
-                {
-                    if (GUILayout.Button(isConnecting ? "Connecting..." : "Connect", GUILayout.Height(30)))
-                    {
-                        ConnectWebSocket();
-                    }
-                }
-
-                using (new EditorGUI.DisabledScope(!isConnected))
-                {
-                    if (GUILayout.Button("Disconnect", GUILayout.Height(30)))
-                    {
-                        DisconnectWebSocket();
-                    }
-                }
-
-                EditorGUILayout.EndHorizontal();
-
-                GUILayout.Space(6);
-
-                EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
-                string statusText = isConnected ? "Connected" : isConnecting ? "Connecting..." : "Disconnected";
-                var statusColor = isConnected ? Color.green : isConnecting ? Color.yellow : Color.gray;
-                
-                var prevColor = GUI.color;
-                GUI.color = statusColor;
-                EditorGUILayout.LabelField("● " + statusText, EditorStyles.boldLabel);
-                GUI.color = prevColor;
-
-                GUILayout.Space(6);
-
-                using (new EditorGUI.DisabledScope(!isConnected))
-                {
-                    EditorGUILayout.LabelField("Send Test Message", EditorStyles.boldLabel);
-                    _testMessage = EditorGUILayout.TextArea(_testMessage, GUILayout.Height(40));
-                    
-                    if (GUILayout.Button("Send Message"))
-                    {
-                        SendTestMessage();
-                    }
-                }
-
-                GUILayout.Space(6);
-
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Connection Log", EditorStyles.boldLabel);
-                if (GUILayout.Button("Clear", GUILayout.Width(60)))
-                {
-                    _wsTransport?.ClearLogs();
-                    Repaint();
-                }
-                EditorGUILayout.EndHorizontal();
-
-                _connectionScrollPos = EditorGUILayout.BeginScrollView(_connectionScrollPos, GUILayout.Height(200));
-
-                if (_wsTransport != null && _wsTransport.LogMessages.Count > 0)
-                {
-                    foreach (var log in _wsTransport.LogMessages)
-                    {
-                        EditorGUILayout.SelectableLabel(log, EditorStyles.wordWrappedLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                    }
-                }
-                else
-                {
-                    EditorGUILayout.LabelField("No logs yet...", EditorStyles.centeredGreyMiniLabel);
-                }
-
-                EditorGUILayout.EndScrollView();
-
-                EditorGUI.indentLevel--;
-            }
-
-            EditorGUILayout.EndFoldoutHeaderGroup();
-            EditorPrefs.SetBool(Const.PrefFoldConnection, _foldConnection);
-        }
-
-        private async void ConnectWebSocket()
-        {
-            if (string.IsNullOrWhiteSpace(_wsEndpoint))
-            {
-                EditorUtility.DisplayDialog("Error", "Endpoint cannot be empty", "OK");
-                return;
-            }
-
-            try
-            {
-                _wsTransport?.Dispose();
-                _wsTransport = new EditorWebSocketTransport(_wsEndpoint);
-
-                _wsTransport.OnConnected += () =>
-                {
-                    Repaint();
-                };
-
-                _wsTransport.OnMessageReceived += (msg) =>
-                {
-                    Repaint();
-                };
-
-                _wsTransport.OnError += (error) =>
-                {
-                    Repaint();
-                };
-
-                _wsTransport.OnDisconnected += () =>
-                {
-                    Repaint();
-                };
-
-                Repaint();
-                await _wsTransport.ConnectAsync();
-                Repaint();
-            }
-            catch (Exception ex)
-            {
-                EditorUtility.DisplayDialog("Connection Error", ex.Message, "OK");
-            }
-        }
-
-        private void DisconnectWebSocket()
-        {
-            _wsTransport?.Disconnect();
-            Repaint();
-        }
-
-        private async void SendTestMessage()
-        {
-            if (_wsTransport == null || !_wsTransport.IsConnected)
-                return;
-
-            await _wsTransport.SendAsync(_testMessage);
-            Repaint();
-        }
-
         private void DrawFooter()
         {
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
@@ -594,9 +916,7 @@ namespace Playserv.Editor
             EditorGUILayout.BeginHorizontal();
 
             bool showOnStartup = EditorPrefs.GetBool(Const.PrefKeyShowOnStartup, true);
-            bool newShowOnStartup = EditorGUILayout.ToggleLeft(
-                "Show this window on Unity startup",
-                showOnStartup);
+            bool newShowOnStartup = EditorGUILayout.ToggleLeft("Show this window on Unity startup", showOnStartup);
 
             if (newShowOnStartup != showOnStartup)
                 EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, newShowOnStartup);

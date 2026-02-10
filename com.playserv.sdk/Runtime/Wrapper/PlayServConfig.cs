@@ -24,6 +24,11 @@ namespace Playserv.Wrapper
         [SerializeField] private bool useLocalBackend = false;
         [SerializeField] private string localEndpoint = DEFAULT_LOCAL_ENDPOINT;
         [SerializeField] private string remoteEndpoint = DEFAULT_REMOTE_ENDPOINT;
+        
+        
+        [Header("Deploy")]
+        [SerializeField] private string deployApiEndpoint = "http://localhost:5000/api/deployments";
+        [SerializeField] private int timeoutSeconds = 120;
 
         public string GameAccessToken => gameAccessToken;
 
@@ -49,6 +54,11 @@ namespace Playserv.Wrapper
         public string LocalEndpoint => localEndpoint;
         public string RemoteEndpoint => remoteEndpoint;
         public string Endpoint => useLocalBackend ? localEndpoint : remoteEndpoint;
+        
+        
+        public string DeployApiEndpoint => deployApiEndpoint;
+        public int TimeoutSeconds => timeoutSeconds;
+        
 
         public void SetAllowMultipleConnections(bool value)
         {
