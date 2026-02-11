@@ -1,3 +1,4 @@
+#if UNITY_5_3_OR_NEWER
 using Playserv.Proxy.Common;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -59,6 +60,27 @@ namespace Playserv.Wrapper
         public string DeployApiEndpoint => deployApiEndpoint;
         public int TimeoutSeconds => timeoutSeconds;
         
+        internal PlayServSettings ToSettings()
+        {
+            return new PlayServSettings
+            {
+                GameAccessToken = gameAccessToken,
+                GameId = gameId,
+                UserId = userId,
+                GameVersion = gameVersion,
+                SdkVersion = sdkVersion,
+                AllowMultipleConnections = allowMultipleConnections,
+                KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
+                KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs,
+                NetworkTransformSyncIntervalMs = networkTransformSyncIntervalMs,
+                UseLocalBackend = useLocalBackend,
+                LocalEndpoint = localEndpoint,
+                RemoteEndpoint = remoteEndpoint,
+                DeployApiEndpoint = deployApiEndpoint,
+                TimeoutSeconds = timeoutSeconds
+            };
+        }
+        
 
         public void SetAllowMultipleConnections(bool value)
         {
@@ -93,3 +115,4 @@ namespace Playserv.Wrapper
         }
     }
 }
+#endif

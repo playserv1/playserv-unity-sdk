@@ -1,3 +1,4 @@
+#if UNITY_5_3_OR_NEWER
 using System.Threading.Tasks;
 using Playserv.Spawn;
 using UnityEngine;
@@ -21,3 +22,4 @@ namespace Playserv.Proxy.Common
             _spawnManager.Dispose();
     }
 }
+#endif

@@ -11,6 +11,7 @@ namespace Playserv.Proxy.Common
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly Action<PlayServState> _stateSetter;
+        private readonly Func<bool> _canReconnect;
 
         private bool _shouldReconnect;
         private bool _isDisposed;
@@ -21,11 +22,13 @@ namespace Playserv.Proxy.Common
         public ReconnectionManager(
             ITransport transport,
             ILogger logger,
-            Action<PlayServState> stateSetter)
+            Action<PlayServState> stateSetter,
+            Func<bool> canReconnect = null)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _stateSetter = stateSetter ?? throw new ArgumentNullException(nameof(stateSetter));
+            _canReconnect = canReconnect ?? (() => true);
         }
 
         public void Start()
@@ -77,8 +80,7 @@ namespace Playserv.Proxy.Common
 
             while (!cts.IsCancellationRequested)
             {
-#if UNITY_EDITOR
-                if (!UnityEngine.Application.isPlaying)
+                if (!_canReconnect())
                 {
                     lock (_reconnectLock)
                     {
@@ -86,10 +88,9 @@ namespace Playserv.Proxy.Common
                         _isReconnecting = false;
                     }
 
-                    _logger.Log("Editor is not in play mode. Stopping reconnection attempts.");
+                    _logger.Log("Reconnection environment is not ready. Stopping reconnection attempts.");
                     return;
                 }
-#endif
 
                 lock (_reconnectLock)
                 {

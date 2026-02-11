@@ -23,7 +23,16 @@ namespace Playserv.Events
             NullValueHandling = NullValueHandling.Include,
             MissingMemberHandling = MissingMemberHandling.Ignore,
             DateParseHandling = DateParseHandling.DateTime,
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
         };
+
+        static PlayServEventsAdapter()
+        {
+#if UNITY_5_3_OR_NEWER
+            JsonSettings.Converters.Add(new Vector3JsonConverter());
+            JsonSettings.Converters.Add(new QuaternionJsonConverter());
+#endif
+        }
 
         public PlayServEventsAdapter(ITransport transport, ILogger logger)
         {

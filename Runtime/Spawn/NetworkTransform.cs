@@ -1,3 +1,4 @@
+#if UNITY_5_3_OR_NEWER
 using System;
 using Playserv.Wrapper;
 using UnityEngine;
@@ -431,3 +432,4 @@ namespace Playserv.Spawn
         }
     }
 }
+#endif

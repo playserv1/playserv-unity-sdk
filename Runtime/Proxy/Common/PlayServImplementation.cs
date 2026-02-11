@@ -70,7 +70,7 @@ namespace Playserv.Proxy.Common
             _transport = new Transport(implementation, serializer, requestIdGenerator, logger);
             _eventsAdapter = new PlayServEventsAdapter(_transport, _logger);
             _dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(this, _logger);
-            _reconnectionManager = new ReconnectionManager(_transport, _logger, state => State = state);
+            _reconnectionManager = new ReconnectionManager(_transport, _logger, state => State = state, IsReconnectEnvironmentReady);
             _handshakeService = new HandshakeService(_transport, _logger);
             _keepAliveManager = new KeepAliveManager(_transport, _logger);
 
@@ -85,6 +85,15 @@ namespace Playserv.Proxy.Common
             }
 
             SetupCommandHandlers();
+        }
+
+        private static bool IsReconnectEnvironmentReady()
+        {
+#if UNITY_EDITOR
+            return UnityEngine.Application.isPlaying;
+#else
+            return true;
+#endif
         }
 
         private void HandleTransportError(TransportError error)
