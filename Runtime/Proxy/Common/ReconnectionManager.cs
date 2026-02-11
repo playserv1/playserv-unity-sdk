@@ -11,10 +11,11 @@ namespace Playserv.Proxy.Common
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly Action<PlayServState> _stateSetter;
-        private readonly Func<bool> _canReconnect;
+        private readonly Func<Task<bool>> _canReconnect;
+        private readonly Func<Task<bool>> _connectAction;
 
         private bool _shouldReconnect;
-        private bool _isDisposed;
+        private volatile bool _isDisposed;
         private bool _isReconnecting;
         private CancellationTokenSource _reconnectCts;
         private readonly object _reconnectLock = new object();
@@ -23,12 +24,14 @@ namespace Playserv.Proxy.Common
             ITransport transport,
             ILogger logger,
             Action<PlayServState> stateSetter,
-            Func<bool> canReconnect = null)
+            Func<Task<bool>> canReconnect = null,
+            Func<Task<bool>> connectAction = null)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _stateSetter = stateSetter ?? throw new ArgumentNullException(nameof(stateSetter));
-            _canReconnect = canReconnect ?? (() => true);
+            _canReconnect = canReconnect ?? (() => Task.FromResult(true));
+            _connectAction = connectAction;
         }
 
         public void Start()
@@ -67,8 +70,11 @@ namespace Playserv.Proxy.Common
         private async Task ReconnectAsync()
         {
             const int maxDelayMs = 30000;
+            const int connectionAttemptTimeoutMs = 30000;
             int delayMs = 1000;
             int attempt = 0;
+
+            bool reconnected = false;
 
             lock (_reconnectLock)
             {
@@ -77,10 +83,30 @@ namespace Playserv.Proxy.Common
             }
 
             var cts = _reconnectCts;
+            
+            try
+            {
+                await Task.Delay(2000, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
 
             while (!cts.IsCancellationRequested)
             {
-                if (!_canReconnect())
+                bool canContinue;
+                try
+                {
+                    canContinue = await _canReconnect();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"The _canReconnect check failed with an exception, stopping reconnection: {ex}");
+                    canContinue = false;
+                }
+
+                if (!canContinue)
                 {
                     lock (_reconnectLock)
                     {
@@ -89,56 +115,91 @@ namespace Playserv.Proxy.Common
                     }
 
                     _logger.Log("Reconnection environment is not ready. Stopping reconnection attempts.");
+
+                    if (!_isDisposed)
+                    {
+                        _stateSetter(PlayServState.Offline);
+                    }
                     return;
                 }
 
                 lock (_reconnectLock)
                 {
                     if (!_shouldReconnect || _isDisposed)
-                        return;
+                        break;
                 }
 
-                try
+                if (attempt > 0)
                 {
-                    await Task.Delay(delayMs, cts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
+                    try
+                    {
+                        await Task.Delay(delayMs, cts.Token);
+                        delayMs = Math.Min(delayMs * 2, maxDelayMs);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
 
                 if (cts.IsCancellationRequested)
-                    return;
+                    break;
 
                 attempt++;
                 _logger.Log($"Reconnection attempt {attempt}...");
 
                 try
                 {
-                    var result = await _transport.Connect();
-                    if (result)
+                    var connectTask = _connectAction != null ? _connectAction() : _transport.Connect();
+                    var timeoutTask = Task.Delay(connectionAttemptTimeoutMs, cts.Token);
+
+                    var completedTask = await Task.WhenAny(connectTask, timeoutTask);
+
+                    if (completedTask == timeoutTask)
                     {
-                        lock (_reconnectLock)
+                        _logger.LogError(
+                            $"Reconnection attempt {attempt} timed out after {connectionAttemptTimeoutMs / 1000}s.");
+                    }
+                    else
+                    {
+                        var result = await connectTask; // Await to get result or propagate exception
+                        if (result)
                         {
-                            _isReconnecting = false;
+                            reconnected = true;
+                            break;
                         }
 
-                        _stateSetter(PlayServState.Online);
-                        _logger.Log("Reconnection successful.");
-                        return;
+                        _logger.LogWarning($"Reconnection attempt {attempt} failed (transport returned false).");
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError($"Reconnection attempt {attempt} failed: {ex.Message}");
                 }
-
-                delayMs = Math.Min(delayMs * 2, maxDelayMs);
             }
 
             lock (_reconnectLock)
             {
+                if (cts != _reconnectCts)
+                {
+                    return;
+                }
                 _isReconnecting = false;
+            }
+
+            if (reconnected)
+            {
+                _stateSetter(PlayServState.Online);
+                _logger.Log("Reconnection successful.");
+            }
+            else if (!_isDisposed)
+            {
+                _stateSetter(PlayServState.Offline);
+                _logger.LogWarning("Reconnection stopped or failed. State set to Offline.");
             }
         }
 

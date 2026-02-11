@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Events;
@@ -17,6 +18,7 @@ namespace Playserv.Proxy.Common
         private readonly ReconnectionManager _reconnectionManager;
         private readonly HandshakeService _handshakeService;
         private readonly KeepAliveManager _keepAliveManager;
+        private readonly SynchronizationContext _mainThreadContext;
 
         private string _gameAccessToken;
         private string _gameId;
@@ -55,6 +57,7 @@ namespace Playserv.Proxy.Common
                 throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
 
             _logger = logger;
+            _mainThreadContext = SynchronizationContext.Current;
 
             if (transportImplementationFactory == null)
             {
@@ -70,7 +73,7 @@ namespace Playserv.Proxy.Common
             _transport = new Transport(implementation, serializer, requestIdGenerator, logger);
             _eventsAdapter = new PlayServEventsAdapter(_transport, _logger);
             _dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(this, _logger);
-            _reconnectionManager = new ReconnectionManager(_transport, _logger, state => State = state, IsReconnectEnvironmentReady);
+            _reconnectionManager = new ReconnectionManager(_transport, _logger, state => State = state, IsReconnectEnvironmentReadyAsync, ReconnectSessionAsync);
             _handshakeService = new HandshakeService(_transport, _logger);
             _keepAliveManager = new KeepAliveManager(_transport, _logger);
 
@@ -87,13 +90,42 @@ namespace Playserv.Proxy.Common
             SetupCommandHandlers();
         }
 
-        private static bool IsReconnectEnvironmentReady()
+        private Task<bool> IsReconnectEnvironmentReadyAsync()
         {
 #if UNITY_EDITOR
-            return UnityEngine.Application.isPlaying;
+            if (_mainThreadContext != null)
+            {
+                var tcs = new TaskCompletionSource<bool>();
+                _mainThreadContext.Post(_ =>
+                {
+                    tcs.SetResult(UnityEngine.Application.isPlaying);
+                }, null);
+                return tcs.Task;
+            }
+            return Task.FromResult(false);
 #else
-            return true;
+            return Task.FromResult(true);
 #endif
+        }
+
+        private async Task<bool> ReconnectSessionAsync()
+        {
+            var connected = await _transport.Connect();
+            if (!connected)
+                return false;
+            
+            var handshakeResult = await _handshakeService.PerformHandshakeAsync(_gameAccessToken, _gameId, _userId, _gameVersion, _sdkVersion);
+            if (!handshakeResult.Success)
+            {
+                _logger.LogError($"Reconnection handshake failed: {handshakeResult.Error}");
+                return false;
+            }
+            
+            await SendClientSettingsAsync();
+            _keepAliveManager.Start();
+            InitializeSpawnManager();
+
+            return true;
         }
 
         private void HandleTransportError(TransportError error)
