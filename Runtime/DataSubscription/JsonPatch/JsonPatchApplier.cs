@@ -7,8 +7,18 @@ using Playserv.DataSubscription.Exceptions;
 
 namespace Playserv.DataSubscription.JsonPatch
 {
+    /// <summary>
+    /// Applies JSON patch operations to typed objects.
+    /// </summary>
     public static class JsonPatchApplier
     {
+        /// <summary>
+        /// Applies parsed patch operations to target object.
+        /// </summary>
+        /// <typeparam name="T">Target object type.</typeparam>
+        /// <param name="target">Current object instance.</param>
+        /// <param name="operations">Patch operations sequence.</param>
+        /// <returns>Patched object instance.</returns>
         public static T ApplyPatch<T>(T target, IEnumerable<PatchOperation> operations) where T : class
         {
             var json = JObject.FromObject(target);
@@ -21,6 +31,13 @@ namespace Playserv.DataSubscription.JsonPatch
             return json.ToObject<T>();
         }
 
+        /// <summary>
+        /// Applies patch payload (JSON string/object/list) to target object.
+        /// </summary>
+        /// <typeparam name="T">Target object type.</typeparam>
+        /// <param name="target">Current object instance.</param>
+        /// <param name="patchData">Patch payload.</param>
+        /// <returns>Patched object instance.</returns>
         public static T ApplyPatch<T>(T target, object patchData) where T : class
         {
             var operations = ParseOperations(patchData);

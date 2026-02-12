@@ -5,8 +5,15 @@ using UnityEngine;
 
 namespace Playserv.Proxy.Logging
 {
+    /// <summary>
+    /// Logger implementation that writes to Unity console or standard output.
+    /// </summary>
     public sealed class ConsoleLogger : ILogger
     {
+        /// <summary>
+        /// Writes informational message.
+        /// </summary>
+        /// <param name="message">Message text.</param>
         public void Log(string message)
         {
 #if UNITY_5_3_OR_NEWER
@@ -16,6 +23,10 @@ namespace Playserv.Proxy.Logging
 #endif
         }
 
+        /// <summary>
+        /// Writes warning message.
+        /// </summary>
+        /// <param name="message">Message text.</param>
         public void LogWarning(string message)
         {
 #if UNITY_5_3_OR_NEWER
@@ -25,6 +36,10 @@ namespace Playserv.Proxy.Logging
 #endif
         }
 
+        /// <summary>
+        /// Writes error message.
+        /// </summary>
+        /// <param name="message">Message text.</param>
         public void LogError(string message)
         {
 #if UNITY_5_3_OR_NEWER

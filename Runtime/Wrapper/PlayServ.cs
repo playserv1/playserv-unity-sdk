@@ -10,77 +10,177 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
+    /// <summary>
+    /// Main static facade for PlayServ SDK runtime operations.
+    /// </summary>
     public static class PlayServ
     {
         private static readonly IPlayServApi Api = new PlayServApi();
 
+        /// <summary>
+        /// Gets current SDK version string reported by the client.
+        /// </summary>
         public static string SdkVersion => Api.SdkVersion;
 
+        /// <summary>
+        /// Gets current connection state of the SDK transport.
+        /// </summary>
         public static PlayServState State => Api.State;
 
+        /// <summary>
+        /// Raised when transport-level error happens (handshake, connection policy, protocol, etc.).
+        /// </summary>
         public static event Action<TransportError>? OnTransportError
         {
             add => Api.OnTransportError += value;
             remove => Api.OnTransportError -= value;
         }
 
+        /// <summary>
+        /// Raised every time keepalive ping is sent by the client.
+        /// </summary>
         public static event Action? OnKeepAlivePingSent
         {
             add => Api.OnKeepAlivePingSent += value;
             remove => Api.OnKeepAlivePingSent -= value;
         }
 
+        /// <summary>
+        /// Raised when keepalive pong is received from server.
+        /// </summary>
         public static event Action? OnKeepAlivePongReceived
         {
             add => Api.OnKeepAlivePongReceived += value;
             remove => Api.OnKeepAlivePongReceived -= value;
         }
 
+        /// <summary>
+        /// Applies full SDK settings object.
+        /// </summary>
+        /// <param name="settings">Runtime settings used to configure endpoint, auth and timeouts.</param>
         public static void Config(PlayServSettings settings) =>
             Api.Config(settings);
 
+        /// <summary>
+        /// Applies basic SDK connection settings.
+        /// </summary>
+        /// <param name="gameAccessToken">Access token used for handshake authorization.</param>
+        /// <param name="gameId">Game identifier.</param>
+        /// <param name="userId">Current player/user identifier.</param>
+        /// <param name="gameVersion">Current game client version.</param>
+        /// <param name="sdkVersion">Optional SDK version override. If null, default SDK version is used.</param>
         public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null) =>
         Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
 
+        /// <summary>
+        /// Connects to configured PlayServ endpoint and performs handshake.
+        /// </summary>
+        /// <returns>True if connection and handshake succeeded; otherwise false.</returns>
         public static Task<bool> Connect() =>
             Api.Connect();
 
+        /// <summary>
+        /// Subscribes to incoming events of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Event payload type.</typeparam>
+        /// <returns>Observable stream of events.</returns>
         public static IObservable<T> Subscribe<T>() =>
             Api.Subscribe<T>();
 
+        /// <summary>
+        /// Subscribes to incoming events of type <typeparamref name="T"/> with callback.
+        /// </summary>
+        /// <typeparam name="T">Event payload type.</typeparam>
+        /// <param name="onNext">Callback invoked for every received event.</param>
+        /// <returns>Subscription handle that should be disposed when no longer needed.</returns>
         public static IDisposable Subscribe<T>(Action<T> onNext) =>
             Api.Subscribe(onNext);
 
+        /// <summary>
+        /// Sends command object using default command namespace resolution.
+        /// </summary>
+        /// <typeparam name="T">Command type.</typeparam>
+        /// <param name="command">Command payload.</param>
         public static void Send<T>(T command) =>
             Api.Send(command);
         
+        /// <summary>
+        /// Sends command object to explicit backend module/command path.
+        /// </summary>
+        /// <typeparam name="T">Command type.</typeparam>
+        /// <param name="command">Command payload.</param>
+        /// <param name="moduleName">Target module path, for example "rpc.InvokeRpc" or "module_dataflow".</param>
         public static void Send<T>(T command, string moduleName) =>
             Api.Send(command,  moduleName);
 
-        // NOTE: only for testing purposes
+        /// <summary>
+        /// Returns low-level transport implementation used by SDK.
+        /// Intended for testing and protocol diagnostics only.
+        /// </summary>
         public static Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             Api.GetTransportImplementation();
 
+        /// <summary>
+        /// Publishes global event to all interested listeners.
+        /// </summary>
+        /// <typeparam name="T">Event payload type.</typeparam>
+        /// <param name="event">Event payload.</param>
         public static void Publish<T>(T @event) =>
             Api.Publish(@event);
 
+        /// <summary>
+        /// Publishes event scoped to a specific group.
+        /// </summary>
+        /// <typeparam name="T">Event payload type.</typeparam>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="event">Event payload.</param>
         public static void PublishForGroup<T>(string groupName, T @event) =>
             Api.PublishForGroup(groupName, @event);
 
+        /// <summary>
+        /// Publishes event scoped to a specific user.
+        /// </summary>
+        /// <typeparam name="T">Event payload type.</typeparam>
+        /// <param name="userId">Target user id.</param>
+        /// <param name="event">Event payload.</param>
         public static void PublishForUser<T>(string userId, T @event) =>
             Api.PublishForUser(userId, @event);
 
+        /// <summary>
+        /// Disconnects SDK transport and disposes internal runtime instance.
+        /// </summary>
         public static void Disconnect() =>
             Api.Disconnect();
 
 #if UNITY_5_3_OR_NEWER
+        /// <summary>
+        /// Spawns networked prefab from Resources at given position and rotation.
+        /// </summary>
+        /// <param name="assetName">Path inside Resources folder.</param>
+        /// <param name="position">World position.</param>
+        /// <param name="rotation">World rotation.</param>
+        /// <returns>Spawned GameObject or null when spawn failed.</returns>
         public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
             Api.Spawn(assetName, position, rotation);
 
+        /// <summary>
+        /// Spawns networked prefab from Resources with identity rotation.
+        /// </summary>
+        /// <param name="assetName">Path inside Resources folder.</param>
+        /// <param name="position">World position.</param>
+        /// <returns>Spawned GameObject or null when spawn failed.</returns>
         public static Task<GameObject> Spawn(string assetName, Vector3 position) =>
             Api.Spawn(assetName, position);
 #endif
 
+        /// <summary>
+        /// Creates shared data subscription for a player entity and maps server model to DTO.
+        /// </summary>
+        /// <typeparam name="TEntity">Raw entity model type returned by backend.</typeparam>
+        /// <typeparam name="TDto">Client DTO type used by gameplay/UI.</typeparam>
+        /// <param name="playerId">Target player identifier used as entity key.</param>
+        /// <param name="map">Projection function from entity model to DTO.</param>
+        /// <returns>Shared entity handle with updates, mutations and refresh operations.</returns>
         public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
             where TEntity : class
             where TDto : class, new() =>

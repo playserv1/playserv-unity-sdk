@@ -3,9 +3,19 @@ using UnityEngine;
 
 namespace Playserv.Spawn
 {
+    /// <summary>
+    /// Event payload used by <see cref="NetworkTransform"/> to synchronize transform state.
+    /// </summary>
     public sealed class TransformSyncEvent
     {
+        /// <summary>
+        /// Network object id.
+        /// </summary>
         public string NetworkId;
+
+        /// <summary>
+        /// Monotonic sequence number.
+        /// </summary>
         public uint Seq;
 
         // Transform state
@@ -19,13 +29,35 @@ namespace Playserv.Spawn
         public Vector3 ScaleVelocity;
 
         // Timing
+        /// <summary>
+        /// Delta time used to compute velocities on sender side.
+        /// </summary>
         public float StepTime;
 
         // Flags
+        /// <summary>
+        /// True when update should be applied as teleport snap.
+        /// </summary>
         public bool Teleport;
 
+        /// <summary>
+        /// Parameterless constructor for deserialization.
+        /// </summary>
         public TransformSyncEvent() { }
 
+        /// <summary>
+        /// Creates transform synchronization event.
+        /// </summary>
+        /// <param name="networkId">Network object id.</param>
+        /// <param name="seq">Sequence number.</param>
+        /// <param name="position">Position.</param>
+        /// <param name="rotation">Rotation.</param>
+        /// <param name="scale">Scale.</param>
+        /// <param name="velocity">Linear velocity estimate.</param>
+        /// <param name="angularVelocityYaw">Yaw angular velocity in degrees/sec.</param>
+        /// <param name="scaleVelocity">Scale velocity estimate.</param>
+        /// <param name="stepTime">Delta time used by sender.</param>
+        /// <param name="teleport">Whether receiver should snap immediately.</param>
         public TransformSyncEvent(
             string networkId,
             uint seq,

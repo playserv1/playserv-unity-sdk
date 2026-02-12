@@ -5,18 +5,31 @@ using UnityEngine;
 
 namespace Playserv.Spawn
 {
+    /// <summary>
+    /// Synchronizes transform changes for spawned network objects.
+    /// Local owner publishes updates, remote clients interpolate received snapshots.
+    /// </summary>
     [RequireComponent(typeof(NetworkObject))]
     public sealed class NetworkTransform : MonoBehaviour
     {
         private const int SnapshotBufferSize = 4;
 
         [field: SerializeField]
+        /// <summary>
+        /// Enables position synchronization.
+        /// </summary>
         public bool SyncPosition { get; set; } = true;
 
         [field: SerializeField]
+        /// <summary>
+        /// Enables rotation synchronization.
+        /// </summary>
         public bool SyncRotation { get; set; } = true;
 
         [field: SerializeField]
+        /// <summary>
+        /// Enables scale synchronization.
+        /// </summary>
         public bool SyncScale { get; set; }
 
         [Header("Send Thresholds")]
@@ -51,7 +64,14 @@ namespace Playserv.Spawn
         private int _freezeCount;
         private float _lastDebugTime;
 
+        /// <summary>
+        /// Returns true after first remote snapshot was applied.
+        /// </summary>
         public bool HasTarget => _hasInitialized;
+
+        /// <summary>
+        /// Time elapsed since last snapshot was received.
+        /// </summary>
         public float TimeSinceLastSnapshot => _snapshotCount > 0
             ? Time.time - _snapshotBuffer[_snapshotCount - 1].RecvTime
             : 0f;
@@ -343,6 +363,12 @@ namespace Playserv.Spawn
                 transform.localScale = snapshot.Scale;
         }
 
+        /// <summary>
+        /// Forcefully teleports locally owned object and sends teleport sync event.
+        /// </summary>
+        /// <param name="position">New world position.</param>
+        /// <param name="rotation">New world rotation.</param>
+        /// <param name="scale">New local scale.</param>
         public void ForceTeleport(Vector3 position, Quaternion rotation, Vector3 scale)
         {
             if (!_networkObject.IsLocallyOwned)
@@ -377,6 +403,9 @@ namespace Playserv.Spawn
             PlayServ.Publish(syncEvent);
         }
 
+        /// <summary>
+        /// Resets local sync state and interpolation buffers.
+        /// </summary>
         public void Reset()
         {
             InitializeLocalState();
@@ -390,6 +419,10 @@ namespace Playserv.Spawn
             _freezeCount = 0;
         }
 
+        /// <summary>
+        /// Returns runtime debug counters and resets per-period stats.
+        /// </summary>
+        /// <returns>Current debug snapshot.</returns>
         public DebugInfo GetDebugInfo()
         {
             float now = Time.time;
@@ -413,13 +446,39 @@ namespace Playserv.Spawn
             return info;
         }
 
+        /// <summary>
+        /// Runtime diagnostics for transform synchronization.
+        /// </summary>
         public struct DebugInfo
         {
+            /// <summary>
+            /// Received packets per second for last measurement interval.
+            /// </summary>
             public float PacketsPerSecond;
+
+            /// <summary>
+            /// Number of buffered snapshots.
+            /// </summary>
             public int SnapshotCount;
+
+            /// <summary>
+            /// Number of teleport snaps in interval.
+            /// </summary>
             public int SnapCount;
+
+            /// <summary>
+            /// Number of frames using latest snapshot without interpolation pair.
+            /// </summary>
             public int FreezeCount;
+
+            /// <summary>
+            /// Time since last snapshot arrival.
+            /// </summary>
             public float TimeSinceLastSnapshot;
+
+            /// <summary>
+            /// Configured interpolation delay.
+            /// </summary>
             public float RenderDelay;
         }
 

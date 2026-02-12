@@ -7,6 +7,9 @@ using UnityEditor;
 
 namespace Playserv.Wrapper
 {
+    /// <summary>
+    /// ScriptableObject configuration stored in Resources and used by PlayServ runtime/editor tooling.
+    /// </summary>
     [CreateAssetMenu(fileName = "PlayServConfig", menuName = "PlayServ/Config", order = 0)]
     public sealed class PlayServConfig : ScriptableObject
     {
@@ -31,33 +34,83 @@ namespace Playserv.Wrapper
         [SerializeField] private string deployApiEndpoint = "http://localhost:5000/api/deployments";
         [SerializeField] private int timeoutSeconds = 120;
 
+        /// <summary>
+        /// Game access token used for handshake.
+        /// </summary>
         public string GameAccessToken => gameAccessToken;
 
+        /// <summary>
+        /// Game identifier.
+        /// </summary>
         public string GameId => gameId;
 
+        /// <summary>
+        /// User/player identifier.
+        /// </summary>
         public string UserId
         {
             get => userId;
             set => userId = value;
         }
 
+        /// <summary>
+        /// Game client version.
+        /// </summary>
         public string GameVersion => gameVersion;
 
+        /// <summary>
+        /// SDK version override used in handshake.
+        /// </summary>
         public string SdkVersion => sdkVersion;
 
+        /// <summary>
+        /// Indicates whether multiple sessions are allowed for same user.
+        /// </summary>
         public bool AllowMultipleConnections => allowMultipleConnections;
+
+        /// <summary>
+        /// Keepalive ping interval in milliseconds.
+        /// </summary>
         public int KeepAlivePingIntervalMs => keepAlivePingIntervalMs;
+
+        /// <summary>
+        /// Keepalive pong timeout in milliseconds.
+        /// </summary>
         public int KeepAlivePongTimeoutMs => keepAlivePongTimeoutMs;
 
+        /// <summary>
+        /// Network transform synchronization interval in milliseconds.
+        /// </summary>
         public int NetworkTransformSyncIntervalMs => networkTransformSyncIntervalMs;
 
+        /// <summary>
+        /// Chooses local endpoint when true, remote endpoint otherwise.
+        /// </summary>
         public bool UseLocalBackend => useLocalBackend;
+
+        /// <summary>
+        /// Local websocket endpoint.
+        /// </summary>
         public string LocalEndpoint => localEndpoint;
+
+        /// <summary>
+        /// Remote websocket endpoint.
+        /// </summary>
         public string RemoteEndpoint => remoteEndpoint;
+
+        /// <summary>
+        /// Active endpoint based on <see cref="UseLocalBackend"/>.
+        /// </summary>
         public string Endpoint => useLocalBackend ? localEndpoint : remoteEndpoint;
         
-        
+        /// <summary>
+        /// Deployment API endpoint used by editor deployment tools.
+        /// </summary>
         public string DeployApiEndpoint => deployApiEndpoint;
+
+        /// <summary>
+        /// Timeout in seconds for deployment HTTP requests.
+        /// </summary>
         public int TimeoutSeconds => timeoutSeconds;
         
         internal PlayServSettings ToSettings()
@@ -82,6 +135,10 @@ namespace Playserv.Wrapper
         }
         
 
+        /// <summary>
+        /// Updates allow-multiple-connections flag and marks asset dirty in editor.
+        /// </summary>
+        /// <param name="value">New value.</param>
         public void SetAllowMultipleConnections(bool value)
         {
             allowMultipleConnections = value;
@@ -90,6 +147,10 @@ namespace Playserv.Wrapper
 #endif
         }
 
+        /// <summary>
+        /// Updates game access token and marks asset dirty in editor.
+        /// </summary>
+        /// <param name="value">New token value.</param>
         public void SetGameAccessToken(string value)
         {
             gameAccessToken = value;
@@ -98,6 +159,10 @@ namespace Playserv.Wrapper
 #endif
         }
 
+        /// <summary>
+        /// Updates game version and marks asset dirty in editor.
+        /// </summary>
+        /// <param name="value">New game version.</param>
         public void SetGameVersion(string value)
         {
             gameVersion = value;
@@ -106,6 +171,10 @@ namespace Playserv.Wrapper
 #endif
         }
 
+        /// <summary>
+        /// Updates SDK version override and marks asset dirty in editor.
+        /// </summary>
+        /// <param name="value">New SDK version.</param>
         public void SetSdkVersion(string value)
         {
             sdkVersion = value;
