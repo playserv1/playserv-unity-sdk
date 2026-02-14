@@ -8,6 +8,8 @@ This folder contains runtime API samples split by feature.
 - `Samples/Events` - event publish/subscribe sample.
 - `Samples/DataSubscription` - shared entity subscription sample.
 - `Samples/Spawn` - network spawn sample.
+- `Samples/RPC` - RPC invoke sample (transport and local in-process modes).
+- `Samples/Server` - full server-mode sample (command + events + rpc in-process).
 
 ## Quick setup for a scene
 
@@ -19,6 +21,8 @@ This folder contains runtime API samples split by feature.
    - `PlayServEventsSample`
    - `PlayServDataSubscriptionSample`
    - `PlayServSpawnSample`
+   - `PlayServRpcSample`
+   - `PlayServServerModeSample`
 6. Press Play.
 
 ## Scene recipes
@@ -48,6 +52,23 @@ This folder contains runtime API samples split by feature.
 - Ensure prefab exists in `Resources` under selected `Asset Name`.
 - Prefab must contain `NetworkObject`.
 - Optional: add `NetworkTransform` on prefab for transform sync.
+
+### 5) RPC scene
+
+- Add `PlayServBootstrapSample`.
+- Add `PlayServRpcSample`.
+- Use `Enable Local` to execute `PlayServ.Invoke(...)` in-process (no websocket send).
+- Use `Disable Local` to fallback to normal transport RPC (`rpc.InvokeRpc`).
+
+### 6) Server mode scene
+
+- Add `PlayServServerModeSample`.
+- Click `Enable Handlers`.
+- Use buttons:
+  - `Send Command` to test `PlayServ.Send(...)` via local command handler.
+  - `Publish Event` to test `PlayServ.Publish(...)` and local subscribe callback.
+  - `Invoke RPC` to test `PlayServ.Invoke(...)` via local rpc invoker.
+- No websocket connection is required while handlers are enabled.
 
 ## Notes
 

@@ -3,6 +3,8 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
+using Playserv.RPC;
+using Playserv.Server;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -86,6 +88,12 @@ namespace Playserv.Wrapper
         void Send<T>(T command);
 
         /// <summary>
+        /// Sets optional local command handler for server-side/in-process execution.
+        /// </summary>
+        /// <param name="commandHandler">Local command handler. Pass null to disable local handling.</param>
+        void SetCommandHandler(ICommandHandler? commandHandler);
+
+        /// <summary>
         /// Sends command to explicit module path.
         /// </summary>
         /// <typeparam name="T">Command type.</typeparam>
@@ -94,12 +102,24 @@ namespace Playserv.Wrapper
         void Send<T>(T command, string moduleName);
 
         /// <summary>
+        /// Sets optional local event handler for server-side/in-process execution.
+        /// </summary>
+        /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
+        void SetEventHandler(IEventHandler? eventHandler);
+
+        /// <summary>
         /// Invokes server RPC method using object payload serialized to base64 JSON.
         /// </summary>
         /// <param name="serviceName">RPC service name.</param>
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payload">Payload object to serialize.</param>
         void Invoke(string serviceName, string methodName, object? payload);
+
+        /// <summary>
+        /// Sets optional local RPC invoker for server-side/in-process execution.
+        /// </summary>
+        /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
+        void SetRpcInvoker(IRpcInvoker? rpcInvoker);
 
         /// <summary>
         /// Invokes server RPC method using already prepared base64 JSON payload.

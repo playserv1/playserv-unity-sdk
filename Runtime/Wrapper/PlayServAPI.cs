@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.RPC;
+using Playserv.Server;
 using Playserv.Proxy.Common;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
@@ -22,6 +23,9 @@ namespace Playserv.Wrapper
         private PlayServImplementation? _instance;
         private PlayServSettings? _settings;
         private string? _instanceEndpoint;
+        private ICommandHandler? _commandHandler;
+        private IEventHandler? _eventHandler;
+        private IRpcInvoker? _rpcInvoker;
 
         public string SdkVersion => SdkInfo.Version;
 
@@ -76,22 +80,46 @@ namespace Playserv.Wrapper
             return await Instance.Connect();
         }
 
-        public IObservable<T> Subscribe<T>() =>
-            Instance.Subscribe<T>();
-
         public IDisposable Subscribe<T>(Action<T> onNext) =>
-            Instance.Subscribe(onNext);
+            TrySubscribeLocal(onNext, out var subscription)
+                ? subscription
+                : Instance.Subscribe(onNext);
 
-        public void Send<T>(T command) => Instance.Send(command);
+        public IObservable<T> Subscribe<T>() =>
+            TrySubscribeLocal<T>(out var observable)
+                ? observable
+                : Instance.Subscribe<T>();
 
-        public void Send<T>(T command, string moduleName) =>
+        public void Send<T>(T command)
+        {
+            if (TryHandleLocalCommand(command!, moduleName: null))
+                return;
+
+            Instance.Send(command);
+        }
+
+        public void SetCommandHandler(ICommandHandler? commandHandler) =>
+            _commandHandler = commandHandler;
+
+        public void Send<T>(T command, string moduleName)
+        {
+            if (TryHandleLocalCommand(command!, moduleName))
+                return;
+
             Instance.Send(command, moduleName);
+        }
+
+        public void SetEventHandler(IEventHandler? eventHandler) =>
+            _eventHandler = eventHandler;
 
         public void Invoke(string serviceName, string methodName, object? payload)
         {
             var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
             Invoke(serviceName, methodName, payloadBase64);
         }
+
+        public void SetRpcInvoker(IRpcInvoker? rpcInvoker) =>
+            _rpcInvoker = rpcInvoker;
 
         public void Invoke(string serviceName, string methodName, string payloadBase64)
         {
@@ -103,6 +131,19 @@ namespace Playserv.Wrapper
 
             if (string.IsNullOrWhiteSpace(payloadBase64))
                 throw new ArgumentException("Payload base64 is required.", nameof(payloadBase64));
+
+            if (_rpcInvoker != null)
+            {
+                if (_rpcInvoker.TryInvoke(serviceName, methodName, payloadBase64))
+                    return;
+
+                if (_instance == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Local RPC invoker did not handle '{serviceName}.{methodName}'. " +
+                        "Register service in invoker or connect transport.");
+                }
+            }
 
             var request = new RpcInvokeRequest
             {
@@ -148,14 +189,29 @@ namespace Playserv.Wrapper
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             Instance.GetTransportImplementation();
 
-        public void Publish<T>(T @event) =>
+        public void Publish<T>(T @event)
+        {
+            if (TryPublishLocal(@event))
+                return;
+
             Instance.Publish(@event);
+        }
 
-        public void PublishForGroup<T>(string groupName, T @event) =>
+        public void PublishForGroup<T>(string groupName, T @event)
+        {
+            if (TryPublishForGroupLocal(groupName, @event))
+                return;
+
             Instance.PublishForGroup(groupName, @event);
+        }
 
-        public void PublishForUser<T>(string userId, T @event) =>
+        public void PublishForUser<T>(string userId, T @event)
+        {
+            if (TryPublishForUserLocal(userId, @event))
+                return;
+
             Instance.PublishForUser(userId, @event);
+        }
 
 #if UNITY_5_3_OR_NEWER
         public Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
@@ -198,6 +254,118 @@ namespace Playserv.Wrapper
         private void HandleKeepAlivePingSent() => OnKeepAlivePingSent?.Invoke();
         private void HandleKeepAlivePongReceived() => OnKeepAlivePongReceived?.Invoke();
 
+        private bool TryHandleLocalCommand(object command, string? moduleName)
+        {
+            if (_commandHandler == null)
+                return false;
+
+            if (_commandHandler.TryHandle(command, moduleName))
+                return true;
+
+            if (_instance == null)
+                throw new InvalidOperationException(
+                    $"Local command handler did not handle module '{moduleName ?? "<default>"}'. " +
+                    "Register handler for module or connect transport.");
+
+            return false;
+        }
+
+        private bool TrySubscribeLocal<T>(out IObservable<T> observable)
+        {
+            if (_eventHandler != null &&
+                _eventHandler.TrySubscribe<T>(out var localObservable) &&
+                localObservable != null)
+            {
+                observable = localObservable;
+                return true;
+            }
+
+            if (_eventHandler != null && _instance == null)
+            {
+                throw new InvalidOperationException(
+                    $"Local event handler did not provide observable subscription for '{typeof(T).Name}'. " +
+                    "Provide event handler subscription or connect transport.");
+            }
+
+            observable = null!;
+            return false;
+        }
+
+        private bool TrySubscribeLocal<T>(Action<T> onNext, out IDisposable subscription)
+        {
+            if (_eventHandler != null &&
+                _eventHandler.TrySubscribe(onNext, out var localSubscription) &&
+                localSubscription != null)
+            {
+                subscription = localSubscription;
+                return true;
+            }
+
+            if (_eventHandler != null && _instance == null)
+            {
+                throw new InvalidOperationException(
+                    $"Local event handler did not handle callback subscription for '{typeof(T).Name}'. " +
+                    "Provide event handler subscription or connect transport.");
+            }
+
+            subscription = null!;
+            return false;
+        }
+
+        private bool TryPublishLocal<T>(T @event)
+        {
+            if (_eventHandler == null)
+                return false;
+
+            if (_eventHandler.TryPublish(@event))
+                return true;
+
+            if (_instance == null)
+            {
+                throw new InvalidOperationException(
+                    $"Local event handler did not handle publish for '{typeof(T).Name}'. " +
+                    "Provide event handler publish route or connect transport.");
+            }
+
+            return false;
+        }
+
+        private bool TryPublishForGroupLocal<T>(string groupName, T @event)
+        {
+            if (_eventHandler == null)
+                return false;
+
+            if (_eventHandler.TryPublishForGroup(groupName, @event))
+                return true;
+
+            if (_instance == null)
+            {
+                throw new InvalidOperationException(
+                    $"Local event handler did not handle group publish '{groupName}' for '{typeof(T).Name}'. " +
+                    "Provide event handler group route or connect transport.");
+            }
+
+            return false;
+        }
+
+        private bool TryPublishForUserLocal<T>(string userId, T @event)
+        {
+            if (_eventHandler == null)
+                return false;
+
+            if (_eventHandler.TryPublishForUser(userId, @event))
+                return true;
+
+            if (_instance == null)
+            {
+                throw new InvalidOperationException(
+                    $"Local event handler did not handle user publish '{userId}' for '{typeof(T).Name}'. " +
+                    "Provide event handler user route or connect transport.");
+            }
+
+            return false;
+        }
+
         private static MethodCallExpression ResolveMethodCall(Expression expression, string paramName)
         {
             if (expression is not MethodCallExpression methodCall)
@@ -224,15 +392,14 @@ namespace Playserv.Wrapper
                     return;
 
                 var attributeTypeName = attribute.GetType().Name;
-                if (string.Equals(attributeTypeName, "RPCAttribute", StringComparison.Ordinal) ||
-                    string.Equals(attributeTypeName, "RpcAttribute", StringComparison.Ordinal))
+                if (string.Equals(attributeTypeName, "RpcAttribute", StringComparison.Ordinal))
                 {
                     return;
                 }
             }
 
             throw new InvalidOperationException(
-                $"RPC service type '{serviceType.FullName}' must be decorated with [RPC] (or [Rpc]) attribute.");
+                $"RPC service type '{serviceType.FullName}' must be decorated with [Rpc] attribute.");
         }
 
         private static object BuildPayloadFromMethodCall(MethodCallExpression methodCall)

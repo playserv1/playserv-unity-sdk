@@ -3,6 +3,8 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
+using Playserv.RPC;
+using Playserv.Server;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -104,7 +106,14 @@ namespace Playserv.Wrapper
         /// <param name="command">Command payload.</param>
         public static void Send<T>(T command) =>
             Api.Send(command);
-        
+
+        /// <summary>
+        /// Sets optional local command handler for server-side/in-process execution.
+        /// </summary>
+        /// <param name="commandHandler">Local command handler. Pass null to disable local handling.</param>
+        public static void SetCommandHandler(ICommandHandler? commandHandler) =>
+            Api.SetCommandHandler(commandHandler);
+
         /// <summary>
         /// Sends command object to explicit backend module/command path.
         /// </summary>
@@ -115,6 +124,13 @@ namespace Playserv.Wrapper
             Api.Send(command,  moduleName);
 
         /// <summary>
+        /// Sets optional local event handler for server-side/in-process execution.
+        /// </summary>
+        /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
+        public static void SetEventHandler(IEventHandler? eventHandler) =>
+            Api.SetEventHandler(eventHandler);
+
+        /// <summary>
         /// Invokes server RPC method using object payload serialized to base64 JSON.
         /// </summary>
         /// <param name="serviceName">RPC service name.</param>
@@ -122,6 +138,13 @@ namespace Playserv.Wrapper
         /// <param name="payload">Payload object to serialize.</param>
         public static void Invoke(string serviceName, string methodName, object? payload) =>
             Api.Invoke(serviceName, methodName, payload);
+
+        /// <summary>
+        /// Sets optional local RPC invoker for server-side/in-process execution.
+        /// </summary>
+        /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
+        public static void SetRpcInvoker(IRpcInvoker? rpcInvoker) =>
+            Api.SetRpcInvoker(rpcInvoker);
 
         /// <summary>
         /// Invokes server RPC method using already prepared base64 JSON payload.

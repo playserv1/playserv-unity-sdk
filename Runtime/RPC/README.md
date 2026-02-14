@@ -11,6 +11,9 @@ Internally, PlayServ sends `RpcInvokeRequest` through module:
 
 - `rpc.InvokeRpc`
 
+If local RPC invoker is configured (`PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
+If invoker is configured but service is not registered, SDK falls back to transport (or throws if transport is not connected).
+
 ## Payload format
 
 RPC payload is sent as:
@@ -75,3 +78,18 @@ For this variant payload is built automatically as:
 ```
 
 `TService` type name is used as `serviceName`, and method call name is used as `methodName`.
+
+## Server-side (no websocket) usage
+
+```csharp
+using Playserv.RPC;
+using Playserv.Wrapper;
+
+var invoker = new LocalRpcInvoker()
+    .RegisterService(new NotificationService(context));
+
+PlayServ.SetRpcInvoker(invoker);
+
+// Executes local method directly, does not send command over websocket.
+PlayServ.Invoke<NotificationService>(x => x.BroadcastToAll("Hello from server"));
+```
