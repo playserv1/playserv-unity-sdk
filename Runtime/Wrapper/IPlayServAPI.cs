@@ -1,4 +1,5 @@
 using System;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
@@ -107,6 +108,29 @@ namespace Playserv.Wrapper
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
         void Invoke(string serviceName, string methodName, string payloadBase64);
+
+        /// <summary>
+        /// Invokes server RPC method from a method-call expression and auto-builds payload from arguments.
+        /// </summary>
+        /// <typeparam name="TService">RPC service type used to derive service name.</typeparam>
+        /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll("Hello"). Service class must have [Rpc] attribute.</param>
+        void Invoke<TService>(Expression<Action<TService>> method);
+
+        /// <summary>
+        /// Invokes server RPC method by passing method expression of service type.
+        /// </summary>
+        /// <typeparam name="TService">RPC service type used to derive service name.</typeparam>
+        /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll(default). Service class must have [Rpc] attribute.</param>
+        /// <param name="payload">Payload object to serialize to base64 JSON.</param>
+        void Invoke<TService>(Expression<Action<TService>> method, object? payload);
+
+        /// <summary>
+        /// Invokes server RPC method by passing method expression with pre-encoded base64 payload.
+        /// </summary>
+        /// <typeparam name="TService">RPC service type used to derive service name.</typeparam>
+        /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll(default). Service class must have [Rpc] attribute.</param>
+        /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
+        void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64);
 
         /// <summary>
         /// Returns low-level transport implementation.

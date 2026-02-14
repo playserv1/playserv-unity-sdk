@@ -4,6 +4,8 @@ This folder contains runtime RPC helpers for calling server services via:
 
 - `PlayServ.Invoke(serviceName, methodName, payload)`
 - `PlayServ.Invoke(serviceName, methodName, payloadBase64)`
+- `PlayServ.Invoke<TService>(x => x.SomeMethod("arg"))`
+- `PlayServ.Invoke<TService>(x => x.SomeMethod(default), payload)`
 
 Internally, PlayServ sends `RpcInvokeRequest` through module:
 
@@ -38,3 +40,38 @@ PlayServ.Invoke(
     "BroadcastToAll",
     "eyJtZXNzYWdlIjoiSGVsbG8ifQ==");
 ```
+
+Expression-based variant:
+
+```csharp
+PlayServ.Invoke<NotificationService>(
+    x => x.BroadcastToAll(default),
+    new { message = "Hello" });
+```
+
+Function-call variant (auto payload from function arguments):
+
+```csharp
+PlayServ.Invoke<NotificationService>(
+    x => x.BroadcastToAll("Hello"));
+```
+
+Service type must be decorated with `[Rpc]`:
+
+```csharp
+using Playserv.RPC;
+
+[Rpc]
+public class NotificationService
+{
+    public void BroadcastToAll(string message) { }
+}
+```
+
+For this variant payload is built automatically as:
+
+```json
+{ "message": "Hello" }
+```
+
+`TService` type name is used as `serviceName`, and method call name is used as `methodName`.
