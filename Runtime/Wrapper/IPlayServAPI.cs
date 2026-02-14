@@ -93,6 +93,22 @@ namespace Playserv.Wrapper
         void Send<T>(T command, string moduleName);
 
         /// <summary>
+        /// Invokes server RPC method using object payload serialized to base64 JSON.
+        /// </summary>
+        /// <param name="serviceName">RPC service name.</param>
+        /// <param name="methodName">RPC method name.</param>
+        /// <param name="payload">Payload object to serialize.</param>
+        void Invoke(string serviceName, string methodName, object? payload);
+
+        /// <summary>
+        /// Invokes server RPC method using already prepared base64 JSON payload.
+        /// </summary>
+        /// <param name="serviceName">RPC service name.</param>
+        /// <param name="methodName">RPC method name.</param>
+        /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
+        void InvokeBase64(string serviceName, string methodName, string payloadBase64);
+
+        /// <summary>
         /// Returns low-level transport implementation.
         /// Intended for tests and protocol diagnostics.
         /// </summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
+using Playserv.RPC;
 using Playserv.Proxy.Common;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
@@ -83,6 +84,33 @@ namespace Playserv.Wrapper
 
         public void Send<T>(T command, string moduleName) =>
             Instance.Send(command, moduleName);
+
+        public void Invoke(string serviceName, string methodName, object? payload)
+        {
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
+            InvokeBase64(serviceName, methodName, payloadBase64);
+        }
+
+        public void InvokeBase64(string serviceName, string methodName, string payloadBase64)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName))
+                throw new ArgumentException("Service name is required.", nameof(serviceName));
+
+            if (string.IsNullOrWhiteSpace(methodName))
+                throw new ArgumentException("Method name is required.", nameof(methodName));
+
+            if (string.IsNullOrWhiteSpace(payloadBase64))
+                throw new ArgumentException("Payload base64 is required.", nameof(payloadBase64));
+
+            var request = new RpcInvokeRequest
+            {
+                ServiceName = serviceName,
+                MethodName = methodName,
+                Payload = payloadBase64
+            };
+
+            Instance.Send(request, RpcConstants.InvokeModuleName);
+        }
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             Instance.GetTransportImplementation();
