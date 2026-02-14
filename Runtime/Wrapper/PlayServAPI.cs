@@ -88,10 +88,10 @@ namespace Playserv.Wrapper
         public void Invoke(string serviceName, string methodName, object? payload)
         {
             var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
-            InvokeBase64(serviceName, methodName, payloadBase64);
+            Invoke(serviceName, methodName, payloadBase64);
         }
 
-        public void InvokeBase64(string serviceName, string methodName, string payloadBase64)
+        public void Invoke(string serviceName, string methodName, string payloadBase64)
         {
             if (string.IsNullOrWhiteSpace(serviceName))
                 throw new ArgumentException("Service name is required.", nameof(serviceName));

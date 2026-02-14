@@ -3,7 +3,7 @@
 This folder contains runtime RPC helpers for calling server services via:
 
 - `PlayServ.Invoke(serviceName, methodName, payload)`
-- `PlayServ.InvokeBase64(serviceName, methodName, payloadBase64)`
+- `PlayServ.Invoke(serviceName, methodName, payloadBase64)`
 
 Internally, PlayServ sends `RpcInvokeRequest` through module:
 
@@ -33,7 +33,7 @@ PlayServ.Invoke(
 Equivalent base64 variant:
 
 ```csharp
-PlayServ.InvokeBase64(
+PlayServ.Invoke(
     "NotificationService",
     "BroadcastToAll",
     "eyJtZXNzYWdlIjoiSGVsbG8ifQ==");

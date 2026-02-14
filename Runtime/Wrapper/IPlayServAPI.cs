@@ -106,7 +106,7 @@ namespace Playserv.Wrapper
         /// <param name="serviceName">RPC service name.</param>
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
-        void InvokeBase64(string serviceName, string methodName, string payloadBase64);
+        void Invoke(string serviceName, string methodName, string payloadBase64);
 
         /// <summary>
         /// Returns low-level transport implementation.
