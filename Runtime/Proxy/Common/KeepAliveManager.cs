@@ -10,24 +10,25 @@ namespace Playserv.Proxy.Common
     public sealed class KeepAliveManager : IDisposable
     {
         private const string KeepAliveLogPrefix = "[PlayServ][KeepAlive]";
+        private const string KeepAliveEventType = "KeepAlive";
+        private const string EmptyPayloadJson = "{}";
+        private const int DefaultKeepAliveIntervalMs = 30000;
 
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly object _lock = new();
 
         private CancellationTokenSource _cts;
-        private IDisposable _pongSubscription;
-        private IDisposable _pingSubscription;
+        private IDisposable _legacyPingSubscription;
         private IDisposable _eventKeepAliveSubscription;
-        private Task _pingLoop;
-        private TaskCompletionSource<bool> _pongTcs;
+        private Task _sendLoop;
+        private Task _monitorLoop;
         private bool _isRunning;
-        private bool _lastPingSendFailed;
-        private int _pingSequence;
-        private int _activePingSequence;
-        private long _activePingSentAtMs;
-        private long _lastPongReceivedAtMs;
-        private long _lastServerPingAtMs;
+        private int _timeoutRaised;
+        private int _heartbeatSequence;
+        private long _startedAtMs;
+        private long _lastClientKeepAliveAtMs;
+        private long _lastServerKeepAliveAtMs;
 
         public int PingIntervalMs { get; set; } = 30000;
         public int PongTimeoutMs { get; set; } = 10000;
@@ -51,19 +52,23 @@ namespace Playserv.Proxy.Common
 
                 _isRunning = true;
                 _cts = new CancellationTokenSource();
+                _timeoutRaised = 0;
+                _heartbeatSequence = 0;
+                Interlocked.Exchange(ref _lastClientKeepAliveAtMs, 0);
+                Interlocked.Exchange(ref _lastServerKeepAliveAtMs, 0);
+                Interlocked.Exchange(ref _startedAtMs, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
-                _pongSubscription = _transport.OnReceive<KeepAliveResponse>()
-                    .Subscribe(OnPongReceived);
-
-                _pingSubscription = _transport.OnReceive<KeepAliveRequest>()
-                    .Subscribe(OnPingReceived);
+                _legacyPingSubscription = _transport.OnReceive<KeepAliveRequest>()
+                    .Subscribe(OnLegacyPingReceived);
 
                 _eventKeepAliveSubscription = _transport.OnReceive<EventMessage>()
                     .Subscribe(OnEventMessageReceived);
 
-                _pingLoop = Task.Run(() => PingLoopAsync(_cts.Token));
+                _sendLoop = Task.Run(() => SendLoopAsync(_cts.Token));
+                _monitorLoop = Task.Run(() => MonitorLoopAsync(_cts.Token));
                 _logger.Log(
-                    $"{KeepAliveLogPrefix} manager started. pingInterval={PingIntervalMs}ms, pongTimeout={PongTimeoutMs}ms");
+                    $"{KeepAliveLogPrefix} manager started. twait={ResolveKeepAliveIntervalMs()}ms, " +
+                    $"waitWindow={ResolveKeepAliveWaitWindowMs()}ms");
             }
         }
 
@@ -76,26 +81,23 @@ namespace Playserv.Proxy.Common
 
                 _isRunning = false;
                 _cts?.Cancel();
-                _pongSubscription?.Dispose();
-                _pingSubscription?.Dispose();
+                _legacyPingSubscription?.Dispose();
                 _eventKeepAliveSubscription?.Dispose();
 
-                _pongSubscription = null;
-                _pingSubscription = null;
+                _legacyPingSubscription = null;
                 _eventKeepAliveSubscription = null;
 
                 _logger.Log(
-                    $"{KeepAliveLogPrefix} manager stopped. lastPingAt={FormatTimestamp(Interlocked.Read(ref _activePingSentAtMs))}, " +
-                    $"lastPongAt={FormatTimestamp(Interlocked.Read(ref _lastPongReceivedAtMs))}, " +
-                    $"lastServerPingAt={FormatTimestamp(Interlocked.Read(ref _lastServerPingAtMs))}");
+                    $"{KeepAliveLogPrefix} manager stopped. lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
+                    $"lastServerKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastServerKeepAliveAtMs))}");
             }
         }
 
-        private async Task PingLoopAsync(CancellationToken cancellationToken)
+        private async Task SendLoopAsync(CancellationToken cancellationToken)
         {
-            var firstPingDelayMs = Math.Min(PingIntervalMs, 5000);
+            var firstPingDelayMs = Math.Min(ResolveKeepAliveIntervalMs(), 5000);
             _logger.Log(
-                $"{KeepAliveLogPrefix} ping loop started. first ping in {firstPingDelayMs}ms");
+                $"{KeepAliveLogPrefix} heartbeat loop started. first KeepAlive in {firstPingDelayMs}ms");
 
             var isFirstPing = true;
 
@@ -103,113 +105,107 @@ namespace Playserv.Proxy.Common
             {
                 try
                 {
-                    var delayMs = isFirstPing ? firstPingDelayMs : PingIntervalMs;
+                    var delayMs = isFirstPing ? firstPingDelayMs : ResolveKeepAliveIntervalMs();
                     isFirstPing = false;
                     await Task.Delay(delayMs, cancellationToken);
 
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    var success = await SendPingAndWaitForPongAsync(cancellationToken);
+                    var success = await SendKeepAliveAsync(cancellationToken);
                     if (!success)
                     {
-                        if (_lastPingSendFailed)
-                        {
-                            _logger.LogWarning(
-                                $"{KeepAliveLogPrefix} ping send failed for ping#{Volatile.Read(ref _activePingSequence)}. " +
-                                "Triggering timeout handler.");
-                        }
-                        else
-                        {
-                            _logger.LogWarning(
-                                $"{KeepAliveLogPrefix} pong not received in time for ping#{Volatile.Read(ref _activePingSequence)}. " +
-                                $"waited={PongTimeoutMs}ms, lastPingAt={FormatTimestamp(Interlocked.Read(ref _activePingSentAtMs))}, " +
-                                $"lastPongAt={FormatTimestamp(Interlocked.Read(ref _lastPongReceivedAtMs))}");
-                        }
-                        OnTimeout?.Invoke();
                         break;
                     }
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.Log($"{KeepAliveLogPrefix} ping loop cancelled.");
+                    _logger.Log($"{KeepAliveLogPrefix} heartbeat loop cancelled.");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"{KeepAliveLogPrefix} error: {ex.Message}");
-                    OnTimeout?.Invoke();
+                    _logger.LogError($"{KeepAliveLogPrefix} send loop error: {ex.Message}");
+                    TriggerTimeout("send loop failed");
                     break;
                 }
             }
         }
 
-        private async Task<bool> SendPingAndWaitForPongAsync(CancellationToken cancellationToken)
+        private async Task MonitorLoopAsync(CancellationToken cancellationToken)
         {
-            var pongTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _pongTcs = pongTcs;
-            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var sequence = Interlocked.Increment(ref _pingSequence);
-            Interlocked.Exchange(ref _activePingSequence, sequence);
-            Interlocked.Exchange(ref _activePingSentAtMs, nowMs);
+            var monitorTickMs = ResolveMonitorTickMs();
+            _logger.Log(
+                $"{KeepAliveLogPrefix} watchdog loop started. checkEvery={monitorTickMs}ms");
 
-            var ping = new KeepAliveRequest
+            while (!cancellationToken.IsCancellationRequested)
             {
-                Timestamp = nowMs
-            };
+                try
+                {
+                    await Task.Delay(monitorTickMs, cancellationToken);
+
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
+                    var waitWindowMs = ResolveKeepAliveWaitWindowMs();
+                    var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    var lastServerKeepAliveAtMs = Interlocked.Read(ref _lastServerKeepAliveAtMs);
+                    var sinceLastServerKeepAliveMs = lastServerKeepAliveAtMs > 0
+                        ? Math.Max(0, nowMs - lastServerKeepAliveAtMs)
+                        : Math.Max(0, nowMs - Interlocked.Read(ref _startedAtMs));
+
+                    if (sinceLastServerKeepAliveMs <= waitWindowMs)
+                        continue;
+
+                    _logger.LogWarning(
+                        $"{KeepAliveLogPrefix} server KeepAlive not received in time. " +
+                        $"waited={waitWindowMs}ms, " +
+                        $"silence={sinceLastServerKeepAliveMs}ms, " +
+                        $"lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
+                        $"lastServerKeepAliveAt={FormatTimestamp(lastServerKeepAliveAtMs)}");
+                    TriggerTimeout("server keepalive timeout");
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.Log($"{KeepAliveLogPrefix} watchdog loop cancelled.");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"{KeepAliveLogPrefix} watchdog loop error: {ex.Message}");
+                    TriggerTimeout("watchdog loop failed");
+                    break;
+                }
+            }
+        }
+
+        private async Task<bool> SendKeepAliveAsync(CancellationToken cancellationToken)
+        {
+            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var sequence = Interlocked.Increment(ref _heartbeatSequence);
+            Interlocked.Exchange(ref _lastClientKeepAliveAtMs, nowMs);
+
+            var keepAliveEvent = new EventMessage(KeepAliveEventType, EmptyPayloadJson);
 
             _logger.Log(
-                $"{KeepAliveLogPrefix} -> ping#{sequence} send attempt. ts={FormatTimestamp(ping.Timestamp)}");
+                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} send attempt. event={KeepAliveEventType}, ts={FormatTimestamp(nowMs)}");
 
-            _lastPingSendFailed = false;
             try
             {
-                await _transport.Send(ping);
+                await _transport.Send(keepAliveEvent);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                _lastPingSendFailed = true;
-                _logger.LogWarning($"{KeepAliveLogPrefix} ping#{sequence} send failed: {ex.Message}");
+                _logger.LogWarning($"{KeepAliveLogPrefix} heartbeat#{sequence} send failed: {ex.Message}");
+                TriggerTimeout("failed to send keepalive");
                 return false;
             }
 
             OnPingSent?.Invoke();
             _logger.Log(
-                $"{KeepAliveLogPrefix} -> ping#{sequence} sent. ts={FormatTimestamp(ping.Timestamp)}, timeout={PongTimeoutMs}ms");
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(PongTimeoutMs);
-
-            try
-            {
-                var timeoutTask = Task.Delay(PongTimeoutMs, timeoutCts.Token);
-                var completedTask = await Task.WhenAny(pongTcs.Task, timeoutTask);
-
-                return completedTask == pongTcs.Task && await pongTcs.Task;
-            }
-            catch (OperationCanceledException)
-            {
-                return false;
-            }
-            finally
-            {
-                if (ReferenceEquals(_pongTcs, pongTcs))
-                    _pongTcs = null;
-            }
-        }
-
-        private void OnPongReceived(KeepAliveResponse response)
-        {
-            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            Interlocked.Exchange(ref _lastPongReceivedAtMs, nowMs);
-            var sequence = Volatile.Read(ref _activePingSequence);
-            var pingSentAtMs = Interlocked.Read(ref _activePingSentAtMs);
-            var rttMs = pingSentAtMs > 0 ? Math.Max(0, nowMs - pingSentAtMs) : -1;
-
-            PongReceived?.Invoke();
-            _logger.Log(
-                $"{KeepAliveLogPrefix} <- pong for ping#{sequence}. responseTs={FormatTimestamp(response?.Timestamp ?? 0)}, rtt~{rttMs}ms");
-            _pongTcs?.TrySetResult(true);
+                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} sent. twait={ResolveKeepAliveIntervalMs()}ms");
+            return true;
         }
 
         private void OnEventMessageReceived(EventMessage message)
@@ -221,80 +217,75 @@ namespace Playserv.Proxy.Common
                 return;
 
             var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            Interlocked.Exchange(ref _lastPongReceivedAtMs, nowMs);
-            var sequence = Volatile.Read(ref _activePingSequence);
-            var pingSentAtMs = Interlocked.Read(ref _activePingSentAtMs);
-            var rttMs = pingSentAtMs > 0 ? Math.Max(0, nowMs - pingSentAtMs) : -1;
-            if (ShouldAcknowledgeInfrastructureEvent(message.EventType))
-            {
-                Interlocked.Exchange(ref _lastServerPingAtMs, nowMs);
-            }
+            var previousServerKeepAliveAtMs = Interlocked.Exchange(ref _lastServerKeepAliveAtMs, nowMs);
+            var elapsedMs = previousServerKeepAliveAtMs > 0
+                ? Math.Max(0, nowMs - previousServerKeepAliveAtMs)
+                : -1;
 
             PongReceived?.Invoke();
-            _logger.Log(
-                $"{KeepAliveLogPrefix} <- infrastructure event '{message.EventType}' treated as pong for ping#{sequence}. rtt~{rttMs}ms");
-            if (ShouldAcknowledgeInfrastructureEvent(message.EventType))
+            if (elapsedMs >= 0)
             {
-                _ = SendInfrastructurePongAckAsync(message.EventType);
+                _logger.Log(
+                    $"{KeepAliveLogPrefix} <- server event '{message.EventType}' received. delta={elapsedMs}ms");
             }
-            _pongTcs?.TrySetResult(true);
+            else
+            {
+                _logger.Log(
+                    $"{KeepAliveLogPrefix} <- first server event '{message.EventType}' received. at={FormatTimestamp(nowMs)}");
+            }
         }
 
         private static bool IsKeepAliveEventType(string eventTypeName)
         {
-            return string.Equals(eventTypeName, "KeepAlive", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(eventTypeName, "Heartbeat", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(eventTypeName, "Ping", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(eventTypeName, "Pong", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(eventTypeName, KeepAliveEventType, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool ShouldAcknowledgeInfrastructureEvent(string eventTypeName)
+        private int ResolveKeepAliveIntervalMs()
         {
-            return string.Equals(eventTypeName, "KeepAlive", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(eventTypeName, "Heartbeat", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(eventTypeName, "Ping", StringComparison.OrdinalIgnoreCase);
+            return PingIntervalMs > 0 ? PingIntervalMs : DefaultKeepAliveIntervalMs;
         }
 
-        private async Task SendInfrastructurePongAckAsync(string eventTypeName)
+        private int ResolveKeepAliveWaitWindowMs()
         {
-            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var response = new KeepAliveResponse
-            {
-                Timestamp = nowMs
-            };
-
-            try
-            {
-                await _transport.Send(response);
-                _logger.Log(
-                    $"{KeepAliveLogPrefix} -> pong ack sent for infrastructure event '{eventTypeName}'. ts={FormatTimestamp(nowMs)}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(
-                    $"{KeepAliveLogPrefix} failed to send pong ack for infrastructure event '{eventTypeName}': {ex.Message}");
-            }
+            var intervalMs = ResolveKeepAliveIntervalMs();
+            return Math.Max(intervalMs, PongTimeoutMs > 0 ? PongTimeoutMs : intervalMs);
         }
 
-        private async void OnPingReceived(KeepAliveRequest request)
+        private int ResolveMonitorTickMs()
+        {
+            var waitWindowMs = ResolveKeepAliveWaitWindowMs();
+            var tickMs = waitWindowMs / 4;
+            tickMs = Math.Min(tickMs, 2000);
+            return Math.Max(tickMs, 500);
+        }
+
+        private void TriggerTimeout(string reason)
+        {
+            if (Interlocked.Exchange(ref _timeoutRaised, 1) != 0)
+                return;
+
+            _logger.LogWarning($"{KeepAliveLogPrefix} timeout triggered: {reason}");
+            OnTimeout?.Invoke();
+        }
+
+        private async void OnLegacyPingReceived(KeepAliveRequest request)
         {
             try
             {
                 var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                Interlocked.Exchange(ref _lastServerPingAtMs, nowMs);
                 _logger.Log(
-                    $"{KeepAliveLogPrefix} <- server ping received. requestTs={FormatTimestamp(request?.Timestamp ?? 0)}, at={FormatTimestamp(nowMs)}");
+                    $"{KeepAliveLogPrefix} <- legacy KeepAliveRequest received. requestTs={FormatTimestamp(request?.Timestamp ?? 0)}, at={FormatTimestamp(nowMs)}");
 
                 var response = new KeepAliveResponse
                 {
                     Timestamp = nowMs
                 };
                 await _transport.Send(response);
-                _logger.Log($"{KeepAliveLogPrefix} -> pong sent to server. ts={FormatTimestamp(response.Timestamp)}");
+                _logger.Log($"{KeepAliveLogPrefix} -> legacy KeepAliveResponse sent. ts={FormatTimestamp(response.Timestamp)}");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"{KeepAliveLogPrefix} failed to reply pong: {ex.Message}");
+                _logger.LogError($"{KeepAliveLogPrefix} failed to reply legacy KeepAliveResponse: {ex.Message}");
             }
         }
 

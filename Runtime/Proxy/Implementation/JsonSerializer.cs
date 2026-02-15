@@ -1,6 +1,7 @@
 using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Playserv.Events.Requests;
 using Playserv.Proxy.Interfaces;
 
 namespace Playserv.Proxy.Implementation
@@ -11,6 +12,15 @@ namespace Playserv.Proxy.Implementation
         {
             if (command == null)
                 throw new ArgumentNullException(nameof(command));
+
+            if (command is EventMessage eventMessage &&
+                string.Equals(eventMessage.EventType, "KeepAlive", StringComparison.OrdinalIgnoreCase))
+            {
+                var keepAlivePayloadJson = JsonConvert.SerializeObject(command);
+                keepAlivePayloadJson = NormalizeOutgoingPayloadForType(keepAlivePayloadJson, command.GetType());
+                keepAlivePayloadJson = EnsureKeepAliveEventAlias(keepAlivePayloadJson);
+                return new MessageEnvelope("EventMessage", keepAlivePayloadJson);
+            }
 
             var commandType = command.GetType();
             var typeName = commandType.Name;
@@ -31,6 +41,7 @@ namespace Playserv.Proxy.Implementation
             }
 
             var payloadJson = JsonConvert.SerializeObject(command);
+            payloadJson = NormalizeOutgoingPayloadForType(payloadJson, commandType);
 
             return new MessageEnvelope(typeName, payloadJson);
         }
@@ -156,6 +167,86 @@ namespace Playserv.Proxy.Implementation
 
             var property = type.GetProperty(memberName);
             return property != null && property.PropertyType == typeof(string);
+        }
+
+        /// <summary>
+        /// Normalizes outgoing event envelopes to the transport wire format expected by server-side proxies:
+        /// - EventType -> Event
+        /// - string payload containing JSON -> object/array payload token
+        /// </summary>
+        private static string NormalizeOutgoingPayloadForType(string payloadJson, Type type)
+        {
+            if (string.IsNullOrWhiteSpace(payloadJson))
+                return payloadJson;
+
+            var commandNamespace = type.Namespace;
+            if (string.IsNullOrEmpty(commandNamespace) ||
+                !commandNamespace.StartsWith("Playserv.Events", StringComparison.Ordinal))
+            {
+                return payloadJson;
+            }
+
+            JObject payloadObject;
+            try
+            {
+                payloadObject = JObject.Parse(payloadJson);
+            }
+            catch (JsonException)
+            {
+                return payloadJson;
+            }
+
+            if (payloadObject.TryGetValue("Payload", StringComparison.OrdinalIgnoreCase, out var commandPayloadToken) &&
+                commandPayloadToken.Type == JTokenType.String)
+            {
+                var rawPayload = commandPayloadToken.Value<string>();
+                if (!string.IsNullOrWhiteSpace(rawPayload))
+                {
+                    var trimmedPayload = rawPayload.Trim();
+                    if ((trimmedPayload.StartsWith("{", StringComparison.Ordinal) && trimmedPayload.EndsWith("}", StringComparison.Ordinal)) ||
+                        (trimmedPayload.StartsWith("[", StringComparison.Ordinal) && trimmedPayload.EndsWith("]", StringComparison.Ordinal)))
+                    {
+                        try
+                        {
+                            payloadObject["Payload"] = JToken.Parse(trimmedPayload);
+                        }
+                        catch (JsonException)
+                        {
+                            // Keep original string payload if it is not valid JSON.
+                        }
+                    }
+                }
+            }
+
+            return payloadObject.ToString(Formatting.None);
+        }
+
+        private static string EnsureKeepAliveEventAlias(string payloadJson)
+        {
+            if (string.IsNullOrWhiteSpace(payloadJson))
+                return payloadJson;
+
+            try
+            {
+                var payloadObject = JObject.Parse(payloadJson);
+                if (!payloadObject.TryGetValue("EventType", StringComparison.OrdinalIgnoreCase, out var eventTypeToken))
+                    return payloadJson;
+
+                var eventType = eventTypeToken.Value<string>();
+                if (!string.Equals(eventType, "KeepAlive", StringComparison.OrdinalIgnoreCase))
+                    return payloadJson;
+
+                if (!payloadObject.ContainsKey("Event"))
+                {
+                    payloadObject["Event"] = "KeepAlive";
+                }
+
+                return payloadObject.ToString(Formatting.None);
+            }
+            catch (JsonException)
+            {
+                return payloadJson;
+            }
         }
 
         private string ToPascalCase(string input)

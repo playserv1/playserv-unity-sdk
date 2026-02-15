@@ -168,37 +168,10 @@ namespace Playserv.Proxy.Common
             _gameVersion = gameVersion;
             _sdkVersion = string.IsNullOrWhiteSpace(sdkVersion) ? SdkInfo.Version : sdkVersion;
             _allowMultipleConnections = allowMultipleConnections;
-            var requestedPingIntervalMs = keepAlivePingIntervalMs;
-            var requestedPongTimeoutMs = keepAlivePongTimeoutMs;
+            _keepAliveManager.PingIntervalMs = keepAlivePingIntervalMs;
+            _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
 
-            const int testKeepAliveIntervalMs = 5000;
-            var effectivePingIntervalMs = keepAlivePingIntervalMs <= 0 ? testKeepAliveIntervalMs : keepAlivePingIntervalMs;
-            if (effectivePingIntervalMs > testKeepAliveIntervalMs)
-            {
-                _logger.LogWarning(
-                    $"KeepAlive ping interval {effectivePingIntervalMs}ms exceeds test keepalive interval. " +
-                    $"Clamping to {testKeepAliveIntervalMs}ms.");
-                effectivePingIntervalMs = testKeepAliveIntervalMs;
-            }
-
-            var effectivePongTimeoutMs = keepAlivePongTimeoutMs <= 0 ? testKeepAliveIntervalMs : keepAlivePongTimeoutMs;
-            var maxPongTimeoutMs = Math.Max(1000, effectivePingIntervalMs);
-            if (effectivePongTimeoutMs > maxPongTimeoutMs)
-            {
-                _logger.LogWarning(
-                    $"KeepAlive pong timeout {effectivePongTimeoutMs}ms is too high for ping interval {effectivePingIntervalMs}ms. " +
-                    $"Clamping to {maxPongTimeoutMs}ms.");
-                effectivePongTimeoutMs = maxPongTimeoutMs;
-            }
-
-            _keepAliveManager.PingIntervalMs = effectivePingIntervalMs;
-            _keepAliveManager.PongTimeoutMs = effectivePongTimeoutMs;
-
-            _logger.Log(
-                $"Config set: token={gameAccessToken}, gameId={gameId}, userId={userId}, gameVersion={gameVersion}, " +
-                $"sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, " +
-                $"keepAlivePingIntervalMs={requestedPingIntervalMs}->{effectivePingIntervalMs}, " +
-                $"keepAlivePongTimeoutMs={requestedPongTimeoutMs}->{effectivePongTimeoutMs}");
+            _logger.Log($"Config set: token={gameAccessToken}, gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}");
         }
 
         public async Task<bool> Connect()
