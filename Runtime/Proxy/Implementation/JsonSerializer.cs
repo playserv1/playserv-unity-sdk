@@ -1,5 +1,6 @@
 using System;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Playserv.Proxy.Interfaces;
 
 namespace Playserv.Proxy.Implementation
@@ -54,7 +55,8 @@ namespace Playserv.Proxy.Implementation
             if (type == null)
                 throw new InvalidOperationException($"Unknown command type: {envelope.Command}");
 
-            var cmd = JsonConvert.DeserializeObject(envelope.Payload, type);
+            var normalizedPayload = NormalizePayloadForType(envelope.Payload, type);
+            var cmd = JsonConvert.DeserializeObject(normalizedPayload, type);
             
             if (cmd == null)
                 throw new InvalidOperationException("Failed to deserialize payload.");
@@ -100,6 +102,60 @@ namespace Playserv.Proxy.Implementation
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Normalizes incoming payload for backward/forward compatible deserialization.
+        /// </summary>
+        /// <remarks>
+        /// Handles two known transport variants:
+        /// 1) "Event" field instead of "EventType"
+        /// 2) Object/array payload token for commands where "Payload" member is string
+        /// </remarks>
+        private static string NormalizePayloadForType(string payloadJson, Type type)
+        {
+            if (string.IsNullOrWhiteSpace(payloadJson))
+                return payloadJson;
+
+            JObject payloadObject;
+            try
+            {
+                payloadObject = JObject.Parse(payloadJson);
+            }
+            catch (JsonException)
+            {
+                // Not an object payload (or not JSON) - use as-is.
+                return payloadJson;
+            }
+
+            if (!payloadObject.ContainsKey("EventType") &&
+                payloadObject.TryGetValue("Event", StringComparison.OrdinalIgnoreCase, out var eventToken) &&
+                HasStringMember(type, "EventType"))
+            {
+                payloadObject["EventType"] = eventToken.Type == JTokenType.String
+                    ? eventToken
+                    : eventToken.ToString(Formatting.None);
+            }
+
+            if (payloadObject.TryGetValue("Payload", StringComparison.OrdinalIgnoreCase, out var commandPayload) &&
+                commandPayload.Type != JTokenType.String &&
+                commandPayload.Type != JTokenType.Null &&
+                HasStringMember(type, "Payload"))
+            {
+                payloadObject["Payload"] = commandPayload.ToString(Formatting.None);
+            }
+
+            return payloadObject.ToString(Formatting.None);
+        }
+
+        private static bool HasStringMember(Type type, string memberName)
+        {
+            var field = type.GetField(memberName);
+            if (field != null && field.FieldType == typeof(string))
+                return true;
+
+            var property = type.GetProperty(memberName);
+            return property != null && property.PropertyType == typeof(string);
         }
 
         private string ToPascalCase(string input)

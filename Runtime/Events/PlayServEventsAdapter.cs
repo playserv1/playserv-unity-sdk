@@ -15,6 +15,7 @@ namespace Playserv.Events
         private readonly ILogger _logger;
         private readonly EventSubscriptionManager _subscriptionManager;
         private readonly Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
+        private readonly HashSet<string> _suppressedInfrastructureEventTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _typeCacheLock = new object();
 
         private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
@@ -143,6 +144,20 @@ namespace Playserv.Events
             var eventType = FindTypeByName(message.EventType);
             if (eventType == null)
             {
+                if (IsInfrastructureEventType(message.EventType))
+                {
+                    var shouldLogOnce = false;
+                    lock (_typeCacheLock)
+                    {
+                        shouldLogOnce = _suppressedInfrastructureEventTypes.Add(message.EventType);
+                    }
+
+                    if (shouldLogOnce)
+                        _logger.Log($"Ignoring infrastructure event type: {message.EventType}");
+
+                    return;
+                }
+
                 _logger.LogError($"No event type found for type name: {message.EventType}");
                 return;
             }
@@ -219,6 +234,17 @@ namespace Playserv.Events
             }
 
             return foundType;
+        }
+
+        private static bool IsInfrastructureEventType(string eventTypeName)
+        {
+            if (string.IsNullOrWhiteSpace(eventTypeName))
+                return false;
+
+            return string.Equals(eventTypeName, "KeepAlive", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(eventTypeName, "Heartbeat", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(eventTypeName, "Ping", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(eventTypeName, "Pong", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
