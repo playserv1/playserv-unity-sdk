@@ -8,7 +8,7 @@ namespace Playserv.Proxy.Common
 {
     public sealed class HandshakeService : IDisposable
     {
-        private const int HandshakeTimeoutMs = 10000;
+        private const int HandshakeTimeoutMs = 20000;
 
         private readonly ITransport _transport;
         private readonly ILogger _logger;

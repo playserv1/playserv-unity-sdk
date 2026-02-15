@@ -16,7 +16,8 @@ namespace Playserv.Proxy.Implementation
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private readonly object _gate = new object();
         private readonly List<IObserver<byte[]>> _observers = new List<IObserver<byte[]>>();
-        private readonly ByteArrayChannel _channel;
+        private ByteArrayChannel _channel;
+        private readonly SynchronizationContext _syncContext;
         private readonly ILogger _logger;
         private readonly object _connectGate = new object();
         
@@ -29,8 +30,8 @@ namespace Playserv.Proxy.Implementation
         {
             _uri = new Uri(uri);
             _logger = logger ?? new ConsoleLogger();
-            var syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
-            _channel = new ByteArrayChannel(_observers, _gate, syncContext);
+            _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
+            _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
         }
 
         public async Task<bool> Connect()
@@ -45,12 +46,37 @@ namespace Playserv.Proxy.Implementation
 
                 if (_socket != null && _socket.State == WebSocketState.Open)
                 {
-                    _logger.LogWarning("WebSocket is already connected.");
-                    return true;
+                    if (_channel.IsCompleted)
+                    {
+                        _logger.LogWarning("WebSocket is open but receive channel is completed. Recreating socket/channel.");
+                        try
+                        {
+                            _socket.Abort();
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
+
+                        _socket.Dispose();
+                        _socket = new ClientWebSocket();
+                        ResetChannel();
+                    }
+                    else
+                    {
+                        _logger.LogWarning("WebSocket is already connected.");
+                        return true;
+                    }
                 }
-                
-                _socket?.Dispose();
-                _socket = new ClientWebSocket();
+                else
+                {
+                    _socket?.Dispose();
+                    _socket = new ClientWebSocket();
+                    // Keep the channel instance on fresh connect to preserve existing transport subscription.
+                    // Recreate only after previous channel was completed by disconnect/error.
+                    if (_channel.IsCompleted)
+                        ResetChannel();
+                }
 
                 _connectCTS?.Dispose();
                 _connectCTS = new CancellationTokenSource();
@@ -133,7 +159,28 @@ namespace Playserv.Proxy.Implementation
 
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+                        var closeStatus = result.CloseStatus?.ToString() ?? "n/a";
+                        var closeDescription = string.IsNullOrWhiteSpace(result.CloseStatusDescription)
+                            ? "n/a"
+                            : result.CloseStatusDescription;
+                        _logger.LogWarning(
+                            $"WebSocket close frame received. status={closeStatus}, description={closeDescription}, socketState={_socket.State}");
+
+                        try
+                        {
+                            if (_socket.State == WebSocketState.Open || _socket.State == WebSocketState.CloseReceived)
+                            {
+                                await _socket.CloseAsync(
+                                    result.CloseStatus ?? WebSocketCloseStatus.NormalClosure,
+                                    result.CloseStatusDescription,
+                                    CancellationToken.None);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning($"Failed to complete websocket close handshake: {ex.Message}");
+                        }
+
                         CompleteAll();
                         return;
                     }
@@ -167,6 +214,15 @@ namespace Playserv.Proxy.Implementation
 
         private void NextAll(byte[] data) => _channel.Next(data);
 
+        private void ResetChannel()
+        {
+            lock (_gate)
+            {
+                _observers.Clear();
+                _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
+            }
+        }
+
         public void Dispose()
         {
             _cts.Cancel();
@@ -177,6 +233,7 @@ namespace Playserv.Proxy.Implementation
             catch { }
 
             _socket.Dispose();
+            _connectCTS?.Dispose();
             _cts.Dispose();
         }
 
@@ -270,6 +327,17 @@ namespace Playserv.Proxy.Implementation
                 }
             }
 
+            public bool IsCompleted
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _completed;
+                    }
+                }
+            }
+
             private sealed class Unsubscriber : IDisposable
             {
                 private readonly List<IObserver<byte[]>> _observers;
@@ -301,4 +369,3 @@ namespace Playserv.Proxy.Implementation
         }
     }
 }
-

@@ -1,4 +1,6 @@
 using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Playserv.Proxy.Implementation
 {
@@ -9,104 +11,35 @@ namespace Playserv.Proxy.Implementation
             if (string.IsNullOrWhiteSpace(json))
                 throw new ArgumentException("JSON string cannot be null or empty.", nameof(json));
 
-            var trimmed = json.Trim();
-            if (!trimmed.StartsWith("{") || !trimmed.EndsWith("}"))
-                throw new InvalidOperationException("Invalid JSON format.");
-
-            var command = ExtractStringValue(json, "Command");
-            var payloadJson = ExtractPayloadValue(json);
-
-            return new MessageEnvelope(command, payloadJson);
-        }
-
-        private static string ExtractStringValue(string json, string key)
-        {
-            var keyPattern = $"\"{key}\"";
-            var keyIndex = json.IndexOf(keyPattern, StringComparison.OrdinalIgnoreCase);
-            if (keyIndex < 0)
-                return string.Empty;
-
-            var valueStart = json.IndexOf(':', keyIndex + keyPattern.Length);
-            if (valueStart < 0)
-                return string.Empty;
-
-            var quoteStart = json.IndexOf('"', valueStart);
-            if (quoteStart < 0)
-                return string.Empty;
-
-            var quoteEnd = json.IndexOf('"', quoteStart + 1);
-            if (quoteEnd < 0)
-                return string.Empty;
-
-            return json.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
-        }
-
-        private static string ExtractPayloadValue(string json)
-        {
-            var keyPattern = "\"Payload\"";
-            var keyIndex = json.IndexOf(keyPattern, StringComparison.OrdinalIgnoreCase);
-            if (keyIndex < 0)
-                return string.Empty;
-
-            var valueStart = json.IndexOf(':', keyIndex + keyPattern.Length);
-            if (valueStart < 0)
-                return string.Empty;
-
-            valueStart++;
-            while (valueStart < json.Length && char.IsWhiteSpace(json[valueStart]))
-                valueStart++;
-
-            if (valueStart >= json.Length)
-                return string.Empty;
-
-            if (json[valueStart] == 'n' && json.Substring(valueStart, 4) == "null")
-                return string.Empty;
-
-            if (json[valueStart] == '"')
+            JObject root;
+            try
             {
-                var endQuote = json.IndexOf('"', valueStart + 1);
-                if (endQuote < 0)
-                    return string.Empty;
-                return json.Substring(valueStart, endQuote - valueStart + 1);
+                root = JObject.Parse(json);
+            }
+            catch (JsonException ex)
+            {
+                throw new InvalidOperationException("Invalid message envelope JSON.", ex);
             }
 
-            if (json[valueStart] == '{')
+            var command = string.Empty;
+            if (root.TryGetValue("Command", StringComparison.OrdinalIgnoreCase, out var commandToken) &&
+                commandToken != null &&
+                commandToken.Type != JTokenType.Null)
             {
-                var depth = 0;
-                var i = valueStart;
-                while (i < json.Length)
-                {
-                    if (json[i] == '{')
-                        depth++;
-                    else if (json[i] == '}')
-                    {
-                        depth--;
-                        if (depth == 0)
-                            return json.Substring(valueStart, i - valueStart + 1);
-                    }
-                    i++;
-                }
+                command = commandToken.Type == JTokenType.String
+                    ? commandToken.Value<string>() ?? string.Empty
+                    : commandToken.ToString(Formatting.None);
             }
 
-            if (json[valueStart] == '[')
+            var payload = string.Empty;
+            if (root.TryGetValue("Payload", StringComparison.OrdinalIgnoreCase, out var payloadToken) &&
+                payloadToken != null &&
+                payloadToken.Type != JTokenType.Null)
             {
-                var depth = 0;
-                var i = valueStart;
-                while (i < json.Length)
-                {
-                    if (json[i] == '[')
-                        depth++;
-                    else if (json[i] == ']')
-                    {
-                        depth--;
-                        if (depth == 0)
-                            return json.Substring(valueStart, i - valueStart + 1);
-                    }
-                    i++;
-                }
+                payload = payloadToken.ToString(Formatting.None);
             }
 
-            return string.Empty;
+            return new MessageEnvelope(command, payload);
         }
     }
 }

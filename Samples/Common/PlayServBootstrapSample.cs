@@ -27,6 +27,10 @@ namespace Playserv.Samples
         [SerializeField] private bool showOverlay = true;
         [SerializeField] private bool disconnectOnDestroy = true;
 
+        [Header("KeepAlive")]
+        [SerializeField] private int keepAlivePingIntervalMs = 5000;
+        [SerializeField] private int keepAlivePongTimeoutMs = 5000;
+
         private string _status = "Not configured";
 
         private void Start()
@@ -68,11 +72,15 @@ namespace Playserv.Samples
                 GameVersion = gameVersion,
                 UseLocalBackend = useLocalBackend,
                 LocalEndpoint = localEndpoint,
-                RemoteEndpoint = remoteEndpoint
+                RemoteEndpoint = remoteEndpoint,
+                KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
+                KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs
             };
 
             PlayServ.Config(settings);
             _status = $"Configured ({settings.Endpoint})";
+            Debug.Log(
+                $"[PlayServ][Sample] Configured. endpoint={settings.Endpoint}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
         }
 
         [ContextMenu("Connect SDK")]
@@ -104,16 +112,19 @@ namespace Playserv.Samples
         private void OnTransportError(TransportError error)
         {
             _status = $"Transport error: {error}";
+            Debug.LogError($"[PlayServ][Sample] Transport error: {error}");
         }
 
         private void OnPingSent()
         {
             _status = "KeepAlive ping sent";
+            Debug.Log("[PlayServ][Sample] KeepAlive ping sent.");
         }
 
         private void OnPongReceived()
         {
             _status = "KeepAlive pong received";
+            Debug.Log("[PlayServ][Sample] KeepAlive pong received.");
         }
 
         private void OnGUI()

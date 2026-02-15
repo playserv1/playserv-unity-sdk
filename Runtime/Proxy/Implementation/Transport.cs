@@ -141,49 +141,79 @@ namespace Playserv.Proxy.Implementation
 
         private void OnRawNext(byte[] data)
         {
+            if (data == null || data.Length == 0)
+            {
+                _logger.LogWarning("Received empty transport frame.");
+                return;
+            }
+
+            MessageEnvelope envelope;
+            object command;
+
             try
             {
                 var json = Encoding.UTF8.GetString(data);
                 _logger.Log($"Received JSON: {json}");
-                var envelope = MessageEnvelopeParser.Parse(json);
-                var command = _serializer.Deserialize(envelope);
+                envelope = MessageEnvelopeParser.Parse(json);
+                command = _serializer.Deserialize(envelope);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to parse/deserialize incoming frame. Message skipped: {ex.Message}");
+                return;
+            }
 
-                if (command == null)
+            if (command == null)
+            {
+                _logger.LogWarning($"Received message with null command. Envelope: {envelope.Command}");
+                return;
+            }
+
+            ICommandChannel typeChannel = null;
+            ICommandNameChannel nameChannel = null;
+
+            lock (_gate)
+            {
+                _channels.TryGetValue(command.GetType(), out typeChannel);
+                if (!string.IsNullOrWhiteSpace(envelope.Command))
                 {
-                    _logger.LogWarning($"Received message with null command. Envelope: {envelope.Command}");
-                    return;
+                    _commandNameChannels.TryGetValue(envelope.Command, out nameChannel);
                 }
+            }
 
-                ICommandChannel typeChannel = null;
-                ICommandNameChannel nameChannel = null;
-
-                lock (_gate)
-                {
-                    _channels.TryGetValue(command.GetType(), out typeChannel);
-                    if (!string.IsNullOrWhiteSpace(envelope.Command))
-                    {
-                        _commandNameChannels.TryGetValue(envelope.Command, out nameChannel);
-                    }
-                }
-
+            try
+            {
                 typeChannel?.Next(command);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    $"Error delivering message '{envelope.Command}' to typed channel '{command.GetType().Name}': {ex.Message}");
+            }
+
+            try
+            {
                 nameChannel?.Next(command);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error processing received message: {ex.Message}");
-                ErrorAll(ex);
+                _logger.LogError(
+                    $"Error delivering message '{envelope.Command}' to command-name channel: {ex.Message}");
             }
         }
 
         private void OnRawError(Exception error)
         {
+            _rawSubscription?.Dispose();
+            _rawSubscription = null;
             ErrorAll(error);
             ConnectionLost?.Invoke(this, EventArgs.Empty);
         }
 
         private void OnRawCompleted()
         {
+            _rawSubscription?.Dispose();
+            _rawSubscription = null;
             CompleteAll();
             ConnectionLost?.Invoke(this, EventArgs.Empty);
         }

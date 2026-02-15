@@ -1,16 +1,37 @@
-# PlayServ Server Mode Usage
+# PlayServ Server Runtime Guide
 
-This folder contains local in-process handlers for server runtime scenarios.
+This folder provides **in-process server adapters** for `PlayServ` API.
 
-When local handlers are configured, `PlayServ` API can be used without websocket transport:
+Use this when you want to run gameplay/backend logic on server **without websocket transport** and **without adding server logic into this SDK project**.
 
-- `PlayServ.Send(...)` via `ICommandHandler`
-- `PlayServ.Publish(...)` / `PlayServ.Subscribe(...)` via `IEventHandler`
-- `PlayServ.Invoke(...)` via `IRpcInvoker` (`LocalRpcInvoker` in `Runtime/RPC`)
+## Recommended architecture
 
-## Quick start
+Keep server logic in a separate project/repository (for example `playserv-game-server`):
+
+1. Reference `Playserv.Runtime.Core.dll` (or package) in your server project.
+2. Implement your domain logic there (commands, events, RPC services).
+3. Register local handlers via:
+   - `PlayServ.SetCommandHandler(...)`
+   - `PlayServ.SetEventHandler(...)`
+   - `PlayServ.SetRpcInvoker(...)`
+4. Call `PlayServ.Send/Publish/Subscribe/Invoke` from server code as usual.
+
+No changes are required in SDK runtime code for this.
+
+## How SDK decides server vs client behavior
+
+`PlayServ` does not auto-detect environment by OS/process type.
+
+Behavior is selected by configuration:
+
+- If local handler/invoker is set and handles call -> handled locally (server mode path).
+- If local handler/invoker is missing or returns `false` -> SDK uses transport path (`Connect` + websocket), if available.
+- If local handler/invoker returns `false` and transport is not connected -> SDK throws clear exception.
+
+## Server bootstrap example
 
 ```csharp
+using Playserv.Events;
 using Playserv.RPC;
 using Playserv.Server;
 using Playserv.Wrapper;
@@ -20,76 +41,77 @@ public sealed class NotificationService
 {
     public void Broadcast(string message)
     {
-        // Server logic
+        // Your server logic here
     }
 }
 
-var commandHandler = new LocalCommandHandler()
-    .RegisterFallback((command, module) =>
-    {
-        // Handle PlayServ.Send(...) locally.
-    });
-
-var eventHandler = new LocalEventHandler();
-
-var rpcInvoker = new LocalRpcInvoker()
-    .RegisterService(new NotificationService());
-
-PlayServ.SetCommandHandler(commandHandler);
-PlayServ.SetEventHandler(eventHandler);
-PlayServ.SetRpcInvoker(rpcInvoker);
-```
-
-After this setup you can call `PlayServ.Send`, `PlayServ.Publish`, `PlayServ.Subscribe`, and `PlayServ.Invoke`
-without calling `PlayServ.Connect()`.
-
-## API usage on server
-
-### 1) Commands (`Send`)
-
-```csharp
-PlayServ.Send(new CreateMatchCommand { Region = "eu" }, "server.match.create");
-```
-
-`LocalCommandHandler` receives module name and payload in registered handlers.
-
-### 2) Events (`Publish` / `Subscribe`)
-
-```csharp
-var sub = PlayServ.Subscribe<MatchReadyEvent>(evt =>
+[Event(EventType.All)]
+public sealed class MatchReadyEvent
 {
-    // Local event callback
-});
+    public string MatchId { get; set; } = string.Empty;
+}
 
-PlayServ.Publish(new MatchReadyEvent { MatchId = "m-123" });
+public sealed class CreateMatchCommand
+{
+    public string Region { get; set; } = "eu";
+}
+
+public static class PlayServServerBootstrap
+{
+    private static LocalCommandHandler? _commandHandler;
+    private static LocalEventHandler? _eventHandler;
+    private static LocalRpcInvoker? _rpcInvoker;
+
+    public static void Start()
+    {
+        _commandHandler = new LocalCommandHandler()
+            .RegisterModule("server.match.create", command =>
+            {
+                var create = (CreateMatchCommand)command;
+                // Run domain logic for match creation.
+            })
+            .RegisterFallback((command, moduleName) =>
+            {
+                // Optional: generic routing/logging.
+            });
+
+        _eventHandler = new LocalEventHandler();
+
+        _rpcInvoker = new LocalRpcInvoker()
+            .RegisterService(new NotificationService());
+
+        PlayServ.SetCommandHandler(_commandHandler);
+        PlayServ.SetEventHandler(_eventHandler);
+        PlayServ.SetRpcInvoker(_rpcInvoker);
+    }
+
+    public static void Stop()
+    {
+        PlayServ.SetCommandHandler(null);
+        PlayServ.SetEventHandler(null);
+        PlayServ.SetRpcInvoker(null);
+        PlayServ.Disconnect();
+    }
+}
 ```
 
-`LocalEventHandler` dispatches events by payload type.
+## API mapping in server mode
 
-### 3) RPC (`Invoke`)
+- `PlayServ.Send(command, module)` -> `ICommandHandler.TryHandle(command, module)`
+- `PlayServ.Publish(evt)` -> `IEventHandler.TryPublish(evt)`
+- `PlayServ.PublishForGroup(group, evt)` -> `IEventHandler.TryPublishForGroup(group, evt)`
+- `PlayServ.PublishForUser(userId, evt)` -> `IEventHandler.TryPublishForUser(userId, evt)`
+- `PlayServ.Subscribe<T>(...)` -> `IEventHandler.TrySubscribe<T>(...)`
+- `PlayServ.Invoke<TService>(...)` -> `IRpcInvoker.TryInvoke(service, method, payload)`
 
-```csharp
-PlayServ.Invoke<NotificationService>(x => x.Broadcast("hello"));
-```
+## Practical usage pattern
 
-`LocalRpcInvoker` resolves service/method and executes it in-process.
+- For pure server runtime: register handlers and do not call `PlayServ.Connect()`.
+- For mixed mode (local first, transport fallback): keep handlers and also connect transport.
+- For shutdown: clear handlers (`null`) and disconnect once.
 
-## Disable local mode
+## Constraints and notes
 
-```csharp
-PlayServ.SetCommandHandler(null);
-PlayServ.SetEventHandler(null);
-PlayServ.SetRpcInvoker(null);
-```
-
-## Fallback behavior
-
-- Local handler returns `true` -> call is handled locally, transport is skipped.
-- Local handler returns `false` and websocket transport is connected -> SDK falls back to transport.
-- Local handler returns `false` and transport is not connected -> SDK throws descriptive exception.
-
-## Notes
-
-- RPC service class must have `[Rpc]` attribute.
-- `LocalRpcInvoker` does not support ambiguous method overloads with the same method name.
-- `LocalEventHandler` group/user publish methods currently route by event type (group/user IDs are validated, but not used for filtering).
+- RPC service type must have `[Rpc]` attribute.
+- `LocalRpcInvoker` does not support ambiguous overloads with same method name.
+- `LocalEventHandler` routes by payload type; group/user values are validated but not used as filters.

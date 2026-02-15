@@ -26,6 +26,8 @@ namespace Playserv.Wrapper
         private ICommandHandler? _commandHandler;
         private IEventHandler? _eventHandler;
         private IRpcInvoker? _rpcInvoker;
+        private readonly object _connectGate = new();
+        private Task<bool>? _connectTask;
 
         public string SdkVersion => SdkInfo.Version;
 
@@ -70,14 +72,41 @@ namespace Playserv.Wrapper
             ApplySettings(settings);
         }
 
-        public async Task<bool> Connect()
+        public Task<bool> Connect()
         {
-            if (State is PlayServState.Online or PlayServState.Connecting or PlayServState.Handshaking)
-                throw new InvalidOperationException("PlayServ is already connected or connecting.");
+            lock (_connectGate)
+            {
+                if (_connectTask != null && !_connectTask.IsCompleted)
+                    return _connectTask;
 
-            var settings = GetOrCreateSettings();
-            ApplySettings(settings);
-            return await Instance.Connect();
+                _connectTask = ConnectInternalAsync();
+                return _connectTask;
+            }
+        }
+
+        private async Task<bool> ConnectInternalAsync()
+        {
+            try
+            {
+                if (State is PlayServState.Online or PlayServState.Connecting or PlayServState.Handshaking)
+                    throw new InvalidOperationException("PlayServ is already connected or connecting.");
+
+                var settings = GetOrCreateSettings();
+                ApplySettings(settings);
+                var connected = await Instance.Connect();
+                if (!connected)
+                    Disconnect();
+
+                return connected;
+            }
+            finally
+            {
+                lock (_connectGate)
+                {
+                    if (_connectTask?.IsCompleted == true)
+                        _connectTask = null;
+                }
+            }
         }
 
         public IDisposable Subscribe<T>(Action<T> onNext) =>
