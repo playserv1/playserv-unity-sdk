@@ -9,12 +9,18 @@ namespace Playserv.Editor
     {
         // You can change this path if you want a different location.
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
+        private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
+        private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
 
         public static PlayServConfig GetOrCreate()
         {
             var config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (config != null)
+            {
+                if (EnsureDeployEndpoint(config))
+                    AssetDatabase.SaveAssets();
                 return config;
+            }
 
             // Ensure folder exists
             var folder = System.IO.Path.GetDirectoryName(AssetPath)?.Replace("\\", "/");
@@ -25,6 +31,7 @@ namespace Playserv.Editor
 
             config = ScriptableObject.CreateInstance<PlayServConfig>();
             AssetDatabase.CreateAsset(config, AssetPath);
+            EnsureDeployEndpoint(config);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return config;
@@ -64,6 +71,28 @@ namespace Playserv.Editor
                     AssetDatabase.CreateFolder(current, parts[i]);
                 current = next;
             }
+        }
+
+        private static bool EnsureDeployEndpoint(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var serializedObject = new SerializedObject(config);
+            var deployEndpointProperty = serializedObject.FindProperty("deployApiEndpoint");
+            if (deployEndpointProperty == null)
+                return false;
+
+            var currentValue = deployEndpointProperty.stringValue?.Trim();
+            var shouldReplace = string.IsNullOrWhiteSpace(currentValue) ||
+                                string.Equals(currentValue, LegacyLocalDeployEndpoint, System.StringComparison.OrdinalIgnoreCase);
+            if (!shouldReplace)
+                return false;
+
+            deployEndpointProperty.stringValue = DefaultBackofficeDeployEndpoint;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
+            return true;
         }
     }
 }

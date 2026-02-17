@@ -21,6 +21,8 @@ namespace Playserv.Editor
     {
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://example.com";
+        private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
+        private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
 
         private PlayServConfig _config;
         private SerializedObject _so;
@@ -31,6 +33,9 @@ namespace Playserv.Editor
         private SerializedProperty _pGameVersion;
         private SerializedProperty _pSdkVersion;
         private SerializedProperty _pAllowMultipleConnections;
+        private SerializedProperty _pDeployApiEndpoint;
+        private SerializedProperty _pDeployAuthToken;
+        private SerializedProperty _pDeployTimeoutSeconds;
 
         private bool _foldCodegen;
         private bool _foldEvents;
@@ -127,6 +132,9 @@ namespace Playserv.Editor
             _pGameVersion = _so.FindProperty("gameVersion");
             _pSdkVersion = _so.FindProperty("sdkVersion");
             _pAllowMultipleConnections = _so.FindProperty("allowMultipleConnections");
+            _pDeployApiEndpoint = _so.FindProperty("deployApiEndpoint");
+            _pDeployAuthToken = _so.FindProperty("deployAuthToken");
+            _pDeployTimeoutSeconds = _so.FindProperty("timeoutSeconds");
         }
 
         private void OnGUI()
@@ -555,6 +563,28 @@ namespace Playserv.Editor
                     "Create a ZIP from selected files and upload it to your Deployment API endpoint.",
                     MessageType.Info);
 
+                if (_so != null)
+                {
+                    _so.Update();
+
+                    if (_pDeployApiEndpoint != null)
+                        EditorGUILayout.PropertyField(_pDeployApiEndpoint, new GUIContent("Deploy Endpoint"));
+
+                    if (_pDeployTimeoutSeconds != null)
+                        EditorGUILayout.PropertyField(_pDeployTimeoutSeconds, new GUIContent("Timeout Seconds"));
+
+                    if (_pDeployAuthToken != null)
+                    {
+                        var updatedToken = EditorGUILayout.PasswordField("Deploy Auth Token", _pDeployAuthToken.stringValue);
+                        if (!string.Equals(updatedToken, _pDeployAuthToken.stringValue, StringComparison.Ordinal))
+                            _pDeployAuthToken.stringValue = updatedToken;
+                    }
+
+                    if (_so.ApplyModifiedProperties())
+                        EditorUtility.SetDirty(_config);
+                }
+
+                GUILayout.Space(4);
                 _deployFolder = (DefaultAsset)EditorGUILayout.ObjectField(
                     "Folder",
                     _deployFolder,
@@ -715,7 +745,7 @@ namespace Playserv.Editor
 
             if (!EditorUtility.DisplayDialog(
                     "Deploy",
-                    $"Upload {files.Count} file(s) for GameId '{gameId}'?\n\nEndpoint:\n{_config.DeployApiEndpoint}",
+                    $"Upload {files.Count} file(s) for GameId '{gameId}'?\n\nEndpoint:\n{ResolveDeployEndpointForDisplay()}",
                     "Deploy",
                     "Cancel"))
             {
@@ -765,6 +795,18 @@ namespace Playserv.Editor
                 _deployCts?.Dispose();
                 _deployCts = null;
             }
+        }
+
+        private string ResolveDeployEndpointForDisplay()
+        {
+            var endpoint = _config?.DeployApiEndpoint?.Trim();
+            if (string.IsNullOrWhiteSpace(endpoint))
+                return DefaultBackofficeDeployEndpoint;
+
+            if (string.Equals(endpoint, LegacyLocalDeployEndpoint, StringComparison.OrdinalIgnoreCase))
+                return DefaultBackofficeDeployEndpoint;
+
+            return endpoint;
         }
 
         private async Task DeployWithRelativePathsAsync(

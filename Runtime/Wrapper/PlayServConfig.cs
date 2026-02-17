@@ -31,7 +31,8 @@ namespace Playserv.Wrapper
         
         
         [Header("Deploy")]
-        [SerializeField] private string deployApiEndpoint = "http://localhost:5000/api/deployments";
+        [SerializeField] private string deployApiEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
+        [SerializeField] private string deployAuthToken = "";
         [SerializeField] private int timeoutSeconds = 120;
 
         /// <summary>
@@ -109,6 +110,11 @@ namespace Playserv.Wrapper
         public string DeployApiEndpoint => deployApiEndpoint;
 
         /// <summary>
+        /// Optional bearer token used by editor deployment HTTP requests.
+        /// </summary>
+        public string DeployAuthToken => deployAuthToken;
+
+        /// <summary>
         /// Timeout in seconds for deployment HTTP requests.
         /// </summary>
         public int TimeoutSeconds => timeoutSeconds;
@@ -130,6 +136,7 @@ namespace Playserv.Wrapper
                 LocalEndpoint = localEndpoint,
                 RemoteEndpoint = remoteEndpoint,
                 DeployApiEndpoint = deployApiEndpoint,
+                DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };
         }

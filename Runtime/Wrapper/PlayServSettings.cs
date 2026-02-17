@@ -82,7 +82,12 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
-        public string DeployApiEndpoint { get; set; } = "http://localhost:5000/api/deployments";
+        public string DeployApiEndpoint { get; set; } = "https://playserv-backoffice.test.playserv.io/api/deployments";
+
+        /// <summary>
+        /// Optional bearer token used by editor deployment HTTP requests.
+        /// </summary>
+        public string DeployAuthToken { get; set; } = string.Empty;
 
         /// <summary>
         /// Timeout in seconds for deployment API requests.
@@ -115,6 +120,7 @@ namespace Playserv.Wrapper
                 LocalEndpoint = LocalEndpoint,
                 RemoteEndpoint = RemoteEndpoint,
                 DeployApiEndpoint = DeployApiEndpoint,
+                DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };
         }
