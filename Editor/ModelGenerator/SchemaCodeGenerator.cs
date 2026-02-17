@@ -1,7 +1,7 @@
 using UnityEditor;
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -56,15 +56,13 @@ namespace Playserv.ModelGenerator.Editor
                 try
                 {
                     // 1. Setup Deserialization
-                    var options = new JsonSerializerOptions
+                    var settings = new JsonSerializerSettings
                     {
-                        PropertyNameCaseInsensitive = true,
-                        ReadCommentHandling = JsonCommentHandling.Skip,
-                        AllowTrailingCommas = true
+                        MetadataPropertyHandling = MetadataPropertyHandling.Ignore
                     };
 
                     // 2. Deserialize Schema
-                    JsonSchemaRoot root = JsonSerializer.Deserialize<JsonSchemaRoot>(content, options)!;
+                    JsonSchemaRoot root = JsonConvert.DeserializeObject<JsonSchemaRoot>(content, settings)!;
 
                     EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, root.JsonSchema.XTimestamp);
                     EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, root.JsonSchema.XVersion);
@@ -138,14 +136,12 @@ namespace Playserv.ModelGenerator.Editor
 
             var content = File.ReadAllText(LatestSchemaFilePath);
 
-            var options = new JsonSerializerOptions
+            var settings = new JsonSerializerSettings
             {
-                PropertyNameCaseInsensitive = true,
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true
+                MetadataPropertyHandling = MetadataPropertyHandling.Ignore
             };
 
-            JsonSchemaRoot root = JsonSerializer.Deserialize<JsonSchemaRoot>(content, options)!;
+            JsonSchemaRoot root = JsonConvert.DeserializeObject<JsonSchemaRoot>(content, settings)!;
 
             EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestTimestamp, root.JsonSchema.XTimestamp);
             EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestVersion, root.JsonSchema.XVersion);
