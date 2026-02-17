@@ -15,8 +15,10 @@ namespace Playserv.Wrapper
     {
         private const string DEFAULT_LOCAL_ENDPOINT = "ws://localhost:8080/ws/";
         private const string DEFAULT_REMOTE_ENDPOINT = "wss://playserv-proxy.test.playserv.io/ws";
+        private readonly string DEPLOY_API_ENDPOINT = "http://playserv-deployment.test.playserv.io/api/deployments";
 
         [SerializeField] private string gameAccessToken;
+        [SerializeField] private string projectId;
         [SerializeField] private string gameId;
         [SerializeField] private string userId;
         [SerializeField] private string gameVersion = "1.0.0";
@@ -29,12 +31,10 @@ namespace Playserv.Wrapper
         [SerializeField] private string localEndpoint = DEFAULT_LOCAL_ENDPOINT;
         [SerializeField] private string remoteEndpoint = DEFAULT_REMOTE_ENDPOINT;
         
-        
         [Header("Deploy")]
-        [SerializeField] private string deployApiEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
         [SerializeField] private string deployAuthToken = "";
         [SerializeField] private int timeoutSeconds = 120;
-
+        
         /// <summary>
         /// Game access token used for handshake.
         /// </summary>
@@ -107,7 +107,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
-        public string DeployApiEndpoint => deployApiEndpoint;
+        public string DeployApiEndpoint => DEPLOY_API_ENDPOINT;
 
         /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.
@@ -124,6 +124,7 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 GameAccessToken = gameAccessToken,
+                ProjectId = projectId,
                 GameId = gameId,
                 UserId = userId,
                 GameVersion = gameVersion,
@@ -135,7 +136,7 @@ namespace Playserv.Wrapper
                 UseLocalBackend = useLocalBackend,
                 LocalEndpoint = localEndpoint,
                 RemoteEndpoint = remoteEndpoint,
-                DeployApiEndpoint = deployApiEndpoint,
+                DeployApiEndpoint = DEPLOY_API_ENDPOINT,
                 DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };

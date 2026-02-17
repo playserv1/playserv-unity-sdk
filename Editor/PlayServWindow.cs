@@ -30,6 +30,7 @@ namespace Playserv.Editor
         private SerializedProperty _pGameAccessToken;
         private SerializedProperty _pUserId;
         private SerializedProperty _pGameId;
+        private SerializedProperty _pProjectId;
         private SerializedProperty _pGameVersion;
         private SerializedProperty _pSdkVersion;
         private SerializedProperty _pAllowMultipleConnections;
@@ -129,6 +130,7 @@ namespace Playserv.Editor
             _pGameAccessToken = _so.FindProperty("gameAccessToken");
             _pUserId = _so.FindProperty("userId");
             _pGameId = _so.FindProperty("gameId");
+            _pProjectId = _so.FindProperty("projectId");
             _pGameVersion = _so.FindProperty("gameVersion");
             _pSdkVersion = _so.FindProperty("sdkVersion");
             _pAllowMultipleConnections = _so.FindProperty("allowMultipleConnections");
@@ -916,6 +918,7 @@ namespace Playserv.Editor
                     _so.Update();
 
                     EditorGUILayout.PropertyField(_pGameAccessToken);
+                    EditorGUILayout.PropertyField(_pProjectId);
                     EditorGUILayout.PropertyField(_pUserId);
                     EditorGUILayout.PropertyField(_pGameId);
                     EditorGUILayout.PropertyField(_pGameVersion);

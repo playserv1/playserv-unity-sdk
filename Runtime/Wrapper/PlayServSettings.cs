@@ -23,6 +23,11 @@ namespace Playserv.Wrapper
         /// Access token used in handshake.
         /// </summary>
         public string GameAccessToken { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// Project identifier
+        /// </summary>
+        public string ProjectId { get; set; } = string.Empty;
 
         /// <summary>
         /// Game identifier.
@@ -108,6 +113,7 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 GameAccessToken = GameAccessToken,
+                ProjectId = ProjectId,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
