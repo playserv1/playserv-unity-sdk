@@ -16,10 +16,11 @@ namespace Playserv.Proxy.Implementation
             if (command is EventMessage eventMessage &&
                 string.Equals(eventMessage.EventType, "KeepAlive", StringComparison.OrdinalIgnoreCase))
             {
-                var keepAlivePayloadJson = JsonConvert.SerializeObject(command);
-                keepAlivePayloadJson = NormalizeOutgoingPayloadForType(keepAlivePayloadJson, command.GetType());
-                keepAlivePayloadJson = EnsureKeepAliveEventAlias(keepAlivePayloadJson);
-                return new MessageEnvelope("EventMessage", keepAlivePayloadJson);
+                // KeepAlive must satisfy both server handlers:
+                // - transport keepalive handler expects "Event"
+                // - events module expects "EventType"
+                var keepAlivePayload = BuildKeepAlivePayload(eventMessage);
+                return new MessageEnvelope("EventMessage", keepAlivePayload.ToString(Formatting.None));
             }
 
             var commandType = command.GetType();
@@ -171,7 +172,6 @@ namespace Playserv.Proxy.Implementation
 
         /// <summary>
         /// Normalizes outgoing event envelopes to the transport wire format expected by server-side proxies:
-        /// - EventType -> Event
         /// - string payload containing JSON -> object/array payload token
         /// </summary>
         private static string NormalizeOutgoingPayloadForType(string payloadJson, Type type)
@@ -221,31 +221,33 @@ namespace Playserv.Proxy.Implementation
             return payloadObject.ToString(Formatting.None);
         }
 
-        private static string EnsureKeepAliveEventAlias(string payloadJson)
+        private static JObject BuildKeepAlivePayload(EventMessage eventMessage)
+        {
+            var payloadToken = ParsePayloadToken(eventMessage.Payload) ?? new JObject();
+            var eventType = string.IsNullOrWhiteSpace(eventMessage.EventType)
+                ? "KeepAlive"
+                : eventMessage.EventType;
+
+            return new JObject
+            {
+                ["EventType"] = eventType,
+                ["Event"] = "KeepAlive",
+                ["Payload"] = payloadToken
+            };
+        }
+
+        private static JToken ParsePayloadToken(string payloadJson)
         {
             if (string.IsNullOrWhiteSpace(payloadJson))
-                return payloadJson;
+                return new JObject();
 
             try
             {
-                var payloadObject = JObject.Parse(payloadJson);
-                if (!payloadObject.TryGetValue("EventType", StringComparison.OrdinalIgnoreCase, out var eventTypeToken))
-                    return payloadJson;
-
-                var eventType = eventTypeToken.Value<string>();
-                if (!string.Equals(eventType, "KeepAlive", StringComparison.OrdinalIgnoreCase))
-                    return payloadJson;
-
-                if (!payloadObject.ContainsKey("Event"))
-                {
-                    payloadObject["Event"] = "KeepAlive";
-                }
-
-                return payloadObject.ToString(Formatting.None);
+                return JToken.Parse(payloadJson);
             }
             catch (JsonException)
             {
-                return payloadJson;
+                return new JObject();
             }
         }
 
