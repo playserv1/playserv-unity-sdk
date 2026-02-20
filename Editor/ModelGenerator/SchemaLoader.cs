@@ -10,7 +10,7 @@ using UnityEngine.Networking;
 public static class SchemaLoader
 {
     private const string Url =
-        "https://dashboard.test.playserv.io/api/projects/by-sdk-key"; 
+        "https://dashboard.test.playserv.io/api/schemas/by-sdk-key"; 
     private const string LatestSchemaFileName = "latest-schema.json";
     
     public static void LoadSchema(string token) => _ = DownloadSchema(token);
