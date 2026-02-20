@@ -369,6 +369,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 739690f867a94cfeab70bf3348c8c70a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  messageText: Hello from RPC sample
+  messageText: Hello
   enableLocalInvokerOnEnable: 1
+  autoSubscribeOnEnable: 1
   showOverlay: 1

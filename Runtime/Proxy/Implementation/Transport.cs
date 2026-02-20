@@ -57,7 +57,7 @@ namespace Playserv.Proxy.Implementation
                 var data = Encoding.UTF8.GetBytes(json);
 
                 await _implementation.Send(data);
-                _logger.Log($"Message sent: {typeof(T).Name} with payload: {json}");
+                LogTransportJson($"Message sent: {typeof(T).Name} with payload: {json}", json);
             }
             catch (Exception ex)
             {
@@ -153,7 +153,7 @@ namespace Playserv.Proxy.Implementation
             try
             {
                 var json = Encoding.UTF8.GetString(data);
-                _logger.Log($"Received JSON: {json}");
+                LogTransportJson($"Received JSON: {json}", json);
                 envelope = MessageEnvelopeParser.Parse(json);
                 command = _serializer.Deserialize(envelope);
             }
@@ -264,6 +264,28 @@ namespace Playserv.Proxy.Implementation
             {
                 ch.Error(ex);
             }
+        }
+
+        private void LogTransportJson(string message, string json)
+        {
+#if PlayServ_Logs
+            _logger.Log(message);
+#else
+            if (IsHeartbeatTransportFrame(json))
+                return;
+
+            _logger.Log(message);
+#endif
+        }
+
+        private static bool IsHeartbeatTransportFrame(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            return json.IndexOf("\"KeepAlive\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   json.IndexOf("\"Ping\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   json.IndexOf("\"Pong\"", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private interface ICommandChannel

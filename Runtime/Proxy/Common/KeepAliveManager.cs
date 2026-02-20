@@ -66,7 +66,7 @@ namespace Playserv.Proxy.Common
 
                 _sendLoop = Task.Run(() => SendLoopAsync(_cts.Token));
                 _monitorLoop = Task.Run(() => MonitorLoopAsync(_cts.Token));
-                _logger.Log(
+                LogKeepAlive(
                     $"{KeepAliveLogPrefix} manager started. twait={ResolveKeepAliveIntervalMs()}ms, " +
                     $"waitWindow={ResolveKeepAliveWaitWindowMs()}ms");
             }
@@ -87,7 +87,7 @@ namespace Playserv.Proxy.Common
                 _legacyPingSubscription = null;
                 _eventKeepAliveSubscription = null;
 
-                _logger.Log(
+                LogKeepAlive(
                     $"{KeepAliveLogPrefix} manager stopped. lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
                     $"lastServerKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastServerKeepAliveAtMs))}");
             }
@@ -96,7 +96,7 @@ namespace Playserv.Proxy.Common
         private async Task SendLoopAsync(CancellationToken cancellationToken)
         {
             var firstPingDelayMs = Math.Min(ResolveKeepAliveIntervalMs(), 5000);
-            _logger.Log(
+            LogKeepAlive(
                 $"{KeepAliveLogPrefix} heartbeat loop started. first KeepAlive in {firstPingDelayMs}ms");
 
             var isFirstPing = true;
@@ -120,12 +120,12 @@ namespace Playserv.Proxy.Common
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.Log($"{KeepAliveLogPrefix} heartbeat loop cancelled.");
+                    LogKeepAlive($"{KeepAliveLogPrefix} heartbeat loop cancelled.");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"{KeepAliveLogPrefix} send loop error: {ex.Message}");
+                    LogKeepAliveError($"{KeepAliveLogPrefix} send loop error: {ex.Message}");
                     TriggerTimeout("send loop failed");
                     break;
                 }
@@ -135,7 +135,7 @@ namespace Playserv.Proxy.Common
         private async Task MonitorLoopAsync(CancellationToken cancellationToken)
         {
             var monitorTickMs = ResolveMonitorTickMs();
-            _logger.Log(
+            LogKeepAlive(
                 $"{KeepAliveLogPrefix} watchdog loop started. checkEvery={monitorTickMs}ms");
 
             while (!cancellationToken.IsCancellationRequested)
@@ -157,7 +157,7 @@ namespace Playserv.Proxy.Common
                     if (sinceLastServerKeepAliveMs <= waitWindowMs)
                         continue;
 
-                    _logger.LogWarning(
+                    LogKeepAliveWarning(
                         $"{KeepAliveLogPrefix} server KeepAlive not received in time. " +
                         $"waited={waitWindowMs}ms, " +
                         $"silence={sinceLastServerKeepAliveMs}ms, " +
@@ -168,12 +168,12 @@ namespace Playserv.Proxy.Common
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.Log($"{KeepAliveLogPrefix} watchdog loop cancelled.");
+                    LogKeepAlive($"{KeepAliveLogPrefix} watchdog loop cancelled.");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError($"{KeepAliveLogPrefix} watchdog loop error: {ex.Message}");
+                    LogKeepAliveError($"{KeepAliveLogPrefix} watchdog loop error: {ex.Message}");
                     TriggerTimeout("watchdog loop failed");
                     break;
                 }
@@ -188,7 +188,7 @@ namespace Playserv.Proxy.Common
 
             var keepAliveEvent = new EventMessage(KeepAliveEventType, EmptyPayloadJson);
 
-            _logger.Log(
+            LogKeepAlive(
                 $"{KeepAliveLogPrefix} -> heartbeat#{sequence} send attempt. event={KeepAliveEventType}, ts={FormatTimestamp(nowMs)}");
 
             try
@@ -197,13 +197,13 @@ namespace Playserv.Proxy.Common
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning($"{KeepAliveLogPrefix} heartbeat#{sequence} send failed: {ex.Message}");
+                LogKeepAliveWarning($"{KeepAliveLogPrefix} heartbeat#{sequence} send failed: {ex.Message}");
                 TriggerTimeout("failed to send keepalive");
                 return false;
             }
 
             OnPingSent?.Invoke();
-            _logger.Log(
+            LogKeepAlive(
                 $"{KeepAliveLogPrefix} -> heartbeat#{sequence} sent. twait={ResolveKeepAliveIntervalMs()}ms");
             return true;
         }
@@ -225,12 +225,12 @@ namespace Playserv.Proxy.Common
             PongReceived?.Invoke();
             if (elapsedMs >= 0)
             {
-                _logger.Log(
+                LogKeepAlive(
                     $"{KeepAliveLogPrefix} <- server event '{message.EventType}' received. delta={elapsedMs}ms");
             }
             else
             {
-                _logger.Log(
+                LogKeepAlive(
                     $"{KeepAliveLogPrefix} <- first server event '{message.EventType}' received. at={FormatTimestamp(nowMs)}");
             }
         }
@@ -264,7 +264,7 @@ namespace Playserv.Proxy.Common
             if (Interlocked.Exchange(ref _timeoutRaised, 1) != 0)
                 return;
 
-            _logger.LogWarning($"{KeepAliveLogPrefix} timeout triggered: {reason}");
+            LogKeepAliveWarning($"{KeepAliveLogPrefix} timeout triggered: {reason}");
             OnTimeout?.Invoke();
         }
 
@@ -273,7 +273,7 @@ namespace Playserv.Proxy.Common
             try
             {
                 var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                _logger.Log(
+                LogKeepAlive(
                     $"{KeepAliveLogPrefix} <- legacy KeepAliveRequest received. requestTs={FormatTimestamp(request?.Timestamp ?? 0)}, at={FormatTimestamp(nowMs)}");
 
                 var response = new KeepAliveResponse
@@ -281,12 +281,33 @@ namespace Playserv.Proxy.Common
                     Timestamp = nowMs
                 };
                 await _transport.Send(response);
-                _logger.Log($"{KeepAliveLogPrefix} -> legacy KeepAliveResponse sent. ts={FormatTimestamp(response.Timestamp)}");
+                LogKeepAlive($"{KeepAliveLogPrefix} -> legacy KeepAliveResponse sent. ts={FormatTimestamp(response.Timestamp)}");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"{KeepAliveLogPrefix} failed to reply legacy KeepAliveResponse: {ex.Message}");
+                LogKeepAliveError($"{KeepAliveLogPrefix} failed to reply legacy KeepAliveResponse: {ex.Message}");
             }
+        }
+
+        private void LogKeepAlive(string message)
+        {
+#if PlayServ_Logs
+            _logger.Log(message);
+#endif
+        }
+
+        private void LogKeepAliveWarning(string message)
+        {
+#if PlayServ_Logs
+            _logger.LogWarning(message);
+#endif
+        }
+
+        private void LogKeepAliveError(string message)
+        {
+#if PlayServ_Logs
+            _logger.LogError(message);
+#endif
         }
 
         private static string FormatTimestamp(long timestampMs)

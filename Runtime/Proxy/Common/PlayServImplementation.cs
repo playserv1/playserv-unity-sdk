@@ -13,8 +13,8 @@ namespace Playserv.Proxy.Common
     {
         private readonly ITransport _transport;
         private readonly ILogger _logger;
-        private readonly IEventsAdapter _eventsAdapter;
-        private readonly IDataSubscriptionAdapter _dataSubscriptionAdapter;
+        private readonly PlayServEventsAdapter _eventsAdapter;
+        private readonly PlayServDataSubscriptionAdapter _dataSubscriptionAdapter;
         private readonly ReconnectionManager _reconnectionManager;
         private readonly HandshakeService _handshakeService;
         private readonly KeepAliveManager _keepAliveManager;

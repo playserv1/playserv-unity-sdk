@@ -105,10 +105,34 @@ namespace Playserv.Events
             _transport.OnReceive<EventSubscribeResponse>()
                 .Subscribe(response =>
                 {
+                    if (response == null || string.IsNullOrWhiteSpace(response.eventSubscriptionId))
+                    {
+                        _logger.LogWarning("Received EventSubscribeResponse with empty subscription id.");
+                        return;
+                    }
+
+                    var existingTopic = _subscriptionManager.GetTopic(response.eventSubscriptionId);
+                    if (!string.IsNullOrWhiteSpace(existingTopic))
+                    {
+                        _logger.LogWarning(
+                            $"Ignoring duplicate subscription response: eventType={existingTopic}, subscriptionId={response.eventSubscriptionId}");
+                        return;
+                    }
+
                     var eventType = _subscriptionManager.GetFirstPendingTopic();
                     if (eventType == null)
                     {
-                        _logger.LogError($"Received subscription response but no pending event type found: subscriptionId={response.eventSubscriptionId}");
+                        if (_subscriptionManager.TryBindOrphanSubscriptionToSingleObservedTopic(
+                                response.eventSubscriptionId,
+                                out var reboundTopic))
+                        {
+                            _logger.LogWarning(
+                                $"Recovered late subscription response: eventType={reboundTopic}, subscriptionId={response.eventSubscriptionId}");
+                            return;
+                        }
+
+                        _logger.LogWarning(
+                            $"Ignoring late subscription response without pending topic: subscriptionId={response.eventSubscriptionId}");
                         return;
                     }
 

@@ -135,9 +135,8 @@ namespace Playserv.Samples
 
             var areaWidth = Mathf.Clamp(Screen.width - 20f, 320f, 520f);
             var areaHeight = Mathf.Clamp(Screen.height - 210f, 170f, 320f);
-            var areaY = Mathf.Clamp(200f, 10f, Screen.height - areaHeight - 10f);
 
-            GUILayout.BeginArea(new Rect(10f, areaY, areaWidth, areaHeight), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10f, 240f, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ Events Sample");
             GUILayout.Label($"State: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");

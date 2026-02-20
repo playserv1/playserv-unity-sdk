@@ -122,6 +122,14 @@ namespace Playserv.Proxy.Implementation
 
         private static bool TryResolveKnownCommandType(string commandName, out Type type)
         {
+            if (string.Equals(commandName, "BroadcastEvent", StringComparison.Ordinal))
+            {
+                // Compatibility path for proxy broadcasts coming from module_rpc host bridge.
+                // Payload shape matches EventMessage, but command name can be "BroadcastEvent".
+                type = typeof(EventMessage);
+                return true;
+            }
+
             if (string.Equals(commandName, "error", StringComparison.OrdinalIgnoreCase))
             {
                 type = typeof(CommandErrorResponse);

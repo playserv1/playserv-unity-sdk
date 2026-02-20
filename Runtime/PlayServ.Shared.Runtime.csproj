@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	
+	<PropertyGroup>
+		<TargetFramework>netstandard2.1</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+		<IntermediateOutputPath>exports/PlayServ.Shared.Runtime/obj/$(Configuration)/</IntermediateOutputPath>
+		<OutputPath>exports/PlayServ.Shared.Runtime/bin/$(Configuration)/</OutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="System.Text.Json" Version="10.0.2" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<Compile Include="./**/*.cs" />
+		<Compile Remove="**/obj/**;**/bin/**" />
+		<Compile Remove="exports\**" />
+		<EmbeddedResource Remove="exports\**" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <None Remove="./**/*.meta;&#xD;&#xA;					./**/*.asmdef" />
+	  <None Remove="exports\**" />
+	</ItemGroup>
+
+</Project>

@@ -6,7 +6,17 @@ namespace Playserv.RPC
     public static class RpcConstants
     {
         /// <summary>
-        /// Module path for invoking server RPC methods.
+        /// Target module service id for RPC commands.
+        /// </summary>
+        public const string InvokeModuleServiceName = "rpc";
+
+        /// <summary>
+        /// Command name expected by rpc module command router.
+        /// </summary>
+        public const string InvokeCommandName = "InvokeRpc";
+
+        /// <summary>
+        /// Legacy combined module path kept for backward compatibility references.
         /// </summary>
         public const string InvokeModuleName = "rpc.InvokeRpc";
     }

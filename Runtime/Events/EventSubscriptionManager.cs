@@ -49,6 +49,44 @@ namespace Playserv.Events
             }
         }
 
+        public bool TryBindOrphanSubscriptionToSingleObservedTopic(string subscriptionId, out string eventType)
+        {
+            if (string.IsNullOrWhiteSpace(subscriptionId))
+            {
+                eventType = null;
+                return false;
+            }
+
+            lock (_lock)
+            {
+                if (_subscriptionIdToEventType.TryGetValue(subscriptionId, out var existingTopic))
+                {
+                    eventType = existingTopic;
+                    return true;
+                }
+
+                var candidates = _typeObservers.Keys
+                    .Select(t => t.Name)
+                    .Distinct(StringComparer.Ordinal)
+                    .Where(topic =>
+                        !_eventTypeToSubscriptionId.ContainsKey(topic) &&
+                        !_pendingEventTypes.Contains(topic))
+                    .Take(2)
+                    .ToArray();
+
+                if (candidates.Length != 1)
+                {
+                    eventType = null;
+                    return false;
+                }
+
+                eventType = candidates[0];
+                _eventTypeToSubscriptionId[eventType] = subscriptionId;
+                _subscriptionIdToEventType[subscriptionId] = eventType;
+                return true;
+            }
+        }
+
         public void AddPendingSubscription(string eventType)
         {
             lock (_lock)
@@ -145,4 +183,3 @@ namespace Playserv.Events
         }
     }
 }
-

@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Playserv.RPC;
+using Playserv.Test.RPC;
 using Playserv.Wrapper;
+using Playserv.Proxy.Common;
 using UnityEngine;
 
 #nullable enable
@@ -9,72 +10,58 @@ using UnityEngine;
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Demo RPC service used by local in-process invoker sample.
-    /// </summary>
-    [Rpc]
-    public sealed class SampleNotificationRpcService
-    {
-        /// <summary>
-        /// Example RPC method.
-        /// </summary>
-        /// <param name="message">Notification message.</param>
-        public void BroadcastToAll(string message)
-        {
-            Debug.Log($"[SampleNotificationRpcService] BroadcastToAll: {message}");
-        }
-    }
-
-    /// <summary>
-    /// RPC sample that can execute PlayServ.Invoke locally without websocket.
+    /// RPC sample based on TestCode NotificationService:
+    /// local in-process invoke via LocalRpcInvoker and transport invoke via rpc.InvokeRpc.
     /// </summary>
     public sealed class PlayServRpcSample : MonoBehaviour
     {
+        private const string NotificationServiceName = nameof(NotificationService);
+        private const string BroadcastMethodName = nameof(NotificationService.BroadcastToAll);
+
         [Header("Message")]
-        [SerializeField] private string messageText = "Hello from RPC sample";
+        [SerializeField] private string messageText = "Hello";
 
         [Header("Execution")]
-        [SerializeField] private bool enableLocalInvokerOnEnable = true;
+        [SerializeField] private bool enableLocalInvokerOnEnable = false;
+        [SerializeField] private bool autoSubscribeOnEnable = true;
         [SerializeField] private bool showOverlay = true;
-
-        private LocalRpcInvoker? _localInvoker;
+        
+        private IDisposable? _notificationSubscription;
         private readonly List<string> _history = new List<string>();
+        private Vector2 _historyScroll;
+        private bool _pendingAutoSubscribe;
         private string _status = "Idle";
 
         private void OnEnable()
         {
-            if (enableLocalInvokerOnEnable)
-                EnableLocalInvoker();
+            PlayServ.OnTransportError += OnTransportError;
+
+            if (autoSubscribeOnEnable)
+            {
+                if (PlayServ.State == PlayServState.Online)
+                    SubscribeNotifications();
+                else
+                    _pendingAutoSubscribe = true;
+            }
+        }
+
+        private void Update()
+        {
+            if (!_pendingAutoSubscribe)
+                return;
+
+            if (PlayServ.State != PlayServState.Online)
+                return;
+
+            _pendingAutoSubscribe = false;
+            SubscribeNotifications();
         }
 
         private void OnDisable()
         {
-            if (_localInvoker != null)
-                DisableLocalInvoker();
-        }
-
-        [ContextMenu("Enable Local RPC Invoker")]
-        public void EnableLocalInvoker()
-        {
-            if (_localInvoker != null)
-            {
-                _status = "Local invoker is already enabled";
-                return;
-            }
-
-            _localInvoker = new LocalRpcInvoker()
-                .RegisterService(new SampleNotificationRpcService());
-            PlayServ.SetRpcInvoker(_localInvoker);
-            _status = "Local invoker enabled";
-            AddHistory(_status);
-        }
-
-        [ContextMenu("Disable Local RPC Invoker")]
-        public void DisableLocalInvoker()
-        {
-            PlayServ.SetRpcInvoker(null);
-            _localInvoker = null;
-            _status = "Local invoker disabled";
-            AddHistory(_status);
+            PlayServ.OnTransportError -= OnTransportError;
+            UnsubscribeNotifications();
+            _pendingAutoSubscribe = false;
         }
 
         [ContextMenu("Invoke RPC")]
@@ -82,12 +69,14 @@ namespace Playserv.Samples
         {
             try
             {
-                PlayServ.Invoke<SampleNotificationRpcService>(x => x.BroadcastToAll(messageText));
-
-                _status = _localInvoker != null
-                    ? "RPC invoked locally (in-process)"
-                    : "RPC invoke sent through transport";
-                AddHistory($"{_status}: {messageText}");
+                PlayServ.Invoke(
+                    NotificationServiceName,
+                    BroadcastMethodName,
+                    new { message = messageText });
+                
+                Debug.Log($"Invoke RPC: {messageText}");
+                
+                AddHistory($"RPC invoke sent through transport: {messageText}");
             }
             catch (Exception ex)
             {
@@ -96,11 +85,57 @@ namespace Playserv.Samples
             }
         }
 
+        [ContextMenu("Subscribe Notifications")]
+        public void SubscribeNotifications()
+        {
+            if (_notificationSubscription != null)
+            {
+                _status = "Notification subscription already active";
+                AddHistory(_status);
+                return;
+            }
+
+            if (PlayServ.State != PlayServState.Online)
+            {
+                _status = "Subscribe requires connected SDK";
+                AddHistory(_status);
+                return;
+            }
+
+            _notificationSubscription = PlayServ.Subscribe<NotificationEvent>(OnNotificationReceived);
+            _status = "Subscribed to NotificationEvent";
+            AddHistory(_status);
+        }
+
+        [ContextMenu("Unsubscribe Notifications")]
+        public void UnsubscribeNotifications()
+        {
+            _notificationSubscription?.Dispose();
+            _notificationSubscription = null;
+        }
+
+        private void OnNotificationReceived(NotificationEvent evt)
+        {
+            var eventType = string.IsNullOrWhiteSpace(evt.EventType) ? "NotificationEvent" : evt.EventType;
+            var message = string.IsNullOrWhiteSpace(evt.Message) ? "<empty>" : evt.Message;
+            _status = $"Received server event: {eventType}";
+            AddHistory($"<- {eventType}: {message}");
+        }
+
+        private void OnTransportError(TransportError error)
+        {
+            var details = error == null ? "Unknown transport error" : error.ToString();
+            _status = $"Transport error: {details}";
+            AddHistory(_status);
+        }
+
         private void AddHistory(string line)
         {
             _history.Add(line);
             if (_history.Count > 8)
                 _history.RemoveAt(0);
+
+            _historyScroll.y = float.MaxValue;
         }
 
         private void OnGUI()
@@ -108,24 +143,41 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
-            GUILayout.BeginArea(new Rect(10f, 420f, 620f, 220f), GUI.skin.box);
+            var areaWidth = Mathf.Clamp(Screen.width - 20f, 320f, 620f);
+            var areaHeight = Mathf.Clamp(Screen.height - 430f, 180f, 260f);
+            var areaY = Mathf.Clamp(420f, 10f, Screen.height - areaHeight - 10f);
+
+            GUILayout.BeginArea(new Rect(10f, areaY, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ RPC Sample");
             GUILayout.Label($"Status: {_status}");
-            GUILayout.Label($"Local invoker: {(_localInvoker != null ? "Enabled" : "Disabled")}");
+            GUILayout.Label($"SDK state: {PlayServ.State}");
+            GUILayout.Label($"Notification subscription: {(_notificationSubscription != null ? "Active" : "Inactive")}");
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Enable Local"))
-                EnableLocalInvoker();
-            if (GUILayout.Button("Disable Local"))
-                DisableLocalInvoker();
             if (GUILayout.Button("Invoke RPC"))
                 InvokeRpc();
             GUILayout.EndHorizontal();
 
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Subscribe"))
+                SubscribeNotifications();
+            if (GUILayout.Button("Unsubscribe"))
+                UnsubscribeNotifications();
+            GUILayout.EndHorizontal();
+
             GUILayout.Space(8f);
-            GUILayout.Label("History:");
-            foreach (var line in _history)
-                GUILayout.Label($"- {line}");
+            GUILayout.Label($"History ({_history.Count}):");
+            _historyScroll = GUILayout.BeginScrollView(_historyScroll, GUILayout.ExpandHeight(true));
+            if (_history.Count == 0)
+            {
+                GUILayout.Label("- No calls yet");
+            }
+            else
+            {
+                foreach (var line in _history)
+                    GUILayout.Label($"- {line}");
+            }
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
     }

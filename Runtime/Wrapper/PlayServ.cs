@@ -18,7 +18,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServ
     {
-        private static readonly IPlayServApi Api = new PlayServApi();
+        private static readonly PlayServApi Api = new PlayServApi();
 
         /// <summary>
         /// Gets current SDK version string reported by the client.
