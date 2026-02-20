@@ -41,6 +41,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!Runtime/PlayServ.Shared.Runtime.csproj
 *.unityproj
 *.sln
 *.suo
@@ -101,3 +102,7 @@ InitTestScene*.unity*
 # macOS
 .DS_Store
 **/.DS_Store
+
+# PlayServ SDK exports
+/exports/
+/Runtime/exports/
