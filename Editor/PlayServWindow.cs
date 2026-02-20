@@ -396,7 +396,7 @@ namespace Playserv.Editor
                 if (GUILayout.Button("Check Updates"))
                 {
                     _showAvailableSchemaInfo = true;
-                    SchemaLoader.LoadSchema(_pGameId.stringValue);
+                    SchemaLoader.LoadSchema(_pGameAccessToken.stringValue);
                     SchemaLoader.CheckNewSchema();
                 }
 
