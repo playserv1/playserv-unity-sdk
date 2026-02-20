@@ -1,8 +1,13 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Playserv.Proxy.Common;
 using Playserv.Wrapper;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+#endif
 
 namespace Playserv.Samples
 {
@@ -11,6 +16,8 @@ namespace Playserv.Samples
     /// </summary>
     public sealed class PlayServBootstrapSample : MonoBehaviour
     {
+        private const string SamplesSceneFileName = "0_Samples.unity";
+
         [Header("Credentials")]
         [SerializeField] private string gameAccessToken = "your-token";
         [SerializeField] private string gameId = "game-001";
@@ -132,7 +139,7 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
-            GUILayout.BeginArea(new Rect(10f, 10f, 460f, 180f), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10f, 10f, 460f, 220f), GUI.skin.box);
             GUILayout.Label("PlayServ Bootstrap Sample");
             GUILayout.Label($"State: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
@@ -145,7 +152,53 @@ namespace Playserv.Samples
             if (GUILayout.Button("Disconnect"))
                 Disconnect();
             GUILayout.EndHorizontal();
+
+            if (CanReturnToSamples())
+            {
+                GUILayout.Space(6f);
+                if (GUILayout.Button("Back to 0_Samples"))
+                    ReturnToSamples();
+            }
+
             GUILayout.EndArea();
+        }
+
+        private static bool CanReturnToSamples()
+        {
+            var scene = SceneManager.GetActiveScene();
+            return scene.IsValid() && !string.Equals(scene.name, Path.GetFileNameWithoutExtension(SamplesSceneFileName),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ReturnToSamples()
+        {
+            var scenePath = ResolveSamplesScenePath();
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                if (!File.Exists(scenePath))
+                {
+                    _status = $"Scene not found: {scenePath}";
+                    return;
+                }
+
+                EditorSceneManager.OpenScene(scenePath);
+                _status = "Opened 0_Samples";
+                return;
+            }
+#endif
+
+            SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePath));
+        }
+
+        private static string ResolveSamplesScenePath()
+        {
+            var activePath = SceneManager.GetActiveScene().path;
+            var activeDirectory = Path.GetDirectoryName(activePath);
+            return string.IsNullOrEmpty(activeDirectory)
+                ? SamplesSceneFileName
+                : Path.Combine(activeDirectory, SamplesSceneFileName).Replace('\\', '/');
         }
     }
 }

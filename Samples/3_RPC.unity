@@ -337,7 +337,7 @@ MonoBehaviour:
   useLocalBackend: 0
   localEndpoint: ws://localhost:8080/ws/
   remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
-  autoConnect: 0
+  autoConnect: 1
   showOverlay: 1
   disconnectOnDestroy: 1
   keepAlivePingIntervalMs: 5000

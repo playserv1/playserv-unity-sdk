@@ -1,4 +1,5 @@
 using System;
+using Newtonsoft.Json;
 
 namespace Playserv.Proxy.Common
 {
@@ -8,7 +9,10 @@ namespace Playserv.Proxy.Common
     [Serializable]
     public sealed class ParseErrorResponse
     {
+        [JsonProperty("error")]
         private string error;
+
+        [JsonProperty("receivedJson")]
         private string receivedJson;
 
         /// <summary>

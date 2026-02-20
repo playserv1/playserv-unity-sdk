@@ -330,6 +330,7 @@ namespace Playserv.Proxy.Common
 
         private void SetupCommandHandlers()
         {
+            OnCommand("error", OnCommandErrorReceived);
             OnCommand("Disconnect", OnDisconnectReceived);
             OnCommand("ClientSettingsResponse", OnClientSettingsResponseReceived);
             OnCommand("ParseErrorResponse", OnParseErrorReceived);
@@ -378,6 +379,20 @@ namespace Playserv.Proxy.Common
             else
             {
                 _logger.LogWarning($"Received ValidationErrorResponse with unexpected payload type: {command?.GetType().Name ?? "null"}");
+            }
+        }
+
+        private void OnCommandErrorReceived(object command)
+        {
+            if (command is CommandErrorResponse response)
+            {
+                _logger.LogError(
+                    $"Server command error received. Error: {response.Error}, Message: {response.Message}, Timestamp: {response.Timestamp}");
+            }
+            else
+            {
+                _logger.LogWarning(
+                    $"Received 'error' command with unexpected payload type: {command?.GetType().Name ?? "null"}");
             }
         }
 

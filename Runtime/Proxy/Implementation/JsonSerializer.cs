@@ -2,6 +2,8 @@ using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Playserv.Events.Requests;
+using Playserv.Events.Responses;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 
 namespace Playserv.Proxy.Implementation
@@ -42,7 +44,6 @@ namespace Playserv.Proxy.Implementation
             }
 
             var payloadJson = JsonConvert.SerializeObject(command);
-            payloadJson = NormalizeOutgoingPayloadForType(payloadJson, commandType);
 
             return new MessageEnvelope(typeName, payloadJson);
         }
@@ -78,6 +79,9 @@ namespace Playserv.Proxy.Implementation
 
         private Type FindType(string typeName)
         {
+            if (TryResolveKnownCommandType(typeName, out var knownType))
+                return knownType;
+
             var type = Type.GetType(typeName);
             if (type != null)
                 return type;
@@ -114,6 +118,36 @@ namespace Playserv.Proxy.Implementation
             }
 
             return null;
+        }
+
+        private static bool TryResolveKnownCommandType(string commandName, out Type type)
+        {
+            if (string.Equals(commandName, "error", StringComparison.OrdinalIgnoreCase))
+            {
+                type = typeof(CommandErrorResponse);
+                return true;
+            }
+
+            if (string.Equals(commandName, "ErrorResponse", StringComparison.Ordinal))
+            {
+                type = typeof(ErrorResponse);
+                return true;
+            }
+
+            if (string.Equals(commandName, "ParseErrorResponse", StringComparison.Ordinal))
+            {
+                type = typeof(ParseErrorResponse);
+                return true;
+            }
+
+            if (string.Equals(commandName, "ValidationErrorResponse", StringComparison.Ordinal))
+            {
+                type = typeof(ValidationErrorResponse);
+                return true;
+            }
+
+            type = null;
+            return false;
         }
 
         /// <summary>
@@ -168,57 +202,6 @@ namespace Playserv.Proxy.Implementation
 
             var property = type.GetProperty(memberName);
             return property != null && property.PropertyType == typeof(string);
-        }
-
-        /// <summary>
-        /// Normalizes outgoing event envelopes to the transport wire format expected by server-side proxies:
-        /// - string payload containing JSON -> object/array payload token
-        /// </summary>
-        private static string NormalizeOutgoingPayloadForType(string payloadJson, Type type)
-        {
-            if (string.IsNullOrWhiteSpace(payloadJson))
-                return payloadJson;
-
-            var commandNamespace = type.Namespace;
-            if (string.IsNullOrEmpty(commandNamespace) ||
-                !commandNamespace.StartsWith("Playserv.Events", StringComparison.Ordinal))
-            {
-                return payloadJson;
-            }
-
-            JObject payloadObject;
-            try
-            {
-                payloadObject = JObject.Parse(payloadJson);
-            }
-            catch (JsonException)
-            {
-                return payloadJson;
-            }
-
-            if (payloadObject.TryGetValue("Payload", StringComparison.OrdinalIgnoreCase, out var commandPayloadToken) &&
-                commandPayloadToken.Type == JTokenType.String)
-            {
-                var rawPayload = commandPayloadToken.Value<string>();
-                if (!string.IsNullOrWhiteSpace(rawPayload))
-                {
-                    var trimmedPayload = rawPayload.Trim();
-                    if ((trimmedPayload.StartsWith("{", StringComparison.Ordinal) && trimmedPayload.EndsWith("}", StringComparison.Ordinal)) ||
-                        (trimmedPayload.StartsWith("[", StringComparison.Ordinal) && trimmedPayload.EndsWith("]", StringComparison.Ordinal)))
-                    {
-                        try
-                        {
-                            payloadObject["Payload"] = JToken.Parse(trimmedPayload);
-                        }
-                        catch (JsonException)
-                        {
-                            // Keep original string payload if it is not valid JSON.
-                        }
-                    }
-                }
-            }
-
-            return payloadObject.ToString(Formatting.None);
         }
 
         private static JObject BuildKeepAlivePayload(EventMessage eventMessage)

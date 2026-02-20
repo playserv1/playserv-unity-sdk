@@ -70,7 +70,7 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
-            GUILayout.BeginArea(new Rect(540f, 280f, 420f, 180f), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10f, 280f, 420f, 180f), GUI.skin.box);
             GUILayout.Label("PlayServ Spawn Sample");
             GUILayout.Label($"State: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
