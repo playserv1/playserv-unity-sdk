@@ -24,9 +24,7 @@ namespace Playserv.Samples
         [SerializeField] private string userId = "player-001";
         [SerializeField] private string gameVersion = "1.0.0";
 
-        [Header("Endpoints")]
-        [SerializeField] private bool useLocalBackend = true;
-        [SerializeField] private string localEndpoint = PlayServSettings.DefaultLocalEndpoint;
+        [Header("Endpoint")]
         [SerializeField] private string remoteEndpoint = PlayServSettings.DefaultRemoteEndpoint;
 
         [Header("Behavior")]
@@ -77,8 +75,8 @@ namespace Playserv.Samples
                 GameId = gameId,
                 UserId = userId,
                 GameVersion = gameVersion,
-                UseLocalBackend = useLocalBackend,
-                LocalEndpoint = localEndpoint,
+                UseLocalBackend = false,
+                LocalEndpoint = remoteEndpoint,
                 RemoteEndpoint = remoteEndpoint,
                 KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
                 KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs
@@ -125,13 +123,11 @@ namespace Playserv.Samples
         private void OnPingSent()
         {
             _status = "KeepAlive ping sent";
-            Debug.Log("[PlayServ][Sample] KeepAlive ping sent.");
         }
 
         private void OnPongReceived()
         {
             _status = "KeepAlive pong received";
-            Debug.Log("[PlayServ][Sample] KeepAlive pong received.");
         }
 
         private void OnGUI()

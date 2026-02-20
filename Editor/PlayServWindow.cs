@@ -71,6 +71,9 @@ namespace Playserv.Editor
         [InitializeOnLoadMethod]
         private static void OnEditorLoad()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                return;
+
             if (!EditorPrefs.HasKey(Const.PrefKeyShowOnStartup))
                 EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, true);
 
@@ -83,6 +86,9 @@ namespace Playserv.Editor
 
         private static void ShowWindow()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                return;
+
             var wnd = GetWindow<PlayServWindow>(utility: true, title: "PlayServ");
             wnd.minSize = new Vector2(520, 520);
             wnd.Show();

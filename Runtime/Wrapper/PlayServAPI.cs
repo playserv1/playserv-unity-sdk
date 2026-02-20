@@ -174,14 +174,14 @@ namespace Playserv.Wrapper
                 }
             }
 
-            var request = new RpcInvokeRequest
+            var request = new InvokeRpc
             {
                 ServiceName = serviceName,
                 MethodName = methodName,
                 Payload = payloadBase64
             };
 
-            Instance.Send(request, RpcConstants.InvokeModuleName);
+            Instance.Send(request, RpcConstants.InvokeModuleServiceName);
         }
 
         public void Invoke<TService>(Expression<Action<TService>> method)

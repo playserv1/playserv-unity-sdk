@@ -18,8 +18,8 @@ namespace Playserv.Samples
         private const string NotificationServiceName = nameof(NotificationService);
         private const string BroadcastMethodName = nameof(NotificationService.BroadcastToAll);
 
-        [Header("Message")]
-        [SerializeField] private string messageText = "Hello";
+
+        private readonly string messageText = "WyJIZWxsbyJd";
 
         [Header("Execution")]
         [SerializeField] private bool enableLocalInvokerOnEnable = false;
@@ -72,7 +72,7 @@ namespace Playserv.Samples
                 PlayServ.Invoke(
                     NotificationServiceName,
                     BroadcastMethodName,
-                    new { message = messageText });
+                    messageText);
                 
                 Debug.Log($"Invoke RPC: {messageText}");
                 

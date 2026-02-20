@@ -330,12 +330,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b99100df71b44a4987e1961c145b7bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameAccessToken: your-token
-  gameId: game-001
-  userId: player-001
+  gameAccessToken: test
+  gameId: test
+  userId: test
   gameVersion: 1.0.0
-  useLocalBackend: 0
-  localEndpoint: ws://localhost:8080/ws/
   remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
   autoConnect: 1
   showOverlay: 1
@@ -369,7 +367,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 739690f867a94cfeab70bf3348c8c70a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  messageText: Hello
   enableLocalInvokerOnEnable: 1
   autoSubscribeOnEnable: 1
   showOverlay: 1
