@@ -16,7 +16,7 @@ namespace Playserv.Samples
     /// </summary>
     public sealed class PlayServBootstrapSample : MonoBehaviour
     {
-        private const string SamplesSceneFileName = "0_Samples.unity";
+        private const string SamplesSceneFileName = "Samples.unity";
 
         [Header("Credentials")]
         [SerializeField] private string gameAccessToken = "your-token";
@@ -156,7 +156,7 @@ namespace Playserv.Samples
             if (CanReturnToSamples())
             {
                 GUILayout.Space(6f);
-                if (GUILayout.Button("Back to 0_Samples"))
+                if (GUILayout.Button("Back to Samples"))
                     ReturnToSamples();
             }
 

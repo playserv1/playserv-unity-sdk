@@ -373,5 +373,5 @@ MonoBehaviour:
   autoConnect: 1
   showOverlay: 1
   disconnectOnDestroy: 1
-  keepAlivePingIntervalMs: 5000
-  keepAlivePongTimeoutMs: 5000
+  keepAlivePingIntervalMs: 30000
+  keepAlivePongTimeoutMs: 30000
