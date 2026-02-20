@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
+using Playserv.RPC;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 
@@ -57,7 +58,7 @@ namespace Playserv.Proxy.Implementation
                 throw new InvalidOperationException("MessageEnvelope missing payload.");
 
             var commandName = envelope.Command;
-            var dotIndex = commandName.IndexOf('.');
+            var dotIndex = commandName.LastIndexOf('.');
             if (dotIndex >= 0 && dotIndex < commandName.Length - 1)
             {
                 commandName = commandName.Substring(dotIndex + 1);
@@ -151,6 +152,12 @@ namespace Playserv.Proxy.Implementation
             if (string.Equals(commandName, "ValidationErrorResponse", StringComparison.Ordinal))
             {
                 type = typeof(ValidationErrorResponse);
+                return true;
+            }
+
+            if (string.Equals(commandName, "InvokeRpcResponse", StringComparison.Ordinal))
+            {
+                type = typeof(InvokeRpcResponse);
                 return true;
             }
 

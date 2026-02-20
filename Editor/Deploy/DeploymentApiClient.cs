@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using Playserv.Wrapper;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -67,17 +69,73 @@ namespace Playserv.Deploy.Editor
             if (req.isNetworkError || req.isHttpError)
 #endif
             {
-                if (req.responseCode == 401)
-                {
-                    throw new InvalidOperationException(
-                        $"Upload failed. HTTP 401 Unauthorized. " +
-                        $"Configure a valid deploy bearer token in PlayServ config field 'deployAuthToken'. " +
-                        $"Body: {req.downloadHandler?.text}");
-                }
+                throw new InvalidOperationException(BuildUploadErrorMessage(
+                    req.responseCode,
+                    req.error,
+                    req.downloadHandler?.text,
+                    url,
+                    gameId));
+            }
+        }
 
-                throw new InvalidOperationException(
-                    $"Upload failed. HTTP {(int)req.responseCode}. Error: {req.error}. Body: {req.downloadHandler?.text}"
-                );
+        private static string BuildUploadErrorMessage(
+            long responseCode,
+            string unityError,
+            string responseBody,
+            string url,
+            string gameId)
+        {
+            var details = ExtractErrorDetails(responseBody);
+            var authHint = responseCode == 401
+                ? " Configure a valid deploy bearer token in PlayServ config field 'deployAuthToken'."
+                : string.Empty;
+
+            var nativeAotHint = details.Any(line =>
+                line.IndexOf("Native AOT compilation failed", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                line.Trim().EndsWith(":", StringComparison.Ordinal));
+
+            var hint = nativeAotHint
+                ? " Native AOT failed but server did not return compiler diagnostics. Check deployment-service logs; common causes are unsupported references (for example UnityEngine/UnityEditor) or code incompatible with AOT."
+                : string.Empty;
+
+            var detailText = details.Length > 0
+                ? string.Join(" | ", details)
+                : (string.IsNullOrWhiteSpace(responseBody) ? "<empty>" : responseBody);
+
+            return
+                $"Upload failed. HTTP {(int)responseCode}. Error: {unityError}.{authHint}" +
+                $" Endpoint: {url}. GameId: {gameId}. Details: {detailText}.{hint}";
+        }
+
+        private static string[] ExtractErrorDetails(string responseBody)
+        {
+            if (string.IsNullOrWhiteSpace(responseBody))
+                return Array.Empty<string>();
+
+            try
+            {
+                var token = JToken.Parse(responseBody);
+                var obj = token as JObject;
+                if (obj == null)
+                    return new[] { responseBody };
+
+                var messages = obj["errors"] is JArray errors
+                    ? errors
+                        .Select(x => x?.ToString())
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Select(x => x.Trim())
+                        .ToList()
+                    : new System.Collections.Generic.List<string>();
+
+                var topMessage = obj["message"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(topMessage))
+                    messages.Insert(0, topMessage.Trim());
+
+                return messages.Count > 0 ? messages.ToArray() : new[] { responseBody };
+            }
+            catch
+            {
+                return new[] { responseBody };
             }
         }
 

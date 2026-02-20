@@ -181,6 +181,21 @@ namespace Playserv.Proxy.Implementation
                 }
             }
 
+            var hasTypedSubscriber = typeChannel != null;
+            var hasCommandSubscriber = nameChannel != null;
+
+            if (IsInvokeRpcResponseCommand(envelope.Command))
+            {
+                _logger.Log(
+                    $"[PlayServ][RPC] Incoming command '{envelope.Command}' parsed as '{command.GetType().Name}'. typedSubscriber={hasTypedSubscriber}, nameSubscriber={hasCommandSubscriber}");
+
+                if (!hasTypedSubscriber && !hasCommandSubscriber)
+                {
+                    _logger.LogWarning(
+                        "[PlayServ][RPC] InvokeRpcResponse received but no subscriber is registered. Response will be dropped.");
+                }
+            }
+
             try
             {
                 typeChannel?.Next(command);
@@ -286,6 +301,17 @@ namespace Playserv.Proxy.Implementation
             return json.IndexOf("\"KeepAlive\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    json.IndexOf("\"Ping\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    json.IndexOf("\"Pong\"", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsInvokeRpcResponseCommand(string commandName)
+        {
+            if (string.IsNullOrWhiteSpace(commandName))
+                return false;
+
+            if (string.Equals(commandName, "InvokeRpcResponse", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return commandName.EndsWith(".InvokeRpcResponse", StringComparison.OrdinalIgnoreCase);
         }
 
         private interface ICommandChannel

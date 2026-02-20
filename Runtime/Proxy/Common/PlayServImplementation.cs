@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Events;
+using Playserv.RPC;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
@@ -335,6 +336,9 @@ namespace Playserv.Proxy.Common
             OnCommand("ClientSettingsResponse", OnClientSettingsResponseReceived);
             OnCommand("ParseErrorResponse", OnParseErrorReceived);
             OnCommand("ValidationErrorResponse", OnValidationErrorReceived);
+            OnCommand("InvokeRpcResponse", OnInvokeRpcResponseReceived);
+            OnCommand("rpc.InvokeRpcResponse", OnInvokeRpcResponseReceived);
+            OnCommand("rpc.InvokeRpc.InvokeRpcResponse", OnInvokeRpcResponseReceived);
         }
 
         private void OnDisconnectReceived(object command)
@@ -393,6 +397,25 @@ namespace Playserv.Proxy.Common
             {
                 _logger.LogWarning(
                     $"Received 'error' command with unexpected payload type: {command?.GetType().Name ?? "null"}");
+            }
+        }
+
+        private void OnInvokeRpcResponseReceived(object command)
+        {
+            if (command is InvokeRpcResponse response)
+            {
+                var requestInfo = response.Request == null
+                    ? "n/a"
+                    : $"{response.Request.ServiceName}.{response.Request.MethodName}";
+                var resultInfo = string.IsNullOrWhiteSpace(response.Result) ? "<empty>" : response.Result;
+
+                _logger.Log(
+                    $"[PlayServ][RPC] InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
+            }
+            else
+            {
+                _logger.LogWarning(
+                    $"[PlayServ][RPC] Received InvokeRpcResponse with unexpected payload type: {command?.GetType().Name ?? "null"}");
             }
         }
 
