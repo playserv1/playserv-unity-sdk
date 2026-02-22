@@ -30,6 +30,7 @@ namespace Playserv.Editor
             "System.Linq",
             "System.Text"
         };
+        private const bool ShowWebSocketConnectionMenu = false;
 
         private PlayServConfig _config;
         private SerializedObject _so;
@@ -166,8 +167,11 @@ namespace Playserv.Editor
             GUILayout.Space(6);
             DrawModelFoldout();
             GUILayout.Space(6);
-            DrawConnectionFoldout();
-            GUILayout.Space(6);
+            if (ShowWebSocketConnectionMenu)
+            {
+                DrawConnectionFoldout();
+                GUILayout.Space(6);
+            }
             DrawDeploymentFoldout();
             GUILayout.Space(6);
 
