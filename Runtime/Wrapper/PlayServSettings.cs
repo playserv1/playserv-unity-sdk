@@ -80,7 +80,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
-        public string DeployApiEndpoint { get; set; } = "https://playserv-backoffice.test.playserv.io/api/deployments";
+        public string DeployApiEndpoint { get; set; } = "http://playserv-deployment.test.playserv.io/api/deployments";
 
         /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.

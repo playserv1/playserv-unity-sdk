@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -21,8 +22,14 @@ namespace Playserv.Editor
     {
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://example.com";
-        private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
-        private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
+        private const string DefaultBackofficeDeployEndpoint = "http://playserv-deployment.test.playserv.io/api/deployments";
+        private static readonly string[] AllowedDeployUsingNamespaces =
+        {
+            "System",
+            "System.Collections.Generic",
+            "System.Linq",
+            "System.Text"
+        };
 
         private PlayServConfig _config;
         private SerializedObject _so;
@@ -692,6 +699,7 @@ namespace Playserv.Editor
             }
 
             var absoluteFolderPath = Path.GetFullPath(folderPath);
+
             var option = _deployIncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
 
             var pattern = string.IsNullOrWhiteSpace(_deployPattern) ? "*" : _deployPattern.Trim();
@@ -708,12 +716,36 @@ namespace Playserv.Editor
             }
 
             var list = files
-                .Where(f => !f.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                .Where(f => f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
+            list = FilterFilesWithUnsupportedUsingNamespaces(list, out var excludedByNamespace);
+            if (excludedByNamespace.Count > 0)
+            {
+                Debug.LogWarning(
+                    $"[PlayServ] Excluded {excludedByNamespace.Count} file(s) with unsupported using namespaces for deployment: " +
+                    string.Join(", ", excludedByNamespace.Take(15)));
+            }
+
+            if (!ValidateRpcConstructors(list, out var rpcValidationError))
+            {
+                error = rpcValidationError;
+                return new List<string>();
+            }
+
+            list = ReduceToRpcDependencyClosure(list, out var excludedByDependencyClosure);
+            if (excludedByDependencyClosure.Count > 0)
+            {
+                Debug.LogWarning(
+                    $"[PlayServ] Excluded {excludedByDependencyClosure.Count} file(s) not required by RPC dependency closure: " +
+                    string.Join(", ", excludedByDependencyClosure.Take(15)));
+            }
+
             if (list.Count == 0)
                 error = "No files matched the current pattern.";
+            else
+                Debug.Log($"[PlayServ] Final deploy file count: {list.Count}. Files: {string.Join(", ", list)}");
 
             return list;
         }
@@ -766,12 +798,22 @@ namespace Playserv.Editor
             try
             {
                 EditorUtility.DisplayProgressBar("PlayServ Deployment", _deployStatus, _deployProgress);
-
                 var api = new DeploymentApiClient(_config);
 
                 if (_deployKeepRelativePaths)
                 {
-                    await DeployWithRelativePathsAsync(api, gameId, files, _deployFolder, _deployCts.Token);
+                    try
+                    {
+                        await DeployWithRelativePathsAsync(api, gameId, files, _deployFolder, _deployCts.Token);
+                    }
+                    catch (InvalidOperationException e) when (IsNativeAotFailure(e))
+                    {
+                        Debug.LogWarning(
+                            "[PlayServ] Relative-path ZIP upload failed with Native AOT error. Retrying with flat ZIP packaging.");
+
+                        var service = new DeploymentService(api);
+                        await service.DeployAsync(gameId, files, _deployCts.Token);
+                    }
                 }
                 else
                 {
@@ -801,15 +843,16 @@ namespace Playserv.Editor
                 _deployCts?.Dispose();
                 _deployCts = null;
             }
+            
+            
+            
+            
         }
 
         private string ResolveDeployEndpointForDisplay()
         {
             var endpoint = _config?.DeployApiEndpoint?.Trim();
             if (string.IsNullOrWhiteSpace(endpoint))
-                return DefaultBackofficeDeployEndpoint;
-
-            if (string.Equals(endpoint, LegacyLocalDeployEndpoint, StringComparison.OrdinalIgnoreCase))
                 return DefaultBackofficeDeployEndpoint;
 
             return endpoint;
@@ -892,6 +935,246 @@ namespace Playserv.Editor
             {
                 Debug.LogWarning($"[PlayServ] Failed to delete temp zip: {e.Message}");
             }
+        }
+
+        private static bool IsNativeAotFailure(Exception exception)
+        {
+            if (exception == null)
+                return false;
+
+            var message = exception.Message ?? string.Empty;
+            return message.IndexOf("Native AOT compilation failed", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static List<string> FilterFilesWithUnsupportedUsingNamespaces(
+            List<string> files,
+            out List<string> excludedFiles)
+        {
+            excludedFiles = new List<string>();
+            var validFiles = new List<string>(files.Count);
+
+            foreach (var file in files)
+            {
+                if (HasUnsupportedUsingNamespace(file))
+                {
+                    excludedFiles.Add(file);
+                    continue;
+                }
+
+                validFiles.Add(file);
+            }
+
+            return validFiles;
+        }
+
+        private static bool HasUnsupportedUsingNamespace(string filePath)
+        {
+            string text;
+            try
+            {
+                text = File.ReadAllText(filePath);
+            }
+            catch
+            {
+                return true;
+            }
+
+            var usingMatches = Regex.Matches(text, @"^\s*using\s+([^;]+);", RegexOptions.Multiline);
+            foreach (Match match in usingMatches)
+            {
+                var rawTarget = match.Groups[1].Value.Trim();
+                if (string.IsNullOrWhiteSpace(rawTarget))
+                    continue;
+
+                if (rawTarget.StartsWith("static ", StringComparison.Ordinal))
+                    rawTarget = rawTarget.Substring("static ".Length).Trim();
+
+                var aliasIndex = rawTarget.IndexOf('=');
+                if (aliasIndex >= 0 && aliasIndex < rawTarget.Length - 1)
+                    rawTarget = rawTarget.Substring(aliasIndex + 1).Trim();
+
+                if (rawTarget.StartsWith("global::", StringComparison.Ordinal))
+                    rawTarget = rawTarget.Substring("global::".Length);
+
+                if (!IsAllowedDeployUsingNamespace(rawTarget))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsAllowedDeployUsingNamespace(string namespaceName)
+        {
+            foreach (var allowed in AllowedDeployUsingNamespaces)
+            {
+                if (string.Equals(namespaceName, allowed, StringComparison.Ordinal) ||
+                    namespaceName.StartsWith(allowed + ".", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ValidateRpcConstructors(List<string> files, out string error)
+        {
+            error = null;
+            foreach (var file in files)
+            {
+                string text;
+                try
+                {
+                    text = File.ReadAllText(file);
+                }
+                catch (Exception e)
+                {
+                    error = $"Failed to read '{file}': {e.Message}";
+                    return false;
+                }
+
+                if (text.IndexOf("[Rpc]", StringComparison.Ordinal) < 0)
+                    continue;
+
+                var classMatch = Regex.Match(text, @"class\s+([A-Za-z_][A-Za-z0-9_]*)");
+                if (!classMatch.Success)
+                    continue;
+
+                var className = classMatch.Groups[1].Value;
+                var ctorPattern = @"\b" + Regex.Escape(className) + @"\s*\(([^)]*)\)";
+                var ctorMatches = Regex.Matches(text, ctorPattern);
+                var hasIContextCtor = ctorMatches.Cast<Match>()
+                    .Select(m => m.Groups[1].Value)
+                    .Any(args => args.IndexOf("IContext", StringComparison.Ordinal) >= 0);
+
+                if (!hasIContextCtor)
+                {
+                    error = $"RPC class '{className}' in '{file}' must define a constructor with IContext parameter.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static List<string> ReduceToRpcDependencyClosure(List<string> files, out List<string> excludedFiles)
+        {
+            excludedFiles = new List<string>();
+            if (files == null || files.Count == 0)
+                return new List<string>();
+
+            var contentByFile = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var typesByFile = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var fileByType = new Dictionary<string, string>(StringComparer.Ordinal);
+            var rpcRootFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var file in files)
+            {
+                string text;
+                try
+                {
+                    text = File.ReadAllText(file);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                contentByFile[file] = text;
+                if (ContainsRpcAttribute(text))
+                    rpcRootFiles.Add(file);
+
+                var declaredTypes = ExtractDeclaredTypes(text);
+                typesByFile[file] = declaredTypes;
+
+                foreach (var typeName in declaredTypes)
+                {
+                    if (!fileByType.ContainsKey(typeName))
+                        fileByType[typeName] = file;
+                }
+            }
+
+            if (rpcRootFiles.Count == 0)
+                return files.ToList();
+
+            var dependencyGraph = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in files)
+            {
+                if (!contentByFile.TryGetValue(file, out var text))
+                    continue;
+
+                var dependencies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var typeName in fileByType.Keys)
+                {
+                    if (typesByFile.TryGetValue(file, out var ownTypes) && ownTypes.Contains(typeName))
+                        continue;
+
+                    if (ContainsTypeReference(text, typeName))
+                    {
+                        var depFile = fileByType[typeName];
+                        if (!string.Equals(depFile, file, StringComparison.OrdinalIgnoreCase))
+                            dependencies.Add(depFile);
+                    }
+                }
+
+                dependencyGraph[file] = dependencies;
+            }
+
+            var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var queue = new Queue<string>(rpcRootFiles);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                if (!selected.Add(current))
+                    continue;
+
+                if (!dependencyGraph.TryGetValue(current, out var deps))
+                    continue;
+
+                foreach (var dep in deps)
+                {
+                    if (!selected.Contains(dep))
+                        queue.Enqueue(dep);
+                }
+            }
+
+            var result = files.Where(f => selected.Contains(f)).ToList();
+            excludedFiles = files.Where(f => !selected.Contains(f)).ToList();
+            return result.Count > 0 ? result : files.ToList();
+        }
+
+        private static bool ContainsRpcAttribute(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            return Regex.IsMatch(text, @"\[\s*Rpc(\s*\(|\s*\])", RegexOptions.Multiline);
+        }
+
+        private static HashSet<string> ExtractDeclaredTypes(string text)
+        {
+            var types = new HashSet<string>(StringComparer.Ordinal);
+            if (string.IsNullOrWhiteSpace(text))
+                return types;
+
+            var matches = Regex.Matches(text, @"\b(class|struct|interface|enum|record)\s+([A-Za-z_][A-Za-z0-9_]*)");
+            foreach (Match match in matches)
+            {
+                var typeName = match.Groups[2].Value;
+                if (!string.IsNullOrWhiteSpace(typeName))
+                    types.Add(typeName);
+            }
+
+            return types;
+        }
+
+        private static bool ContainsTypeReference(string text, string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(typeName))
+                return false;
+
+            var pattern = $@"\b{Regex.Escape(typeName)}\b";
+            return Regex.IsMatch(text, pattern);
         }
 
         private void DrawConfigFoldout()

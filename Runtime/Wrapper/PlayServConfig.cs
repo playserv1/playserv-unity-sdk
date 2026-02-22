@@ -14,7 +14,7 @@ namespace Playserv.Wrapper
     {
         private const string DEFAULT_LOCAL_ENDPOINT = "ws://localhost:8080/ws/";
         private const string DEFAULT_REMOTE_ENDPOINT = "wss://playserv-proxy.test.playserv.io/ws";
-        private readonly string DEPLOY_API_ENDPOINT = "http://playserv-deployment.test.playserv.io/api/deployments";
+        private const string DEFAULT_DEPLOY_API_ENDPOINT = "http://playserv-deployment.test.playserv.io/api/deployments";
 
         [SerializeField] private string gameAccessToken;
         [SerializeField] private string gameId;
@@ -30,6 +30,7 @@ namespace Playserv.Wrapper
         [SerializeField] private string remoteEndpoint = DEFAULT_REMOTE_ENDPOINT;
         
         [Header("Deploy")]
+        [SerializeField] private string deployApiEndpoint = DEFAULT_DEPLOY_API_ENDPOINT;
         [SerializeField] private string deployAuthToken = "";
         [SerializeField] private int timeoutSeconds = 120;
         
@@ -105,7 +106,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
-        public string DeployApiEndpoint => DEPLOY_API_ENDPOINT;
+        public string DeployApiEndpoint => deployApiEndpoint;
 
         /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.
@@ -116,7 +117,7 @@ namespace Playserv.Wrapper
         /// Timeout in seconds for deployment HTTP requests.
         /// </summary>
         public int TimeoutSeconds => timeoutSeconds;
-        
+
         internal PlayServSettings ToSettings()
         {
             return new PlayServSettings
@@ -133,7 +134,7 @@ namespace Playserv.Wrapper
                 UseLocalBackend = useLocalBackend,
                 LocalEndpoint = localEndpoint,
                 RemoteEndpoint = remoteEndpoint,
-                DeployApiEndpoint = DEPLOY_API_ENDPOINT,
+                DeployApiEndpoint = deployApiEndpoint,
                 DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };

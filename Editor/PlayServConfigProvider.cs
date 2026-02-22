@@ -9,8 +9,7 @@ namespace Playserv.Editor
     {
         // You can change this path if you want a different location.
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
-        private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
-        private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
+        private const string DefaultBackofficeDeployEndpoint = "http://playserv-deployment.test.playserv.io/api/deployments";
         private const string LegacyDefaultSdkVersion = "1.0.0";
         private const string CurrentDefaultSdkVersion = "0.1.0";
 
@@ -89,8 +88,7 @@ namespace Playserv.Editor
                 return false;
 
             var currentValue = deployEndpointProperty.stringValue?.Trim();
-            var shouldReplace = string.IsNullOrWhiteSpace(currentValue) ||
-                                string.Equals(currentValue, LegacyLocalDeployEndpoint, System.StringComparison.OrdinalIgnoreCase);
+            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
             if (!shouldReplace)
                 return false;
 

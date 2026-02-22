@@ -1,13 +1,17 @@
 using System;
 
-using Playserv.Events;
-using Playserv.Wrapper;
-
 namespace Playserv.Test.RPC
 {
     [Rpc]
     public class NotificationService
     {
+        private readonly IContext _context;
+
+        public NotificationService(IContext context)
+        {
+            _context = context;
+        }
+
         public Result BroadcastToAll(string message)
         {
             if (string.IsNullOrEmpty(message))
@@ -23,7 +27,7 @@ namespace Playserv.Test.RPC
                 EventType = "Broadcast"
             };
 
-            PlayServ.Publish(notificationEvent);
+            _context.Publish(notificationEvent);
             
             return Result.Ok();
         }
@@ -48,7 +52,7 @@ namespace Playserv.Test.RPC
                 EventType = "GroupNotification"
             };
 
-            PlayServ.PublishForGroup(groupName, notificationEvent);
+            _context.PublishForGroup(groupName, notificationEvent);
 
             return Result.Ok();
         }
@@ -73,7 +77,7 @@ namespace Playserv.Test.RPC
                 EventType = "UserNotification"
             };
 
-            PlayServ.PublishForUser(userId, notificationEvent);
+            _context.PublishForUser(userId, notificationEvent);
 
             return Result.Ok();
         }
@@ -93,7 +97,7 @@ namespace Playserv.Test.RPC
                 EventType = "Broadcast"
             };
 
-            PlayServ.Publish(broadcastEvent);
+            _context.Publish(broadcastEvent);
 
             if (!string.IsNullOrEmpty(groupName))
             {
@@ -105,7 +109,7 @@ namespace Playserv.Test.RPC
                     EventType = "GroupNotification"
                 };
 
-                PlayServ.PublishForGroup(groupName, groupEvent);
+                _context.PublishForGroup(groupName, groupEvent);
             }
 
             if (!string.IsNullOrEmpty(userId))
@@ -118,14 +122,12 @@ namespace Playserv.Test.RPC
                     EventType = "UserNotification"
                 };
 
-                PlayServ.PublishForUser(userId, userEvent);
+                _context.PublishForUser(userId, userEvent);
             }
 
             return Result.Ok();
         }
     }
-
 }
-
 
 

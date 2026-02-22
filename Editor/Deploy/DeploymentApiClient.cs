@@ -13,8 +13,6 @@ namespace Playserv.Deploy.Editor
     public sealed class DeploymentApiClient
     {
         private const string DeploymentPath = "/api/deployments";
-        private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
-        private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
         private readonly PlayServConfig _settings;
 
         public DeploymentApiClient(PlayServConfig settings)
@@ -32,10 +30,8 @@ namespace Playserv.Deploy.Editor
 
             if (!File.Exists(zipPath))
                 throw new FileNotFoundException("ZIP file not found.", zipPath);
-
-            // Server-side deployment service reads game id from X-Game-Id header.
-            // Keep query parameter as a compatibility fallback for older services.
-            var url = BuildDeploymentUrl(_settings.DeployApiEndpoint, gameId);
+            
+            var url = BuildDeploymentUrl(_settings.DeployApiEndpoint);
 
             // Read ZIP bytes
             var data = File.ReadAllBytes(zipPath);
@@ -139,7 +135,7 @@ namespace Playserv.Deploy.Editor
             }
         }
 
-        private static string BuildDeploymentUrl(string endpoint, string gameId)
+        private static string BuildDeploymentUrl(string endpoint)
         {
             endpoint = NormalizeEndpoint(endpoint);
 
@@ -160,20 +156,12 @@ namespace Playserv.Deploy.Editor
                     builder.Path = normalizedPath + DeploymentPath;
             }
 
-            var gameIdParam = $"gameId={UnityWebRequest.EscapeURL(gameId)}";
-            var query = builder.Query.TrimStart('?');
-            builder.Query = string.IsNullOrEmpty(query) ? gameIdParam : $"{query}&{gameIdParam}";
-
             return builder.Uri.ToString();
         }
 
         private static string NormalizeEndpoint(string endpoint)
         {
-            var value = endpoint?.Trim() ?? string.Empty;
-            if (string.Equals(value, LegacyLocalDeployEndpoint, StringComparison.OrdinalIgnoreCase))
-                return DefaultBackofficeDeployEndpoint;
-
-            return value;
+            return endpoint?.Trim() ?? string.Empty;
         }
 
         private string ResolveDeployAuthToken()
@@ -181,7 +169,7 @@ namespace Playserv.Deploy.Editor
             if (!string.IsNullOrWhiteSpace(_settings.DeployAuthToken))
                 return _settings.DeployAuthToken.Trim();
 
-            return _settings.GameAccessToken?.Trim() ?? string.Empty;
+            return string.Empty;
         }
     }
 }
