@@ -225,7 +225,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 877046254}
-  - component: {fileID: 877046253}
   - component: {fileID: 877046252}
   m_Layer: 0
   m_Name: DataSubscriptionSample
@@ -250,30 +249,6 @@ MonoBehaviour:
   renameTo: RenamedPlayer
   levelToSet: 10
   showOverlay: 1
---- !u!114 &877046253
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 877046251}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8b99100df71b44a4987e1961c145b7bf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  gameAccessToken: your-token
-  gameId: game-001
-  userId: player-001
-  gameVersion: 1.0.0
-  useLocalBackend: 0
-  localEndpoint: ws://localhost:8080/ws/
-  remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
-  autoConnect: 1
-  showOverlay: 1
-  disconnectOnDestroy: 1
-  keepAlivePingIntervalMs: 30000
-  keepAlivePongTimeoutMs: 30000
 --- !u!4 &877046254
 Transform:
   m_ObjectHideFlags: 0

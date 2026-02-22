@@ -1,9 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using Playserv.Proxy.Common;
 using Playserv.Test.RPC;
 using Playserv.Wrapper;
-using Playserv.Proxy.Common;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+#endif
 
 #nullable enable
 
@@ -11,13 +17,13 @@ namespace Playserv.Samples
 {
     /// <summary>
     /// RPC sample based on TestCode NotificationService:
-    /// local in-process invoke via LocalRpcInvoker and transport invoke via rpc.InvokeRpc.
+    /// transport invoke via rpc.InvokeRpc and response tracking via NotificationEvent.
     /// </summary>
     public sealed class PlayServRpcSample : MonoBehaviour
     {
+        private const string SamplesSceneFileName = "Samples.unity";
         private const string NotificationServiceName = nameof(NotificationService);
         private const string BroadcastMethodName = nameof(NotificationService.BroadcastToAll);
-
 
         private readonly string messageText = "WyJIZWxsbyJd";
 
@@ -25,16 +31,20 @@ namespace Playserv.Samples
         [SerializeField] private bool enableLocalInvokerOnEnable = false;
         [SerializeField] private bool autoSubscribeOnEnable = true;
         [SerializeField] private bool showOverlay = true;
-        
+
         private IDisposable? _notificationSubscription;
         private readonly List<string> _history = new List<string>();
         private Vector2 _historyScroll;
         private bool _pendingAutoSubscribe;
         private string _status = "Idle";
+        private bool _showInfo;
 
         private void OnEnable()
         {
             PlayServ.OnTransportError += OnTransportError;
+
+            if (enableLocalInvokerOnEnable)
+                AddHistory("Local invoker toggle is deprecated in this sample; transport RPC is used.");
 
             if (autoSubscribeOnEnable)
             {
@@ -73,10 +83,9 @@ namespace Playserv.Samples
                     NotificationServiceName,
                     BroadcastMethodName,
                     messageText);
-                
-                Debug.Log($"Invoke RPC: {messageText}");
-                
-                AddHistory($"RPC invoke sent through transport: {messageText}");
+
+                _status = "RPC invoke sent";
+                AddHistory($"-> {NotificationServiceName}.{BroadcastMethodName} payload={messageText}");
             }
             catch (Exception ex)
             {
@@ -112,6 +121,7 @@ namespace Playserv.Samples
         {
             _notificationSubscription?.Dispose();
             _notificationSubscription = null;
+            AddHistory("Unsubscribed NotificationEvent.");
         }
 
         private void OnNotificationReceived(NotificationEvent evt)
@@ -129,10 +139,55 @@ namespace Playserv.Samples
             AddHistory(_status);
         }
 
+        private async Task ConnectSdkAsync()
+        {
+            try
+            {
+                var connected = await PlayServ.Connect();
+                _status = connected ? "SDK connected" : "SDK connection failed";
+                AddHistory(_status);
+            }
+            catch (Exception ex)
+            {
+                _status = $"Connect error: {ex.Message}";
+                AddHistory(_status);
+            }
+        }
+
+        private void DisconnectSdk()
+        {
+            PlayServ.Disconnect();
+            _status = "SDK disconnected";
+            AddHistory(_status);
+        }
+
+        private void BackToSamples()
+        {
+            var scenePath = ResolveSamplesScenePath();
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                if (File.Exists(scenePath))
+                    EditorSceneManager.OpenScene(scenePath);
+                return;
+            }
+#endif
+            SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePath));
+        }
+
+        private static string ResolveSamplesScenePath()
+        {
+            var activePath = SceneManager.GetActiveScene().path;
+            var activeDirectory = Path.GetDirectoryName(activePath);
+            return string.IsNullOrEmpty(activeDirectory)
+                ? SamplesSceneFileName
+                : Path.Combine(activeDirectory, SamplesSceneFileName).Replace('\\', '/');
+        }
+
         private void AddHistory(string line)
         {
             _history.Add(line);
-            if (_history.Count > 8)
+            if (_history.Count > 128)
                 _history.RemoveAt(0);
 
             _historyScroll.y = float.MaxValue;
@@ -143,22 +198,42 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
-            var areaWidth = Mathf.Clamp(Screen.width - 20f, 320f, 620f);
-            var areaHeight = Mathf.Clamp(Screen.height - 430f, 180f, 260f);
-            var areaY = Mathf.Clamp(420f, 10f, Screen.height - areaHeight - 10f);
+            var margin = 10f;
+            var areaWidth = Mathf.Max(320f, Screen.width - margin * 2f);
+            var areaHeight = Mathf.Max(220f, Screen.height - margin * 2f);
 
-            GUILayout.BeginArea(new Rect(10f, areaY, areaWidth, areaHeight), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ RPC Sample");
-            GUILayout.Label($"Status: {_status}");
+            GUILayout.Label("How to use: connect SDK, subscribe NotificationEvent, click Invoke RPC, and watch incoming event/response logs.");
             GUILayout.Label($"SDK state: {PlayServ.State}");
+            GUILayout.Label($"Status: {_status}");
             GUILayout.Label($"Notification subscription: {(_notificationSubscription != null ? "Active" : "Inactive")}");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Connect SDK"))
+                _ = ConnectSdkAsync();
+            if (GUILayout.Button("Disconnect SDK"))
+                DisconnectSdk();
+            if (GUILayout.Button("Back to 0_Samples"))
+                BackToSamples();
+            if (GUILayout.Button(_showInfo ? "Hide Info" : "Info"))
+                _showInfo = !_showInfo;
+            GUILayout.EndHorizontal();
+
+            if (_showInfo)
+            {
+                GUILayout.Space(6f);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label("Info");
+                GUILayout.Label("Purpose: Demonstrates RPC invocation through transport and event-based response handling.");
+                GUILayout.Label("How to use: Connect, subscribe to NotificationEvent, invoke RPC, then verify outbound/inbound logs.");
+                GUILayout.Label("Use in your game: Gameplay server actions, backend workflows, and follow-up notifications.");
+                GUILayout.EndVertical();
+            }
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Invoke RPC"))
                 InvokeRpc();
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
             if (GUILayout.Button("Subscribe"))
                 SubscribeNotifications();
             if (GUILayout.Button("Unsubscribe"))
@@ -166,11 +241,11 @@ namespace Playserv.Samples
             GUILayout.EndHorizontal();
 
             GUILayout.Space(8f);
-            GUILayout.Label($"History ({_history.Count}):");
+            GUILayout.Label($"Logs ({_history.Count}):");
             _historyScroll = GUILayout.BeginScrollView(_historyScroll, GUILayout.ExpandHeight(true));
             if (_history.Count == 0)
             {
-                GUILayout.Label("- No calls yet");
+                GUILayout.Label("- No logs yet");
             }
             else
             {

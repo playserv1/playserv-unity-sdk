@@ -11,13 +11,17 @@ namespace Playserv.Editor
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
         private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
         private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
+        private const string LegacyDefaultSdkVersion = "1.0.0";
+        private const string CurrentDefaultSdkVersion = "0.1.0";
 
         public static PlayServConfig GetOrCreate()
         {
             var config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (config != null)
             {
-                if (EnsureDeployEndpoint(config))
+                var changed = EnsureDeployEndpoint(config);
+                changed |= EnsureDefaultSdkVersion(config);
+                if (changed)
                     AssetDatabase.SaveAssets();
                 return config;
             }
@@ -32,6 +36,7 @@ namespace Playserv.Editor
             config = ScriptableObject.CreateInstance<PlayServConfig>();
             AssetDatabase.CreateAsset(config, AssetPath);
             EnsureDeployEndpoint(config);
+            EnsureDefaultSdkVersion(config);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return config;
@@ -90,6 +95,28 @@ namespace Playserv.Editor
                 return false;
 
             deployEndpointProperty.stringValue = DefaultBackofficeDeployEndpoint;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
+            return true;
+        }
+
+        private static bool EnsureDefaultSdkVersion(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var serializedObject = new SerializedObject(config);
+            var sdkVersionProperty = serializedObject.FindProperty("sdkVersion");
+            if (sdkVersionProperty == null)
+                return false;
+
+            var currentValue = sdkVersionProperty.stringValue?.Trim();
+            var shouldReplace = string.IsNullOrWhiteSpace(currentValue) ||
+                                string.Equals(currentValue, LegacyDefaultSdkVersion, System.StringComparison.Ordinal);
+            if (!shouldReplace)
+                return false;
+
+            sdkVersionProperty.stringValue = CurrentDefaultSdkVersion;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;

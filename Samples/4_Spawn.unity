@@ -309,7 +309,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1702885661}
-  - component: {fileID: 1702885660}
   - component: {fileID: 1702885659}
   m_Layer: 0
   m_Name: SpawnSample
@@ -334,30 +333,6 @@ MonoBehaviour:
   spawnCenter: {x: 0, y: 0, z: 0}
   spawnRadius: 6
   showOverlay: 1
---- !u!114 &1702885660
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1702885658}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8b99100df71b44a4987e1961c145b7bf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  gameAccessToken: your-token
-  gameId: game-001
-  userId: player-001
-  gameVersion: 1.0.0
-  useLocalBackend: 0
-  localEndpoint: ws://localhost:8080/ws/
-  remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
-  autoConnect: 1
-  showOverlay: 1
-  disconnectOnDestroy: 1
-  keepAlivePingIntervalMs: 30000
-  keepAlivePongTimeoutMs: 30000
 --- !u!4 &1702885661
 Transform:
   m_ObjectHideFlags: 0

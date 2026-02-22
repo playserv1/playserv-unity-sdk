@@ -1,5 +1,4 @@
 #if UNITY_5_3_OR_NEWER
-using Playserv.Proxy.Common;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -18,11 +17,10 @@ namespace Playserv.Wrapper
         private readonly string DEPLOY_API_ENDPOINT = "http://playserv-deployment.test.playserv.io/api/deployments";
 
         [SerializeField] private string gameAccessToken;
-        [SerializeField] private string projectId;
         [SerializeField] private string gameId;
         [SerializeField] private string userId;
         [SerializeField] private string gameVersion = "1.0.0";
-        [SerializeField] private string sdkVersion = SdkInfo.Version;
+        [SerializeField] private string sdkVersion = "0.1.0";
         [SerializeField] private bool allowMultipleConnections = true;
         [SerializeField] private int keepAlivePingIntervalMs = 30000;
         [SerializeField] private int keepAlivePongTimeoutMs = 10000;
@@ -124,7 +122,6 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 GameAccessToken = gameAccessToken,
-                ProjectId = projectId,
                 GameId = gameId,
                 UserId = userId,
                 GameVersion = gameVersion,

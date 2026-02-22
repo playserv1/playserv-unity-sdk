@@ -1,4 +1,3 @@
-using System;
 using Playserv.Wrapper;
 using UnityEngine;
 
@@ -8,12 +7,6 @@ namespace Playserv.Test.RPC
     {
         private const string NotificationServiceName = nameof(NotificationService);
         private const string BroadcastMethodName = nameof(NotificationService.BroadcastToAll);
-
-
-        private void Start()
-        {
-            PlayServ.Connect();
-        }
 
         private void Update()
         {

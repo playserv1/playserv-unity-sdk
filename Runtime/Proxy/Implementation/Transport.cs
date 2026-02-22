@@ -149,17 +149,28 @@ namespace Playserv.Proxy.Implementation
 
             MessageEnvelope envelope;
             object command;
+            var json = string.Empty;
 
             try
             {
-                var json = Encoding.UTF8.GetString(data);
+                json = Encoding.UTF8.GetString(data);
                 LogTransportJson($"Received JSON: {json}", json);
                 envelope = MessageEnvelopeParser.Parse(json);
-                command = _serializer.Deserialize(envelope);
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Failed to parse/deserialize incoming frame. Message skipped: {ex.Message}");
+                return;
+            }
+
+            try
+            {
+                command = _serializer.Deserialize(envelope);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    $"Failed to deserialize incoming frame for command '{envelope.Command}'. Message skipped: {ex.Message}. Payload: {envelope.Payload}");
                 return;
             }
 

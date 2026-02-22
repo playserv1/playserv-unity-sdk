@@ -1,7 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Playserv.Wrapper;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+#endif
 
 namespace Playserv.Samples
 {
@@ -10,6 +16,8 @@ namespace Playserv.Samples
     /// </summary>
     public sealed class PlayServEventsSample : MonoBehaviour
     {
+        private const string SamplesSceneFileName = "Samples.unity";
+
         [Header("Message")]
         [SerializeField] private string senderId = "player-001";
         [SerializeField] private string messageText = "Hello from events sample";
@@ -26,6 +34,7 @@ namespace Playserv.Samples
         private Vector2 _messagesScroll;
         private IDisposable _subscription;
         private string _status = "Idle";
+        private bool _showInfo;
 
         private void OnEnable()
         {
@@ -44,6 +53,7 @@ namespace Playserv.Samples
             if (_subscription != null)
             {
                 _status = "Already subscribed";
+                AddMessage(_status);
                 return;
             }
 
@@ -58,6 +68,7 @@ namespace Playserv.Samples
             {
                 _subscription = PlayServ.Subscribe<SampleChatEvent>(OnEventReceived);
                 _status = "Subscribed";
+                AddMessage(_status);
             }
             catch (InvalidOperationException ex)
             {
@@ -72,6 +83,7 @@ namespace Playserv.Samples
             _subscription?.Dispose();
             _subscription = null;
             _status = "Unsubscribed";
+            AddMessage(_status);
         }
 
         [ContextMenu("Publish Global")]
@@ -115,6 +127,51 @@ namespace Playserv.Samples
             _status = $"Received event at {evt.SentAtUnixMs}";
         }
 
+        private async Task ConnectSdkAsync()
+        {
+            try
+            {
+                var connected = await PlayServ.Connect();
+                _status = connected ? "SDK connected" : "SDK connection failed";
+                AddMessage(_status);
+            }
+            catch (Exception ex)
+            {
+                _status = $"Connect error: {ex.Message}";
+                AddMessage(_status);
+            }
+        }
+
+        private void DisconnectSdk()
+        {
+            PlayServ.Disconnect();
+            _status = "SDK disconnected";
+            AddMessage(_status);
+        }
+
+        private void BackToSamples()
+        {
+            var scenePath = ResolveSamplesScenePath();
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                if (File.Exists(scenePath))
+                    EditorSceneManager.OpenScene(scenePath);
+                return;
+            }
+#endif
+            SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePath));
+        }
+
+        private static string ResolveSamplesScenePath()
+        {
+            var activePath = SceneManager.GetActiveScene().path;
+            var activeDirectory = Path.GetDirectoryName(activePath);
+            return string.IsNullOrEmpty(activeDirectory)
+                ? SamplesSceneFileName
+                : Path.Combine(activeDirectory, SamplesSceneFileName).Replace('\\', '/');
+        }
+
         private void AddMessage(string line)
         {
             if (string.IsNullOrWhiteSpace(line))
@@ -122,7 +179,7 @@ namespace Playserv.Samples
 
             _messages.Add(line);
 
-            if (_messages.Count > 24)
+            if (_messages.Count > 128)
                 _messages.RemoveAt(0);
 
             _messagesScroll.y = float.MaxValue;
@@ -133,13 +190,37 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
-            var areaWidth = Mathf.Clamp(Screen.width - 20f, 320f, 520f);
-            var areaHeight = Mathf.Clamp(Screen.height - 210f, 170f, 320f);
+            var margin = 10f;
+            var areaWidth = Mathf.Max(320f, Screen.width - margin * 2f);
+            var areaHeight = Mathf.Max(220f, Screen.height - margin * 2f);
 
-            GUILayout.BeginArea(new Rect(10f, 240f, areaWidth, areaHeight), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ Events Sample");
-            GUILayout.Label($"State: {PlayServ.State}");
+            GUILayout.Label("How to use: 1) Configure bootstrap in 0_Samples. 2) Connect SDK. 3) Subscribe. 4) Publish Global/Group/User and watch logs.");
+            GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Connect SDK"))
+                _ = ConnectSdkAsync();
+            if (GUILayout.Button("Disconnect SDK"))
+                DisconnectSdk();
+            if (GUILayout.Button("Back to 0_Samples"))
+                BackToSamples();
+            if (GUILayout.Button(_showInfo ? "Hide Info" : "Info"))
+                _showInfo = !_showInfo;
+            GUILayout.EndHorizontal();
+
+            if (_showInfo)
+            {
+                GUILayout.Space(6f);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label("Info");
+                GUILayout.Label("Purpose: Demonstrates event-based communication via PlayServ events.");
+                GUILayout.Label("How to use: Connect, subscribe, publish Global/Group/User events, then inspect received messages.");
+                GUILayout.Label("Use in your game: Chat, notifications, lobby/match broadcasts, and user-targeted messages.");
+                GUILayout.EndVertical();
+            }
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Subscribe"))
@@ -158,7 +239,7 @@ namespace Playserv.Samples
             GUILayout.EndHorizontal();
 
             GUILayout.Space(8f);
-            GUILayout.Label($"Recent messages ({_messages.Count}):");
+            GUILayout.Label($"Logs ({_messages.Count}):");
 
             _messagesScroll = GUILayout.BeginScrollView(_messagesScroll, GUILayout.ExpandHeight(true));
             if (_messages.Count == 0)

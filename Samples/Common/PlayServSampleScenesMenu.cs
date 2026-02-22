@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
+using Playserv.Wrapper;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 #if UNITY_EDITOR
@@ -20,9 +22,12 @@ namespace Playserv.Samples
         [SerializeField] private bool autoRefreshOnEnable = true;
 
         private readonly List<SceneEntry> _sceneEntries = new List<SceneEntry>();
+        private readonly List<string> _logs = new List<string>();
         private Vector2 _scroll;
+        private Vector2 _logsScroll;
         private string _status = "Idle";
         private string _currentScenePath = string.Empty;
+        private bool _showInfo;
 
         private sealed class SceneEntry
         {
@@ -103,6 +108,7 @@ namespace Playserv.Samples
             _status = _sceneEntries.Count > 0
                 ? $"Found {_sceneEntries.Count} scenes."
                 : "No scenes found in folder.";
+            AddLog(_status);
         }
 
         private void LoadScene(SceneEntry scene)
@@ -115,11 +121,13 @@ namespace Playserv.Samples
             {
                 EditorSceneManager.OpenScene(scene.Path);
                 _status = $"Opened '{scene.Name}' in editor.";
+                AddLog(_status);
                 return;
             }
 #endif
             try
             {
+                AddLog($"Loading scene '{scene.Name}'.");
                 if (scene.BuildIndex >= 0)
                 {
                     SceneManager.LoadScene(scene.BuildIndex);
@@ -131,8 +139,31 @@ namespace Playserv.Samples
             catch (Exception ex)
             {
                 _status = $"Failed to load '{scene.Name}': {ex.Message}";
+                AddLog(_status);
                 Debug.LogError($"[PlayServ][Samples] {_status}");
             }
+        }
+
+        private async Task ConnectSdkAsync()
+        {
+            try
+            {
+                var connected = await PlayServ.Connect();
+                _status = connected ? "SDK connected." : "SDK connection failed.";
+                AddLog(_status);
+            }
+            catch (Exception ex)
+            {
+                _status = $"Connect error: {ex.Message}";
+                AddLog(_status);
+            }
+        }
+
+        private void DisconnectSdk()
+        {
+            PlayServ.Disconnect();
+            _status = "SDK disconnected.";
+            AddLog(_status);
         }
 
         private static Dictionary<string, int> BuildSceneIndexByPath()
@@ -202,23 +233,65 @@ namespace Playserv.Samples
         private static string NormalizePath(string path) =>
             string.IsNullOrWhiteSpace(path) ? string.Empty : path.Replace('\\', '/');
 
+        private void AddLog(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return;
+
+            _logs.Add(line);
+            if (_logs.Count > 64)
+                _logs.RemoveAt(0);
+
+            _logsScroll.y = float.MaxValue;
+        }
+
         private void OnGUI()
         {
             if (!showOverlay)
                 return;
 
-            GUILayout.BeginArea(new Rect(10f, 200f, 340f, 260f), GUI.skin.box);
-            GUILayout.Label("PlayServ Samples Menu");
-            GUILayout.Label($"Current: {Path.GetFileNameWithoutExtension(_currentScenePath)}");
+            var margin = 10f;
+            var areaRect = new Rect(
+                margin,
+                margin,
+                Mathf.Max(320f, Screen.width - margin * 2f),
+                Mathf.Max(220f, Screen.height - margin * 2f));
+            var sceneListHeight = Mathf.Max(140f, areaRect.height * 0.38f);
+            var logsHeight = Mathf.Max(140f, areaRect.height * 0.30f);
+
+            GUILayout.BeginArea(areaRect, GUI.skin.box);
+            GUILayout.Label("PlayServ Samples Hub (0_Samples)");
+            GUILayout.Label("How to use: configure 'PlayServBootstrap' in this scene inspector, run Play mode, then open a sample scene below.");
+            GUILayout.Label("Bootstrap is persistent (DontDestroyOnLoad), so one connection is reused across scenes.");
+            GUILayout.Label($"Current scene: {Path.GetFileNameWithoutExtension(_currentScenePath)}");
+            GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Refresh"))
                 RefreshSceneList();
+            if (GUILayout.Button("Connect SDK"))
+                _ = ConnectSdkAsync();
+            if (GUILayout.Button("Disconnect SDK"))
+                DisconnectSdk();
+            if (GUILayout.Button(_showInfo ? "Hide Info" : "Info"))
+                _showInfo = !_showInfo;
             GUILayout.EndHorizontal();
 
+            if (_showInfo)
+            {
+                GUILayout.Space(6f);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label("Info");
+                GUILayout.Label("Purpose: This is the sample launcher and central SDK control point.");
+                GUILayout.Label("How to use: Configure PlayServBootstrap, connect once, then open any sample scene.");
+                GUILayout.Label("Use in your game: Keep one persistent bootstrap and reuse one SDK connection across scenes.");
+                GUILayout.EndVertical();
+            }
+
             GUILayout.Space(6f);
-            _scroll = GUILayout.BeginScrollView(_scroll);
+            GUILayout.Label("Scenes:");
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(sceneListHeight));
             if (_sceneEntries.Count == 0)
             {
                 GUILayout.Label("- No scenes");
@@ -237,6 +310,19 @@ namespace Playserv.Samples
                 }
             }
 
+            GUILayout.EndScrollView();
+            GUILayout.Space(6f);
+            GUILayout.Label($"Logs ({_logs.Count}):");
+            _logsScroll = GUILayout.BeginScrollView(_logsScroll, GUILayout.Height(logsHeight));
+            if (_logs.Count == 0)
+            {
+                GUILayout.Label("- No logs yet");
+            }
+            else
+            {
+                foreach (var line in _logs)
+                    GUILayout.Label($"- {line}");
+            }
             GUILayout.EndScrollView();
             GUILayout.EndArea();
         }

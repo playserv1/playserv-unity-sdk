@@ -169,6 +169,59 @@ MonoBehaviour:
   showOverlay: 1
   includeCurrentScene: 0
   autoRefreshOnEnable: 1
+--- !u!1 &200345673
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 200345674}
+  - component: {fileID: 200345675}
+  m_Layer: 0
+  m_Name: PlayServBootstrap
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &200345674
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200345673}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 3
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &200345675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200345673}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b99100df71b44a4987e1961c145b7bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameAccessToken: your-token
+  gameId: game-001
+  userId: player-001
+  gameVersion: 1.0.0
+  remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
+  autoConnect: 1
+  disconnectOnDestroy: 1
+  keepAlivePingIntervalMs: 30000
+  keepAlivePongTimeoutMs: 30000
 --- !u!1 &228641480
 GameObject:
   m_ObjectHideFlags: 0

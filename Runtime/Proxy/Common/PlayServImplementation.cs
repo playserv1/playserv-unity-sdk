@@ -390,6 +390,13 @@ namespace Playserv.Proxy.Common
         {
             if (command is CommandErrorResponse response)
             {
+                if (IsUnsupportedDataSubscriptionRefresh(response))
+                {
+                    _logger.LogWarning(
+                        $"Server command warning received. Error: {response.Error}, Message: {response.Message}, Timestamp: {response.Timestamp}");
+                    return;
+                }
+
                 _logger.LogError(
                     $"Server command error received. Error: {response.Error}, Message: {response.Message}, Timestamp: {response.Timestamp}");
             }
@@ -398,6 +405,16 @@ namespace Playserv.Proxy.Common
                 _logger.LogWarning(
                     $"Received 'error' command with unexpected payload type: {command?.GetType().Name ?? "null"}");
             }
+        }
+
+        private static bool IsUnsupportedDataSubscriptionRefresh(CommandErrorResponse response)
+        {
+            var message = response?.Message ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(message))
+                return false;
+
+            return message.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   message.IndexOf("not supported by this module", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void OnInvokeRpcResponseReceived(object command)
@@ -440,6 +457,8 @@ namespace Playserv.Proxy.Common
         public void Dispose()
         {
             DisposeSpawnManager();
+
+            _dataSubscriptionAdapter.Dispose();
 
             _keepAliveManager.Stop();
             _keepAliveManager.Dispose();

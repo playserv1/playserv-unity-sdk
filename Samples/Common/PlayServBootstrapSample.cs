@@ -1,22 +1,18 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using Playserv.Proxy.Common;
 using Playserv.Wrapper;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-#if UNITY_EDITOR
-using UnityEditor.SceneManagement;
-#endif
 
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Minimal bootstrap component for configuring and connecting PlayServ from a scene.
+    /// Persistent bootstrap component for configuring and connecting PlayServ in samples.
     /// </summary>
     public sealed class PlayServBootstrapSample : MonoBehaviour
     {
-        private const string SamplesSceneFileName = "Samples.unity";
+        private static PlayServBootstrapSample _instance;
+        private static bool _applicationIsQuitting;
 
         [Header("Credentials")]
         [SerializeField] private string gameAccessToken = "your-token";
@@ -29,41 +25,72 @@ namespace Playserv.Samples
 
         [Header("Behavior")]
         [SerializeField] private bool autoConnect;
-        [SerializeField] private bool showOverlay = true;
         [SerializeField] private bool disconnectOnDestroy = true;
 
         [Header("KeepAlive")]
         [SerializeField] private int keepAlivePingIntervalMs = 5000;
         [SerializeField] private int keepAlivePongTimeoutMs = 5000;
 
-        private string _status = "Not configured";
+        private bool _isOwner;
+
+        private void Awake()
+        {
+            if (_instance != null && _instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            _applicationIsQuitting = false;
+            _instance = this;
+            _isOwner = true;
+            DontDestroyOnLoad(gameObject);
+        }
 
         private void Start()
         {
+            if (!_isOwner)
+                return;
+
             Configure();
 
-            if (autoConnect)
+            if (autoConnect &&
+                PlayServ.State != PlayServState.Online &&
+                PlayServ.State != PlayServState.Connecting &&
+                PlayServ.State != PlayServState.Handshaking)
+            {
                 _ = ConnectAsync();
+            }
         }
 
         private void OnEnable()
         {
+            if (!_isOwner)
+                return;
+
             PlayServ.OnTransportError += OnTransportError;
-            PlayServ.OnKeepAlivePingSent += OnPingSent;
-            PlayServ.OnKeepAlivePongReceived += OnPongReceived;
         }
 
         private void OnDisable()
         {
+            if (!_isOwner)
+                return;
+
             PlayServ.OnTransportError -= OnTransportError;
-            PlayServ.OnKeepAlivePingSent -= OnPingSent;
-            PlayServ.OnKeepAlivePongReceived -= OnPongReceived;
         }
 
         private void OnDestroy()
         {
-            if (disconnectOnDestroy)
+            if (_instance == this)
+                _instance = null;
+
+            if (_isOwner && disconnectOnDestroy && _applicationIsQuitting)
                 PlayServ.Disconnect();
+        }
+
+        private void OnApplicationQuit()
+        {
+            _applicationIsQuitting = true;
         }
 
         [ContextMenu("Configure SDK")]
@@ -83,7 +110,6 @@ namespace Playserv.Samples
             };
 
             PlayServ.Config(settings);
-            _status = $"Configured ({settings.Endpoint})";
             Debug.Log(
                 $"[PlayServ][Sample] Configured. endpoint={settings.Endpoint}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
         }
@@ -98,7 +124,7 @@ namespace Playserv.Samples
         public void Disconnect()
         {
             PlayServ.Disconnect();
-            _status = "Disconnected";
+            Debug.Log("[PlayServ][Sample] Disconnected.");
         }
 
         public async Task ConnectAsync()
@@ -106,95 +132,19 @@ namespace Playserv.Samples
             try
             {
                 bool connected = await PlayServ.Connect();
-                _status = connected ? "Connected" : "Connection failed";
+                Debug.Log(connected
+                    ? "[PlayServ][Sample] Connected."
+                    : "[PlayServ][Sample] Connection failed.");
             }
             catch (Exception ex)
             {
-                _status = $"Connect error: {ex.Message}";
+                Debug.LogError($"[PlayServ][Sample] Connect error: {ex.Message}");
             }
         }
 
         private void OnTransportError(TransportError error)
         {
-            _status = $"Transport error: {error}";
             Debug.LogError($"[PlayServ][Sample] Transport error: {error}");
-        }
-
-        private void OnPingSent()
-        {
-            _status = "KeepAlive ping sent";
-        }
-
-        private void OnPongReceived()
-        {
-            _status = "KeepAlive pong received";
-        }
-
-        private void OnGUI()
-        {
-            if (!showOverlay)
-                return;
-
-            GUILayout.BeginArea(new Rect(10f, 10f, 460f, 220f), GUI.skin.box);
-            GUILayout.Label("PlayServ Bootstrap Sample");
-            GUILayout.Label($"State: {PlayServ.State}");
-            GUILayout.Label($"Status: {_status}");
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Configure"))
-                Configure();
-            if (GUILayout.Button("Connect"))
-                _ = ConnectAsync();
-            if (GUILayout.Button("Disconnect"))
-                Disconnect();
-            GUILayout.EndHorizontal();
-
-            if (CanReturnToSamples())
-            {
-                GUILayout.Space(6f);
-                if (GUILayout.Button("Back to Samples"))
-                    ReturnToSamples();
-            }
-
-            GUILayout.EndArea();
-        }
-
-        private static bool CanReturnToSamples()
-        {
-            var scene = SceneManager.GetActiveScene();
-            return scene.IsValid() && !string.Equals(scene.name, Path.GetFileNameWithoutExtension(SamplesSceneFileName),
-                StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void ReturnToSamples()
-        {
-            var scenePath = ResolveSamplesScenePath();
-
-#if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                if (!File.Exists(scenePath))
-                {
-                    _status = $"Scene not found: {scenePath}";
-                    return;
-                }
-
-                EditorSceneManager.OpenScene(scenePath);
-                _status = "Opened 0_Samples";
-                return;
-            }
-#endif
-
-            SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePath));
-        }
-
-        private static string ResolveSamplesScenePath()
-        {
-            var activePath = SceneManager.GetActiveScene().path;
-            var activeDirectory = Path.GetDirectoryName(activePath);
-            return string.IsNullOrEmpty(activeDirectory)
-                ? SamplesSceneFileName
-                : Path.Combine(activeDirectory, SamplesSceneFileName).Replace('\\', '/');
         }
     }
 }

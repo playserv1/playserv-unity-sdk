@@ -1,77 +1,169 @@
 # PlayServ SDK Samples
 
-This folder contains runtime API samples split by feature.
+This folder contains ready-to-run examples of the PlayServ client SDK for Unity.
+Each sample can be launched as a standalone scene and then adapted to your game code.
 
-## Folder structure
+## What is included
 
-- `Samples/Common` - connection/bootstrap sample.
-- `Samples/Events` - event publish/subscribe sample.
-- `Samples/DataSubscription` - shared entity subscription sample.
-- `Samples/Spawn` - network spawn sample.
-- `Samples/RPC` - RPC invoke sample (transport and local in-process modes).
-- `Samples/Server` - full server-mode sample (command + events + rpc in-process).
+- `Samples/Samples.unity` (`0_Samples`) - scene hub and base connection controls.
+- `Samples/Common/PlayServBootstrapSample.cs` - shared bootstrap for SDK config and connection.
+- `Samples/1_DataSubscriptionScene.unity` - data subscription example (`SelectEntity`).
+- `Samples/2_EventsScene.unity` - event pub/sub example (`Subscribe`, `Publish`).
+- `Samples/3_RPC.unity` - RPC call example (`PlayServ.Invoke`) with `NotificationEvent` handling.
+- `Samples/4_Spawn.unity` - network spawning example (`PlayServ.Spawn`).
 
-## Quick setup for a scene
+## How to run all samples
 
-1. Create a new Unity scene.
-2. Add an empty GameObject `PlayServBootstrap`.
-3. Attach `PlayServBootstrapSample` (`Samples/Common/PlayServBootstrapSample.cs`).
-4. Fill credentials and endpoint in inspector.
-5. Add one feature sample component to another GameObject:
-   - `PlayServEventsSample`
-   - `PlayServDataSubscriptionSample`
-   - `PlayServSpawnSample`
-   - `PlayServRpcSample`
-   - `PlayServServerModeSample`
-6. Press Play.
+1. Open `Samples/Samples.unity`.
+2. On the `PlayServBootstrap` object, set:
+   `gameAccessToken`, `gameId`, `userId`, `gameVersion`, `remoteEndpoint`.
+3. Enable `autoConnect` if you want automatic connection on Play Mode start.
+4. Press Play.
+5. In `PlayServ Samples Hub (0_Samples)`:
+   - click `Connect SDK` (if auto-connect is disabled),
+   - open any sample scene.
 
-## Scene recipes
+Important: `PlayServBootstrapSample` uses `DontDestroyOnLoad`, so the same connection is reused across sample scenes.
 
-### 1) Connection scene
+---
 
-- Add only `PlayServBootstrapSample`.
-- Use overlay buttons (`Configure`, `Connect`, `Disconnect`).
+## 0_Samples (Hub + Bootstrap)
 
-### 2) Events scene
+### Purpose
+Single entry point for all demo scenes: configuration, connect/disconnect, and scene navigation.
 
-- Add `PlayServBootstrapSample`.
-- Add `PlayServEventsSample`.
-- Connect first, then use publish buttons (global/group/user).
+### What it demonstrates
+- Base initialization through `PlayServ.Config(PlayServSettings)`.
+- Reusing one SDK connection across multiple scenes.
+- Basic SDK state monitoring.
 
-### 3) Data subscription scene
+### How to use
+1. Configure `PlayServBootstrap` in the Inspector.
+2. Connect (`Connect SDK`).
+3. Open a scene from the `Scenes` list.
+4. Use `Back to 0_Samples` inside each sample scene when needed.
 
-- Add `PlayServBootstrapSample`.
-- Add `PlayServDataSubscriptionSample`.
-- Click `Bind` in component context menu or use overlay buttons.
-- Use `Rename`, `Add Level`, `Set Level`, `Refresh`.
+### What you can build with it
+- A single persistent bootstrap for your entire game.
+- No repeated `Connect()` calls during scene transitions.
 
-### 4) Spawn scene
+---
 
-- Add `PlayServBootstrapSample`.
-- Add `PlayServSpawnSample`.
-- Ensure prefab exists in `Resources` under selected `Asset Name`.
-- Prefab must contain `NetworkObject`.
-- Optional: add `NetworkTransform` on prefab for transform sync.
+## 1_DataSubscriptionScene
 
-### 5) RPC scene
+### Purpose
+Shows live DTO state, local mutations, and full server refresh.
 
-- Add `PlayServBootstrapSample`.
-- Add `PlayServRpcSample`.
-- Use `Enable Local` to execute `PlayServ.Invoke(...)` in-process (no websocket send).
-- Use `Disable Local` to fallback to normal transport RPC (`rpc.InvokeRpc`).
+### What it demonstrates
+- `PlayServ.SelectEntity<TEntity, TDto>(...)`.
+- Handling `Changed`, `Error`, and `Terminated`.
+- Local updates: `Update(...)`, `UpdateAsync(...)`.
+- Forced state refresh: `RefreshAsync()`.
 
-### 6) Server mode scene
+### How to use
+1. Connect to SDK.
+2. Click `Bind` to subscribe to an entity for `playerId`.
+3. Try:
+   - `Rename`,
+   - `Add Level`,
+   - `Set Level Async`.
+4. Watch `Current value` and `Logs`.
+5. Click `Unbind` to stop the subscription.
 
-- Add `PlayServServerModeSample`.
-- Click `Enable Handlers`.
-- Use buttons:
-  - `Send Command` to test `PlayServ.Send(...)` via local command handler.
-  - `Publish Event` to test `PlayServ.Publish(...)` and local subscribe callback.
-  - `Invoke RPC` to test `PlayServ.Invoke(...)` via local rpc invoker.
-- No websocket connection is required while handlers are enabled.
+### What you can build with it
+- Real-time player HUD/profile.
+- Live inventory or stats sync.
+- Optimistic local updates with server reconciliation.
 
-## Notes
+---
 
-- `PlayServBootstrapSample` can auto-connect on play.
-- All samples are intentionally simple and use IMGUI overlays to avoid extra UI dependencies.
-- You can copy scripts into your game code and adapt logic/UI as needed.
+## 2_EventsScene
+
+### Purpose
+Shows event channels for global, group, and user-targeted scenarios.
+
+### What it demonstrates
+- Subscription: `PlayServ.Subscribe<SampleChatEvent>(...)`.
+- Publishing:
+  - `PlayServ.Publish(...)`,
+  - `PlayServ.PublishForGroup(...)`,
+  - `PlayServ.PublishForUser(...)`.
+- Safe unsubscription via `Dispose()`.
+
+### How to use
+1. Connect to SDK.
+2. Click `Subscribe`.
+3. Send events with:
+   - `Publish Global`,
+   - `Publish Group`,
+   - `Publish User`.
+4. Check incoming messages in `Logs`.
+5. Click `Unsubscribe` when done.
+
+### What you can build with it
+- Chat, notifications, and system alerts.
+- Group broadcasts (lobby, match, clan).
+- User-targeted messaging.
+
+---
+
+## 3_RPC
+
+### Purpose
+Shows backend RPC invocation and receiving the outcome through events.
+
+### What it demonstrates
+- RPC call: `PlayServ.Invoke(serviceName, methodName, payloadBase64)`.
+- `NotificationEvent` subscription for transport-level responses/notifications.
+- Transport error logging via `PlayServ.OnTransportError`.
+
+### How to use
+1. Connect to SDK.
+2. Click `Subscribe` (for `NotificationEvent`).
+3. Click `Invoke RPC`.
+4. Check `Logs` for:
+   - outbound RPC (`-> ...`),
+   - inbound event (`<- ...`).
+5. Click `Unsubscribe` to stop receiving events.
+
+### What you can build with it
+- Gameplay RPC operations (rewards, matchmaking, match actions).
+- Push-style notifications after RPC execution.
+- Unified transport flow for RPC + events.
+
+---
+
+## 4_Spawn
+
+### Purpose
+Shows networked prefab spawning at runtime.
+
+### What it demonstrates
+- `PlayServ.Spawn(assetName, position, rotation)`.
+- Reading `NetworkObject` and `NetworkId`.
+- Basic prefab validation checks.
+
+### Requirements
+- Prefab must be in `Resources`.
+- Prefab must include `NetworkObject`.
+- Add `NetworkTransform` for movement sync (optional).
+
+### How to use
+1. Connect to SDK.
+2. Verify `assetName` (prefab name from `Resources`).
+3. Click `Spawn Random`.
+4. Check status and `Logs`.
+
+### What you can build with it
+- Online spawning for players, bots, and world objects.
+- Dynamic level entities with network identity.
+- A base for transform replication flows.
+
+---
+
+## Useful notes
+
+- All sample overlays are full-screen and include in-window usage hints.
+- Every scene includes a `Back to 0_Samples` button.
+- If controls do not work, check `SDK state` and `Logs` first.
+- You can copy these scripts into production code as a baseline.

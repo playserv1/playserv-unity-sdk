@@ -12,16 +12,20 @@ using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription
 {
-    internal sealed class PlayServDataSubscriptionAdapter : IDataSubscriptionAdapter
+    internal sealed class PlayServDataSubscriptionAdapter : IDataSubscriptionAdapter, IDisposable
     {
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
         private long _requestIdCounter;
+        private readonly IDisposable _commandErrorSubscription;
+        private bool _refreshCommandSupported = true;
+        private bool _refreshUnsupportedLogged;
 
         public PlayServDataSubscriptionAdapter(PlayServImplementation proxy, ILogger logger)
         {
             _transport = proxy ?? throw new ArgumentNullException(nameof(proxy));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _commandErrorSubscription = _transport.OnCommand("error", OnCommandErrorReceived);
         }
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
@@ -73,6 +77,9 @@ namespace Playserv.DataSubscription
 
         public Task RequestFullStateAsync(long subscriptionId)
         {
+            if (!_refreshCommandSupported)
+                return Task.CompletedTask;
+
             var requestId = Interlocked.Increment(ref _requestIdCounter);
             var refreshRequest = new DataSubscriptionRefreshRequest
             {
@@ -206,6 +213,38 @@ namespace Playserv.DataSubscription
                 SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, error.Message),
                 _ => new DataSubscriptionException(error.ErrorCode, error.Message)
             };
+        }
+
+        public void Dispose()
+        {
+            _commandErrorSubscription?.Dispose();
+        }
+
+        private void OnCommandErrorReceived(object command)
+        {
+            if (command is not CommandErrorResponse response)
+                return;
+
+            if (!IsUnsupportedRefreshCommandError(response))
+                return;
+
+            _refreshCommandSupported = false;
+            if (_refreshUnsupportedLogged)
+                return;
+
+            _refreshUnsupportedLogged = true;
+            _logger.LogWarning(
+                "[DataSubscription] Server does not support DataSubscriptionRefreshRequest. Refresh requests are disabled for this session.");
+        }
+
+        private static bool IsUnsupportedRefreshCommandError(CommandErrorResponse response)
+        {
+            var message = response?.Message ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(message))
+                return false;
+
+            return message.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   message.IndexOf("not supported by this module", StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

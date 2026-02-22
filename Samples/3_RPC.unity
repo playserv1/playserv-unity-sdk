@@ -309,7 +309,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1236662343}
-  - component: {fileID: 1236662342}
   - component: {fileID: 1236662344}
   m_Layer: 0
   m_Name: RPCScene
@@ -318,28 +317,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1236662342
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1236662341}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8b99100df71b44a4987e1961c145b7bf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  gameAccessToken: test
-  gameId: test
-  userId: test
-  gameVersion: 1.0.0
-  remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
-  autoConnect: 1
-  showOverlay: 1
-  disconnectOnDestroy: 1
-  keepAlivePingIntervalMs: 30000
-  keepAlivePongTimeoutMs: 30000
 --- !u!4 &1236662343
 Transform:
   m_ObjectHideFlags: 0

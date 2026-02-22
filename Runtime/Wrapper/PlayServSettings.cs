@@ -1,5 +1,3 @@
-using Playserv.Proxy.Common;
-
 #nullable enable
 
 namespace Playserv.Wrapper
@@ -23,11 +21,6 @@ namespace Playserv.Wrapper
         /// Access token used in handshake.
         /// </summary>
         public string GameAccessToken { get; set; } = string.Empty;
-        
-        /// <summary>
-        /// Project identifier
-        /// </summary>
-        public string ProjectId { get; set; } = string.Empty;
 
         /// <summary>
         /// Game identifier.
@@ -47,7 +40,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// SDK version sent in handshake.
         /// </summary>
-        public string SdkVersion { get; set; } = SdkInfo.Version;
+        public string SdkVersion { get; set; } = "0.1.0";
 
         /// <summary>
         /// Indicates whether server should allow multiple sessions for same user.
@@ -113,7 +106,6 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 GameAccessToken = GameAccessToken,
-                ProjectId = ProjectId,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,

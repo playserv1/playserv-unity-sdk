@@ -63,6 +63,7 @@ namespace Playserv.Proxy.Implementation
             {
                 commandName = commandName.Substring(dotIndex + 1);
             }
+            commandName = commandName.Trim();
 
             var type = FindType(commandName);
             
@@ -70,7 +71,18 @@ namespace Playserv.Proxy.Implementation
                 throw new InvalidOperationException($"Unknown command type: {envelope.Command}");
 
             var normalizedPayload = NormalizePayloadForType(envelope.Payload, type);
-            var cmd = JsonConvert.DeserializeObject(normalizedPayload, type);
+            object cmd;
+            try
+            {
+                cmd = JsonConvert.DeserializeObject(normalizedPayload, type);
+            }
+            catch (JsonException)
+            {
+                if (TryDeserializeAsCommandError(envelope.Payload, out var fallback))
+                    return fallback;
+
+                throw;
+            }
             
             if (cmd == null)
                 throw new InvalidOperationException("Failed to deserialize payload.");
@@ -123,6 +135,14 @@ namespace Playserv.Proxy.Implementation
 
         private static bool TryResolveKnownCommandType(string commandName, out Type type)
         {
+            if (string.IsNullOrWhiteSpace(commandName))
+            {
+                type = null;
+                return false;
+            }
+
+            commandName = commandName.Trim();
+
             if (string.Equals(commandName, "BroadcastEvent", StringComparison.Ordinal))
             {
                 // Compatibility path for proxy broadcasts coming from module_rpc host bridge.
@@ -132,6 +152,14 @@ namespace Playserv.Proxy.Implementation
             }
 
             if (string.Equals(commandName, "error", StringComparison.OrdinalIgnoreCase))
+            {
+                type = typeof(CommandErrorResponse);
+                return true;
+            }
+
+            if (string.Equals(commandName, "Error", StringComparison.Ordinal) ||
+                string.Equals(commandName, "CommandErrorResponse", StringComparison.Ordinal) ||
+                commandName.EndsWith("+Error", StringComparison.OrdinalIgnoreCase))
             {
                 type = typeof(CommandErrorResponse);
                 return true;
@@ -206,7 +234,68 @@ namespace Playserv.Proxy.Implementation
                 payloadObject["Payload"] = commandPayload.ToString(Formatting.None);
             }
 
+            if (payloadObject.TryGetValue("error", StringComparison.OrdinalIgnoreCase, out var errorPayload) &&
+                errorPayload.Type != JTokenType.String &&
+                errorPayload.Type != JTokenType.Null &&
+                HasStringMember(type, "error"))
+            {
+                payloadObject["error"] = errorPayload.Type == JTokenType.Object &&
+                                         errorPayload["message"]?.Type == JTokenType.String
+                    ? errorPayload["message"]!.ToString()
+                    : errorPayload.ToString(Formatting.None);
+            }
+
             return payloadObject.ToString(Formatting.None);
+        }
+
+        private static bool TryDeserializeAsCommandError(string payloadJson, out CommandErrorResponse response)
+        {
+            response = null;
+
+            if (string.IsNullOrWhiteSpace(payloadJson))
+                return false;
+
+            JObject payloadObject;
+            try
+            {
+                payloadObject = JObject.Parse(payloadJson);
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+
+            if (!payloadObject.TryGetValue("error", StringComparison.OrdinalIgnoreCase, out var errorToken) &&
+                !payloadObject.TryGetValue("message", StringComparison.OrdinalIgnoreCase, out _))
+            {
+                return false;
+            }
+
+            var error = string.Empty;
+            if (errorToken != null && errorToken.Type != JTokenType.Null)
+            {
+                if (errorToken.Type == JTokenType.String)
+                {
+                    error = errorToken.ToString();
+                }
+                else if (errorToken.Type == JTokenType.Object &&
+                         errorToken["message"]?.Type == JTokenType.String)
+                {
+                    error = errorToken["message"]!.ToString();
+                }
+                else
+                {
+                    error = errorToken.ToString(Formatting.None);
+                }
+            }
+
+            response = new CommandErrorResponse
+            {
+                error = error,
+                message = payloadObject["message"]?.ToString() ?? string.Empty,
+                timestamp = payloadObject["timestamp"]?.ToString() ?? string.Empty
+            };
+            return true;
         }
 
         private static bool HasStringMember(Type type, string memberName)
