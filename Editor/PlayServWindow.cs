@@ -23,6 +23,7 @@ namespace Playserv.Editor
         private const string DocsUrl = "https://example.com";
         private const string LegacyLocalDeployEndpoint = "http://localhost:5000/api/deployments";
         private const string DefaultBackofficeDeployEndpoint = "https://playserv-backoffice.test.playserv.io/api/deployments";
+        private const bool ShowWebSocketConnectionMenu = false;
 
         private PlayServConfig _config;
         private SerializedObject _so;
@@ -159,8 +160,11 @@ namespace Playserv.Editor
             GUILayout.Space(6);
             DrawModelFoldout();
             GUILayout.Space(6);
-            DrawConnectionFoldout();
-            GUILayout.Space(6);
+            if (ShowWebSocketConnectionMenu)
+            {
+                DrawConnectionFoldout();
+                GUILayout.Space(6);
+            }
             DrawDeploymentFoldout();
             GUILayout.Space(6);
 
