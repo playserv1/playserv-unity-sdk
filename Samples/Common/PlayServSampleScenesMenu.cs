@@ -250,6 +250,8 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
+            SampleGuiFontScale.Apply();
+
             var margin = 10f;
             var areaRect = new Rect(
                 margin,

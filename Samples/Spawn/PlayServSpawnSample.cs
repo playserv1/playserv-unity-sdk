@@ -143,6 +143,8 @@ namespace Playserv.Samples
             if (!showOverlay)
                 return;
 
+            SampleGuiFontScale.Apply();
+
             var margin = 10f;
             var areaWidth = Mathf.Max(320f, Screen.width - margin * 2f);
             var areaHeight = Mathf.Max(220f, Screen.height - margin * 2f);
