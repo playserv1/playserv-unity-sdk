@@ -47,8 +47,12 @@ namespace Playserv.Samples
             DontDestroyOnLoad(gameObject);
         }
 
-        private void Start()
+        public void ConnectToCurrentServer(string accessToken, string gameId, string userId)
         {
+            gameAccessToken = accessToken;
+            this.gameId = gameId;
+            this.userId = userId;
+            
             if (!_isOwner)
                 return;
 
