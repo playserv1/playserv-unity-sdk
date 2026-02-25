@@ -169,7 +169,6 @@ MonoBehaviour:
   showOverlay: 1
   includeCurrentScene: 0
   autoRefreshOnEnable: 1
-  bootstrapSample: {fileID: 200345675}
 --- !u!1 &200345673
 GameObject:
   m_ObjectHideFlags: 0
