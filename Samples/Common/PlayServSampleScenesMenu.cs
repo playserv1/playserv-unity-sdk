@@ -21,6 +21,8 @@ namespace Playserv.Samples
         [SerializeField] private bool includeCurrentScene;
         [SerializeField] private bool autoRefreshOnEnable = true;
 
+        [SerializeField] private PlayServBootstrapSample bootstrapSample;
+        
         private readonly List<SceneEntry> _sceneEntries = new List<SceneEntry>();
         private readonly List<string> _logs = new List<string>();
         private Vector2 _scroll;
@@ -28,6 +30,12 @@ namespace Playserv.Samples
         private string _status = "Idle";
         private string _currentScenePath = string.Empty;
         private bool _showInfo;
+
+        private bool _showConnectDialog;
+        private Rect _connectDialogRect = new Rect(0, 0, 640, 320);
+        private string _connectGameAccessToken = string.Empty;
+        private string _connectGameId = string.Empty;
+        private string _connectUserId = string.Empty;
 
         private sealed class SceneEntry
         {
@@ -234,7 +242,7 @@ namespace Playserv.Samples
             string.IsNullOrWhiteSpace(path) ? string.Empty : path.Replace('\\', '/');
 
         private void AddLog(string line)
-        {
+         {
             if (string.IsNullOrWhiteSpace(line))
                 return;
 
@@ -244,11 +252,99 @@ namespace Playserv.Samples
 
             _logsScroll.y = float.MaxValue;
         }
+        
+        private void DrawConnectDialog(int windowId)
+        {
+            // Small internal padding
+            GUILayout.Space(6f);
+
+            GUILayout.Label("Connect SDK", GUI.skin.label);
+            GUILayout.Space(10f);
+
+            const float labelWidth = 140f;
+
+            GUILayout.BeginVertical();
+
+            // Game Access Token
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Game Access Token", GUILayout.Width(labelWidth));
+            _connectGameAccessToken = GUILayout.TextField(_connectGameAccessToken ?? string.Empty, GUILayout.ExpandWidth(true));
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8f);
+
+            // Game ID
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Game ID", GUILayout.Width(labelWidth));
+            _connectGameId = GUILayout.TextField(_connectGameId ?? string.Empty, GUILayout.ExpandWidth(true));
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8f);
+
+            // User ID
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("User ID", GUILayout.Width(labelWidth));
+            _connectUserId = GUILayout.TextField(_connectUserId ?? string.Empty, GUILayout.ExpandWidth(true));
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(14f);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("OK", GUILayout.Width(140f), GUILayout.Height(30f)))
+            {
+                _showConnectDialog = false;
+
+                // Capture values locally (so they are stable even if fields change later)
+                var token = _connectGameAccessToken;
+                var gameId = _connectGameId;
+                var userId = _connectUserId;
+
+                // Do NOT log the token itself.
+                AddLog($"Connect dialog OK. GameId='{gameId}', UserId='{userId}', TokenLen={(token?.Length ?? 0)}");
+
+                // Start connect flow with provided values
+                ConnectWithInputAsync(token, gameId, userId);
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.EndVertical();
+
+            // Allow dragging by the title bar area
+            GUI.DragWindow(new Rect(0, 0, 10000, 24));
+        }
+       
+
+        private void ConnectWithInputAsync(string token, string gameId, string userId)
+        {
+            try
+            {
+                _status = "Connecting with custom credentials...";
+                AddLog(_status);
+                
+
+                bootstrapSample.ConnectToCurrentServer(token, gameId, userId);
+                
+            }
+            catch (Exception ex)
+            {
+                _status = $"Connect error: {ex.Message}";
+                AddLog(_status);
+            }
+        }
 
         private void OnGUI()
         {
             if (!showOverlay)
                 return;
+
+            // Unity can keep GUI.matrix between OnGUI calls/events. If scaling is applied by multiplication,
+            // it can accumulate and blow up the UI. Force a clean baseline.
+            var originalMatrix = GUI.matrix;
+            GUI.matrix = Matrix4x4.identity;
 
             SampleGuiFontScale.Apply();
 
@@ -273,7 +369,7 @@ namespace Playserv.Samples
             if (GUILayout.Button("Refresh"))
                 RefreshSceneList();
             if (GUILayout.Button("Connect SDK"))
-                _ = ConnectSdkAsync();
+                _showConnectDialog = true;
             if (GUILayout.Button("Disconnect SDK"))
                 DisconnectSdk();
             if (GUILayout.Button(_showInfo ? "Hide Info" : "Info"))
@@ -327,6 +423,28 @@ namespace Playserv.Samples
             }
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+
+            if (_showConnectDialog)
+            {
+                // Render the dialog unscaled (identity matrix) so it is not affected by overlay scaling.
+                GUI.matrix = Matrix4x4.identity;
+
+                // Center the dialog each frame (keeps it centered on resize)
+                _connectDialogRect.x = (Screen.width - _connectDialogRect.width) * 0.5f;
+                _connectDialogRect.y = (Screen.height - _connectDialogRect.height) * 0.5f;
+
+                _connectDialogRect = GUI.ModalWindow(
+                    9031421,
+                    _connectDialogRect,
+                    DrawConnectDialog,
+                    "PlayServ Connect");
+
+                // Re-apply scaled matrix for anything else below.
+                SampleGuiFontScale.Apply();
+            }
+
+            // Always restore whatever matrix Unity had before our drawing.
+            GUI.matrix = originalMatrix;
         }
     }
 }
