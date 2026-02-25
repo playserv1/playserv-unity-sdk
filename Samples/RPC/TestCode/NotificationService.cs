@@ -5,13 +5,6 @@ namespace Playserv.Test.RPC
     [Rpc]
     public class NotificationService
     {
-        private readonly IContext _context;
-
-        public NotificationService(IContext context)
-        {
-            _context = context;
-        }
-
         public Result BroadcastToAll(string message)
         {
             if (string.IsNullOrEmpty(message))
@@ -27,8 +20,8 @@ namespace Playserv.Test.RPC
                 EventType = "Broadcast"
             };
 
-            _context.Publish(notificationEvent);
-            
+            Playserv.Wrapper.PlayServ.Publish(notificationEvent);
+
             return Result.Ok();
         }
 
@@ -52,7 +45,7 @@ namespace Playserv.Test.RPC
                 EventType = "GroupNotification"
             };
 
-            _context.PublishForGroup(groupName, notificationEvent);
+            Playserv.Wrapper.PlayServ.PublishForGroup(groupName, notificationEvent);
 
             return Result.Ok();
         }
@@ -77,7 +70,7 @@ namespace Playserv.Test.RPC
                 EventType = "UserNotification"
             };
 
-            _context.PublishForUser(userId, notificationEvent);
+            Playserv.Wrapper.PlayServ.PublishForUser(userId, notificationEvent);
 
             return Result.Ok();
         }
@@ -97,7 +90,7 @@ namespace Playserv.Test.RPC
                 EventType = "Broadcast"
             };
 
-            _context.Publish(broadcastEvent);
+            Playserv.Wrapper.PlayServ.Publish(broadcastEvent);
 
             if (!string.IsNullOrEmpty(groupName))
             {
@@ -109,7 +102,7 @@ namespace Playserv.Test.RPC
                     EventType = "GroupNotification"
                 };
 
-                _context.PublishForGroup(groupName, groupEvent);
+                Playserv.Wrapper.PlayServ.PublishForGroup(groupName, groupEvent);
             }
 
             if (!string.IsNullOrEmpty(userId))
@@ -122,12 +115,10 @@ namespace Playserv.Test.RPC
                     EventType = "UserNotification"
                 };
 
-                _context.PublishForUser(userId, userEvent);
+                Playserv.Wrapper.PlayServ.PublishForUser(userId, userEvent);
             }
 
             return Result.Ok();
         }
     }
 }
-
-

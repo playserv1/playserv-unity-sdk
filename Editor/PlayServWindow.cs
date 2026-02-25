@@ -1047,13 +1047,11 @@ namespace Playserv.Editor
                 var className = classMatch.Groups[1].Value;
                 var ctorPattern = @"\b" + Regex.Escape(className) + @"\s*\(([^)]*)\)";
                 var ctorMatches = Regex.Matches(text, ctorPattern);
-                var hasIContextCtor = ctorMatches.Cast<Match>()
-                    .Select(m => m.Groups[1].Value)
-                    .Any(args => args.IndexOf("IContext", StringComparison.Ordinal) >= 0);
+                var constructorCount = ctorMatches.Count;
 
-                if (!hasIContextCtor)
+                if (constructorCount > 1)
                 {
-                    error = $"RPC class '{className}' in '{file}' must define a constructor with IContext parameter.";
+                    error = $"RPC class '{className}' in '{file}' cannot define multiple constructors.";
                     return false;
                 }
             }
