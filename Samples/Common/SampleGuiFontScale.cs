@@ -8,7 +8,7 @@ namespace Playserv.Samples
     /// </summary>
     internal static class SampleGuiFontScale
     {
-        private const float FontScale = 1.3f;
+        private const float FontScale = 1.15f;
         private const int FallbackFontSize = 14;
 
         private static readonly Dictionary<GUIStyle, int> BaseFontSizes = new Dictionary<GUIStyle, int>();
