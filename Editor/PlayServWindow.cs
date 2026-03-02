@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -72,6 +73,8 @@ namespace Playserv.Editor
         private float _deployProgress;
         private string _deployStatus = "";
         private CancellationTokenSource _deployCts;
+        private bool _versionSyncRunning;
+        private string _versionSyncStatus = "";
 
         [MenuItem(MenuPath)]
         public static void ShowFromMenu() => ShowWindow();
@@ -623,7 +626,7 @@ namespace Playserv.Editor
 
                 GUILayout.Space(6);
 
-                using (new EditorGUI.DisabledScope(_deployRunning))
+                using (new EditorGUI.DisabledScope(_deployRunning || _versionSyncRunning))
                 {
                     using (new EditorGUILayout.HorizontalScope())
                     {
@@ -643,6 +646,9 @@ namespace Playserv.Editor
                         }
 
                         GUILayout.FlexibleSpace();
+
+                        if (GUILayout.Button("Sync Version", GUILayout.Width(120)))
+                            _ = StartVersionSyncAsync();
 
                         if (GUILayout.Button("Deploy Now", GUILayout.Width(140)))
                             _ = StartDeployAsync();
@@ -677,6 +683,13 @@ namespace Playserv.Editor
                     EditorGUILayout.LabelField("Status", EditorStyles.miniBoldLabel);
                     EditorGUILayout.HelpBox(string.IsNullOrEmpty(_deployStatus) ? "Working..." : _deployStatus, MessageType.None);
                     EditorGUILayout.Slider("Progress", _deployProgress, 0f, 1f);
+                }
+
+                if (_versionSyncRunning || !string.IsNullOrWhiteSpace(_versionSyncStatus))
+                {
+                    GUILayout.Space(6);
+                    EditorGUILayout.LabelField("Version Sync", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.HelpBox(_versionSyncStatus, _versionSyncRunning ? MessageType.Info : MessageType.None);
                 }
 
                 EditorGUI.indentLevel--;
@@ -790,7 +803,7 @@ namespace Playserv.Editor
 
         private async Task StartDeployAsync()
         {
-            if (_deployRunning)
+            if (_deployRunning || _versionSyncRunning)
                 return;
 
             if (_config == null)
@@ -885,6 +898,126 @@ namespace Playserv.Editor
             
             
             
+        }
+
+        private async Task StartVersionSyncAsync()
+        {
+            if (_versionSyncRunning || _deployRunning)
+                return;
+
+            if (_config == null || _so == null)
+            {
+                Debug.LogError("[PlayServ] Config is not loaded.");
+                return;
+            }
+
+            var gameId = _pGameId?.stringValue;
+            if (string.IsNullOrWhiteSpace(gameId))
+            {
+                Debug.LogError("[PlayServ] GameId is empty. Please set it in PlayServ Config.");
+                return;
+            }
+
+            var files = BuildDeployFileList(out var err);
+            if (!string.IsNullOrEmpty(err))
+            {
+                Debug.LogError($"[PlayServ] {err}");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                    "Sync Version",
+                    $"Compare local RPC code hash against remote for GameId '{gameId}'?",
+                    "Sync",
+                    "Cancel"))
+            {
+                return;
+            }
+
+            _versionSyncRunning = true;
+            _versionSyncStatus = "Fetching schemas...";
+            Repaint();
+
+            try
+            {
+                var api = new DeploymentApiClient(_config);
+
+                await api.FetchLatestSchemasAsync(gameId);
+                _versionSyncStatus = "Computing local hash...";
+                Repaint();
+
+                var localHash = ComputeCodeHash(CreateZipArchiveBytes(files));
+
+                _versionSyncStatus = "Fetching remote hash...";
+                Repaint();
+
+                var remoteHash = await api.GetRemoteCodeHashAsync(gameId);
+
+                if (string.Equals(localHash, remoteHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    _versionSyncStatus = "Hashes match. Fetching latest version...";
+                    Repaint();
+
+                    var latestVersion = await api.GetLatestVersionAsync(gameId);
+
+                    _so.Update();
+                    if (_pGameVersion != null)
+                    {
+                        _pGameVersion.stringValue = latestVersion;
+                        _so.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(_config);
+                    }
+
+                    _versionSyncStatus = $"Synced to version {latestVersion}.";
+                    Debug.Log($"[PlayServ] Version synchronized to {latestVersion}.");
+                }
+                else
+                {
+                    _versionSyncStatus = "Hash mismatch. Downloading archive...";
+                    Repaint();
+
+                    var archiveOutputDir = Path.Combine(Path.GetTempPath(), "playserv-sync");
+                    var archivePath = await api.DownloadCodeArchiveAsync(gameId, archiveOutputDir);
+
+                    _versionSyncStatus = "Hash mismatch. Archive downloaded.";
+                    Debug.LogWarning($"[PlayServ] Code hash mismatch. Archive saved to: {archivePath}");
+                }
+            }
+            catch (Exception e)
+            {
+                _versionSyncStatus = $"Sync failed: {e.Message}";
+                Debug.LogError($"[PlayServ] Version sync failed: {e}");
+            }
+            finally
+            {
+                _versionSyncRunning = false;
+                Repaint();
+            }
+        }
+
+        private static byte[] CreateZipArchiveBytes(List<string> filePaths)
+        {
+            using var memoryStream = new MemoryStream();
+
+            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                foreach (var filePath in filePaths)
+                {
+                    if (!File.Exists(filePath))
+                        continue;
+
+                    archive.CreateEntryFromFile(filePath, Path.GetFileName(filePath));
+                }
+            }
+
+            return memoryStream.ToArray();
+        }
+
+        private static string ComputeCodeHash(byte[] zipBytes)
+        {
+            using var sha256 = SHA256.Create();
+            var hashBytes = sha256.ComputeHash(zipBytes);
+            return BitConverter.ToString(hashBytes).Replace("-", string.Empty);
         }
 
         private string ResolveDeployEndpointForDisplay()
