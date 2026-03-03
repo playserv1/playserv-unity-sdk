@@ -857,10 +857,10 @@ namespace Playserv.Editor
                     {
                         await DeployWithRelativePathsAsync(api, gameId, files, _deployFolder, _deployCts.Token);
                     }
-                    catch (InvalidOperationException e) when (IsNativeAotFailure(e))
+                    catch (InvalidOperationException e) when (IsNativeAotFailure(e) || IsInvalidZipUploadFailure(e))
                     {
                         Debug.LogWarning(
-                            "[PlayServ] Relative-path ZIP upload failed with Native AOT error. Retrying with flat ZIP packaging.");
+                            "[PlayServ] Relative-path ZIP upload failed. Retrying with flat ZIP packaging.");
 
                         var service = new DeploymentService(api);
                         await service.DeployAsync(gameId, files, _deployCts.Token);
@@ -1115,6 +1115,16 @@ namespace Playserv.Editor
 
             var message = exception.Message ?? string.Empty;
             return message.IndexOf("Native AOT compilation failed", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsInvalidZipUploadFailure(Exception exception)
+        {
+            if (exception == null)
+                return false;
+
+            var message = exception.Message ?? string.Empty;
+            return message.IndexOf("Request body is empty", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("valid ZIP archive", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static List<string> FilterFilesWithUnsupportedUsingNamespaces(

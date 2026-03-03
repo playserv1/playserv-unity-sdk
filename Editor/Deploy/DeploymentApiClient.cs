@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -41,40 +44,84 @@ namespace Playserv.Deploy.Editor
 
             // Read ZIP bytes
             var data = File.ReadAllBytes(zipPath);
+            if (data.Length == 0)
+                throw new InvalidOperationException($"ZIP file is empty: {zipPath}");
 
-            using var req = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
-            req.uploadHandler = new UploadHandlerRaw(data);
-            req.downloadHandler = new DownloadHandlerBuffer();
-            req.SetRequestHeader("Content-Type", "application/zip");
-            req.SetRequestHeader("X-Game-Id", gameId);
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(Mathf.Max(1, _settings.TimeoutSeconds))
+            };
 
             var authToken = ResolveDeployAuthToken();
-            if (!string.IsNullOrWhiteSpace(authToken))
+
+            using var firstRequest = CreateUploadRequest(url, gameId, data, authToken);
+            using var firstResponse = await client.SendAsync(firstRequest, ct);
+
+            if (IsRedirect(firstResponse.StatusCode) && firstResponse.Headers.Location != null)
             {
-                req.SetRequestHeader("Authorization", $"Bearer {authToken}");
+                var redirectUri = firstResponse.Headers.Location.IsAbsoluteUri
+                    ? firstResponse.Headers.Location
+                    : new Uri(new Uri(url), firstResponse.Headers.Location);
+
+                using var redirectedRequest = CreateUploadRequest(redirectUri.ToString(), gameId, data, authToken);
+                using var redirectedResponse = await client.SendAsync(redirectedRequest, ct);
+
+                if (!redirectedResponse.IsSuccessStatusCode)
+                {
+                    var redirectedBody = await redirectedResponse.Content.ReadAsStringAsync();
+                    if (ShouldRetryAsMultipart((long)redirectedResponse.StatusCode, redirectedBody))
+                    {
+                        Debug.LogWarning("[PlayServ] Upload rejected as empty ZIP body after redirect. Retrying as multipart/form-data.");
+                        using var redirectedMultipartRequest = CreateMultipartUploadRequest(redirectUri.ToString(), gameId, data, authToken);
+                        using var redirectedMultipartResponse = await client.SendAsync(redirectedMultipartRequest, ct);
+                        if (redirectedMultipartResponse.IsSuccessStatusCode)
+                            return;
+
+                        redirectedBody = await redirectedMultipartResponse.Content.ReadAsStringAsync();
+                        throw new InvalidOperationException(BuildUploadErrorMessage(
+                            (long)redirectedMultipartResponse.StatusCode,
+                            redirectedMultipartResponse.ReasonPhrase,
+                            redirectedBody,
+                            redirectUri.ToString(),
+                            gameId));
+                    }
+
+                    throw new InvalidOperationException(BuildUploadErrorMessage(
+                        (long)redirectedResponse.StatusCode,
+                        redirectedResponse.ReasonPhrase,
+                        redirectedBody,
+                        redirectUri.ToString(),
+                        gameId));
+                }
+
+                return;
             }
 
-            req.timeout = Mathf.Max(1, _settings.TimeoutSeconds);
-
-            var op = req.SendWebRequest();
-
-            // Await UnityWebRequest in editor without coroutines
-            while (!op.isDone)
+            if (!firstResponse.IsSuccessStatusCode)
             {
-                ct.ThrowIfCancellationRequested();
-                await Task.Delay(50, ct);
-            }
+                var errorBody = await firstResponse.Content.ReadAsStringAsync();
+                if (ShouldRetryAsMultipart((long)firstResponse.StatusCode, errorBody))
+                {
+                    Debug.LogWarning("[PlayServ] Upload rejected as empty ZIP body. Retrying as multipart/form-data.");
+                    using var multipartRequest = CreateMultipartUploadRequest(url, gameId, data, authToken);
+                    using var multipartResponse = await client.SendAsync(multipartRequest, ct);
+                    if (multipartResponse.IsSuccessStatusCode)
+                        return;
 
-#if UNITY_2020_2_OR_NEWER
-            if (req.result != UnityWebRequest.Result.Success)
-#else
-            if (req.isNetworkError || req.isHttpError)
-#endif
-            {
+                    errorBody = await multipartResponse.Content.ReadAsStringAsync();
+                    throw new InvalidOperationException(BuildUploadErrorMessage(
+                        (long)multipartResponse.StatusCode,
+                        multipartResponse.ReasonPhrase,
+                        errorBody,
+                        url,
+                        gameId));
+                }
+
                 throw new InvalidOperationException(BuildUploadErrorMessage(
-                    req.responseCode,
-                    req.error,
-                    req.downloadHandler?.text,
+                    (long)firstResponse.StatusCode,
+                    firstResponse.ReasonPhrase,
+                    errorBody,
                     url,
                     gameId));
             }
@@ -281,6 +328,59 @@ namespace Playserv.Deploy.Editor
         private static string BuildPath(string template, string gameId)
         {
             return string.Format(template, gameId);
+        }
+
+        private static HttpRequestMessage CreateUploadRequest(string url, string gameId, byte[] data, string authToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("X-Game-Id", gameId);
+
+            if (!string.IsNullOrWhiteSpace(authToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
+
+            var content = new ByteArrayContent(data);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+            request.Content = content;
+
+            return request;
+        }
+
+        private static HttpRequestMessage CreateMultipartUploadRequest(string url, string gameId, byte[] data, string authToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("X-Game-Id", gameId);
+
+            if (!string.IsNullOrWhiteSpace(authToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
+
+            var multipart = new MultipartFormDataContent();
+            var fileContent = new ByteArrayContent(data);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+            multipart.Add(fileContent, "file", "deployment.zip");
+            request.Content = multipart;
+
+            return request;
+        }
+
+        private static bool ShouldRetryAsMultipart(long statusCode, string responseBody)
+        {
+            if (statusCode != 400)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(responseBody))
+                return false;
+
+            return responseBody.IndexOf("Request body is empty", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   responseBody.IndexOf("valid ZIP archive", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsRedirect(HttpStatusCode statusCode)
+        {
+            return statusCode == HttpStatusCode.MovedPermanently ||
+                   statusCode == HttpStatusCode.Found ||
+                   statusCode == HttpStatusCode.SeeOther ||
+                   statusCode == HttpStatusCode.TemporaryRedirect ||
+                   (int)statusCode == 308;
         }
 
         private void AddCommonHeaders(UnityWebRequest req)
