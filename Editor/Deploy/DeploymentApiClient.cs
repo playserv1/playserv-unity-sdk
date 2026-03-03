@@ -14,12 +14,12 @@ namespace Playserv.Deploy.Editor
     public sealed class DeploymentApiClient
     {
         private const string ApiPath = "/api";
-        private const string DeploymentsPath = "/deployments";
-        private const string DeploymentPath = ApiPath + DeploymentsPath;
+        private const string DeploymentEndpointPath = "/deployments";
         private const string SchemasLatestPathTemplate = "schemas/{0}/latest";
         private const string RemoteCodeHashPathTemplate = "games/{0}/rpc-code/hash";
         private const string LatestVersionPathTemplate = "games/{0}/version/latest";
         private const string CodeArchivePathTemplate = "games/{0}/code-archive";
+        private const int MaxUploadRedirects = 3;
         private readonly PlayServConfig _settings;
 
         public DeploymentApiClient(PlayServConfig settings)
@@ -29,8 +29,8 @@ namespace Playserv.Deploy.Editor
 
         public async Task UploadDeploymentAsync(string gameId, string zipPath, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(_settings.DeployApiEndpoint))
-                throw new InvalidOperationException("DeploymentSettings.ApiEndpoint is empty.");
+            if (string.IsNullOrWhiteSpace(_settings.DeployApiServerAddress))
+                throw new InvalidOperationException("DeploymentSettings.DeployApiServerAddress is empty.");
 
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
@@ -38,7 +38,7 @@ namespace Playserv.Deploy.Editor
             if (!File.Exists(zipPath))
                 throw new FileNotFoundException("ZIP file not found.", zipPath);
             
-            var url = BuildDeploymentUrl(_settings.DeployApiEndpoint);
+            var url = BuildDeployUploadUrl(_settings.DeployApiServerAddress);
 
             // Read ZIP bytes
             var data = File.ReadAllBytes(zipPath);
@@ -46,88 +46,34 @@ namespace Playserv.Deploy.Editor
                 throw new InvalidOperationException($"ZIP file is empty: {zipPath}");
 
             var authToken = ResolveDeployAuthToken();
+            var currentUrl = url;
+            var response = await SendDeploymentUploadRequestAsync(currentUrl, gameId, data, authToken, useMultipart: false, ct);
 
-            var firstResponse = await SendDeploymentUploadRequestAsync(url, gameId, data, authToken, useMultipart: false, ct);
-
-            if (IsRedirect((int)firstResponse.ResponseCode) && !string.IsNullOrWhiteSpace(firstResponse.RedirectLocation))
+            var redirectCount = 0;
+            while (IsRedirect(response.ResponseCode) &&
+                   !string.IsNullOrWhiteSpace(response.RedirectLocation) &&
+                   redirectCount < MaxUploadRedirects)
             {
-                var redirectUrl = ResolveRedirectUrl(firstResponse.RedirectLocation, url);
-                var redirectedResponse = await SendDeploymentUploadRequestAsync(
-                    redirectUrl,
-                    gameId,
-                    data,
-                    authToken,
-                    useMultipart: false,
-                    ct: ct);
-
-                if (!IsSuccessfulUploadStatus(redirectedResponse.ResponseCode))
-                {
-                    var redirectedBody = redirectedResponse.Body;
-                    if (ShouldRetryAsMultipart(redirectedResponse.ResponseCode, redirectedBody))
-                    {
-                        Debug.LogWarning("[PlayServ] Upload rejected as empty ZIP body after redirect. Retrying as multipart/form-data.");
-                        var redirectedMultipartResponse = await SendDeploymentUploadRequestAsync(
-                            redirectUrl,
-                            gameId,
-                            data,
-                            authToken,
-                            useMultipart: true,
-                            ct: ct);
-
-                        if (IsSuccessfulUploadStatus(redirectedMultipartResponse.ResponseCode))
-                            return;
-
-                        redirectedBody = redirectedMultipartResponse.Body;
-                        throw new InvalidOperationException(BuildUploadErrorMessage(
-                            (long)redirectedMultipartResponse.ResponseCode,
-                            redirectedMultipartResponse.ReasonPhrase,
-                            redirectedBody,
-                            redirectUrl,
-                            gameId));
-                    }
-
-                    throw new InvalidOperationException(BuildUploadErrorMessage(
-                        (long)redirectedResponse.ResponseCode,
-                        redirectedResponse.ReasonPhrase,
-                        redirectedBody,
-                        redirectUrl,
-                        gameId));
-                }
-
-                return;
+                currentUrl = ResolveRedirectUrl(response.RedirectLocation, currentUrl);
+                response = await SendDeploymentUploadRequestAsync(currentUrl, gameId, data, authToken, useMultipart: false, ct);
+                redirectCount++;
             }
 
-            if (!IsSuccessfulUploadStatus(firstResponse.ResponseCode))
+            if (IsRedirect(response.ResponseCode) && !string.IsNullOrWhiteSpace(response.RedirectLocation))
             {
-                var errorBody = firstResponse.Body;
-                if (ShouldRetryAsMultipart((long)firstResponse.ResponseCode, errorBody))
-                {
-                    Debug.LogWarning("[PlayServ] Upload rejected as empty ZIP body. Retrying as multipart/form-data.");
-                    var multipartResponse = await SendDeploymentUploadRequestAsync(
-                        url,
-                        gameId,
-                        data,
-                        authToken,
-                        useMultipart: true,
-                        ct: ct);
+                throw new InvalidOperationException(
+                    $"Upload redirect limit reached ({MaxUploadRedirects}). Last URL: {currentUrl}. Location: {response.RedirectLocation}");
+            }
 
-                    if (IsSuccessfulUploadStatus(multipartResponse.ResponseCode))
-                        return;
+            response = await RetryAsMultipartIfNeededAsync(response, currentUrl, gameId, data, authToken, redirectCount > 0, ct);
 
-                    errorBody = multipartResponse.Body;
-                    throw new InvalidOperationException(BuildUploadErrorMessage(
-                        (long)multipartResponse.ResponseCode,
-                        multipartResponse.ReasonPhrase,
-                        errorBody,
-                        url,
-                        gameId));
-                }
-
+            if (!IsSuccessfulUploadStatus(response.ResponseCode))
+            {
                 throw new InvalidOperationException(BuildUploadErrorMessage(
-                    (long)firstResponse.ResponseCode,
-                    firstResponse.ReasonPhrase,
-                    errorBody,
-                    url,
+                    response.ResponseCode,
+                    response.ReasonPhrase,
+                    response.Body,
+                    currentUrl,
                     gameId));
             }
         }
@@ -137,7 +83,7 @@ namespace Playserv.Deploy.Editor
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
 
-            var url = BuildApiUrl(BuildSchemasLatestPath(gameId));
+            var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildSchemasLatestPath(gameId));
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
@@ -149,7 +95,7 @@ namespace Playserv.Deploy.Editor
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
 
-            var url = BuildApiUrl(BuildPath(RemoteCodeHashPathTemplate, gameId));
+            var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildPath(RemoteCodeHashPathTemplate, gameId));
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
@@ -160,7 +106,7 @@ namespace Playserv.Deploy.Editor
                 throw new InvalidOperationException("Remote hash response body is empty.");
 
             var obj = JObject.Parse(body);
-            var hash = obj["hash"]?.ToString()?.Trim();
+            var hash = GetJsonValueIgnoreCase(obj, "hash");
 
             if (string.IsNullOrWhiteSpace(hash))
                 throw new InvalidOperationException("Remote hash was not found in response.");
@@ -173,7 +119,7 @@ namespace Playserv.Deploy.Editor
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
 
-            var url = BuildApiUrl(BuildPath(LatestVersionPathTemplate, gameId));
+            var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildPath(LatestVersionPathTemplate, gameId));
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
@@ -184,7 +130,7 @@ namespace Playserv.Deploy.Editor
                 throw new InvalidOperationException("Latest version response body is empty.");
 
             var obj = JObject.Parse(body);
-            var version = obj["version"]?.ToString()?.Trim();
+            var version = GetJsonValueIgnoreCase(obj, "version");
 
             if (string.IsNullOrWhiteSpace(version))
                 throw new InvalidOperationException("Latest version was not found in response.");
@@ -200,7 +146,7 @@ namespace Playserv.Deploy.Editor
             if (string.IsNullOrWhiteSpace(outputDirectory))
                 throw new ArgumentException("Output directory is required.", nameof(outputDirectory));
 
-            var url = BuildApiUrl(BuildPath(CodeArchivePathTemplate, gameId));
+            var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildPath(CodeArchivePathTemplate, gameId));
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
@@ -281,46 +227,42 @@ namespace Playserv.Deploy.Editor
             }
         }
 
-        private static string BuildDeploymentUrl(string endpoint)
+        private static string BuildApiBaseUrl(string serverAddress)
         {
-            endpoint = NormalizeEndpoint(endpoint);
+            serverAddress = NormalizeEndpoint(serverAddress);
 
-            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
-                throw new InvalidOperationException($"DeploymentSettings.ApiEndpoint is invalid: {endpoint}");
+            if (!Uri.TryCreate(serverAddress, UriKind.Absolute, out var endpointUri))
+                throw new InvalidOperationException($"DeploymentSettings.DeployApiServerAddress is invalid: {serverAddress}");
 
             var builder = new UriBuilder(endpointUri);
             var normalizedPath = (builder.Path ?? string.Empty).TrimEnd('/');
 
             if (string.IsNullOrEmpty(normalizedPath))
             {
-                builder.Path = DeploymentPath;
+                builder.Path = ApiPath;
             }
             else
             {
-                if (!normalizedPath.EndsWith(DeploymentPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    builder.Path = normalizedPath.EndsWith(ApiPath, StringComparison.OrdinalIgnoreCase)
-                        ? normalizedPath + DeploymentsPath
-                        : normalizedPath + DeploymentPath;
-                }
+                if (normalizedPath.EndsWith(DeploymentEndpointPath, StringComparison.OrdinalIgnoreCase))
+                    normalizedPath = normalizedPath.Substring(0, normalizedPath.Length - DeploymentEndpointPath.Length);
+
+                if (!normalizedPath.EndsWith(ApiPath, StringComparison.OrdinalIgnoreCase))
+                    normalizedPath += ApiPath;
+
+                builder.Path = normalizedPath;
             }
 
-            return builder.Uri.ToString();
+            return builder.Uri.ToString().TrimEnd('/');
         }
 
-        private string BuildApiUrl(string relativePath)
+        private static string BuildDeployUploadUrl(string serverAddress)
         {
-            var deploymentUrl = BuildDeploymentUrl(_settings.DeployApiEndpoint);
-            var deploymentUri = new Uri(deploymentUrl, UriKind.Absolute);
-            var builder = new UriBuilder(deploymentUri);
-            var path = (builder.Path ?? string.Empty).TrimEnd('/');
+            return BuildApiBaseUrl(serverAddress) + DeploymentEndpointPath;
+        }
 
-            if (path.EndsWith(DeploymentsPath, StringComparison.OrdinalIgnoreCase))
-                path = path.Substring(0, path.Length - DeploymentsPath.Length);
-
-            builder.Path = path;
-
-            var baseUrl = builder.Uri.ToString().TrimEnd('/');
+        private static string BuildApiRelativeUrl(string serverAddress, string relativePath)
+        {
+            var baseUrl = BuildApiBaseUrl(serverAddress);
             var rel = (relativePath ?? string.Empty).TrimStart('/');
             return string.Concat(baseUrl, "/", rel);
         }
@@ -333,6 +275,44 @@ namespace Playserv.Deploy.Editor
         private static string BuildPath(string template, string gameId)
         {
             return string.Format(template, gameId);
+        }
+
+        private static string GetJsonValueIgnoreCase(JObject obj, string key)
+        {
+            if (obj == null || string.IsNullOrWhiteSpace(key))
+                return string.Empty;
+
+            return obj.TryGetValue(key, StringComparison.OrdinalIgnoreCase, out var token)
+                ? token?.ToString()?.Trim()
+                : string.Empty;
+        }
+
+        private async Task<DeploymentUploadResponse> RetryAsMultipartIfNeededAsync(
+            DeploymentUploadResponse response,
+            string requestUrl,
+            string gameId,
+            byte[] data,
+            string authToken,
+            bool afterRedirect,
+            CancellationToken ct)
+        {
+            if (IsSuccessfulUploadStatus(response.ResponseCode))
+                return response;
+
+            if (!ShouldRetryAsMultipart(response.ResponseCode, response.Body))
+                return response;
+
+            Debug.LogWarning(afterRedirect
+                ? "[PlayServ] Upload rejected as empty ZIP body after redirect. Retrying as multipart/form-data."
+                : "[PlayServ] Upload rejected as empty ZIP body. Retrying as multipart/form-data.");
+
+            return await SendDeploymentUploadRequestAsync(
+                requestUrl,
+                gameId,
+                data,
+                authToken,
+                useMultipart: true,
+                ct: ct);
         }
 
         private async Task<DeploymentUploadResponse> SendDeploymentUploadRequestAsync(

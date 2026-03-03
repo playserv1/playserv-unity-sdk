@@ -18,6 +18,11 @@ namespace Playserv.Wrapper
         public const string DefaultRemoteEndpoint = "wss://playserv-proxy.test.playserv.io/ws";
 
         /// <summary>
+        /// Default deployment API server address.
+        /// </summary>
+        public const string DefaultDeployApiServerAddress = "http://playserv-deployment.test.playserv.io";
+
+        /// <summary>
         /// Access token used in handshake.
         /// </summary>
         public string GameAccessToken { get; set; } = string.Empty;
@@ -78,9 +83,18 @@ namespace Playserv.Wrapper
         public string RemoteEndpoint { get; set; } = DefaultRemoteEndpoint;
 
         /// <summary>
-        /// Deployment API endpoint used by editor deployment tools.
+        /// Deployment API server address used by editor deployment tools.
         /// </summary>
-        public string DeployApiEndpoint { get; set; } = "http://playserv-deployment.test.playserv.io/api/deployments";
+        public string DeployApiServerAddress { get; set; } = DefaultDeployApiServerAddress;
+
+        /// <summary>
+        /// Backward-compatible alias for <see cref="DeployApiServerAddress"/>.
+        /// </summary>
+        public string DeployApiEndpoint
+        {
+            get => DeployApiServerAddress;
+            set => DeployApiServerAddress = value;
+        }
 
         /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.
@@ -117,7 +131,7 @@ namespace Playserv.Wrapper
                 UseLocalBackend = UseLocalBackend,
                 LocalEndpoint = LocalEndpoint,
                 RemoteEndpoint = RemoteEndpoint,
-                DeployApiEndpoint = DeployApiEndpoint,
+                DeployApiServerAddress = DeployApiServerAddress,
                 DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };

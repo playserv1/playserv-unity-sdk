@@ -9,7 +9,7 @@ namespace Playserv.Editor
     {
         // You can change this path if you want a different location.
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
-        private const string DefaultBackofficeDeployEndpoint = "http://playserv-deployment.test.playserv.io/api/deployments";
+        private const string DeployApiServerAddressPropertyName = "deployApiServerAddress";
         private const string LegacyDefaultSdkVersion = "1.0.0";
         private const string CurrentDefaultSdkVersion = "0.1.0";
 
@@ -18,7 +18,7 @@ namespace Playserv.Editor
             var config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (config != null)
             {
-                var changed = EnsureDeployEndpoint(config);
+                var changed = EnsureDeployApiServerAddress(config);
                 changed |= EnsureDefaultSdkVersion(config);
                 if (changed)
                     AssetDatabase.SaveAssets();
@@ -34,7 +34,7 @@ namespace Playserv.Editor
 
             config = ScriptableObject.CreateInstance<PlayServConfig>();
             AssetDatabase.CreateAsset(config, AssetPath);
-            EnsureDeployEndpoint(config);
+            EnsureDeployApiServerAddress(config);
             EnsureDefaultSdkVersion(config);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -77,13 +77,13 @@ namespace Playserv.Editor
             }
         }
 
-        private static bool EnsureDeployEndpoint(PlayServConfig config)
+        private static bool EnsureDeployApiServerAddress(PlayServConfig config)
         {
             if (config == null)
                 return false;
 
             var serializedObject = new SerializedObject(config);
-            var deployEndpointProperty = serializedObject.FindProperty("deployApiEndpoint");
+            var deployEndpointProperty = serializedObject.FindProperty(DeployApiServerAddressPropertyName);
             if (deployEndpointProperty == null)
                 return false;
 
@@ -92,7 +92,7 @@ namespace Playserv.Editor
             if (!shouldReplace)
                 return false;
 
-            deployEndpointProperty.stringValue = DefaultBackofficeDeployEndpoint;
+            deployEndpointProperty.stringValue = PlayServSettings.DefaultDeployApiServerAddress;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;

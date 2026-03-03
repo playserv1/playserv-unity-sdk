@@ -1,5 +1,6 @@
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
+using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -14,7 +15,7 @@ namespace Playserv.Wrapper
     {
         private const string DEFAULT_LOCAL_ENDPOINT = "ws://localhost:8080/ws/";
         private const string DEFAULT_REMOTE_ENDPOINT = "wss://playserv-proxy.test.playserv.io/ws";
-        private const string DEFAULT_DEPLOY_API_ENDPOINT = "http://playserv-deployment.test.playserv.io/api/deployments";
+        private const string DEFAULT_DEPLOY_API_SERVER_ADDRESS = PlayServSettings.DefaultDeployApiServerAddress;
 
         [SerializeField] private string gameAccessToken;
         [SerializeField] private string gameId;
@@ -29,8 +30,9 @@ namespace Playserv.Wrapper
         [SerializeField] private string localEndpoint = DEFAULT_LOCAL_ENDPOINT;
         [SerializeField] private string remoteEndpoint = DEFAULT_REMOTE_ENDPOINT;
         
+        [FormerlySerializedAs("deployApiEndpoint")]
         [Header("Deploy")]
-        [SerializeField] private string deployApiEndpoint = DEFAULT_DEPLOY_API_ENDPOINT;
+        [SerializeField] private string deployApiServerAddress = DEFAULT_DEPLOY_API_SERVER_ADDRESS;
         [SerializeField] private string deployAuthToken = "";
         [SerializeField] private int timeoutSeconds = 120;
         
@@ -106,7 +108,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
-        public string DeployApiEndpoint => deployApiEndpoint;
+        public string DeployApiServerAddress => deployApiServerAddress;
 
         /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.
@@ -134,7 +136,7 @@ namespace Playserv.Wrapper
                 UseLocalBackend = useLocalBackend,
                 LocalEndpoint = localEndpoint,
                 RemoteEndpoint = remoteEndpoint,
-                DeployApiEndpoint = deployApiEndpoint,
+                DeployApiServerAddress = deployApiServerAddress,
                 DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };

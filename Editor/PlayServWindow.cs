@@ -24,7 +24,6 @@ namespace Playserv.Editor
     {
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://example.com";
-        private const string DefaultBackofficeDeployEndpoint = "http://playserv-deployment.test.playserv.io/api/deployments";
         private static readonly string[] AllowedDeployUsingNamespaces =
         {
             "System",
@@ -43,7 +42,7 @@ namespace Playserv.Editor
         private SerializedProperty _pGameVersion;
         private SerializedProperty _pSdkVersion;
         private SerializedProperty _pAllowMultipleConnections;
-        private SerializedProperty _pDeployApiEndpoint;
+        private SerializedProperty _pDeployApiServerAddress;
         private SerializedProperty _pDeployAuthToken;
         private SerializedProperty _pDeployTimeoutSeconds;
 
@@ -150,7 +149,7 @@ namespace Playserv.Editor
             _pGameVersion = _so.FindProperty("gameVersion");
             _pSdkVersion = _so.FindProperty("sdkVersion");
             _pAllowMultipleConnections = _so.FindProperty("allowMultipleConnections");
-            _pDeployApiEndpoint = _so.FindProperty("deployApiEndpoint");
+            _pDeployApiServerAddress = _so.FindProperty("deployApiServerAddress");
             _pDeployAuthToken = _so.FindProperty("deployAuthToken");
             _pDeployTimeoutSeconds = _so.FindProperty("timeoutSeconds");
         }
@@ -588,8 +587,8 @@ namespace Playserv.Editor
                 {
                     _so.Update();
 
-                    if (_pDeployApiEndpoint != null)
-                        EditorGUILayout.PropertyField(_pDeployApiEndpoint, new GUIContent("Deploy Endpoint"));
+                    if (_pDeployApiServerAddress != null)
+                        EditorGUILayout.PropertyField(_pDeployApiServerAddress, new GUIContent("Server Address"));
 
                     if (_pDeployTimeoutSeconds != null)
                         EditorGUILayout.PropertyField(_pDeployTimeoutSeconds, new GUIContent("Timeout Seconds"));
@@ -1022,9 +1021,9 @@ namespace Playserv.Editor
 
         private string ResolveDeployEndpointForDisplay()
         {
-            var endpoint = _config?.DeployApiEndpoint?.Trim();
+            var endpoint = _config?.DeployApiServerAddress?.Trim();
             if (string.IsNullOrWhiteSpace(endpoint))
-                return DefaultBackofficeDeployEndpoint;
+                return PlayServSettings.DefaultDeployApiServerAddress;
 
             return endpoint;
         }
