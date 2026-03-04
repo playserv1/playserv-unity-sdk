@@ -114,7 +114,7 @@ namespace Playserv.Samples
         {
             return new SampleChatEvent
             {
-                SenderId = senderId,
+                SenderId = PlayServ.Settings.UserId,
                 Text = messageText,
                 SentAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };

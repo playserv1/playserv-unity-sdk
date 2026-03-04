@@ -24,6 +24,11 @@ namespace Playserv.Wrapper
         /// Gets current SDK version string reported by the client.
         /// </summary>
         public static string SdkVersion => Api.SdkVersion;
+        
+        /// <summary>
+        /// Get SDK settings
+        /// </summary>
+        public static PlayServSettings Settings => Api.Settings;
 
         /// <summary>
         /// Gets current connection state of the SDK transport.

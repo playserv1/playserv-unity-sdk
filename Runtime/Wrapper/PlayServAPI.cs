@@ -30,6 +30,7 @@ namespace Playserv.Wrapper
         private Task<bool>? _connectTask;
 
         public string SdkVersion => SdkInfo.Version;
+        public PlayServSettings Settings => _settings;
 
         public PlayServState State => _instance?.State ?? PlayServState.Offline;
 
