@@ -6,6 +6,44 @@ This document contains practical examples for the public runtime API exposed by:
 - `Playserv.DataSubscription.ISharedEntity<T>`
 - `Playserv.Spawn` components
 
+## Installation
+
+### OpenUPM
+
+Install via OpenUPM CLI:
+
+```bash
+openupm add com.playserv.sdk
+```
+
+### Unity scoped registry (manual)
+
+Add OpenUPM registry in your project `Packages/manifest.json`:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.playserv"
+      ]
+    }
+  ],
+  "dependencies": {
+    "com.playserv.sdk": "0.1.0"
+  }
+}
+```
+
+## Versioning
+
+- Package version is defined in `package.json` (`version`).
+- Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
+- Release tag should match package version with `v` prefix (example: `v0.1.0`).
+- `CHANGELOG.md` must include a heading for the same package version.
+
 ## 1) Configure SDK
 
 ### Option A: through Unity asset (recommended for editor workflow)
