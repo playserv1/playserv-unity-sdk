@@ -63,6 +63,15 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
+        /// Raised when RPC module returns InvokeRpcResponse command.
+        /// </summary>
+        public static event Action<InvokeRpcResponse>? OnRpcInvokeResponse
+        {
+            add => Api.OnRpcInvokeResponse += value;
+            remove => Api.OnRpcInvokeResponse -= value;
+        }
+
+        /// <summary>
         /// Applies full SDK settings object.
         /// </summary>
         /// <param name="settings">Runtime settings used to configure endpoint, auth and timeouts.</param>

@@ -34,6 +34,7 @@ namespace Playserv.Proxy.Common
         public event Action<TransportError> OnTransportError;
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
+        public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
 
         public PlayServImplementation(string endpoint)
             : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), new ConsoleLogger()) { }
@@ -428,6 +429,7 @@ namespace Playserv.Proxy.Common
 
                 _logger.Log(
                     $"[PlayServ][RPC] InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
+                OnRpcInvokeResponse?.Invoke(response);
             }
             else
             {

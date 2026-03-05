@@ -37,6 +37,7 @@ namespace Playserv.Wrapper
         public event Action<TransportError>? OnTransportError;
         public event Action? OnKeepAlivePingSent;
         public event Action? OnKeepAlivePongReceived;
+        public event Action<InvokeRpcResponse>? OnRpcInvokeResponse;
 
         public void Config(PlayServSettings settings)
         {
@@ -274,15 +275,18 @@ namespace Playserv.Wrapper
             _instance!.OnTransportError -= HandleTransportError;
             _instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
             _instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
+            _instance.OnRpcInvokeResponse -= HandleRpcInvokeResponse;
 
             _instance.OnTransportError += HandleTransportError;
             _instance.OnKeepAlivePingSent += HandleKeepAlivePingSent;
             _instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
+            _instance.OnRpcInvokeResponse += HandleRpcInvokeResponse;
         }
 
         private void HandleTransportError(TransportError error) => OnTransportError?.Invoke(error);
         private void HandleKeepAlivePingSent() => OnKeepAlivePingSent?.Invoke();
         private void HandleKeepAlivePongReceived() => OnKeepAlivePongReceived?.Invoke();
+        private void HandleRpcInvokeResponse(InvokeRpcResponse response) => OnRpcInvokeResponse?.Invoke(response);
 
         private bool TryHandleLocalCommand(object command, string? moduleName)
         {

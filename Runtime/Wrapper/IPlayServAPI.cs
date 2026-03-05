@@ -44,6 +44,11 @@ namespace Playserv.Wrapper
         event Action? OnKeepAlivePongReceived;
 
         /// <summary>
+        /// Raised when RPC module returns InvokeRpcResponse.
+        /// </summary>
+        event Action<InvokeRpcResponse>? OnRpcInvokeResponse;
+
+        /// <summary>
         /// Applies full SDK settings object.
         /// </summary>
         /// <param name="settings">Runtime settings for endpoint, auth and timeouts.</param>

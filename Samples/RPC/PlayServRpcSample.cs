@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Playserv.Proxy.Common;
+using Playserv.RPC;
 using Playserv.Test.RPC;
 using Playserv.Wrapper;
 using UnityEngine;
@@ -42,6 +43,7 @@ namespace Playserv.Samples
         private void OnEnable()
         {
             PlayServ.OnTransportError += OnTransportError;
+            PlayServ.OnRpcInvokeResponse += OnRpcInvokeResponse;
 
             if (enableLocalInvokerOnEnable)
                 AddHistory("Local invoker toggle is deprecated in this sample; transport RPC is used.");
@@ -70,6 +72,7 @@ namespace Playserv.Samples
         private void OnDisable()
         {
             PlayServ.OnTransportError -= OnTransportError;
+            PlayServ.OnRpcInvokeResponse -= OnRpcInvokeResponse;
             UnsubscribeNotifications();
             _pendingAutoSubscribe = false;
         }
@@ -137,6 +140,18 @@ namespace Playserv.Samples
             var details = error == null ? "Unknown transport error" : error.ToString();
             _status = $"Transport error: {details}";
             AddHistory(_status);
+        }
+
+        private void OnRpcInvokeResponse(InvokeRpcResponse response)
+        {
+            var requestInfo = response.Request == null
+                ? "n/a"
+                : $"{response.Request.ServiceName}.{response.Request.MethodName}";
+            var message = string.IsNullOrWhiteSpace(response.Message) ? "<empty>" : response.Message;
+            var result = string.IsNullOrWhiteSpace(response.Result) ? "<empty>" : response.Result;
+
+            _status = $"RPC response: {response.Status}";
+            AddHistory($"<- InvokeRpcResponse status={response.Status}, request={requestInfo}, message={message}, result={result}");
         }
 
         private async Task ConnectSdkAsync()
@@ -228,7 +243,7 @@ namespace Playserv.Samples
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label("Info");
                 GUILayout.Label("Purpose: Demonstrates RPC invocation through transport and event-based response handling.");
-                GUILayout.Label("How to use: Connect, subscribe to NotificationEvent, invoke RPC, then verify outbound/inbound logs.");
+                GUILayout.Label("How to use: Connect, subscribe to NotificationEvent, invoke RPC, then verify InvokeRpcResponse and event logs.");
                 GUILayout.Label("Use in your game: Gameplay server actions, backend workflows, and follow-up notifications.");
                 GUILayout.EndVertical();
             }
