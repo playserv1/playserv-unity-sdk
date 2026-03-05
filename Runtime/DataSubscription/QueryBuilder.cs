@@ -13,16 +13,19 @@ namespace Playserv.DataSubscription
             sb.Append(entityType);
             sb.Append("(id: $id)");
 
-            if (selector != null)
-            {
-                sb.Append(" { ");
-                BuildSelection(selector.Body, sb);
-                sb.Append(" }");
-            }
-            else
-            {
-                sb.Append(" { * }");
-            }
+            if (selector == null)
+                return sb.ToString();
+
+            var selectionBuilder = new StringBuilder();
+            BuildSelection(selector.Body, selectionBuilder);
+            var selection = selectionBuilder.ToString().Trim();
+
+            if (selection.Length == 0)
+                return sb.ToString();
+
+            sb.Append(" { ");
+            sb.Append(selection);
+            sb.Append(" }");
 
             return sb.ToString();
         }

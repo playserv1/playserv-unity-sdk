@@ -14,6 +14,7 @@ namespace Playserv.DataSubscription
 {
     internal sealed class PlayServDataSubscriptionAdapter : IDataSubscriptionAdapter, IDisposable
     {
+        private const int SubscriptionResponseTimeoutMs = 15000;
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
         private long _requestIdCounter;
@@ -92,54 +93,67 @@ namespace Playserv.DataSubscription
 
         public async Task<DataSubscriptionResponse> SendSubscriptionRequestAsync(DataSubscriptionRequest request)
         {
-            var tcs = new TaskCompletionSource<DataSubscriptionResponse>();
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            var tcs = new TaskCompletionSource<DataSubscriptionResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
             IDisposable responseSubscription = null;
-            IDisposable errorSubscription = null;
+            IDisposable errorResponseSubscription = null;
+            IDisposable commandErrorSubscription = null;
 
             responseSubscription = _transport.On<DataSubscriptionResponse>(response =>
             {
                 if (response is DataSubscriptionResponse dataResponse && dataResponse.RequestId == request.RequestId)
                 {
-                    if (!tcs.Task.IsCompleted)
-                    {
-                        tcs.TrySetResult(dataResponse);
-                    }
-                    responseSubscription?.Dispose();
-                    errorSubscription?.Dispose();
+                    tcs.TrySetResult(dataResponse);
                 }
             });
 
-            errorSubscription = _transport.OnCommand("ErrorResponse", command =>
+            errorResponseSubscription = _transport.OnCommand("ErrorResponse", command =>
             {
                 if (command is ErrorResponse errorResponse)
                 {
-                    var errorResponseWrapper = new DataSubscriptionResponse
-                    {
-                        RequestId = request.RequestId,
-                        Error = new DataSubscriptionError
-                        {
-                            ErrorCode = errorResponse.ErrorCode,
-                            Message = errorResponse.Message
-                        }
-                    };
-                    if (!tcs.Task.IsCompleted)
-                    {
-                        tcs.TrySetResult(errorResponseWrapper);
-                    }
-                    responseSubscription?.Dispose();
-                    errorSubscription?.Dispose();
+                    tcs.TrySetResult(CreateErrorResponse(
+                        request.RequestId,
+                        errorResponse.ErrorCode,
+                        errorResponse.Message));
                 }
+            });
+
+            commandErrorSubscription = _transport.OnCommand("error", command =>
+            {
+                if (command is not CommandErrorResponse errorResponse)
+                    return;
+
+                if (!LooksLikeDataSubscriptionCommandError(errorResponse))
+                    return;
+
+                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
+                    ? errorResponse.Error
+                    : errorResponse.Message;
+                tcs.TrySetResult(CreateErrorResponse(request.RequestId, 0, message));
             });
 
             try
             {
                 await _transport.SendAsync(request, "module_dataflow");
+                var timeoutTask = Task.Delay(SubscriptionResponseTimeoutMs);
+                var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+                if (completedTask == timeoutTask)
+                {
+                    return CreateErrorResponse(
+                        request.RequestId,
+                        0,
+                        $"Timed out waiting for DataSubscriptionResponse after {SubscriptionResponseTimeoutMs}ms.");
+                }
+
                 return await tcs.Task;
             }
             finally
             {
                 responseSubscription?.Dispose();
-                errorSubscription?.Dispose();
+                errorResponseSubscription?.Dispose();
+                commandErrorSubscription?.Dispose();
             }
         }
 
@@ -152,67 +166,84 @@ namespace Playserv.DataSubscription
 
             var query = QueryBuilder.BuildQuery<TEntity>(entityTypeName, playerId);
             var variables = QueryBuilder.BuildVariables(playerId);
+            _logger.Log($"[DataSubscription] Opening subscription. entity={entityTypeName}, query={query}");
 
             var request = new DataSubscriptionRequest(requestId, query, variables);
+            var response = await SendSubscriptionRequestAsync(request);
 
-            var tcs = new TaskCompletionSource<DataSubscriptionResponse>();
-            IDisposable subscription = null;
+            if (response.HasError)
+                throw MapErrorToException(response.Error);
 
-            subscription = _transport.On<DataSubscriptionResponse>(response =>
-            {
-                if (response is DataSubscriptionResponse dataResponse && dataResponse.RequestId == requestId)
+            if (response.Result == null)
+                throw new InvalidOperationException("Invalid DataSubscriptionResponse: Result is null");
+
+            var subscriptionId = response.Result.SubscriptionId;
+            var sharedEntity = new SharedEntity<TDto>(
+                this,
+                subscriptionId,
+                null,
+                query,
+                variables,
+                raw =>
                 {
-                    tcs.TrySetResult(dataResponse);
-                    subscription?.Dispose();
-                }
-            });
+                    var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
+                    var entity = JsonConvert.DeserializeObject<TEntity>(json);
+                    return map(entity);
+                });
 
-            try
-            {
-                await _transport.SendAsync(request, "module_dataflow");
-
-                var response = await tcs.Task;
-
-                if (response.HasError)
-                {
-                    throw MapErrorToException(response.Error);
-                }
-
-                if (response.Result == null)
-                    throw new InvalidOperationException("Invalid DataSubscriptionResponse: Result is null");
-
-                var subscriptionId = response.Result.SubscriptionId;
-
-                var sharedEntity = new SharedEntity<TDto>(
-                    this,
-                    subscriptionId,
-                    null,
-                    query,
-                    variables,
-                    raw =>
-                    {
-                        var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
-                        var entity = JsonConvert.DeserializeObject<TEntity>(json);
-                        return map(entity);
-                    });
-
-                return sharedEntity;
-            }
-            finally
-            {
-                subscription?.Dispose();
-            }
+            return sharedEntity;
         }
 
         private static DataSubscriptionException MapErrorToException(DataSubscriptionError error)
         {
+            if (error == null)
+                return new DataSubscriptionException(0, "Unknown data subscription error.");
+
+            var message = error.Message ?? string.Empty;
             return error.ErrorCode switch
             {
                 UpdateDataCorruptionException.Code => new UpdateDataCorruptionException(error.Message),
                 SubscriptionTerminatedException.Code => new SubscriptionTerminatedException(0, error.Message),
                 SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, error.Message),
+                0 when LooksLikeInvalidQueryError(message) => new InvalidQuerySyntaxException(message),
                 _ => new DataSubscriptionException(error.ErrorCode, error.Message)
             };
+        }
+
+        private static DataSubscriptionResponse CreateErrorResponse(long requestId, int errorCode, string message)
+        {
+            return new DataSubscriptionResponse
+            {
+                RequestId = requestId,
+                Error = new DataSubscriptionError
+                {
+                    ErrorCode = errorCode,
+                    Message = message ?? "Unknown data subscription error."
+                }
+            };
+        }
+
+        private static bool LooksLikeDataSubscriptionCommandError(CommandErrorResponse errorResponse)
+        {
+            var error = errorResponse?.Error ?? string.Empty;
+            var message = errorResponse?.Message ?? string.Empty;
+
+            return message.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("module_dataflow", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("dataflow", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("query", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool LooksLikeInvalidQueryError(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return false;
+
+            return message.IndexOf("Syntax Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("GraphQL", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("Query is empty", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("id argument", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public void Dispose()
