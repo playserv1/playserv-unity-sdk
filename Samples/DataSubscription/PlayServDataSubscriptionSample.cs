@@ -364,8 +364,9 @@ namespace Playserv.Samples
             }
 
             var payload = response.Result?.Data?.ToString() ?? "<null>";
+            var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
             _status = $"{source} success";
-            AddLog($"{source} -> {TrimForLog(payload, 240)}");
+            AddLog($"[{ts}] {source} -> {TrimForLog(payload, 240)}");
         }
 
         private static string TrimForLog(string text, int maxLength)

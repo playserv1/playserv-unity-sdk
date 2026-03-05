@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -12,15 +13,22 @@ namespace Playserv.Proxy.Implementation
 #if UNITY_WEBGL && !UNITY_EDITOR
     public sealed class WebGLWebSocketTransportImplementation : ITransportImplementation
     {
+        private const int ConnectTimeoutMs = 12000;
+
         private readonly Uri _uri;
         private readonly ILogger _logger;
-        private readonly ByteArrayChannel _channel;
+        private ByteArrayChannel _channel;
         private readonly List<IObserver<byte[]>> _observers = new List<IObserver<byte[]>>();
         private readonly object _gate = new object();
+        private readonly object _connectGate = new object();
         private readonly SynchronizationContext _syncContext;
+        private WebGLWebSocketBridge _bridge;
 
         private bool _isConnected;
         private bool _isDisposed;
+        private bool _connecting;
+        private bool _bridgeEventsSubscribed;
+        private TaskCompletionSource<bool> _connectTcs;
 
         public WebGLWebSocketTransportImplementation(string uri, ILogger logger = null)
         {
@@ -34,7 +42,7 @@ namespace Playserv.Proxy.Implementation
         private static extern void Ws_Connect(string gameObjectName, string url);
 
         [DllImport("__Internal")]
-        private static extern void Ws_Send(string message);
+        private static extern int Ws_Send(string message);
 
         [DllImport("__Internal")]
         private static extern void Ws_Close();
@@ -44,74 +52,63 @@ namespace Playserv.Proxy.Implementation
             if (_isDisposed)
                 throw new ObjectDisposedException(nameof(WebGLWebSocketTransportImplementation));
 
-            if (_isConnected)
+            EnsureBridgeEventHandlers();
+
+            TaskCompletionSource<bool> connectTcs;
+            lock (_connectGate)
             {
-                _logger.LogWarning("WebGL WebSocket is already connected.");
-                return Task.FromResult(true);
-            }
+                if (_connecting)
+                {
+                    _logger.LogWarning("WebGL WebSocket connect already in progress.");
+                    return _connectTcs?.Task ?? Task.FromResult(false);
+                }
 
-            var tcs = new TaskCompletionSource<bool>();
-            var bridge = WebGLWebSocketBridge.Instance;
+                if (_isConnected)
+                {
+                    if (_channel.IsCompleted)
+                    {
+                        _logger.LogWarning("WebGL socket is marked connected but channel is completed. Recreating receive channel.");
+                        _isConnected = false;
+                        ResetChannel();
+                    }
+                    else
+                    {
+                        _logger.LogWarning("WebGL WebSocket is already connected.");
+                        return Task.FromResult(true);
+                    }
+                }
+                else if (_channel.IsCompleted)
+                {
+                    ResetChannel();
+                }
 
-            void HandleOpen()
-            {
-                bridge.Opened -= HandleOpen;
-                bridge.ErrorReceived -= HandleError;
-                bridge.Closed -= HandleClosed;
-
-                _isConnected = true;
-                _logger.Log("WebGL WebSocket connected successfully.");
-                if (!tcs.Task.IsCompleted)
-                    tcs.TrySetResult(true);
-            }
-
-            void HandleError(string error)
-            {
-                bridge.Opened -= HandleOpen;
-                bridge.ErrorReceived -= HandleError;
-                bridge.Closed -= HandleClosed;
-
-                _logger.LogError($"WebGL WebSocket error: {error}");
-                if (!tcs.Task.IsCompleted)
-                    tcs.TrySetResult(false);
-            }
-
-            void HandleClosed(string reason)
-            {
-                bridge.Opened -= HandleOpen;
-                bridge.ErrorReceived -= HandleError;
-                bridge.Closed -= HandleClosed;
-
+                _connecting = true;
                 _isConnected = false;
-                _logger.LogWarning($"WebGL WebSocket closed: {reason}");
-                if (!tcs.Task.IsCompleted)
-                    tcs.TrySetResult(false);
-
-                _channel.Complete();
+                _connectTcs = new TaskCompletionSource<bool>();
+                connectTcs = _connectTcs;
             }
-
-            bridge.Opened += HandleOpen;
-            bridge.ErrorReceived += HandleError;
-            bridge.Closed += HandleClosed;
-            bridge.MessageReceived += HandleMessage;
 
             try
             {
                 _logger.Log($"Connecting WebGL WebSocket to: {_uri}");
-                Ws_Connect(bridge.GameObjectName, _uri.ToString());
+                Ws_Connect(_bridge.GameObjectName, _uri.ToString());
             }
             catch (Exception ex)
             {
-                bridge.Opened -= HandleOpen;
-                bridge.ErrorReceived -= HandleError;
-                bridge.Closed -= HandleClosed;
-                bridge.MessageReceived -= HandleMessage;
-
                 _logger.LogError($"Failed to start WebGL WebSocket connection: {ex.Message}");
-                tcs.TrySetResult(false);
+                lock (_connectGate)
+                {
+                    if (ReferenceEquals(_connectTcs, connectTcs))
+                    {
+                        _connecting = false;
+                        _connectTcs = null;
+                    }
+                }
+                connectTcs.TrySetResult(false);
             }
 
-            return tcs.Task;
+            _ = WatchConnectTimeoutAsync(connectTcs);
+            return connectTcs.Task;
         }
 
         public Task Send(byte[] data)
@@ -131,11 +128,24 @@ namespace Playserv.Proxy.Implementation
             try
             {
                 var message = Encoding.UTF8.GetString(data);
-                Ws_Send(message);
+                var sendResult = Ws_Send(message);
+                if (sendResult != 1)
+                {
+                    _logger.LogError(
+                        "WebGL WebSocket send failed: JS layer reported socket is not open or send threw.");
+                    _isConnected = false;
+                    CompleteAll();
+                    TryCloseSocket();
+                    throw new InvalidOperationException(
+                        "WebGL WebSocket send failed (socket not open or JS send error).");
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Failed to send data via WebGL WebSocket: {ex.Message}");
+                _isConnected = false;
+                CompleteAll();
+                TryCloseSocket();
                 throw;
             }
 
@@ -144,13 +154,174 @@ namespace Playserv.Proxy.Implementation
 
         public IObservable<byte[]> OnReceive() => _channel;
 
-        private void HandleMessage(string data)
+        private void CompleteAll() => _channel.Complete();
+
+        private void EnsureBridgeEventHandlers()
+        {
+            if (_bridgeEventsSubscribed)
+                return;
+
+            _bridge = WebGLWebSocketBridge.Instance;
+            _bridge.Opened += OnBridgeOpened;
+            _bridge.MessageReceived += OnBridgeMessageReceived;
+            _bridge.ErrorReceived += OnBridgeErrorReceived;
+            _bridge.Closed += OnBridgeClosed;
+            _bridgeEventsSubscribed = true;
+        }
+
+        private void RemoveBridgeEventHandlers()
+        {
+            if (!_bridgeEventsSubscribed || _bridge == null)
+                return;
+
+            _bridge.Opened -= OnBridgeOpened;
+            _bridge.MessageReceived -= OnBridgeMessageReceived;
+            _bridge.ErrorReceived -= OnBridgeErrorReceived;
+            _bridge.Closed -= OnBridgeClosed;
+            _bridgeEventsSubscribed = false;
+        }
+
+        private void OnBridgeOpened()
+        {
+            TaskCompletionSource<bool> pendingConnect;
+            lock (_connectGate)
+            {
+                if (!_connecting)
+                {
+                    _logger.LogWarning("WebGL OnWsOpen received without active connect attempt. Ignored.");
+                    return;
+                }
+
+                _isConnected = true;
+                _connecting = false;
+                pendingConnect = _connectTcs;
+                _connectTcs = null;
+            }
+
+            _logger.Log("WebGL WebSocket connected successfully.");
+            pendingConnect?.TrySetResult(true);
+        }
+
+        private void OnBridgeMessageReceived(string data)
         {
             if (data == null)
                 return;
 
             var bytes = Encoding.UTF8.GetBytes(data);
             _channel.Next(bytes);
+        }
+
+        private void OnBridgeErrorReceived(string error)
+        {
+            TaskCompletionSource<bool> pendingConnect;
+            var wasConnected = false;
+            lock (_connectGate)
+            {
+                if (!_connecting && !_isConnected)
+                    return;
+
+                wasConnected = _isConnected;
+                _isConnected = false;
+                _connecting = false;
+                pendingConnect = _connectTcs;
+                _connectTcs = null;
+            }
+
+            _logger.LogError($"WebGL WebSocket error: {error}");
+            pendingConnect?.TrySetResult(false);
+
+            if (wasConnected)
+                CompleteAll();
+        }
+
+        private void OnBridgeClosed(string reason)
+        {
+            TaskCompletionSource<bool> pendingConnect;
+            var wasConnected = false;
+            lock (_connectGate)
+            {
+                if (!_connecting && !_isConnected)
+                    return;
+
+                wasConnected = _isConnected;
+                _isConnected = false;
+                _connecting = false;
+                pendingConnect = _connectTcs;
+                _connectTcs = null;
+            }
+
+            _logger.LogWarning($"WebGL WebSocket closed: {reason}");
+            pendingConnect?.TrySetResult(false);
+
+            if (wasConnected)
+                CompleteAll();
+        }
+
+        private void ResetChannel()
+        {
+            lock (_gate)
+            {
+                _observers.Clear();
+                _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
+            }
+        }
+
+        private async Task WatchConnectTimeoutAsync(TaskCompletionSource<bool> connectTcs)
+        {
+            var completed = await WaitForCompletionOrTimeoutAsync(connectTcs.Task, ConnectTimeoutMs);
+            if (completed)
+                return;
+
+            lock (_connectGate)
+            {
+                if (!ReferenceEquals(_connectTcs, connectTcs) || !_connecting)
+                    return;
+
+                _connecting = false;
+                _isConnected = false;
+                _connectTcs = null;
+            }
+
+            _logger.LogWarning($"WebGL WebSocket connect timed out after {ConnectTimeoutMs}ms.");
+            TryCloseSocket();
+            connectTcs.TrySetResult(false);
+        }
+
+        private static async Task<bool> WaitForCompletionOrTimeoutAsync(Task task, int timeoutMs)
+        {
+            if (task.IsCompleted)
+                return true;
+
+            if (timeoutMs <= 0)
+                timeoutMs = 1;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!task.IsCompleted)
+            {
+                if (stopwatch.ElapsedMilliseconds >= timeoutMs)
+                    return false;
+
+                await Task.Yield();
+            }
+
+            return true;
+#else
+            var timeoutTask = Task.Delay(timeoutMs);
+            var completedTask = await Task.WhenAny(task, timeoutTask);
+            return completedTask == task;
+#endif
+        }
+
+        private void TryCloseSocket()
+        {
+            try
+            {
+                Ws_Close();
+            }
+            catch
+            {
+            }
         }
 
         public void Dispose()
@@ -160,15 +331,11 @@ namespace Playserv.Proxy.Implementation
 
             _isDisposed = true;
             _isConnected = false;
+            _connecting = false;
 
-            try
-            {
-                Ws_Close();
-            }
-            catch
-            {
-            }
+            TryCloseSocket();
 
+            RemoveBridgeEventHandlers();
             _channel.Complete();
         }
 
@@ -242,6 +409,17 @@ namespace Playserv.Proxy.Implementation
                 }
             }
 
+            public bool IsCompleted
+            {
+                get
+                {
+                    lock (_gate)
+                    {
+                        return _completed;
+                    }
+                }
+            }
+
             private sealed class Unsubscriber : IDisposable
             {
                 private readonly List<IObserver<byte[]>> _observers;
@@ -274,4 +452,3 @@ namespace Playserv.Proxy.Implementation
     }
 #endif
 }
-

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
@@ -86,10 +87,17 @@ namespace Playserv.Proxy.Common
             
             try
             {
-                await Task.Delay(2000, cts.Token);
+                await DelayWithCancellationAsync(2000, cts.Token);
             }
             catch (OperationCanceledException)
             {
+                lock (_reconnectLock)
+                {
+                    if (cts == _reconnectCts)
+                        _isReconnecting = false;
+                }
+
+                _logger.LogWarning("Reconnection loop canceled before first attempt.");
                 return;
             }
 
@@ -133,7 +141,7 @@ namespace Playserv.Proxy.Common
                 {
                     try
                     {
-                        await Task.Delay(delayMs, cts.Token);
+                        await DelayWithCancellationAsync(delayMs, cts.Token);
                         delayMs = Math.Min(delayMs * 2, maxDelayMs);
                     }
                     catch (OperationCanceledException)
@@ -151,11 +159,12 @@ namespace Playserv.Proxy.Common
                 try
                 {
                     var connectTask = _connectAction != null ? _connectAction() : _transport.Connect();
-                    var timeoutTask = Task.Delay(connectionAttemptTimeoutMs, cts.Token);
+                    var completedInTime = await WaitForTaskOrTimeoutAsync(
+                        connectTask,
+                        connectionAttemptTimeoutMs,
+                        cts.Token);
 
-                    var completedTask = await Task.WhenAny(connectTask, timeoutTask);
-
-                    if (completedTask == timeoutTask)
+                    if (!completedInTime)
                     {
                         _logger.LogError(
                             $"Reconnection attempt {attempt} timed out after {connectionAttemptTimeoutMs / 1000}s.");
@@ -201,6 +210,63 @@ namespace Playserv.Proxy.Common
                 _stateSetter(PlayServState.Offline);
                 _logger.LogWarning("Reconnection stopped or failed. State set to Offline.");
             }
+        }
+
+        private static async Task DelayWithCancellationAsync(int delayMs, CancellationToken ct)
+        {
+            if (delayMs <= 0)
+                return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!ct.IsCancellationRequested)
+            {
+                if (stopwatch.ElapsedMilliseconds >= delayMs)
+                    break;
+
+                await Task.Yield();
+            }
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+#else
+            await Task.Delay(delayMs, ct);
+#endif
+        }
+
+        private static async Task<bool> WaitForTaskOrTimeoutAsync(Task task, int timeoutMs, CancellationToken ct)
+        {
+            if (task.IsCompleted)
+                return true;
+
+            if (timeoutMs <= 0)
+                timeoutMs = 1;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!ct.IsCancellationRequested)
+            {
+                if (task.IsCompleted)
+                    return true;
+
+                if (stopwatch.ElapsedMilliseconds >= timeoutMs)
+                    return false;
+
+                await Task.Yield();
+            }
+
+            throw new OperationCanceledException(ct);
+#else
+            var timeoutTask = Task.Delay(timeoutMs, ct);
+            var completedTask = await Task.WhenAny(task, timeoutTask);
+            if (completedTask == task)
+                return true;
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+
+            return false;
+#endif
         }
 
         public void Dispose()

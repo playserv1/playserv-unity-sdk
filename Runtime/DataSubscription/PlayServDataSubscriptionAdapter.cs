@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -17,6 +18,7 @@ namespace Playserv.DataSubscription
         private const int SubscriptionResponseTimeoutMs = 15000;
         private const int DataGetResponseTimeoutMs = 15000;
         private const int DefaultDataGetPollIntervalMs = 4000;
+        private const int DefaultDataGetPollRequestTimeoutMs = 4000;
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
         private long _requestIdCounter;
@@ -202,22 +204,8 @@ namespace Playserv.DataSubscription
             Dictionary<string, object> variables,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(key))
-                throw new ArgumentException("Key is required.", nameof(key));
-
-            if (string.IsNullOrWhiteSpace(query))
-                throw new ArgumentException("Query is required.", nameof(query));
-
-            var requestId = Interlocked.Increment(ref _requestIdCounter);
-            var request = new DataGetRequest
-            {
-                RequestId = requestId,
-                Key = key,
-                Query = query,
-                Variables = CloneVariables(variables)
-            };
-
-            return await SendDataGetRequestAsync(request, ct);
+            var request = CreateDataGetRequest(key, query, variables);
+            return await SendDataGetRequestAsync(request, DataGetResponseTimeoutMs, ct);
         }
 
         public IDisposable StartDataByKeyPolling(
@@ -233,7 +221,7 @@ namespace Playserv.DataSubscription
             var cts = new CancellationTokenSource();
             var variablesSnapshot = CloneVariables(variables);
 
-            _ = PollDataByKeyLoopAsync(
+            var pollingTask = PollDataByKeyLoopAsync(
                 key,
                 query,
                 variablesSnapshot,
@@ -242,7 +230,7 @@ namespace Playserv.DataSubscription
                 onError,
                 cts.Token);
 
-            return new PollingHandle(cts);
+            return new PollingHandle(cts, pollingTask);
         }
 
         private static DataSubscriptionException MapErrorToException(DataSubscriptionError error)
@@ -297,16 +285,70 @@ namespace Playserv.DataSubscription
                    message.IndexOf("id argument", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private async Task<DataGetResponse> SendDataGetRequestAsync(DataGetRequest request, CancellationToken ct)
+        private Task<DataGetResponse> SendDataGetRequestAsync(DataGetRequest request, CancellationToken ct)
         {
-            var tcs = new TaskCompletionSource<DataGetResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            return SendDataGetRequestAsync(request, DataGetResponseTimeoutMs, ct);
+        }
+
+        private async Task<DataGetResponse> SendDataGetRequestAsync(
+            DataGetRequest request,
+            int timeoutMs,
+            CancellationToken ct)
+        {
+            var tcs = new TaskCompletionSource<DataGetResponse>();
             IDisposable responseSubscription = null;
+            IDisposable responseByCommandSubscription = null;
+            IDisposable responseByModuleCommandSubscription = null;
             IDisposable commandErrorSubscription = null;
 
             responseSubscription = _transport.On<DataGetResponse>(response =>
             {
                 if (response != null && response.RequestId == request.RequestId)
-                    tcs.TrySetResult(response);
+                {
+                    var set = tcs.TrySetResult(response);
+#if PlayServ_Logs
+                    SafeLog(
+                        $"[DataGet] typed response matched. requestId={request.RequestId}, setResult={set}, hasError={response.HasError}");
+#endif
+                }
+            });
+
+            responseByCommandSubscription = _transport.OnCommand("DataGetResponse", command =>
+            {
+                if (!TryMapDataGetResponse(command, out var response))
+                    return;
+
+#if PlayServ_Logs
+                SafeLog(
+                    $"[DataGet] command response observed. expected={request.RequestId}, incoming={response.RequestId}, hasError={response.HasError}");
+#endif
+
+                if (response.RequestId == request.RequestId)
+                {
+                    var set = tcs.TrySetResult(response);
+#if PlayServ_Logs
+                    SafeLog($"[DataGet] command response matched. requestId={request.RequestId}, setResult={set}");
+#endif
+                }
+            });
+
+            responseByModuleCommandSubscription = _transport.OnCommand("module_dataflow.DataGetResponse", command =>
+            {
+                if (!TryMapDataGetResponse(command, out var response))
+                    return;
+
+#if PlayServ_Logs
+                SafeLog(
+                    $"[DataGet] module response observed. expected={request.RequestId}, incoming={response.RequestId}, hasError={response.HasError}");
+#endif
+
+                if (response.RequestId == request.RequestId)
+                {
+                    var set = tcs.TrySetResult(response);
+#if PlayServ_Logs
+                    SafeLog($"[DataGet] module response matched. requestId={request.RequestId}, setResult={set}");
+#endif
+                }
             });
 
             commandErrorSubscription = _transport.OnCommand("error", command =>
@@ -321,24 +363,27 @@ namespace Playserv.DataSubscription
                     ? errorResponse.Error
                     : errorResponse.Message;
 
-                tcs.TrySetResult(CreateDataGetErrorResponse(request.RequestId, 0, message));
+                var set = tcs.TrySetResult(CreateDataGetErrorResponse(request.RequestId, 0, message));
+#if PlayServ_Logs
+                SafeLog($"[DataGet] command error mapped to requestId={request.RequestId}, setResult={set}, message={message}");
+#endif
             });
 
             try
             {
                 await _transport.SendAsync(request, "module_dataflow");
-                var timeoutTask = Task.Delay(DataGetResponseTimeoutMs, ct);
-                var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-
-                if (completedTask == timeoutTask)
+                var effectiveTimeoutMs = timeoutMs > 0 ? timeoutMs : DataGetResponseTimeoutMs;
+                var completedInTime = await WaitForCompletionOrTimeoutAsync(tcs.Task, effectiveTimeoutMs, ct);
+                if (!completedInTime)
                 {
-                    if (ct.IsCancellationRequested)
-                        throw new OperationCanceledException(ct);
-
+#if PlayServ_Logs
+                    SafeLogWarning(
+                        $"[DataGet] timeout. requestId={request.RequestId}, key={request.Key}, timeout={effectiveTimeoutMs}ms");
+#endif
                     return CreateDataGetErrorResponse(
                         request.RequestId,
                         0,
-                        $"Timed out waiting for DataGetResponse after {DataGetResponseTimeoutMs}ms.");
+                        $"Timed out waiting for DataGetResponse after {effectiveTimeoutMs}ms.");
                 }
 
                 return await tcs.Task;
@@ -346,6 +391,8 @@ namespace Playserv.DataSubscription
             finally
             {
                 responseSubscription?.Dispose();
+                responseByCommandSubscription?.Dispose();
+                responseByModuleCommandSubscription?.Dispose();
                 commandErrorSubscription?.Dispose();
             }
         }
@@ -359,40 +406,146 @@ namespace Playserv.DataSubscription
             Action<Exception>? onError,
             CancellationToken ct)
         {
-            _logger.Log($"[DataGet] Polling started. interval={intervalMs}ms, key={key}");
-
-            while (!ct.IsCancellationRequested)
+            SafeLog($"[DataGet] Polling started. interval={intervalMs}ms, key={key}");
+            PlayServState? pausedAtState = null;
+            try
             {
-                var startedAt = DateTime.UtcNow;
-                try
+                while (!ct.IsCancellationRequested)
                 {
-                    var response = await GetDataByKeyAsync(key, query, variables, ct);
-                    onData(response);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError($"[DataGet] Poll request failed: {ex.Message}");
-                    onError?.Invoke(ex);
-                }
+                    var sdkState = _transport.State;
+                    if (sdkState != PlayServState.Online)
+                    {
+                        if (pausedAtState != sdkState)
+                        {
+                            SafeLogWarning($"[DataGet] poll paused. sdkState={sdkState}");
+                            pausedAtState = sdkState;
+                        }
 
-                var elapsedMs = (int)(DateTime.UtcNow - startedAt).TotalMilliseconds;
-                var delayMs = Math.Max(0, intervalMs - elapsedMs);
+                        try
+                        {
+                            await DelayWithCancellationAsync(intervalMs, ct);
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                        {
+                            break;
+                        }
 
-                try
-                {
-                    await Task.Delay(delayMs, ct);
-                }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    break;
+                        continue;
+                    }
+
+                    if (pausedAtState.HasValue)
+                    {
+                        SafeLog($"[DataGet] poll resumed. sdkState={sdkState}");
+                        pausedAtState = null;
+                    }
+
+                    var startedAt = DateTime.UtcNow;
+                    try
+                    {
+                        var request = CreateDataGetRequest(key, query, variables);
+#if PlayServ_Logs
+                        SafeLog(
+                            $"[DataGet] -> poll request send. requestId={request.RequestId}, key={key}, timeout={DefaultDataGetPollRequestTimeoutMs}ms");
+#endif
+                        var response = await SendDataGetRequestAsync(request, DefaultDataGetPollRequestTimeoutMs, ct);
+#if PlayServ_Logs
+                        SafeLog(
+                            $"[DataGet] <- poll response received. requestId={request.RequestId}, hasError={(response?.HasError ?? false)}");
+#endif
+                        onData(response);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        SafeLogError($"[DataGet] Poll request failed: {ex.Message}");
+                        SafeInvokeOnError(onError, ex);
+                    }
+
+                    var elapsedMs = (int)(DateTime.UtcNow - startedAt).TotalMilliseconds;
+                    var delayMs = Math.Max(0, intervalMs - elapsedMs);
+
+                    try
+                    {
+                        await DelayWithCancellationAsync(delayMs, ct);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        break;
+                    }
                 }
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                SafeLogError($"[DataGet] Polling loop crashed: {ex.Message}");
+                SafeInvokeOnError(onError, ex);
+            }
+            finally
+            {
+                SafeLog($"[DataGet] Polling stopped. key={key}");
+            }
+        }
 
-            _logger.Log($"[DataGet] Polling stopped. key={key}");
+        private static async Task DelayWithCancellationAsync(int delayMs, CancellationToken ct)
+        {
+            if (delayMs <= 0)
+                return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!ct.IsCancellationRequested)
+            {
+                if (stopwatch.ElapsedMilliseconds >= delayMs)
+                    break;
+
+                await Task.Yield();
+            }
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+#else
+            await Task.Delay(delayMs, ct);
+#endif
+        }
+
+        private static async Task<bool> WaitForCompletionOrTimeoutAsync(Task task, int timeoutMs, CancellationToken ct)
+        {
+            if (task.IsCompleted)
+                return true;
+
+            if (timeoutMs <= 0)
+                timeoutMs = 1;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!task.IsCompleted)
+            {
+                if (ct.IsCancellationRequested)
+                    throw new OperationCanceledException(ct);
+
+                if (stopwatch.ElapsedMilliseconds >= timeoutMs)
+                    return false;
+
+                await Task.Yield();
+            }
+
+            return true;
+#else
+            var timeoutTask = Task.Delay(timeoutMs, ct);
+            var completedTask = await Task.WhenAny(task, timeoutTask);
+            if (completedTask == task)
+                return true;
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+
+            return false;
+#endif
         }
 
         private static DataGetResponse CreateDataGetErrorResponse(long requestId, int errorCode, string message)
@@ -419,12 +572,107 @@ namespace Playserv.DataSubscription
                    error.IndexOf("DataGetRequest", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        private static bool TryMapDataGetResponse(object command, out DataGetResponse response)
+        {
+            response = null;
+            if (command == null)
+                return false;
+
+            if (command is DataGetResponse dataGetResponse)
+            {
+                response = dataGetResponse;
+                return true;
+            }
+
+            try
+            {
+                var json = JsonConvert.SerializeObject(command);
+                var mapped = JsonConvert.DeserializeObject<DataGetResponse>(json);
+                if (mapped == null)
+                    return false;
+
+                response = mapped;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static Dictionary<string, object> CloneVariables(Dictionary<string, object> variables)
         {
             if (variables == null || variables.Count == 0)
                 return new Dictionary<string, object>();
 
             return new Dictionary<string, object>(variables);
+        }
+
+        private DataGetRequest CreateDataGetRequest(
+            string key,
+            string query,
+            Dictionary<string, object> variables)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Key is required.", nameof(key));
+
+            if (string.IsNullOrWhiteSpace(query))
+                throw new ArgumentException("Query is required.", nameof(query));
+
+            return new DataGetRequest
+            {
+                RequestId = Interlocked.Increment(ref _requestIdCounter),
+                Key = key,
+                Query = query,
+                Variables = CloneVariables(variables)
+            };
+        }
+
+        private void SafeLog(string message)
+        {
+            try
+            {
+                _logger.Log(message);
+            }
+            catch
+            {
+            }
+        }
+
+        private void SafeLogError(string message)
+        {
+            try
+            {
+                _logger.LogError(message);
+            }
+            catch
+            {
+            }
+        }
+
+        private void SafeLogWarning(string message)
+        {
+            try
+            {
+                _logger.LogWarning(message);
+            }
+            catch
+            {
+            }
+        }
+
+        private static void SafeInvokeOnError(Action<Exception>? onError, Exception ex)
+        {
+            if (onError == null)
+                return;
+
+            try
+            {
+                onError(ex);
+            }
+            catch
+            {
+            }
         }
 
         public void Dispose()
@@ -462,10 +710,12 @@ namespace Playserv.DataSubscription
         private sealed class PollingHandle : IDisposable
         {
             private CancellationTokenSource? _cts;
+            private Task? _pollingTask;
 
-            public PollingHandle(CancellationTokenSource cts)
+            public PollingHandle(CancellationTokenSource cts, Task pollingTask)
             {
                 _cts = cts;
+                _pollingTask = pollingTask;
             }
 
             public void Dispose()
@@ -478,6 +728,7 @@ namespace Playserv.DataSubscription
                     cts.Cancel();
 
                 cts.Dispose();
+                _pollingTask = null;
             }
         }
     }
