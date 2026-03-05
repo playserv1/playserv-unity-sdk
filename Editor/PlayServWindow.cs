@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -588,7 +589,7 @@ namespace Playserv.Editor
                     _so.Update();
 
                     if (_pDeployApiServerAddress != null)
-                        EditorGUILayout.PropertyField(_pDeployApiServerAddress, new GUIContent("Server Address"));
+                        DrawReadOnlyTextField("Server Address", _pDeployApiServerAddress.stringValue);
 
                     if (_pDeployTimeoutSeconds != null)
                         EditorGUILayout.PropertyField(_pDeployTimeoutSeconds, new GUIContent("Timeout Seconds"));
@@ -1372,6 +1373,9 @@ namespace Playserv.Editor
                 }
                 else
                 {
+                    DrawEnvironmentSummary();
+                    GUILayout.Space(6);
+
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.ObjectField("Config Asset", _config, typeof(PlayServConfig), false);
                     if (GUILayout.Button("Ping", GUILayout.Width(60)))
@@ -1387,6 +1391,9 @@ namespace Playserv.Editor
                     EditorGUILayout.PropertyField(_pGameId);
                     EditorGUILayout.PropertyField(_pGameVersion);
                     EditorGUILayout.PropertyField(_pAllowMultipleConnections);
+                    DrawReadOnlyTextField("Backend Server Address", _config.BackendServerAddress);
+                    DrawReadOnlyTextField("Deploy API Server", _config.DeployApiServerAddress);
+                    DrawReadOnlyTextField("Schema API Server", _config.SchemaApiServerAddress);
                     
                     using (new EditorGUILayout.HorizontalScope())
                     {
@@ -1406,6 +1413,125 @@ namespace Playserv.Editor
 
             EditorGUILayout.EndFoldoutHeaderGroup();
             EditorPrefs.SetBool(Const.PrefFoldConfig, _foldConfig);
+        }
+
+        private void DrawEnvironmentSummary()
+        {
+            var environments = PlayServEnvironmentResolver.Environments;
+            if (environments.Length == 0)
+                return;
+
+            var activeEnvironment = ResolveActiveEnvironmentNameForDisplay();
+            var activeIndex = Array.IndexOf(environments, activeEnvironment);
+            if (activeIndex < 0)
+                activeIndex = 0;
+
+            var labels = environments
+                .Select(AsDisplayEnvironmentLabel)
+                .ToArray();
+
+            var canSwitchInClientEditor = CanSwitchEnvironmentInClientEditor();
+            int selectedIndex;
+            using (new EditorGUI.DisabledScope(!canSwitchInClientEditor))
+            {
+                selectedIndex = EditorGUILayout.Popup("Environment", activeIndex, labels);
+            }
+
+            if (canSwitchInClientEditor && selectedIndex != activeIndex)
+            {
+                var selectedEnvironment = environments[selectedIndex];
+                if (TrySetEnvironmentInClientEditor(selectedEnvironment, out var error))
+                {
+                    EnsureConfig();
+                    Repaint();
+                }
+                else
+                {
+                    Debug.LogError($"[PlayServ] Failed to switch environment: {error}");
+                }
+            }
+        }
+
+        private static string ResolveActiveEnvironmentNameForDisplay()
+        {
+            if (PlayServEnvironmentResolver.TryLoadConfigFromFile(out var config, out _))
+                return PlayServEnvironmentResolver.ResolveEnvironmentName(config.ActiveEnvironment);
+
+            return PlayServEnvironmentResolver.ResolveEnvironmentName(null);
+        }
+
+        private static bool CanSwitchEnvironmentInClientEditor()
+        {
+            return TryGetClientEnvironmentSetMethod(out _);
+        }
+
+        private static bool TrySetEnvironmentInClientEditor(string environmentName, out string error)
+        {
+            if (!TryGetClientEnvironmentSetMethod(out var setMethod))
+            {
+                error = "Client environment manager method TrySetActiveEnvironment is not available.";
+                return false;
+            }
+
+            var args = new object[] { environmentName, string.Empty };
+            var invocationResult = setMethod.Invoke(null, args);
+            var success = invocationResult is bool b && b;
+            error = args[1] as string ?? string.Empty;
+            return success;
+        }
+
+        private static bool TryGetClientEnvironmentSetMethod(out MethodInfo setMethod)
+        {
+            setMethod = null;
+
+            var managerType = FindClientEnvironmentManagerType();
+            if (managerType == null)
+                return false;
+
+            setMethod = managerType.GetMethod(
+                "TrySetActiveEnvironment",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            return setMethod != null;
+        }
+
+        private static Type FindClientEnvironmentManagerType()
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType("Playserv.ClientEditor.PlayServEnvironmentManager", throwOnError: false);
+                if (type != null)
+                    return type;
+            }
+
+            return null;
+        }
+
+        private static void DrawReadOnlyTextField(string label, string value)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.PrefixLabel(label);
+                EditorGUILayout.SelectableLabel(
+                    value ?? string.Empty,
+                    EditorStyles.textField,
+                    GUILayout.Height(EditorGUIUtility.singleLineHeight));
+            }
+        }
+
+        private static string AsDisplayEnvironmentLabel(string environmentName)
+        {
+            if (string.IsNullOrWhiteSpace(environmentName))
+                return "Unknown";
+
+            var normalized = environmentName.Trim().ToLowerInvariant();
+            return normalized switch
+            {
+                "local" => "Local",
+                "dev" => "Dev",
+                "prod" => "Prod",
+                _ => environmentName
+            };
         }
 
         private void DrawFooter()

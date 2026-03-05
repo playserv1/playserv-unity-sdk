@@ -8,19 +8,19 @@ namespace Playserv.Wrapper
     public sealed class PlayServSettings
     {
         /// <summary>
-        /// Default local websocket endpoint.
+        /// Default backend websocket endpoint.
         /// </summary>
-        public const string DefaultLocalEndpoint = "ws://localhost:8080/ws/";
-
-        /// <summary>
-        /// Default remote websocket endpoint.
-        /// </summary>
-        public const string DefaultRemoteEndpoint = "wss://playserv-proxy.test.playserv.io/ws";
+        public const string DefaultBackendServerAddress = "wss://playserv-proxy.test.playserv.io/ws";
 
         /// <summary>
         /// Default deployment API server address.
         /// </summary>
         public const string DefaultDeployApiServerAddress = "http://playserv-deployment.test.playserv.io";
+
+        /// <summary>
+        /// Default schema API server address.
+        /// </summary>
+        public const string DefaultSchemaApiServerAddress = "https://playserv-backoffice.test.playserv.io";
 
         /// <summary>
         /// Access token used in handshake.
@@ -68,24 +68,19 @@ namespace Playserv.Wrapper
         public int NetworkTransformSyncIntervalMs { get; set; } = 100;
 
         /// <summary>
-        /// Chooses local endpoint when true, otherwise remote endpoint.
+        /// Backend websocket endpoint.
         /// </summary>
-        public bool UseLocalBackend { get; set; }
-
-        /// <summary>
-        /// Local backend endpoint.
-        /// </summary>
-        public string LocalEndpoint { get; set; } = DefaultLocalEndpoint;
-
-        /// <summary>
-        /// Remote backend endpoint.
-        /// </summary>
-        public string RemoteEndpoint { get; set; } = DefaultRemoteEndpoint;
+        public string BackendServerAddress { get; set; } = DefaultBackendServerAddress;
 
         /// <summary>
         /// Deployment API server address used by editor deployment tools.
         /// </summary>
         public string DeployApiServerAddress { get; set; } = DefaultDeployApiServerAddress;
+
+        /// <summary>
+        /// Schema API server address used by editor schema tools.
+        /// </summary>
+        public string SchemaApiServerAddress { get; set; } = DefaultSchemaApiServerAddress;
 
         /// <summary>
         /// Backward-compatible alias for <see cref="DeployApiServerAddress"/>.
@@ -107,9 +102,9 @@ namespace Playserv.Wrapper
         public int TimeoutSeconds { get; set; } = 120;
 
         /// <summary>
-        /// Active websocket endpoint resolved from <see cref="UseLocalBackend"/>.
+        /// Backward-compatible alias for <see cref="BackendServerAddress"/>.
         /// </summary>
-        public string Endpoint => UseLocalBackend ? LocalEndpoint : RemoteEndpoint;
+        public string Endpoint => BackendServerAddress;
 
         /// <summary>
         /// Creates a deep copy of current settings object.
@@ -128,10 +123,9 @@ namespace Playserv.Wrapper
                 KeepAlivePingIntervalMs = KeepAlivePingIntervalMs,
                 KeepAlivePongTimeoutMs = KeepAlivePongTimeoutMs,
                 NetworkTransformSyncIntervalMs = NetworkTransformSyncIntervalMs,
-                UseLocalBackend = UseLocalBackend,
-                LocalEndpoint = LocalEndpoint,
-                RemoteEndpoint = RemoteEndpoint,
+                BackendServerAddress = BackendServerAddress,
                 DeployApiServerAddress = DeployApiServerAddress,
+                SchemaApiServerAddress = SchemaApiServerAddress,
                 DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };

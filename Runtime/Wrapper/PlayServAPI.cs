@@ -550,7 +550,7 @@ namespace Playserv.Wrapper
                 throw new InvalidOperationException("Game version is required. Call Config(...) first.");
 
             if (string.IsNullOrWhiteSpace(settings.Endpoint))
-                throw new InvalidOperationException("Endpoint is required. Provide LocalEndpoint or RemoteEndpoint.");
+                throw new InvalidOperationException("Endpoint is required. Provide BackendServerAddress.");
         }
 
         private static bool TryLoadSettingsFromUnityResources(out PlayServSettings settings)
@@ -559,7 +559,17 @@ namespace Playserv.Wrapper
             var config = Resources.Load<PlayServConfig>(ConfigResourceName);
             if (config != null)
             {
+#if UNITY_EDITOR
+                var resolvedSettings = PlayServEnvironmentResolver.ResolveSettingsForEditor(
+                    config,
+                    out _,
+                    out _,
+                    out _);
+
+                settings = resolvedSettings;
+#else
                 settings = config.ToSettings();
+#endif
                 return true;
             }
 #endif

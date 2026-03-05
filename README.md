@@ -65,9 +65,7 @@ PlayServ.Config(new PlayServSettings
     UserId = "player-001",
     GameVersion = "1.0.0",
     SdkVersion = PlayServ.SdkVersion,
-    UseLocalBackend = true,
-    LocalEndpoint = "ws://localhost:8080/ws/",
-    RemoteEndpoint = "wss://playserv-proxy.test.playserv.io/ws",
+    BackendServerAddress = "wss://playserv-proxy.test.playserv.io/ws",
     AllowMultipleConnections = true,
     KeepAlivePingIntervalMs = 30000,
     KeepAlivePongTimeoutMs = 10000

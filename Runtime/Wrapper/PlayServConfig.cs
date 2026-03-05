@@ -1,4 +1,5 @@
 #if UNITY_5_3_OR_NEWER
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 #if UNITY_EDITOR
@@ -13,9 +14,9 @@ namespace Playserv.Wrapper
     [CreateAssetMenu(fileName = "PlayServConfig", menuName = "PlayServ/Config", order = 0)]
     public sealed class PlayServConfig : ScriptableObject
     {
-        private const string DEFAULT_LOCAL_ENDPOINT = "ws://localhost:8080/ws/";
-        private const string DEFAULT_REMOTE_ENDPOINT = "wss://playserv-proxy.test.playserv.io/ws";
+        private const string DEFAULT_BACKEND_SERVER_ADDRESS = PlayServSettings.DefaultBackendServerAddress;
         private const string DEFAULT_DEPLOY_API_SERVER_ADDRESS = PlayServSettings.DefaultDeployApiServerAddress;
+        private const string DEFAULT_SCHEMA_API_SERVER_ADDRESS = PlayServSettings.DefaultSchemaApiServerAddress;
 
         [SerializeField] private string gameAccessToken;
         [SerializeField] private string gameId;
@@ -26,13 +27,13 @@ namespace Playserv.Wrapper
         [SerializeField] private int keepAlivePingIntervalMs = 30000;
         [SerializeField] private int keepAlivePongTimeoutMs = 10000;
         [SerializeField] private int networkTransformSyncIntervalMs = 100;
-        [SerializeField] private bool useLocalBackend = false;
-        [SerializeField] private string localEndpoint = DEFAULT_LOCAL_ENDPOINT;
-        [SerializeField] private string remoteEndpoint = DEFAULT_REMOTE_ENDPOINT;
+        [FormerlySerializedAs("remoteEndpoint")]
+        [SerializeField] private string backendServerAddress = DEFAULT_BACKEND_SERVER_ADDRESS;
         
         [FormerlySerializedAs("deployApiEndpoint")]
         [Header("Deploy")]
         [SerializeField] private string deployApiServerAddress = DEFAULT_DEPLOY_API_SERVER_ADDRESS;
+        [SerializeField] private string schemaApiServerAddress = DEFAULT_SCHEMA_API_SERVER_ADDRESS;
         [SerializeField] private string deployAuthToken = "";
         [SerializeField] private int timeoutSeconds = 120;
         
@@ -86,29 +87,24 @@ namespace Playserv.Wrapper
         public int NetworkTransformSyncIntervalMs => networkTransformSyncIntervalMs;
 
         /// <summary>
-        /// Chooses local endpoint when true, remote endpoint otherwise.
+        /// Backend websocket endpoint.
         /// </summary>
-        public bool UseLocalBackend => useLocalBackend;
+        public string BackendServerAddress => backendServerAddress;
 
         /// <summary>
-        /// Local websocket endpoint.
+        /// Backward-compatible alias for <see cref="BackendServerAddress"/>.
         /// </summary>
-        public string LocalEndpoint => localEndpoint;
-
-        /// <summary>
-        /// Remote websocket endpoint.
-        /// </summary>
-        public string RemoteEndpoint => remoteEndpoint;
-
-        /// <summary>
-        /// Active endpoint based on <see cref="UseLocalBackend"/>.
-        /// </summary>
-        public string Endpoint => useLocalBackend ? localEndpoint : remoteEndpoint;
+        public string Endpoint => backendServerAddress;
         
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
         public string DeployApiServerAddress => deployApiServerAddress;
+
+        /// <summary>
+        /// Schema API endpoint used by editor schema tools.
+        /// </summary>
+        public string SchemaApiServerAddress => schemaApiServerAddress;
 
         /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.
@@ -120,7 +116,7 @@ namespace Playserv.Wrapper
         /// </summary>
         public int TimeoutSeconds => timeoutSeconds;
 
-        internal PlayServSettings ToSettings()
+        public PlayServSettings ToSettings()
         {
             return new PlayServSettings
             {
@@ -133,15 +129,45 @@ namespace Playserv.Wrapper
                 KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
                 KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs,
                 NetworkTransformSyncIntervalMs = networkTransformSyncIntervalMs,
-                UseLocalBackend = useLocalBackend,
-                LocalEndpoint = localEndpoint,
-                RemoteEndpoint = remoteEndpoint,
+                BackendServerAddress = backendServerAddress,
                 DeployApiServerAddress = deployApiServerAddress,
+                SchemaApiServerAddress = schemaApiServerAddress,
                 DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };
         }
-        
+
+        /// <summary>
+        /// Applies provided settings to this config asset and marks it dirty in editor if changed.
+        /// </summary>
+        public bool ApplySettings(PlayServSettings settings)
+        {
+            if (settings == null)
+                return false;
+
+            var changed = false;
+            changed |= AssignIfDifferent(ref gameAccessToken, settings.GameAccessToken);
+            changed |= AssignIfDifferent(ref gameId, settings.GameId);
+            changed |= AssignIfDifferent(ref userId, settings.UserId);
+            changed |= AssignIfDifferent(ref gameVersion, settings.GameVersion);
+            changed |= AssignIfDifferent(ref sdkVersion, settings.SdkVersion);
+            changed |= AssignIfDifferent(ref allowMultipleConnections, settings.AllowMultipleConnections);
+            changed |= AssignIfDifferent(ref keepAlivePingIntervalMs, settings.KeepAlivePingIntervalMs);
+            changed |= AssignIfDifferent(ref keepAlivePongTimeoutMs, settings.KeepAlivePongTimeoutMs);
+            changed |= AssignIfDifferent(ref networkTransformSyncIntervalMs, settings.NetworkTransformSyncIntervalMs);
+            changed |= AssignIfDifferent(ref backendServerAddress, settings.BackendServerAddress);
+            changed |= AssignIfDifferent(ref deployApiServerAddress, settings.DeployApiServerAddress);
+            changed |= AssignIfDifferent(ref schemaApiServerAddress, settings.SchemaApiServerAddress);
+            changed |= AssignIfDifferent(ref deployAuthToken, settings.DeployAuthToken);
+            changed |= AssignIfDifferent(ref timeoutSeconds, settings.TimeoutSeconds);
+
+#if UNITY_EDITOR
+            if (changed)
+                EditorUtility.SetDirty(this);
+#endif
+
+            return changed;
+        }
 
         /// <summary>
         /// Updates allow-multiple-connections flag and marks asset dirty in editor.
@@ -189,6 +215,15 @@ namespace Playserv.Wrapper
 #if UNITY_EDITOR
             EditorUtility.SetDirty(this);
 #endif
+        }
+
+        private static bool AssignIfDifferent<T>(ref T field, T value)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return false;
+
+            field = value;
+            return true;
         }
     }
 }

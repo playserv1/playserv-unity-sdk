@@ -10,6 +10,7 @@ namespace Playserv.Editor
         // You can change this path if you want a different location.
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
         private const string DeployApiServerAddressPropertyName = "deployApiServerAddress";
+        private const string SchemaApiServerAddressPropertyName = "schemaApiServerAddress";
         private const string LegacyDefaultSdkVersion = "1.0.0";
         private const string CurrentDefaultSdkVersion = "0.1.0";
 
@@ -19,7 +20,9 @@ namespace Playserv.Editor
             if (config != null)
             {
                 var changed = EnsureDeployApiServerAddress(config);
+                changed |= EnsureSchemaApiServerAddress(config);
                 changed |= EnsureDefaultSdkVersion(config);
+                changed |= ApplyEnvironmentProfile(config);
                 if (changed)
                     AssetDatabase.SaveAssets();
                 return config;
@@ -35,7 +38,9 @@ namespace Playserv.Editor
             config = ScriptableObject.CreateInstance<PlayServConfig>();
             AssetDatabase.CreateAsset(config, AssetPath);
             EnsureDeployApiServerAddress(config);
+            EnsureSchemaApiServerAddress(config);
             EnsureDefaultSdkVersion(config);
+            ApplyEnvironmentProfile(config);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return config;
@@ -98,6 +103,27 @@ namespace Playserv.Editor
             return true;
         }
 
+        private static bool EnsureSchemaApiServerAddress(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var serializedObject = new SerializedObject(config);
+            var schemaEndpointProperty = serializedObject.FindProperty(SchemaApiServerAddressPropertyName);
+            if (schemaEndpointProperty == null)
+                return false;
+
+            var currentValue = schemaEndpointProperty.stringValue?.Trim();
+            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
+            if (!shouldReplace)
+                return false;
+
+            schemaEndpointProperty.stringValue = PlayServSettings.DefaultSchemaApiServerAddress;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
+            return true;
+        }
+
         private static bool EnsureDefaultSdkVersion(PlayServConfig config)
         {
             if (config == null)
@@ -118,6 +144,20 @@ namespace Playserv.Editor
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
+        }
+
+        private static bool ApplyEnvironmentProfile(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var resolved = PlayServEnvironmentResolver.ResolveSettingsForEditor(
+                config,
+                out _,
+                out _,
+                out _);
+
+            return config.ApplySettings(resolved);
         }
     }
 }
