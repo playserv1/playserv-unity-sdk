@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
+using Playserv.DataSubscription.Responses;
 using Playserv.Events;
 using Playserv.RPC;
 using Playserv.Proxy.Implementation;
@@ -311,6 +313,30 @@ namespace Playserv.Proxy.Common
             where TDto : class, new()
         {
             return _dataSubscriptionAdapter.SelectEntity(playerId, map);
+        }
+
+        public Task<DataGetResponse> GetDataByKeyAsync(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            CancellationToken ct = default)
+        {
+            return _dataSubscriptionAdapter.GetDataByKeyAsync(key, query, variables, ct);
+        }
+
+        public IDisposable StartDataByKeyPolling(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            Action<DataGetResponse> onData,
+            Action<Exception>? onError = null)
+        {
+            return _dataSubscriptionAdapter.StartDataByKeyPolling(
+                key,
+                query,
+                variables,
+                onData,
+                onError);
         }
 
         private void OnConnectionLost(object sender, EventArgs e)

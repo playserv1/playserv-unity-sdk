@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
+using Playserv.DataSubscription.Responses;
 using Playserv.RPC;
 using Playserv.Server;
 using Playserv.Proxy.Common;
@@ -266,6 +268,21 @@ namespace Playserv.Wrapper
             where TEntity : class
             where TDto : class, new() =>
             Instance.SelectEntity(playerId, map);
+
+        public Task<DataGetResponse> GetDataByKeyAsync(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            CancellationToken ct = default) =>
+            Instance.GetDataByKeyAsync(key, query, variables, ct);
+
+        public IDisposable StartDataByKeyPolling(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            Action<DataGetResponse> onData,
+            Action<Exception>? onError = null) =>
+            Instance.StartDataByKeyPolling(key, query, variables, onData, onError);
 
         private PlayServImplementation Instance =>
             _instance ?? throw new InvalidOperationException("SDK is not connected. Call Connect() first.");

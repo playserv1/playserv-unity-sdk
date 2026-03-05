@@ -214,7 +214,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameAccessToken: your-token
-  gameId: game-001
+  gameId: development-test-x8hh
   userId: player-001
   gameVersion: 1.0.0
   remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws

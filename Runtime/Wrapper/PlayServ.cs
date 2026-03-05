@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
+using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
 using Playserv.Server;
@@ -267,6 +270,38 @@ namespace Playserv.Wrapper
             where TEntity : class
             where TDto : class, new() =>
             Api.SelectEntity<TEntity, TDto>(playerId, map);
+
+        /// <summary>
+        /// Sends simplified key-based retrieval request once.
+        /// </summary>
+        /// <param name="key">Entity key.</param>
+        /// <param name="query">GraphQL-like query string.</param>
+        /// <param name="variables">Query variables object.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>DataGetResponse with Result or Error.</returns>
+        public static Task<DataGetResponse> GetDataByKeyAsync(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            CancellationToken ct = default) =>
+            Api.GetDataByKeyAsync(key, query, variables, ct);
+
+        /// <summary>
+        /// Starts simplified key-based polling loop.
+        /// </summary>
+        /// <param name="key">Entity key.</param>
+        /// <param name="query">GraphQL-like query string.</param>
+        /// <param name="variables">Query variables object.</param>
+        /// <param name="onData">Callback invoked for each response.</param>
+        /// <param name="onError">Optional callback for runtime errors.</param>
+        /// <returns>Disposable handle to stop polling.</returns>
+        public static IDisposable StartDataByKeyPolling(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            Action<DataGetResponse> onData,
+            Action<Exception>? onError = null) =>
+            Api.StartDataByKeyPolling(key, query, variables, onData, onError);
     }
 }
 

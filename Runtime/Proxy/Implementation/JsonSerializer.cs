@@ -1,6 +1,7 @@
 using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Playserv.DataSubscription.Responses;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
 using Playserv.RPC;
@@ -186,6 +187,12 @@ namespace Playserv.Proxy.Implementation
             if (string.Equals(commandName, "InvokeRpcResponse", StringComparison.Ordinal))
             {
                 type = typeof(InvokeRpcResponse);
+                return true;
+            }
+
+            if (string.Equals(commandName, "DataGetResponse", StringComparison.Ordinal))
+            {
+                type = typeof(DataGetResponse);
                 return true;
             }
 
