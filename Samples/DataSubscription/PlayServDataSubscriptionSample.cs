@@ -21,12 +21,22 @@ namespace Playserv.Samples
     {
         private const string SamplesSceneFileName = "Samples.unity";
         private const string SubscriptionPollingInfo = "3s";
+        private static readonly string[] RandomNamePrefixes =
+        {
+            "Player",
+            "Ranger",
+            "Falcon",
+            "Nova",
+            "Tanker",
+            "Shadow",
+            "Blaze",
+            "Storm"
+        };
 
         [Header("Target")]
         [SerializeField] private string playerId = "player-001";
 
         [Header("Mutations")]
-        [SerializeField] private string renameTo = "RenamedPlayer";
         [SerializeField] private int levelToSet = 10;
 
         [Header("Behavior")]
@@ -52,14 +62,31 @@ namespace Playserv.Samples
             UnbindInternal();
         }
 
-        [ContextMenu("Rename")]
+        [ContextMenu("Randomize Nickname")]
         public void Rename()
         {
             if (_player == null)
                 return;
 
-            _player.Update(dto => dto.Nickname = renameTo);
-            _status = $"Nickname update requested: {renameTo}";
+            var randomNickname = GenerateRandomNickname();
+            _player.Update(dto => dto.Nickname = randomNickname);
+            _status = $"Random nickname requested: {randomNickname}";
+            AddLog(_status);
+        }
+
+        [ContextMenu("Reset Player")]
+        public void ResetPlayer()
+        {
+            if (_player == null)
+                return;
+
+            _player.Update(dto =>
+            {
+                dto.Nickname = "Player";
+                dto.Level = 0;
+            });
+
+            _status = "Reset requested: nickname=Player, level=0";
             AddLog(_status);
         }
 
@@ -259,6 +286,13 @@ namespace Playserv.Samples
             _historyScroll.y = float.MaxValue;
         }
 
+        private static string GenerateRandomNickname()
+        {
+            var prefix = RandomNamePrefixes[UnityEngine.Random.Range(0, RandomNamePrefixes.Length)];
+            var suffix = UnityEngine.Random.Range(100, 1000);
+            return $"{prefix}{suffix}";
+        }
+
         private void OnGUI()
         {
             if (!showOverlay)
@@ -272,7 +306,7 @@ namespace Playserv.Samples
 
             GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ DataSubscription Sample");
-            GUILayout.Label("How to use: connect SDK, click Bind, then run Rename/Add Level/Set Level and watch updates in logs.");
+            GUILayout.Label("How to use: connect SDK, click Bind, then run Rename/Add Level/Set Level/Reset and watch updates in logs.");
             GUILayout.Label($"Subscription polling: Running every {SubscriptionPollingInfo} (internal).");
             GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
@@ -308,12 +342,14 @@ namespace Playserv.Samples
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Rename"))
+            if (GUILayout.Button("Random Name"))
                 Rename();
             if (GUILayout.Button("Add Level"))
                 AddLevel();
             if (GUILayout.Button("Set Level Async"))
                 _ = SetLevelInternalAsync();
+            if (GUILayout.Button("Reset"))
+                ResetPlayer();
             if (GUILayout.Button("Refresh"))
                 _ = RefreshInternalAsync();
             GUILayout.EndHorizontal();
