@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Exceptions;
@@ -21,6 +22,9 @@ namespace Playserv.Samples
     {
         private const string SamplesSceneFileName = "Samples.unity";
         private const string SubscriptionPollingInfo = "3s";
+        private const int UiLogTrimLimit = 220;
+        private static readonly Regex RequestIdRegex =
+            new Regex("\"RequestId\"\\s*:\\s*(\\d+)", RegexOptions.Compiled);
         private static readonly string[] RandomNamePrefixes =
         {
             "Player",
@@ -36,11 +40,9 @@ namespace Playserv.Samples
         [Header("Target")]
         [SerializeField] private string playerId = "player-001";
 
-        [Header("Mutations")]
-        [SerializeField] private int levelToSet = 10;
-
         [Header("Behavior")]
         [SerializeField] private bool showOverlay = true;
+        [SerializeField] private bool showTransportDataGetLogsInUi = true;
 
         private readonly List<string> _history = new List<string>();
         private ISharedEntity<SamplePlayerDto>? _player;
@@ -49,6 +51,18 @@ namespace Playserv.Samples
         private string _status = "Not subscribed";
         private SamplePlayerDto? _snapshot;
         private bool _showInfo;
+        private bool _setLevelInProgress;
+        private bool _logHooked;
+
+        private void OnEnable()
+        {
+            HookUnityLogs();
+        }
+
+        private void OnDisable()
+        {
+            UnhookUnityLogs();
+        }
 
         [ContextMenu("Bind")]
         public void Bind()
@@ -156,16 +170,35 @@ namespace Playserv.Samples
             if (_player == null)
                 return;
 
+            if (_setLevelInProgress)
+            {
+                _status = "Set level is already in progress";
+                AddLog(_status);
+                return;
+            }
+
+            if (PlayServ.State != PlayServState.Online)
+            {
+                _status = $"Set level skipped: SDK state is {PlayServ.State}";
+                AddLog(_status);
+                return;
+            }
+
             try
             {
-                await _player.UpdateAsync(dto => dto.Level = levelToSet);
-                _status = $"Set level requested: {levelToSet}";
+                _setLevelInProgress = true;
+                await _player.UpdateAsync(dto => dto.Level += 10);
+                _status = "Set level async requested: +10";
                 AddLog(_status);
             }
             catch (Exception ex)
             {
                 _status = $"Set level error: {ex.Message}";
                 AddLog(_status);
+            }
+            finally
+            {
+                _setLevelInProgress = false;
             }
         }
 
@@ -271,7 +304,69 @@ namespace Playserv.Samples
 
         private void OnDestroy()
         {
+            UnhookUnityLogs();
             UnbindInternal();
+        }
+
+        private void HookUnityLogs()
+        {
+            if (_logHooked)
+                return;
+
+            Application.logMessageReceived += OnUnityLogMessageReceived;
+            _logHooked = true;
+        }
+
+        private void UnhookUnityLogs()
+        {
+            if (!_logHooked)
+                return;
+
+            Application.logMessageReceived -= OnUnityLogMessageReceived;
+            _logHooked = false;
+        }
+
+        private void OnUnityLogMessageReceived(string condition, string stackTrace, LogType type)
+        {
+            if (!showTransportDataGetLogsInUi || string.IsNullOrWhiteSpace(condition))
+                return;
+
+            if (condition.StartsWith("Message sent: DataGetRequest", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] -> DataGetRequest requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.StartsWith("Received JSON: {\"Command\":\"DataGetResponse\"", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] <- DataGetResponse requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.IndexOf("[DataGet]", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                AddLog($"[Transport] {TrimForUi(condition)}");
+            }
+        }
+
+        private static string ExtractRequestIdOrUnknown(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return "n/a";
+
+            var match = RequestIdRegex.Match(text);
+            return match.Success ? match.Groups[1].Value : "n/a";
+        }
+
+        private static string TrimForUi(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            if (text.Length <= UiLogTrimLimit)
+                return text;
+
+            return text.Substring(0, UiLogTrimLimit) + "...";
         }
 
         private void AddLog(string line)
@@ -331,6 +426,7 @@ namespace Playserv.Samples
                 GUILayout.Label("Flow: Bind -> SDK registers subscription in-memory -> polls DataGetRequest every 3s -> emits Changed only on real diff.");
                 GUILayout.Label("Dispose behavior: Unbind removes subscription from registry and stops polling.");
                 GUILayout.Label("Use in your game: HUD/profile sync, simple reactive state, low-risk replacement while server subscriptions are disabled.");
+                GUILayout.Label("UI transport logs: request/response DataGet lines are mirrored from Unity console.");
                 GUILayout.EndVertical();
             }
 
@@ -346,8 +442,12 @@ namespace Playserv.Samples
                 Rename();
             if (GUILayout.Button("Add Level"))
                 AddLevel();
-            if (GUILayout.Button("Set Level Async"))
+            var setLevelLabel = _setLevelInProgress ? "Set Level Async (Running...)" : "Set Level Async";
+            var prevEnabled = GUI.enabled;
+            GUI.enabled = prevEnabled && !_setLevelInProgress && PlayServ.State == PlayServState.Online;
+            if (GUILayout.Button(setLevelLabel))
                 _ = SetLevelInternalAsync();
+            GUI.enabled = prevEnabled;
             if (GUILayout.Button("Reset"))
                 ResetPlayer();
             if (GUILayout.Button("Refresh"))
