@@ -58,8 +58,8 @@ namespace Playserv.Samples
             if (_player == null)
                 return;
 
-            _player.Update(dto => dto.Name = renameTo);
-            _status = $"Rename requested: {renameTo}";
+            _player.Update(dto => dto.Nickname = renameTo);
+            _status = $"Nickname update requested: {renameTo}";
             AddLog(_status);
         }
 
@@ -97,13 +97,12 @@ namespace Playserv.Samples
 
             try
             {
-                _player = await PlayServ.SelectEntity<SamplePlayerEntity, SamplePlayerDto>(
+                _player = await PlayServ.SelectEntity<Player, SamplePlayerDto>(
                     playerId,
                     entity => new SamplePlayerDto
                     {
-                        Id = entity?.Id ?? string.Empty,
-                        Name = entity?.Name ?? string.Empty,
-                        Level = entity?.Level ?? 0
+                        Nickname = entity?.Nickname ?? string.Empty,
+                        Level = entity?.Level ?? 1
                     });
 
                 _player.Changed += OnPlayerChanged;
@@ -114,7 +113,7 @@ namespace Playserv.Samples
                     _playerDisposable = disposable;
 
                 _snapshot = _player.Value;
-                _status = $"Bound to player: {playerId} (poll {SubscriptionPollingInfo})";
+                _status = $"Bound to Player(id={playerId}) (poll {SubscriptionPollingInfo})";
                 AddLog(_status);
                 AddLog("Subscription backend: in-memory registry + DataGetRequest polling.");
             }
@@ -210,7 +209,7 @@ namespace Playserv.Samples
         {
             _snapshot = dto;
             _status = "Player changed";
-            AddLog($"Player updated: id={dto.Id}, name={dto.Name}, level={dto.Level}");
+            AddLog($"Player updated: key={playerId}, nickname={dto.Nickname}, level={dto.Level}");
         }
 
         private void OnPlayerError(DataSubscriptionException ex)
@@ -327,8 +326,8 @@ namespace Playserv.Samples
             }
             else
             {
-                GUILayout.Label($"- Id: {_snapshot.Id}");
-                GUILayout.Label($"- Name: {_snapshot.Name}");
+                GUILayout.Label($"- Key: {playerId}");
+                GUILayout.Label($"- Nickname: {_snapshot.Nickname}");
                 GUILayout.Label($"- Level: {_snapshot.Level}");
             }
 

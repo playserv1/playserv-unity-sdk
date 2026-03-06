@@ -3,23 +3,22 @@ using System;
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Demo server-side player model used by shared data subscription mapping.
+    /// Local mirror of schema entity "Player" used by DataGet/Subscribe sample.
+    /// Type name must stay "Player" so query generation maps to schema entity.
     /// </summary>
     [Serializable]
-    public sealed class SamplePlayerEntity
+    public sealed class Player
     {
-        public string Id;
-        public string Name;
-        public int Level;
+        public string Nickname;
+        public int? Level;
     }
 
     /// <summary>
-    /// Demo client DTO projected from SamplePlayerEntity and updated by polling subscription.
+    /// Client DTO projected from schema Player and updated by polling subscription.
     /// </summary>
     public sealed class SamplePlayerDto
     {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
+        public string Nickname { get; set; } = string.Empty;
         public int Level { get; set; }
     }
 }
