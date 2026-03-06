@@ -115,7 +115,7 @@ namespace Playserv.Editor
 
             _wsEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
-                "wss://playserv-proxy.test.playserv.io/ws"
+                PlayServSettings.DefaultBackendServerAddress
             );
 
             EnsureConfig();
@@ -1521,6 +1521,7 @@ namespace Playserv.Editor
             {
                 "local" => "Local",
                 "dev" => "Dev",
+                "test" => "Test",
                 "prod" => "Prod",
                 _ => environmentName
             };

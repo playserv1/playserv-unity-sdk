@@ -16,6 +16,7 @@ namespace Playserv.Wrapper
     {
         public const string LocalEnvironment = "local";
         public const string DevEnvironment = "dev";
+        public const string TestEnvironment = "test";
         public const string ProdEnvironment = "prod";
         public const string DefaultEnvironment = DevEnvironment;
 
@@ -27,6 +28,7 @@ namespace Playserv.Wrapper
         {
             LocalEnvironment,
             DevEnvironment,
+            TestEnvironment,
             ProdEnvironment
         };
 
@@ -57,7 +59,7 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
-        /// Converts user-provided environment value into one of: local/dev/prod.
+        /// Converts user-provided environment value into one of: local/dev/test/prod.
         /// </summary>
         public static bool TryNormalizeEnvironment(string? value, out string normalized)
         {
@@ -76,6 +78,10 @@ namespace Playserv.Wrapper
                 case DevEnvironment:
                 case "development":
                     normalized = DevEnvironment;
+                    return true;
+                case TestEnvironment:
+                case "testing":
+                    normalized = TestEnvironment;
                     return true;
                 case ProdEnvironment:
                 case "production":
@@ -267,6 +273,9 @@ namespace Playserv.Wrapper
                 case PlayServEnvironmentResolver.DevEnvironment:
                     profile = Environments.Dev;
                     break;
+                case PlayServEnvironmentResolver.TestEnvironment:
+                    profile = Environments.Test;
+                    break;
                 case PlayServEnvironmentResolver.ProdEnvironment:
                     profile = Environments.Prod;
                     break;
@@ -286,6 +295,7 @@ namespace Playserv.Wrapper
                 {
                     Local = PlayServEnvironmentProfile.CreateLocalDefaults(),
                     Dev = PlayServEnvironmentProfile.CreateDevDefaults(),
+                    Test = PlayServEnvironmentProfile.CreateTestDefaults(),
                     Prod = PlayServEnvironmentProfile.CreateProdDefaults()
                 }
             };
@@ -300,6 +310,9 @@ namespace Playserv.Wrapper
 
         [JsonProperty("dev")]
         public PlayServEnvironmentProfile Dev { get; set; } = PlayServEnvironmentProfile.CreateDevDefaults();
+
+        [JsonProperty("test")]
+        public PlayServEnvironmentProfile Test { get; set; } = PlayServEnvironmentProfile.CreateTestDefaults();
 
         [JsonProperty("prod")]
         public PlayServEnvironmentProfile Prod { get; set; } = PlayServEnvironmentProfile.CreateProdDefaults();
@@ -391,7 +404,7 @@ namespace Playserv.Wrapper
             {
                 BackendServerAddress = "ws://localhost:8080/ws/",
                 DeployApiServerAddress = "http://localhost:8080",
-                SchemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress,
+                SchemaApiServerAddress = "http://localhost:8081",
                 KeepAlivePingIntervalMs = 30000,
                 KeepAlivePongTimeoutMs = 10000,
                 NetworkTransformSyncIntervalMs = 100,
@@ -404,9 +417,24 @@ namespace Playserv.Wrapper
         {
             return new PlayServEnvironmentProfile
             {
-                BackendServerAddress = PlayServSettings.DefaultBackendServerAddress,
-                DeployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress,
-                SchemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress,
+                BackendServerAddress = "wss://proxy.dev.playserv.io/ws",
+                DeployApiServerAddress = "https://deployment.dev.playserv.io",
+                SchemaApiServerAddress = "https://backoffice.dev.playserv.io",
+                KeepAlivePingIntervalMs = 30000,
+                KeepAlivePongTimeoutMs = 10000,
+                NetworkTransformSyncIntervalMs = 100,
+                AllowMultipleConnections = true,
+                TimeoutSeconds = 120
+            };
+        }
+
+        public static PlayServEnvironmentProfile CreateTestDefaults()
+        {
+            return new PlayServEnvironmentProfile
+            {
+                BackendServerAddress = "wss://playserv-proxy.test.playserv.io/ws",
+                DeployApiServerAddress = "http://playserv-deployment.test.playserv.io",
+                SchemaApiServerAddress = "https://playserv-backoffice.test.playserv.io",
                 KeepAlivePingIntervalMs = 30000,
                 KeepAlivePongTimeoutMs = 10000,
                 NetworkTransformSyncIntervalMs = 100,
@@ -419,9 +447,9 @@ namespace Playserv.Wrapper
         {
             return new PlayServEnvironmentProfile
             {
-                BackendServerAddress = PlayServSettings.DefaultBackendServerAddress,
-                DeployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress,
-                SchemaApiServerAddress = "https://playserv-backoffice.playserv.io",
+                BackendServerAddress = "wss://proxy.playserv.io",
+                DeployApiServerAddress = "https://deployment.playserv.io",
+                SchemaApiServerAddress = "https://backoffice.playserv.io",
                 KeepAlivePingIntervalMs = 30000,
                 KeepAlivePongTimeoutMs = 10000,
                 NetworkTransformSyncIntervalMs = 100,
