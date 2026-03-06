@@ -1,5 +1,5 @@
 #if UNITY_EDITOR
-using Playserv.Samples;
+using Playserv.Examples;
 using UnityEditor;
 
 namespace Playserv.Editor

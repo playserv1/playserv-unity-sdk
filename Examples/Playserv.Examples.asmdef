@@ -1,9 +1,8 @@
 {
-    "name": "Playserv.Samples",
-    "rootNamespace": "Playserv.Samples",
+    "name": "Examples",
+    "rootNamespace": "",
     "references": [
-        "Playserv.Runtime",
-        "Examples"
+        "GUID:5d1d5261866248298e19f5a7e76fcaf7"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

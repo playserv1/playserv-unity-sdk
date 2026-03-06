@@ -38,12 +38,10 @@ namespace Playserv.Editor
         private SerializedObject _so;
 
         private SerializedProperty _pGameAccessToken;
-        private SerializedProperty _pUserId;
         private SerializedProperty _pGameId;
         private SerializedProperty _pGameVersion;
         private SerializedProperty _pSdkVersion;
         private SerializedProperty _pAllowMultipleConnections;
-        private SerializedProperty _pDeployApiServerAddress;
         private SerializedProperty _pDeployAuthToken;
         private SerializedProperty _pDeployTimeoutSeconds;
 
@@ -145,12 +143,10 @@ namespace Playserv.Editor
             _so = new SerializedObject(_config);
 
             _pGameAccessToken = _so.FindProperty("gameAccessToken");
-            _pUserId = _so.FindProperty("userId");
             _pGameId = _so.FindProperty("gameId");
             _pGameVersion = _so.FindProperty("gameVersion");
             _pSdkVersion = _so.FindProperty("sdkVersion");
             _pAllowMultipleConnections = _so.FindProperty("allowMultipleConnections");
-            _pDeployApiServerAddress = _so.FindProperty("deployApiServerAddress");
             _pDeployAuthToken = _so.FindProperty("deployAuthToken");
             _pDeployTimeoutSeconds = _so.FindProperty("timeoutSeconds");
         }
@@ -587,9 +583,6 @@ namespace Playserv.Editor
                 if (_so != null)
                 {
                     _so.Update();
-
-                    if (_pDeployApiServerAddress != null)
-                        DrawReadOnlyTextField("Server Address", _pDeployApiServerAddress.stringValue);
 
                     if (_pDeployTimeoutSeconds != null)
                         EditorGUILayout.PropertyField(_pDeployTimeoutSeconds, new GUIContent("Timeout Seconds"));
@@ -1387,7 +1380,6 @@ namespace Playserv.Editor
                     _so.Update();
 
                     EditorGUILayout.PropertyField(_pGameAccessToken);
-                    EditorGUILayout.PropertyField(_pUserId);
                     EditorGUILayout.PropertyField(_pGameId);
                     EditorGUILayout.PropertyField(_pGameVersion);
                     EditorGUILayout.PropertyField(_pAllowMultipleConnections);

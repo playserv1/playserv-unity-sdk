@@ -5,7 +5,7 @@ using Playserv.Wrapper;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-namespace Playserv.Samples
+namespace Playserv.Examples
 {
     /// <summary>
     /// Persistent bootstrap component for configuring and connecting PlayServ in samples.
