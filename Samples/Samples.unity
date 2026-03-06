@@ -217,7 +217,7 @@ MonoBehaviour:
   gameId: development-test-x8hh
   userId: player-001
   gameVersion: 1.0.0
-  remoteEndpoint: wss://playserv-proxy.test.playserv.io/ws
+  backendServerAddress: wss://playserv-proxy.test.playserv.io/ws
   autoConnect: 1
   disconnectOnDestroy: 1
   keepAlivePingIntervalMs: 30000

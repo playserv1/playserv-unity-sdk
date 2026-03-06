@@ -1,16 +1,17 @@
 #if UNITY_EDITOR
+using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Playserv.ModelGenerator.Editor;
+using Playserv.Wrapper;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
 public static class SchemaLoader
 {
-    private const string Url =
-        "https://playserv-backoffice.test.playserv.io/api/schemas/by-sdk-key"; 
+    private const string SchemaBySdkKeyEndpointPath = "/api/schemas/by-sdk-key";
     private const string LatestSchemaFileName = "latest-schema.json";
     
     public static void LoadSchema(string token) => _ = DownloadSchema(token);
@@ -22,7 +23,8 @@ public static class SchemaLoader
     
     private static async Task DownloadSchema(string token)
     {
-        await DownloadAndSaveToResourcesAsync(Url, token);
+        var schemaUrl = ResolveSchemaUrl();
+        await DownloadAndSaveToResourcesAsync(schemaUrl, token);
     }
     
     private static async Task DownloadAndSaveToResourcesAsync(string url, string token)
@@ -66,6 +68,38 @@ public static class SchemaLoader
         }
         
         return request.downloadHandler.text;
+    }
+
+    private static string ResolveSchemaUrl()
+    {
+        var selectedEnvironment = PlayServEnvironmentResolver.ResolveEnvironmentName(null);
+        PlayServEnvironmentConfig config;
+
+        if (!PlayServEnvironmentResolver.TryLoadConfigFromFile(out config, out var error))
+        {
+            config = PlayServEnvironmentConfig.CreateDefault();
+            Debug.LogWarning($"[SchemaDownloader] {error} Falling back to default environment profiles.");
+        }
+
+        selectedEnvironment = PlayServEnvironmentResolver.ResolveEnvironmentName(config.ActiveEnvironment);
+        if (!config.TryGetProfile(selectedEnvironment, out var profile) ||
+            string.IsNullOrWhiteSpace(profile.SchemaApiServerAddress))
+        {
+            profile = PlayServEnvironmentProfile.CreateDevDefaults();
+            selectedEnvironment = PlayServEnvironmentResolver.DevEnvironment;
+            Debug.LogWarning("[SchemaDownloader] schemaApiServerAddress is not configured for selected environment. Falling back to dev defaults.");
+        }
+
+        return BuildSchemaUrl(profile.SchemaApiServerAddress, selectedEnvironment);
+    }
+
+    private static string BuildSchemaUrl(string serverAddress, string environmentName)
+    {
+        if (string.IsNullOrWhiteSpace(serverAddress))
+            throw new InvalidOperationException(
+                $"schemaApiServerAddress is required for environment '{environmentName}'.");
+
+        return serverAddress.Trim().TrimEnd('/') + SchemaBySdkKeyEndpointPath;
     }
 }
 #endif

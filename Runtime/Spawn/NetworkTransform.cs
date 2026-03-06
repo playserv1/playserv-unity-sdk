@@ -81,7 +81,23 @@ namespace Playserv.Spawn
             _networkObject = GetComponent<NetworkObject>();
 
             var config = Resources.Load<PlayServConfig>("PlayServConfig");
-            _syncInterval = config != null ? config.NetworkTransformSyncIntervalMs / 1000f : 0.05f;
+            var syncIntervalMs = 50;
+            if (config != null)
+            {
+#if UNITY_EDITOR
+                var resolvedSettings = PlayServEnvironmentResolver.ResolveSettingsForEditor(
+                    config,
+                    out _,
+                    out _,
+                    out _);
+
+                syncIntervalMs = resolvedSettings.NetworkTransformSyncIntervalMs;
+#else
+                syncIntervalMs = config.NetworkTransformSyncIntervalMs;
+#endif
+            }
+
+            _syncInterval = syncIntervalMs / 1000f;
 
             InitializeLocalState();
         }

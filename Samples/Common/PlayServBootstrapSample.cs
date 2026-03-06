@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Playserv.Proxy.Common;
 using Playserv.Wrapper;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Playserv.Samples
 {
@@ -20,8 +21,11 @@ namespace Playserv.Samples
         [SerializeField] private string userId = "player-001";
         [SerializeField] private string gameVersion = "1.0.0";
 
-        [Header("Endpoint")]
-        [SerializeField] private string remoteEndpoint = PlayServSettings.DefaultRemoteEndpoint;
+        [Header("Resolved Endpoints (Read Only)")]
+        [FormerlySerializedAs("remoteEndpoint")]
+        [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
+        [SerializeField] private string deployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress;
+        [SerializeField] private string schemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress;
 
         [Header("Behavior")]
         [SerializeField] private bool autoConnect;
@@ -45,6 +49,7 @@ namespace Playserv.Samples
             _instance = this;
             _isOwner = true;
             DontDestroyOnLoad(gameObject);
+            RefreshResolvedEndpointsPreview();
         }
 
         private void Start()
@@ -93,25 +98,26 @@ namespace Playserv.Samples
             _applicationIsQuitting = true;
         }
 
+        private void OnValidate()
+        {
+            RefreshResolvedEndpointsPreview();
+        }
+
         [ContextMenu("Configure SDK")]
         public void Configure()
         {
-            var settings = new PlayServSettings
-            {
-                GameAccessToken = gameAccessToken,
-                GameId = gameId,
-                UserId = userId,
-                GameVersion = gameVersion,
-                UseLocalBackend = false,
-                LocalEndpoint = remoteEndpoint,
-                RemoteEndpoint = remoteEndpoint,
-                KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
-                KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs
-            };
+            var settings = BuildSettingsFromConfig();
+            settings.GameAccessToken = gameAccessToken;
+            settings.GameId = gameId;
+            settings.UserId = userId;
+            settings.GameVersion = gameVersion;
+            settings.KeepAlivePingIntervalMs = keepAlivePingIntervalMs;
+            settings.KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs;
 
             PlayServ.Config(settings);
+            ApplyResolvedEndpointsPreview(settings);
             Debug.Log(
-                $"[PlayServ][Sample] Configured. endpoint={settings.Endpoint}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
+                $"[PlayServ][Sample] Configured. backend={settings.BackendServerAddress}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
         }
 
         [ContextMenu("Connect SDK")]
@@ -145,6 +151,39 @@ namespace Playserv.Samples
         private void OnTransportError(TransportError error)
         {
             Debug.LogError($"[PlayServ][Sample] Transport error: {error}");
+        }
+
+        private void RefreshResolvedEndpointsPreview()
+        {
+            var settings = BuildSettingsFromConfig();
+            ApplyResolvedEndpointsPreview(settings);
+        }
+
+        private void ApplyResolvedEndpointsPreview(PlayServSettings settings)
+        {
+            if (settings == null)
+                return;
+
+            backendServerAddress = settings.BackendServerAddress;
+            deployApiServerAddress = settings.DeployApiServerAddress;
+            schemaApiServerAddress = settings.SchemaApiServerAddress;
+        }
+
+        private static PlayServSettings BuildSettingsFromConfig()
+        {
+            var config = Resources.Load<PlayServConfig>("PlayServConfig");
+            if (config == null)
+                return new PlayServSettings();
+
+#if UNITY_EDITOR
+            return PlayServEnvironmentResolver.ResolveSettingsForEditor(
+                config,
+                out _,
+                out _,
+                out _);
+#else
+            return config.ToSettings();
+#endif
         }
     }
 }
