@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Exceptions;
-using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
 using Playserv.Wrapper;
 using UnityEngine;
@@ -16,11 +15,12 @@ using UnityEditor.SceneManagement;
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Example of SelectEntity + mutation + refresh flow.
+    /// Example of shared data subscription using in-memory registry + internal polling.
     /// </summary>
     public sealed class PlayServDataSubscriptionSample : MonoBehaviour
     {
         private const string SamplesSceneFileName = "Samples.unity";
+        private const string SubscriptionPollingInfo = "3s";
 
         [Header("Target")]
         [SerializeField] private string playerId = "player-001";
@@ -29,21 +29,15 @@ namespace Playserv.Samples
         [SerializeField] private string renameTo = "RenamedPlayer";
         [SerializeField] private int levelToSet = 10;
 
-        [Header("DataGet (By Key)")]
-        [SerializeField] private string dataGetKey = "SHOP-001";
-        [SerializeField] private string dataGetQuery = "Shop(id:$id) { RegularItems { Id Name Category Price { Amount Currency } } }";
-        [SerializeField] private string dataGetId = "SHOP-001";
-
         [Header("Behavior")]
         [SerializeField] private bool showOverlay = true;
 
         private readonly List<string> _history = new List<string>();
-        private ISharedEntity<SamplePlayerDto> _player;
-        private IDisposable _playerDisposable;
-        private IDisposable _dataGetPolling;
+        private ISharedEntity<SamplePlayerDto>? _player;
+        private IDisposable? _playerDisposable;
         private Vector2 _historyScroll;
         private string _status = "Not subscribed";
-        private SamplePlayerDto _snapshot;
+        private SamplePlayerDto? _snapshot;
         private bool _showInfo;
 
         [ContextMenu("Bind")]
@@ -92,52 +86,6 @@ namespace Playserv.Samples
             _ = RefreshInternalAsync();
         }
 
-        [ContextMenu("DataGet Once")]
-        public void DataGetOnce()
-        {
-            _ = DataGetOnceAsync();
-        }
-
-        [ContextMenu("Start DataGet Polling")]
-        public void StartDataGetPolling()
-        {
-            if (_dataGetPolling != null)
-            {
-                _status = "DataGet polling already running";
-                AddLog(_status);
-                return;
-            }
-
-            if (PlayServ.State != PlayServState.Online)
-            {
-                _status = "DataGet polling requires connected SDK";
-                AddLog(_status);
-                return;
-            }
-
-            _dataGetPolling = PlayServ.StartDataByKeyPolling(
-                dataGetKey,
-                dataGetQuery,
-                BuildDataGetVariables(),
-                OnDataGetPollingResponse,
-                OnDataGetPollingError);
-
-            _status = $"DataGet polling started (4s). key={dataGetKey}";
-            AddLog(_status);
-        }
-
-        [ContextMenu("Stop DataGet Polling")]
-        public void StopDataGetPolling()
-        {
-            if (_dataGetPolling == null)
-                return;
-
-            _dataGetPolling.Dispose();
-            _dataGetPolling = null;
-            _status = "DataGet polling stopped";
-            AddLog(_status);
-        }
-
         private async Task BindAsync()
         {
             if (_player != null)
@@ -166,8 +114,9 @@ namespace Playserv.Samples
                     _playerDisposable = disposable;
 
                 _snapshot = _player.Value;
-                _status = $"Bound to player: {playerId}";
+                _status = $"Bound to player: {playerId} (poll {SubscriptionPollingInfo})";
                 AddLog(_status);
+                AddLog("Subscription backend: in-memory registry + DataGetRequest polling.");
             }
             catch (Exception ex)
             {
@@ -212,31 +161,6 @@ namespace Playserv.Samples
             }
         }
 
-        private async Task DataGetOnceAsync()
-        {
-            if (PlayServ.State != PlayServState.Online)
-            {
-                _status = "DataGet requires connected SDK";
-                AddLog(_status);
-                return;
-            }
-
-            try
-            {
-                var response = await PlayServ.GetDataByKeyAsync(
-                    dataGetKey,
-                    dataGetQuery,
-                    BuildDataGetVariables());
-
-                HandleDataGetResponse(response, "DataGet once");
-            }
-            catch (Exception ex)
-            {
-                _status = $"DataGet once error: {ex.Message}";
-                AddLog(_status);
-            }
-        }
-
         private async Task ConnectSdkAsync()
         {
             try
@@ -254,7 +178,6 @@ namespace Playserv.Samples
 
         private void DisconnectSdk()
         {
-            StopDataGetPolling();
             PlayServ.Disconnect();
             _status = "SDK disconnected";
             AddLog(_status);
@@ -303,17 +226,6 @@ namespace Playserv.Samples
             UnbindInternal();
         }
 
-        private void OnDataGetPollingResponse(DataGetResponse response)
-        {
-            HandleDataGetResponse(response, "DataGet poll");
-        }
-
-        private void OnDataGetPollingError(Exception ex)
-        {
-            _status = $"DataGet polling error: {ex.Message}";
-            AddLog(_status);
-        }
-
         private void UnbindInternal()
         {
             if (_player != null)
@@ -333,48 +245,7 @@ namespace Playserv.Samples
 
         private void OnDestroy()
         {
-            StopDataGetPolling();
             UnbindInternal();
-        }
-
-        private Dictionary<string, object> BuildDataGetVariables()
-        {
-            return new Dictionary<string, object>
-            {
-                ["id"] = dataGetId
-            };
-        }
-
-        private void HandleDataGetResponse(DataGetResponse response, string source)
-        {
-            if (response == null)
-            {
-                _status = $"{source}: empty response";
-                AddLog(_status);
-                return;
-            }
-
-            if (response.HasError)
-            {
-                var code = response.Error?.Code ?? 0;
-                var message = response.Error?.Message ?? "Unknown error";
-                _status = $"{source} error [{code}]: {message}";
-                AddLog(_status);
-                return;
-            }
-
-            var payload = response.Result?.Data?.ToString() ?? "<null>";
-            var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-            _status = $"{source} success";
-            AddLog($"[{ts}] {source} -> {TrimForLog(payload, 240)}");
-        }
-
-        private static string TrimForLog(string text, int maxLength)
-        {
-            if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
-                return text;
-
-            return text.Substring(0, maxLength) + "...";
         }
 
         private void AddLog(string line)
@@ -403,6 +274,7 @@ namespace Playserv.Samples
             GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ DataSubscription Sample");
             GUILayout.Label("How to use: connect SDK, click Bind, then run Rename/Add Level/Set Level and watch updates in logs.");
+            GUILayout.Label($"Subscription polling: Running every {SubscriptionPollingInfo} (internal).");
             GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
 
@@ -422,9 +294,10 @@ namespace Playserv.Samples
                 GUILayout.Space(6f);
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label("Info");
-                GUILayout.Label("Purpose: Shows SelectEntity and simplified DataGet by key flow.");
-                GUILayout.Label("How to use: Connect, Bind by player id for reactive updates, and use DataGet buttons for key-based reads.");
-                GUILayout.Label("Use in your game: HUD sync, inventory/shop snapshots, periodic read-only data refresh.");
+                GUILayout.Label("Purpose: Shows shared subscription with automatic query generation and polling-based updates.");
+                GUILayout.Label("Flow: Bind -> SDK registers subscription in-memory -> polls DataGetRequest every 3s -> emits Changed only on real diff.");
+                GUILayout.Label("Dispose behavior: Unbind removes subscription from registry and stops polling.");
+                GUILayout.Label("Use in your game: HUD/profile sync, simple reactive state, low-risk replacement while server subscriptions are disabled.");
                 GUILayout.EndVertical();
             }
 
@@ -442,17 +315,8 @@ namespace Playserv.Samples
                 AddLevel();
             if (GUILayout.Button("Set Level Async"))
                 _ = SetLevelInternalAsync();
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(8f);
-            GUILayout.Label($"DataGet polling: {(_dataGetPolling != null ? "Running (4s)" : "Stopped")}");
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("DataGet Once"))
-                _ = DataGetOnceAsync();
-            if (GUILayout.Button("Start DataGet Poll"))
-                StartDataGetPolling();
-            if (GUILayout.Button("Stop DataGet Poll"))
-                StopDataGetPolling();
+            if (GUILayout.Button("Refresh"))
+                _ = RefreshInternalAsync();
             GUILayout.EndHorizontal();
 
             GUILayout.Space(8f);

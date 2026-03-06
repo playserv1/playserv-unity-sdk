@@ -3,7 +3,7 @@ using System;
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Demo server-side player model used by SelectEntity mapping.
+    /// Demo server-side player model used by shared data subscription mapping.
     /// </summary>
     [Serializable]
     public sealed class SamplePlayerEntity
@@ -14,7 +14,7 @@ namespace Playserv.Samples
     }
 
     /// <summary>
-    /// Demo client DTO projected from SamplePlayerEntity.
+    /// Demo client DTO projected from SamplePlayerEntity and updated by polling subscription.
     /// </summary>
     public sealed class SamplePlayerDto
     {

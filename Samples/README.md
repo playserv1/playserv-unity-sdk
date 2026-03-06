@@ -7,7 +7,7 @@ Each sample can be launched as a standalone scene and then adapted to your game 
 
 - `Samples/Samples.unity` (`0_Samples`) - scene hub and base connection controls.
 - `Samples/Common/PlayServBootstrapSample.cs` - shared bootstrap for SDK config and connection.
-- `Samples/1_DataSubscriptionScene.unity` - data subscription example (`SelectEntity`).
+- `Samples/1_DataSubscriptionScene.unity` - data subscription example (`SelectEntity`, internal polling registry).
 - `Samples/2_EventsScene.unity` - event pub/sub example (`Subscribe`, `Publish`).
 - `Samples/3_RPC.unity` - RPC call example (`PlayServ.Invoke`) with `NotificationEvent` handling.
 - `Samples/4_Spawn.unity` - network spawning example (`PlayServ.Spawn`).
@@ -52,13 +52,17 @@ Single entry point for all demo scenes: configuration, connect/disconnect, and s
 ## 1_DataSubscriptionScene
 
 ### Purpose
-Shows live DTO state, local mutations, and full server refresh.
+Shows live DTO state, local mutations, and full refresh in polling subscription mode.
 
 ### What it demonstrates
 - `PlayServ.SelectEntity<TEntity, TDto>(...)`.
 - Handling `Changed`, `Error`, and `Terminated`.
 - Local updates: `Update(...)`, `UpdateAsync(...)`.
 - Forced state refresh: `RefreshAsync()`.
+- Internal subscription engine:
+  - in-memory subscription registry,
+  - `DataGetRequest` polling every 3 seconds,
+  - update callback only when payload diff is detected.
 
 ### How to use
 1. Connect to SDK.
@@ -69,6 +73,8 @@ Shows live DTO state, local mutations, and full server refresh.
    - `Set Level Async`.
 4. Watch `Current value` and `Logs`.
 5. Click `Unbind` to stop the subscription.
+
+Note: server-side `DataSubscriptionRequest` is temporarily disabled in this SDK path; the scene demonstrates the replacement behavior that keeps the same high-level shared entity API.
 
 ### What you can build with it
 - Real-time player HUD/profile.

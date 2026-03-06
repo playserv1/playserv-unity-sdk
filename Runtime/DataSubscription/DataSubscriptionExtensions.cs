@@ -1,3 +1,4 @@
+using System;
 using Playserv.Proxy.Common;
 
 namespace Playserv.DataSubscription
@@ -15,8 +16,10 @@ namespace Playserv.DataSubscription
         /// <returns>Fluent shared entity builder.</returns>
         public static ISharedEntityBuilder<T> Subscribe<T>(this PlayServImplementation proxy) where T : class, new()
         {
-            var logger = proxy.GetLogger();
-            var adapter = new PlayServDataSubscriptionAdapter(proxy, logger);
+            if (proxy == null)
+                throw new ArgumentNullException(nameof(proxy));
+
+            var adapter = proxy.GetDataSubscriptionAdapter();
             return new SharedEntityBuilder<T>(adapter, typeof(T).Name);
         }
     }

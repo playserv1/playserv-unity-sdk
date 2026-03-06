@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Threading;
 using System.Threading.Tasks;
-using Playserv.DataSubscription.Exceptions;
-using Playserv.DataSubscription.Requests;
-using Playserv.DataSubscription.Responses;
 
 namespace Playserv.DataSubscription
 {
@@ -17,11 +13,10 @@ namespace Playserv.DataSubscription
         private Expression<Func<T, bool>> _wherePredicate;
         private readonly List<Expression> _includes = new List<Expression>();
         private LambdaExpression _selector;
-        private long _requestIdCounter;
 
         public SharedEntityBuilder(PlayServDataSubscriptionAdapter adapter, string entityType)
         {
-            _adapter = adapter;
+            _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
             _entityType = entityType ?? typeof(T).Name;
         }
 
@@ -61,77 +56,43 @@ namespace Playserv.DataSubscription
             _selector = selector;
         }
 
-        public async Task<ISharedEntity<T>> BindAsync()
+        public Task<ISharedEntity<T>> BindAsync()
         {
-            return await BindAsync<T>();
+            return BindAsync<T>();
         }
 
-        public async Task<ISharedEntity<TResult>> BindAsync<TResult>() where TResult : class, new()
+        public Task<ISharedEntity<TResult>> BindAsync<TResult>() where TResult : class, new()
         {
             if (_key == null)
                 throw new InvalidOperationException("Key must be specified using Key() method");
 
-            var requestId = Interlocked.Increment(ref _requestIdCounter);
-            Expression<Func<T, object>> querySelector = null;
-
-            if (_selector != null)
-            {
-                if (_selector is Expression<Func<T, TResult>> typedSelector)
-                {
-                    querySelector = x => typedSelector.Compile()(x);
-                }
-                else
-                {
-                    querySelector = x => _selector.Compile().DynamicInvoke(x);
-                }
-            }
-
-            var query = QueryBuilder.BuildQuery<T>(_entityType, _key, querySelector);
+            var stringKey = ConvertKeyToString(_key);
+            var query = QueryBuilder.BuildQuery<T>(_entityType, _key);
             var variables = QueryBuilder.BuildVariables(_key);
-
-            var request = new DataSubscriptionRequest(requestId, query, variables);
-            var response = await _adapter.SendSubscriptionRequestAsync(request);
-
-            if (response.HasError)
-            {
-                ThrowExceptionForError(response.Error);
-            }
-
-            if (response.Result == null)
-                throw new InvalidOperationException("Invalid DataSubscriptionResponse: Result is null");
-
-            var subscriptionId = response.Result.SubscriptionId;
+            var subscriptionId = _adapter.NextSubscriptionId();
 
             var entity = new SharedEntity<TResult>(
                 _adapter,
                 subscriptionId,
+                stringKey,
+                _entityType,
                 _selector,
                 query,
                 variables);
 
-            await _adapter.RequestFullStateAsync(subscriptionId);
-
-            return entity;
+            return Task.FromResult<ISharedEntity<TResult>>(entity);
         }
 
-        private static void ThrowExceptionForError(DataSubscriptionError error)
+        private static string ConvertKeyToString(object key)
         {
-            if (error == null)
-                return;
+            if (key is string text && !string.IsNullOrWhiteSpace(text))
+                return text;
 
-            switch (error.ErrorCode)
-            {
-                case 30001:
-                    throw new InvalidQuerySyntaxException(error.Message);
-                case 31001:
-                    throw new AccessDeniedException(error.Message);
-                case 31002:
-                    throw new TargetNotFoundException(error.Message);
-                case 39001:
-                    throw new MaxSubscriptionsReachedException(error.Message);
-                default:
-                    throw new DataSubscriptionException(error.ErrorCode, error.Message);
-            }
+            var value = key?.ToString();
+            if (string.IsNullOrWhiteSpace(value))
+                throw new InvalidOperationException("Key must be a non-empty string value for polling requests.");
+
+            return value;
         }
     }
 }

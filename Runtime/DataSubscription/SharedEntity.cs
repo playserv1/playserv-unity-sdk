@@ -4,7 +4,6 @@ using System.Linq.Expressions;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playserv.DataSubscription.Exceptions;
-using Playserv.DataSubscription.JsonPatch;
 using Playserv.Proxy.Logging;
 
 namespace Playserv.DataSubscription
@@ -13,13 +12,13 @@ namespace Playserv.DataSubscription
     {
         private readonly PlayServDataSubscriptionAdapter _adapter;
         private readonly long _subscriptionId;
-        private readonly LambdaExpression _selector;
-        private readonly Func<object, T> _mapFunc;
+        private readonly LambdaExpression? _selector;
+        private readonly Func<object?, T>? _mapFunc;
         private readonly IDisposable _subscription;
         private readonly string _query;
         private readonly Dictionary<string, object> _variables;
-        private bool _isDisposed;
         private readonly ILogger _logger = new ConsoleLogger();
+        private bool _isDisposed;
 
         public T Value { get; private set; } = new();
 
@@ -30,75 +29,65 @@ namespace Playserv.DataSubscription
         public SharedEntity(
             PlayServDataSubscriptionAdapter adapter,
             long subscriptionId,
-            LambdaExpression selector,
+            string key,
+            string rootFieldName,
+            LambdaExpression? selector,
             string query,
             Dictionary<string, object> variables,
-            Func<object, T> mapFunc = null)
+            Func<object?, T>? mapFunc = null)
         {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Subscription key is required.", nameof(key));
+
             _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
             _subscriptionId = subscriptionId;
             _selector = selector;
             _query = query ?? throw new ArgumentNullException(nameof(query));
             _variables = variables ?? throw new ArgumentNullException(nameof(variables));
             _mapFunc = mapFunc;
-            _subscription = _adapter.OnSubscriptionUpdate(_subscriptionId, OnServerUpdate);
+
+            _subscription = _adapter.RegisterPollingSubscription(
+                _subscriptionId,
+                key,
+                _query,
+                _variables,
+                rootFieldName,
+                OnPollingDataReceived,
+                OnPollingErrorReceived);
         }
 
-        private void OnServerUpdate(DataSubscriptionUpdate update)
+        private void OnPollingDataReceived(object? rawData)
         {
             if (_isDisposed)
                 return;
 
-            if (update.HasError)
-            {
-                HandleError(update);
-                return;
-            }
-
             try
             {
-                if (update.IsOverwrite)
-                {
-                    ApplyOverwrite(update.Data);
-                }
-                else if (update.IsPatch)
-                {
-                    ApplyPatch(update.Data, update.IsCollection);
-                }
-            }
-            catch (UpdateDataCorruptionException ex)
-            {
-                _logger.LogWarning($"[SharedEntity] Patch failed, requesting full refresh: {ex.Message}");
-                Error?.Invoke(ex);
-                RequestRefreshOnPatchFailure();
+                Value = MapData(rawData);
+                Changed?.Invoke(Value);
             }
             catch (Exception ex)
             {
-                _logger.LogError($"[SharedEntity] Unexpected error processing update: {ex.Message}");
+                _logger.LogError($"[SharedEntity] Failed to map polling payload: {ex.Message}");
             }
         }
 
-        private void ApplyOverwrite(object rawData)
+        private void OnPollingErrorReceived(DataSubscriptionException ex)
         {
-            Value = MapData(rawData);
-            Changed?.Invoke(Value);
-        }
-
-        private void ApplyPatch(object patchData, bool isCollection)
-        {
-            if (Value == null)
-            {
-                _logger.LogWarning("[SharedEntity] Cannot apply patch to null value, requesting full refresh");
-                RequestRefreshOnPatchFailure();
+            if (_isDisposed)
                 return;
-            }
 
-            Value = JsonPatchApplier.ApplyPatch(Value, patchData);
-            Changed?.Invoke(Value);
+            Error?.Invoke(ex);
+
+            if (ex is SubscriptionTerminatedException || ex is TargetNotFoundException)
+                Terminated?.Invoke();
         }
 
-        private T MapData(object raw)
+        private T MapData(object? raw)
         {
+            if (raw == null)
+                return new T();
+
             if (_mapFunc != null)
                 return _mapFunc(raw);
 
@@ -106,51 +95,8 @@ namespace Playserv.DataSubscription
                 return SharedDataMapper.Map<T>(_selector, raw);
 
             var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
-            return JsonConvert.DeserializeObject<T>(json);
-        }
-
-        private void HandleError(DataSubscriptionUpdate update)
-        {
-            var errorCode = update.ErrorCode ?? 0;
-            var errorMessage = update.ErrorMessage ?? "Unknown error";
-
-            switch (errorCode)
-            {
-                case UpdateDataCorruptionException.Code:
-                    var corruptionEx = new UpdateDataCorruptionException(errorMessage);
-                    Error?.Invoke(corruptionEx);
-                    RequestRefreshOnPatchFailure();
-                    break;
-
-                case SubscriptionTerminatedException.Code:
-                    var terminatedEx = new SubscriptionTerminatedException(_subscriptionId, errorMessage);
-                    Error?.Invoke(terminatedEx);
-                    Terminated?.Invoke();
-                    break;
-
-                case SubscriptionNotFoundException.Code:
-                    _logger.LogWarning($"[SharedEntity] Subscription not found (race condition): {errorMessage}");
-                    break;
-
-                default:
-                    _logger.LogWarning($"[SharedEntity] Unknown error code {errorCode}: {errorMessage}");
-                    break;
-            }
-        }
-
-        private void RequestRefreshOnPatchFailure()
-        {
-            if (_isDisposed)
-                return;
-
-            try
-            {
-                _adapter.RequestFullState(_subscriptionId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"[SharedEntity] Failed to request full refresh: {ex.Message}");
-            }
+            var mapped = JsonConvert.DeserializeObject<T>(json);
+            return mapped ?? new T();
         }
 
         public void Update(Action<T> mutator)

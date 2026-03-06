@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
@@ -15,22 +16,23 @@ namespace Playserv.DataSubscription
 {
     internal sealed class PlayServDataSubscriptionAdapter : IDataSubscriptionAdapter, IDisposable
     {
-        private const int SubscriptionResponseTimeoutMs = 15000;
         private const int DataGetResponseTimeoutMs = 15000;
         private const int DefaultDataGetPollIntervalMs = 4000;
         private const int DefaultDataGetPollRequestTimeoutMs = 4000;
+        private const int SubscriptionPollIntervalMs = 3000;
+        private const int SubscriptionPollRequestTimeoutMs = 4000;
+
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
+        private readonly object _subscriptionRegistryGate = new object();
+        private readonly Dictionary<long, PollingSubscriptionEntry> _subscriptionRegistry = new Dictionary<long, PollingSubscriptionEntry>();
         private long _requestIdCounter;
-        private readonly IDisposable _commandErrorSubscription;
-        private bool _refreshCommandSupported = true;
-        private bool _refreshUnsupportedLogged;
+        private long _subscriptionIdCounter;
 
         public PlayServDataSubscriptionAdapter(PlayServImplementation proxy, ILogger logger)
         {
             _transport = proxy ?? throw new ArgumentNullException(nameof(proxy));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _commandErrorSubscription = _transport.OnCommand("error", OnCommandErrorReceived);
         }
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
@@ -38,9 +40,7 @@ namespace Playserv.DataSubscription
             return _transport.On<DataSubscriptionUpdate>(update =>
             {
                 if (update is DataSubscriptionUpdate dataUpdate && dataUpdate.DataSubscriptionId == subscriptionId)
-                {
                     onData(dataUpdate.Data);
-                }
             });
         }
 
@@ -49,10 +49,106 @@ namespace Playserv.DataSubscription
             return _transport.On<DataSubscriptionUpdate>(update =>
             {
                 if (update is DataSubscriptionUpdate dataUpdate && dataUpdate.DataSubscriptionId == subscriptionId)
-                {
                     onUpdate(dataUpdate);
-                }
             });
+        }
+
+        internal long NextSubscriptionId()
+        {
+            return Interlocked.Increment(ref _subscriptionIdCounter);
+        }
+
+        internal IDisposable RegisterPollingSubscription(
+            long subscriptionId,
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            string rootFieldName,
+            Action<object?> onChanged,
+            Action<DataSubscriptionException>? onError = null)
+        {
+            if (subscriptionId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(subscriptionId));
+
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Key is required.", nameof(key));
+
+            if (string.IsNullOrWhiteSpace(query))
+                throw new ArgumentException("Query is required.", nameof(query));
+
+            if (onChanged == null)
+                throw new ArgumentNullException(nameof(onChanged));
+
+            var entry = new PollingSubscriptionEntry(
+                subscriptionId,
+                key,
+                query,
+                CloneVariables(variables),
+                rootFieldName ?? string.Empty,
+                onChanged,
+                onError);
+
+            lock (_subscriptionRegistryGate)
+            {
+                if (_subscriptionRegistry.ContainsKey(subscriptionId))
+                    throw new InvalidOperationException($"Subscription with id={subscriptionId} is already registered.");
+
+                _subscriptionRegistry[subscriptionId] = entry;
+            }
+
+            var pollingHandle = StartDataByKeyPollingInternal(
+                key,
+                query,
+                entry.Variables,
+                SubscriptionPollIntervalMs,
+                SubscriptionPollRequestTimeoutMs,
+                response => ProcessSubscriptionResponse(subscriptionId, response),
+                ex => ProcessSubscriptionException(subscriptionId, ex));
+
+            lock (_subscriptionRegistryGate)
+            {
+                if (_subscriptionRegistry.TryGetValue(subscriptionId, out var existing))
+                {
+                    existing.PollingHandle = pollingHandle;
+                }
+                else
+                {
+                    pollingHandle.Dispose();
+                }
+            }
+
+            SafeLog($"[DataSubscription] Registered polling subscription. id={subscriptionId}, key={key}, interval={SubscriptionPollIntervalMs}ms");
+            return new SubscriptionHandle(this, subscriptionId);
+        }
+
+        internal Task RefreshSubscriptionAsync(long subscriptionId, CancellationToken ct = default)
+        {
+            PollingSubscriptionEntry? entry;
+            lock (_subscriptionRegistryGate)
+            {
+                _subscriptionRegistry.TryGetValue(subscriptionId, out entry);
+            }
+
+            if (entry == null)
+                throw new SubscriptionNotFoundException(subscriptionId, $"Subscription {subscriptionId} is not registered.");
+
+            return RefreshEntryAsync(entry, ct);
+        }
+
+        internal void UnregisterSubscription(long subscriptionId)
+        {
+            IDisposable? polling = null;
+            lock (_subscriptionRegistryGate)
+            {
+                if (_subscriptionRegistry.TryGetValue(subscriptionId, out var entry))
+                {
+                    polling = entry.PollingHandle;
+                    _subscriptionRegistry.Remove(subscriptionId);
+                }
+            }
+
+            polling?.Dispose();
+            SafeLog($"[DataSubscription] Unregistered polling subscription. id={subscriptionId}");
         }
 
         public void SendMutation(long subscriptionId, string query, Dictionary<string, object> variables, object patch)
@@ -82,120 +178,45 @@ namespace Playserv.DataSubscription
 
         public Task RequestFullStateAsync(long subscriptionId)
         {
-            if (!_refreshCommandSupported)
-                return Task.CompletedTask;
-
-            var requestId = Interlocked.Increment(ref _requestIdCounter);
-            var refreshRequest = new DataSubscriptionRefreshRequest
-            {
-                RequestId = requestId,
-                SubscriptionId = subscriptionId
-            };
-
-            return _transport.SendAsync(refreshRequest, "module_dataflow");
+            return RefreshSubscriptionAsync(subscriptionId);
         }
 
-        public async Task<DataSubscriptionResponse> SendSubscriptionRequestAsync(DataSubscriptionRequest request)
-        {
-            if (request == null)
-                throw new ArgumentNullException(nameof(request));
-
-            var tcs = new TaskCompletionSource<DataSubscriptionResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-            IDisposable responseSubscription = null;
-            IDisposable errorResponseSubscription = null;
-            IDisposable commandErrorSubscription = null;
-
-            responseSubscription = _transport.On<DataSubscriptionResponse>(response =>
-            {
-                if (response is DataSubscriptionResponse dataResponse && dataResponse.RequestId == request.RequestId)
-                {
-                    tcs.TrySetResult(dataResponse);
-                }
-            });
-
-            errorResponseSubscription = _transport.OnCommand("ErrorResponse", command =>
-            {
-                if (command is ErrorResponse errorResponse)
-                {
-                    tcs.TrySetResult(CreateErrorResponse(
-                        request.RequestId,
-                        errorResponse.ErrorCode,
-                        errorResponse.Message));
-                }
-            });
-
-            commandErrorSubscription = _transport.OnCommand("error", command =>
-            {
-                if (command is not CommandErrorResponse errorResponse)
-                    return;
-
-                if (!LooksLikeDataSubscriptionCommandError(errorResponse))
-                    return;
-
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
-                tcs.TrySetResult(CreateErrorResponse(request.RequestId, 0, message));
-            });
-
-            try
-            {
-                await _transport.SendAsync(request, "module_dataflow");
-                var timeoutTask = Task.Delay(SubscriptionResponseTimeoutMs);
-                var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-                if (completedTask == timeoutTask)
-                {
-                    return CreateErrorResponse(
-                        request.RequestId,
-                        0,
-                        $"Timed out waiting for DataSubscriptionResponse after {SubscriptionResponseTimeoutMs}ms.");
-                }
-
-                return await tcs.Task;
-            }
-            finally
-            {
-                responseSubscription?.Dispose();
-                errorResponseSubscription?.Dispose();
-                commandErrorSubscription?.Dispose();
-            }
-        }
-
-        public async Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
             where TEntity : class
             where TDto : class, new()
         {
-            var entityTypeName = typeof(TEntity).Name;
-            var requestId = Interlocked.Increment(ref _requestIdCounter);
+            if (string.IsNullOrWhiteSpace(playerId))
+                throw new ArgumentException("Player id is required.", nameof(playerId));
 
+            if (map == null)
+                throw new ArgumentNullException(nameof(map));
+
+            var entityTypeName = typeof(TEntity).Name;
             var query = QueryBuilder.BuildQuery<TEntity>(entityTypeName, playerId);
             var variables = QueryBuilder.BuildVariables(playerId);
-            _logger.Log($"[DataSubscription] Opening subscription. entity={entityTypeName}, query={query}");
 
-            var request = new DataSubscriptionRequest(requestId, query, variables);
-            var response = await SendSubscriptionRequestAsync(request);
+            SafeLog($"[DataSubscription] Opening polling subscription. entity={entityTypeName}, key={playerId}, query={query}");
 
-            if (response.HasError)
-                throw MapErrorToException(response.Error);
-
-            if (response.Result == null)
-                throw new InvalidOperationException("Invalid DataSubscriptionResponse: Result is null");
-
-            var subscriptionId = response.Result.SubscriptionId;
+            var subscriptionId = NextSubscriptionId();
             var sharedEntity = new SharedEntity<TDto>(
                 this,
                 subscriptionId,
+                playerId,
+                entityTypeName,
                 null,
                 query,
                 variables,
                 raw =>
                 {
+                    if (raw == null)
+                        return new TDto();
+
                     var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
                     var entity = JsonConvert.DeserializeObject<TEntity>(json);
-                    return map(entity);
+                    return entity == null ? new TDto() : map(entity);
                 });
 
-            return sharedEntity;
+            return Task.FromResult<ISharedEntity<TDto>>(sharedEntity);
         }
 
         public async Task<DataGetResponse> GetDataByKeyAsync(
@@ -215,6 +236,25 @@ namespace Playserv.DataSubscription
             Action<DataGetResponse> onData,
             Action<Exception>? onError = null)
         {
+            return StartDataByKeyPollingInternal(
+                key,
+                query,
+                variables,
+                DefaultDataGetPollIntervalMs,
+                DefaultDataGetPollRequestTimeoutMs,
+                onData,
+                onError);
+        }
+
+        private IDisposable StartDataByKeyPollingInternal(
+            string key,
+            string query,
+            Dictionary<string, object> variables,
+            int intervalMs,
+            int requestTimeoutMs,
+            Action<DataGetResponse> onData,
+            Action<Exception>? onError = null)
+        {
             if (onData == null)
                 throw new ArgumentNullException(nameof(onData));
 
@@ -225,69 +265,13 @@ namespace Playserv.DataSubscription
                 key,
                 query,
                 variablesSnapshot,
-                DefaultDataGetPollIntervalMs,
+                intervalMs,
+                requestTimeoutMs,
                 onData,
                 onError,
                 cts.Token);
 
             return new PollingHandle(cts, pollingTask);
-        }
-
-        private static DataSubscriptionException MapErrorToException(DataSubscriptionError error)
-        {
-            if (error == null)
-                return new DataSubscriptionException(0, "Unknown data subscription error.");
-
-            var message = error.Message ?? string.Empty;
-            return error.ErrorCode switch
-            {
-                UpdateDataCorruptionException.Code => new UpdateDataCorruptionException(error.Message),
-                SubscriptionTerminatedException.Code => new SubscriptionTerminatedException(0, error.Message),
-                SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, error.Message),
-                0 when LooksLikeInvalidQueryError(message) => new InvalidQuerySyntaxException(message),
-                _ => new DataSubscriptionException(error.ErrorCode, error.Message)
-            };
-        }
-
-        private static DataSubscriptionResponse CreateErrorResponse(long requestId, int errorCode, string message)
-        {
-            return new DataSubscriptionResponse
-            {
-                RequestId = requestId,
-                Error = new DataSubscriptionError
-                {
-                    ErrorCode = errorCode,
-                    Message = message ?? "Unknown data subscription error."
-                }
-            };
-        }
-
-        private static bool LooksLikeDataSubscriptionCommandError(CommandErrorResponse errorResponse)
-        {
-            var error = errorResponse?.Error ?? string.Empty;
-            var message = errorResponse?.Message ?? string.Empty;
-
-            return message.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   message.IndexOf("module_dataflow", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   message.IndexOf("dataflow", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   message.IndexOf("query", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   error.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool LooksLikeInvalidQueryError(string message)
-        {
-            if (string.IsNullOrWhiteSpace(message))
-                return false;
-
-            return message.IndexOf("Syntax Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   message.IndexOf("GraphQL", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   message.IndexOf("Query is empty", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   message.IndexOf("id argument", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private Task<DataGetResponse> SendDataGetRequestAsync(DataGetRequest request, CancellationToken ct)
-        {
-            return SendDataGetRequestAsync(request, DataGetResponseTimeoutMs, ct);
         }
 
         private async Task<DataGetResponse> SendDataGetRequestAsync(
@@ -296,10 +280,10 @@ namespace Playserv.DataSubscription
             CancellationToken ct)
         {
             var tcs = new TaskCompletionSource<DataGetResponse>();
-            IDisposable responseSubscription = null;
-            IDisposable responseByCommandSubscription = null;
-            IDisposable responseByModuleCommandSubscription = null;
-            IDisposable commandErrorSubscription = null;
+            IDisposable? responseSubscription = null;
+            IDisposable? responseByCommandSubscription = null;
+            IDisposable? responseByModuleCommandSubscription = null;
+            IDisposable? commandErrorSubscription = null;
 
             responseSubscription = _transport.On<DataGetResponse>(response =>
             {
@@ -307,8 +291,7 @@ namespace Playserv.DataSubscription
                 {
                     var set = tcs.TrySetResult(response);
 #if PlayServ_Logs
-                    SafeLog(
-                        $"[DataGet] typed response matched. requestId={request.RequestId}, setResult={set}, hasError={response.HasError}");
+                    SafeLog($"[DataGet] typed response matched. requestId={request.RequestId}, setResult={set}, hasError={response.HasError}");
 #endif
                 }
             });
@@ -319,8 +302,7 @@ namespace Playserv.DataSubscription
                     return;
 
 #if PlayServ_Logs
-                SafeLog(
-                    $"[DataGet] command response observed. expected={request.RequestId}, incoming={response.RequestId}, hasError={response.HasError}");
+                SafeLog($"[DataGet] command response observed. expected={request.RequestId}, incoming={response.RequestId}, hasError={response.HasError}");
 #endif
 
                 if (response.RequestId == request.RequestId)
@@ -338,8 +320,7 @@ namespace Playserv.DataSubscription
                     return;
 
 #if PlayServ_Logs
-                SafeLog(
-                    $"[DataGet] module response observed. expected={request.RequestId}, incoming={response.RequestId}, hasError={response.HasError}");
+                SafeLog($"[DataGet] module response observed. expected={request.RequestId}, incoming={response.RequestId}, hasError={response.HasError}");
 #endif
 
                 if (response.RequestId == request.RequestId)
@@ -377,8 +358,7 @@ namespace Playserv.DataSubscription
                 if (!completedInTime)
                 {
 #if PlayServ_Logs
-                    SafeLogWarning(
-                        $"[DataGet] timeout. requestId={request.RequestId}, key={request.Key}, timeout={effectiveTimeoutMs}ms");
+                    SafeLogWarning($"[DataGet] timeout. requestId={request.RequestId}, key={request.Key}, timeout={effectiveTimeoutMs}ms");
 #endif
                     return CreateDataGetErrorResponse(
                         request.RequestId,
@@ -402,12 +382,14 @@ namespace Playserv.DataSubscription
             string query,
             Dictionary<string, object> variables,
             int intervalMs,
+            int requestTimeoutMs,
             Action<DataGetResponse> onData,
             Action<Exception>? onError,
             CancellationToken ct)
         {
             SafeLog($"[DataGet] Polling started. interval={intervalMs}ms, key={key}");
             PlayServState? pausedAtState = null;
+
             try
             {
                 while (!ct.IsCancellationRequested)
@@ -444,13 +426,11 @@ namespace Playserv.DataSubscription
                     {
                         var request = CreateDataGetRequest(key, query, variables);
 #if PlayServ_Logs
-                        SafeLog(
-                            $"[DataGet] -> poll request send. requestId={request.RequestId}, key={key}, timeout={DefaultDataGetPollRequestTimeoutMs}ms");
+                        SafeLog($"[DataGet] -> poll request send. requestId={request.RequestId}, key={key}, timeout={requestTimeoutMs}ms");
 #endif
-                        var response = await SendDataGetRequestAsync(request, DefaultDataGetPollRequestTimeoutMs, ct);
+                        var response = await SendDataGetRequestAsync(request, requestTimeoutMs, ct);
 #if PlayServ_Logs
-                        SafeLog(
-                            $"[DataGet] <- poll response received. requestId={request.RequestId}, hasError={(response?.HasError ?? false)}");
+                        SafeLog($"[DataGet] <- poll response received. requestId={request.RequestId}, hasError={(response?.HasError ?? false)}");
 #endif
                         onData(response);
                     }
@@ -466,7 +446,6 @@ namespace Playserv.DataSubscription
 
                     var elapsedMs = (int)(DateTime.UtcNow - startedAt).TotalMilliseconds;
                     var delayMs = Math.Max(0, intervalMs - elapsedMs);
-
                     try
                     {
                         await DelayWithCancellationAsync(delayMs, ct);
@@ -489,6 +468,153 @@ namespace Playserv.DataSubscription
             {
                 SafeLog($"[DataGet] Polling stopped. key={key}");
             }
+        }
+
+        private async Task RefreshEntryAsync(PollingSubscriptionEntry entry, CancellationToken ct)
+        {
+            try
+            {
+                var request = CreateDataGetRequest(entry.Key, entry.Query, entry.Variables);
+                var response = await SendDataGetRequestAsync(request, SubscriptionPollRequestTimeoutMs, ct);
+                ProcessSubscriptionResponse(entry.SubscriptionId, response);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                ProcessSubscriptionException(entry.SubscriptionId, ex);
+            }
+        }
+
+        private void ProcessSubscriptionException(long subscriptionId, Exception ex)
+        {
+            var wrapped = ex as DataSubscriptionException ??
+                          new DataSubscriptionException(0, ex?.Message ?? "Unknown subscription polling error.");
+            RaiseSubscriptionError(subscriptionId, wrapped);
+        }
+
+        private void ProcessSubscriptionResponse(long subscriptionId, DataGetResponse response)
+        {
+            if (response == null)
+            {
+                RaiseSubscriptionError(subscriptionId, new DataSubscriptionException(0, "DataGet response is null."));
+                return;
+            }
+
+            if (response.HasError)
+            {
+                RaiseSubscriptionError(subscriptionId, MapDataGetError(response.Error));
+                return;
+            }
+
+            PollingSubscriptionEntry? entry;
+            lock (_subscriptionRegistryGate)
+            {
+                _subscriptionRegistry.TryGetValue(subscriptionId, out entry);
+            }
+
+            if (entry == null)
+                return;
+
+            var payloadToken = ExtractSubscriptionPayload(response.Result?.Data, entry.RootFieldName);
+            var payloadFingerprint = payloadToken == null ? string.Empty : payloadToken.ToString(Formatting.None);
+
+            var shouldNotify = false;
+            Action<object?>? onChanged = null;
+            object? callbackPayload = null;
+
+            lock (_subscriptionRegistryGate)
+            {
+                if (_subscriptionRegistry.TryGetValue(subscriptionId, out var current))
+                {
+                    if (!current.HasSnapshot || !string.Equals(current.LastSnapshotJson, payloadFingerprint, StringComparison.Ordinal))
+                    {
+                        current.HasSnapshot = true;
+                        current.LastSnapshotJson = payloadFingerprint;
+                        shouldNotify = true;
+                        onChanged = current.OnChanged;
+                        callbackPayload = payloadToken?.DeepClone();
+                    }
+                }
+            }
+
+            if (!shouldNotify || onChanged == null)
+                return;
+
+            try
+            {
+                onChanged(callbackPayload);
+            }
+            catch (Exception ex)
+            {
+                SafeLogError($"[DataSubscription] Changed callback failed. id={subscriptionId}, error={ex.Message}");
+            }
+        }
+
+        private void RaiseSubscriptionError(long subscriptionId, DataSubscriptionException exception)
+        {
+            Action<DataSubscriptionException>? onError = null;
+            lock (_subscriptionRegistryGate)
+            {
+                if (_subscriptionRegistry.TryGetValue(subscriptionId, out var entry))
+                    onError = entry.OnError;
+            }
+
+            if (onError == null)
+                return;
+
+            try
+            {
+                onError(exception);
+            }
+            catch (Exception ex)
+            {
+                SafeLogError($"[DataSubscription] Error callback failed. id={subscriptionId}, error={ex.Message}");
+            }
+        }
+
+        private static DataSubscriptionException MapDataGetError(DataGetError? error)
+        {
+            if (error == null)
+                return new DataSubscriptionException(0, "Unknown data get error.");
+
+            var code = error.Code;
+            var message = error.Message ?? "Unknown data get error.";
+
+            return code switch
+            {
+                31002 => new TargetNotFoundException(message),
+                SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, message),
+                31001 => new AccessDeniedException(message),
+                _ => new DataSubscriptionException(code, message)
+            };
+        }
+
+        private static JToken? ExtractSubscriptionPayload(JToken? data, string rootFieldName)
+        {
+            if (data == null)
+                return null;
+
+            if (data is not JObject obj)
+                return data;
+
+            if (!string.IsNullOrWhiteSpace(rootFieldName))
+            {
+                if (obj.TryGetValue(rootFieldName, StringComparison.Ordinal, out var exact))
+                    return exact;
+
+                if (obj.TryGetValue(rootFieldName, StringComparison.OrdinalIgnoreCase, out var insensitive))
+                    return insensitive;
+            }
+
+            foreach (var property in obj.Properties())
+            {
+                return property.Value;
+            }
+
+            return data;
         }
 
         private static async Task DelayWithCancellationAsync(int delayMs, CancellationToken ct)
@@ -574,7 +700,7 @@ namespace Playserv.DataSubscription
 
         private static bool TryMapDataGetResponse(object command, out DataGetResponse response)
         {
-            response = null;
+            response = null!;
             if (command == null)
                 return false;
 
@@ -677,34 +803,54 @@ namespace Playserv.DataSubscription
 
         public void Dispose()
         {
-            _commandErrorSubscription?.Dispose();
+            List<IDisposable> handles = new List<IDisposable>();
+            lock (_subscriptionRegistryGate)
+            {
+                foreach (var entry in _subscriptionRegistry.Values)
+                {
+                    if (entry.PollingHandle != null)
+                        handles.Add(entry.PollingHandle);
+                }
+
+                _subscriptionRegistry.Clear();
+            }
+
+            foreach (var handle in handles)
+            {
+                handle.Dispose();
+            }
         }
 
-        private void OnCommandErrorReceived(object command)
+        private sealed class PollingSubscriptionEntry
         {
-            if (command is not CommandErrorResponse response)
-                return;
+            public PollingSubscriptionEntry(
+                long subscriptionId,
+                string key,
+                string query,
+                Dictionary<string, object> variables,
+                string rootFieldName,
+                Action<object?> onChanged,
+                Action<DataSubscriptionException>? onError)
+            {
+                SubscriptionId = subscriptionId;
+                Key = key;
+                Query = query;
+                Variables = variables;
+                RootFieldName = rootFieldName;
+                OnChanged = onChanged;
+                OnError = onError;
+            }
 
-            if (!IsUnsupportedRefreshCommandError(response))
-                return;
-
-            _refreshCommandSupported = false;
-            if (_refreshUnsupportedLogged)
-                return;
-
-            _refreshUnsupportedLogged = true;
-            _logger.LogWarning(
-                "[DataSubscription] Server does not support DataSubscriptionRefreshRequest. Refresh requests are disabled for this session.");
-        }
-
-        private static bool IsUnsupportedRefreshCommandError(CommandErrorResponse response)
-        {
-            var message = response?.Message ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(message))
-                return false;
-
-            return message.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                   message.IndexOf("not supported by this module", StringComparison.OrdinalIgnoreCase) >= 0;
+            public long SubscriptionId { get; }
+            public string Key { get; }
+            public string Query { get; }
+            public Dictionary<string, object> Variables { get; }
+            public string RootFieldName { get; }
+            public Action<object?> OnChanged { get; }
+            public Action<DataSubscriptionException>? OnError { get; }
+            public bool HasSnapshot { get; set; }
+            public string LastSnapshotJson { get; set; } = string.Empty;
+            public IDisposable? PollingHandle { get; set; }
         }
 
         private sealed class PollingHandle : IDisposable
@@ -729,6 +875,27 @@ namespace Playserv.DataSubscription
 
                 cts.Dispose();
                 _pollingTask = null;
+            }
+        }
+
+        private sealed class SubscriptionHandle : IDisposable
+        {
+            private PlayServDataSubscriptionAdapter? _adapter;
+            private readonly long _subscriptionId;
+
+            public SubscriptionHandle(PlayServDataSubscriptionAdapter adapter, long subscriptionId)
+            {
+                _adapter = adapter;
+                _subscriptionId = subscriptionId;
+            }
+
+            public void Dispose()
+            {
+                var adapter = Interlocked.Exchange(ref _adapter, null);
+                if (adapter == null)
+                    return;
+
+                adapter.UnregisterSubscription(_subscriptionId);
             }
         }
     }

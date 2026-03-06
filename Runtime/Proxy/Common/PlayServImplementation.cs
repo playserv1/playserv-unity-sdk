@@ -308,6 +308,11 @@ namespace Playserv.Proxy.Common
             return _logger;
         }
 
+        internal PlayServDataSubscriptionAdapter GetDataSubscriptionAdapter()
+        {
+            return _dataSubscriptionAdapter;
+        }
+
         public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
             where TEntity : class
             where TDto : class, new()
