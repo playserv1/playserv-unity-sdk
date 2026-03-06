@@ -592,34 +592,7 @@ await _player.UpdateAsync(p => p.Level = level);
 await _player.RefreshAsync();
 ```
 
-## 14) IngameDebugConsole command bridge (pattern from `Assets/Tests/EntryPointConsoleCommands.cs`)
-
-Non-RPC commands used in tests:
-- `connectsdk`, `disconnectsdk`
-- `subscribe`, `unsubscribe`, `sendevent`
-- `set_allowmultipleconnections`
-- `datasub.init`, `datasub.rename`, `datasub.addlevel`, `datasub.setlevel`, `datasub.refresh`, `datasub.status`
-- `spawn`
-
-Sample bridge method:
-
-```csharp
-using IngameDebugConsole;
-using Playserv.Wrapper;
-using UnityEngine;
-
-public static class ConsoleBridgeExample
-{
-    [ConsoleMethod("connectsdk", "Connects to PlayServ SDK")]
-    public static async void ConnectSdk()
-    {
-        bool result = await PlayServ.Connect();
-        Debug.Log($"Console SDK connection result: {result}");
-    }
-}
-```
-
-## 15) `[Shared]` DTO generation from a ViewModel (pattern from `Assets/Tests/ViewModels/ViewModel.cs`)
+## 14) `[Shared]` DTO generation from a ViewModel (pattern from `Assets/Tests/ViewModels/ViewModel.cs`)
 
 ```csharp
 using Playserv.Shared;
