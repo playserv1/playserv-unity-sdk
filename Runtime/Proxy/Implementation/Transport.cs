@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playserv.Proxy.Interfaces;
@@ -14,9 +15,11 @@ namespace Playserv.Proxy.Implementation
         private readonly IMessageSerializer _serializer;
         private readonly ISdkLogger _logger;
         private readonly object _gate = new object();
+        private readonly SemaphoreSlim _sendGate = new SemaphoreSlim(1, 1);
         private readonly Dictionary<Type, ICommandChannel> _channels = new Dictionary<Type, ICommandChannel>();
         private readonly Dictionary<string, ICommandNameChannel> _commandNameChannels = new Dictionary<string, ICommandNameChannel>();
         private IDisposable _rawSubscription;
+        private bool _isDisposed;
 
         public event EventHandler ConnectionLost;
 
@@ -46,18 +49,46 @@ namespace Playserv.Proxy.Implementation
             if (command == null)
                 throw new ArgumentNullException(nameof(command));
 
+            if (_isDisposed)
+            {
+                _logger.LogWarning(
+                    $"[Transport] Send skipped because transport is already disposed. Command={typeof(T).Name}");
+                return;
+            }
+
             try
             {
-                var envelope = _serializer.Serialize(command, moduleName);
-                var commandJson = JsonConvert.SerializeObject(envelope.Command);
-                var payloadJson = string.IsNullOrWhiteSpace(envelope.Payload)
-                    ? "null"
-                    : envelope.Payload;
-                var json = $"{{\"Command\":{commandJson},\"Payload\":{payloadJson}}}";
-                var data = Encoding.UTF8.GetBytes(json);
+                await _sendGate.WaitAsync();
+                try
+                {
+                    if (_isDisposed)
+                    {
+                        _logger.LogWarning(
+                            $"[Transport] Send skipped after wait because transport is disposed. Command={typeof(T).Name}");
+                        return;
+                    }
 
-                await _implementation.Send(data);
-                LogTransportJson($"Message sent: {typeof(T).Name} with payload: {json}", json);
+                    var envelope = _serializer.Serialize(command, moduleName);
+                    var commandJson = JsonConvert.SerializeObject(envelope.Command);
+                    var payloadJson = string.IsNullOrWhiteSpace(envelope.Payload)
+                        ? "null"
+                        : envelope.Payload;
+                    var json = $"{{\"Command\":{commandJson},\"Payload\":{payloadJson}}}";
+                    var data = Encoding.UTF8.GetBytes(json);
+
+                    await _implementation.Send(data);
+                    LogTransportJson($"Message sent: {typeof(T).Name} with payload: {json}", json);
+                }
+                finally
+                {
+                    _sendGate.Release();
+                }
+            }
+            catch (ObjectDisposedException) when (_isDisposed)
+            {
+                // Late send during teardown (for example unsubscribe at PlayMode exit).
+                _logger.LogWarning(
+                    $"[Transport] Late send ignored during teardown. Command={typeof(T).Name}");
             }
             catch (Exception ex)
             {
@@ -111,6 +142,10 @@ namespace Playserv.Proxy.Implementation
 
         public void Dispose()
         {
+            if (_isDisposed)
+                return;
+
+            _isDisposed = true;
             _rawSubscription?.Dispose();
             _implementation.Dispose();
 
@@ -132,6 +167,9 @@ namespace Playserv.Proxy.Implementation
 
         private void EnsureSubscription()
         {
+            if (_isDisposed)
+                return;
+
             if (_rawSubscription != null)
                 return;
 
