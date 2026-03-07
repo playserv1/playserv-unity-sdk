@@ -22,7 +22,7 @@ namespace Playserv.Wrapper
 
         public const string EnvironmentVariableName = "PLAYSERV_ENV";
         public const string CommandLineArgumentName = "-playservEnv";
-        public const string ConfigFileRelativePath = "ProjectSettings/PlayServEnvironments.json";
+        public const string ConfigFileRelativePath = "Assets/Editor/PlayServEnvironments.json";
 
         private static readonly string[] SupportedEnvironments =
         {
@@ -142,7 +142,7 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
-        /// Loads environment config from ProjectSettings/PlayServEnvironments.json.
+        /// Loads environment config from Assets/Editor/PlayServEnvironments.json.
         /// </summary>
         public static bool TryLoadConfigFromFile(out PlayServEnvironmentConfig config, out string error)
         {
@@ -244,6 +244,7 @@ namespace Playserv.Wrapper
 
             return null;
         }
+
     }
 
     [Serializable]
