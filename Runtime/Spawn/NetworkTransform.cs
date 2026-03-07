@@ -96,6 +96,10 @@ namespace Playserv.Spawn
                 syncIntervalMs = config.NetworkTransformSyncIntervalMs;
 #endif
             }
+            else if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
+            {
+                syncIntervalMs = bakedSettings.NetworkTransformSyncIntervalMs;
+            }
 
             _syncInterval = syncIntervalMs / 1000f;
 

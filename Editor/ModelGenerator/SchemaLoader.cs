@@ -85,6 +85,16 @@ public static class SchemaLoader
         if (!config.TryGetProfile(selectedEnvironment, out var profile) ||
             string.IsNullOrWhiteSpace(profile.SchemaApiServerAddress))
         {
+            if (PlayServEnvDefaultsProvider.TryLoadAsset(out var envDefaults) &&
+                !string.IsNullOrWhiteSpace(envDefaults.SchemaApiServerAddress))
+            {
+                selectedEnvironment = string.IsNullOrWhiteSpace(envDefaults.EnvironmentName)
+                    ? PlayServEnvironmentResolver.DefaultEnvironment
+                    : envDefaults.EnvironmentName;
+
+                return BuildSchemaUrl(envDefaults.SchemaApiServerAddress, selectedEnvironment);
+            }
+
             profile = PlayServEnvironmentProfile.CreateDevDefaults();
             selectedEnvironment = PlayServEnvironmentResolver.DevEnvironment;
             Debug.LogWarning("[SchemaDownloader] schemaApiServerAddress is not configured for selected environment. Falling back to dev defaults.");

@@ -173,7 +173,7 @@ namespace Playserv.Examples
         {
             var config = Resources.Load<PlayServConfig>("PlayServConfig");
             if (config == null)
-                return new PlayServSettings();
+                return PlayServEnvDefaultsProvider.LoadSettingsOrDefault();
 
 #if UNITY_EDITOR
             return PlayServEnvironmentResolver.ResolveSettingsForEditor(

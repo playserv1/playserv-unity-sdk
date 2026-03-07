@@ -1,4 +1,6 @@
 #if UNITY_EDITOR
+using System;
+using System.Reflection;
 using Playserv.Wrapper;
 using UnityEditor;
 using UnityEngine;
@@ -14,13 +16,17 @@ namespace Playserv.Editor
             "gameId",
             "userId",
             "gameVersion",
-            "sdkVersion",
             "allowMultipleConnections",
             "keepAlivePingIntervalMs",
             "keepAlivePongTimeoutMs",
             "networkTransformSyncIntervalMs",
             "deployAuthToken",
             "timeoutSeconds"
+        };
+
+        private static readonly string[] SdkVersionPropertyOrder =
+        {
+            "sdkVersion"
         };
 
         private static readonly string[] ReadOnlyEndpointPropertyOrder =
@@ -35,14 +41,9 @@ namespace Playserv.Editor
             serializedObject.Update();
 
             DrawProperties(EditablePropertyOrder, readOnly: false);
+            DrawProperties(SdkVersionPropertyOrder, readOnly: !CanEditSdkVersionInClientEditor());
 
-            EditorGUILayout.Space(4);
-            EditorGUILayout.LabelField("Environment-managed endpoint settings", EditorStyles.boldLabel);
             DrawProperties(ReadOnlyEndpointPropertyOrder, readOnly: true);
-
-            EditorGUILayout.HelpBox(
-                $"Edit endpoint values only in {PlayServEnvironmentResolver.ConfigFileRelativePath}.",
-                MessageType.Info);
 
             if (serializedObject.ApplyModifiedProperties())
                 EditorUtility.SetDirty(target);
@@ -59,6 +60,31 @@ namespace Playserv.Editor
                 using (new EditorGUI.DisabledScope(readOnly))
                     EditorGUILayout.PropertyField(property, includeChildren: true);
             }
+        }
+
+        private static bool CanEditSdkVersionInClientEditor()
+        {
+            var managerType = FindClientEnvironmentManagerType();
+            if (managerType == null)
+                return false;
+
+            var setMethod = managerType.GetMethod(
+                "TrySetActiveEnvironment",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            return setMethod != null;
+        }
+
+        private static Type FindClientEnvironmentManagerType()
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType("Playserv.ClientEditor.PlayServEnvironmentManager", throwOnError: false);
+                if (type != null)
+                    return type;
+            }
+
+            return null;
         }
     }
 }

@@ -572,6 +572,12 @@ namespace Playserv.Wrapper
 #endif
                 return true;
             }
+
+            if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
+            {
+                settings = bakedSettings;
+                return true;
+            }
 #endif
 
             settings = null!;

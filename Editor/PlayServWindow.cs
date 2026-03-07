@@ -115,7 +115,7 @@ namespace Playserv.Editor
 
             _wsEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
-                PlayServSettings.DefaultBackendServerAddress
+                PlayServEnvDefaultsProvider.ResolveBackendServerAddress(null)
             );
 
             EnsureConfig();
@@ -1016,10 +1016,7 @@ namespace Playserv.Editor
         private string ResolveDeployEndpointForDisplay()
         {
             var endpoint = _config?.DeployApiServerAddress?.Trim();
-            if (string.IsNullOrWhiteSpace(endpoint))
-                return PlayServSettings.DefaultDeployApiServerAddress;
-
-            return endpoint;
+            return PlayServEnvDefaultsProvider.ResolveDeployApiServerAddress(endpoint);
         }
 
         private async Task DeployWithRelativePathsAsync(
@@ -1366,8 +1363,11 @@ namespace Playserv.Editor
                 }
                 else
                 {
-                    DrawEnvironmentSummary();
-                    GUILayout.Space(6);
+                    if (CanSwitchEnvironmentInClientEditor())
+                    {
+                        DrawEnvironmentSummary();
+                        GUILayout.Space(6);
+                    }
 
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.ObjectField("Config Asset", _config, typeof(PlayServConfig), false);

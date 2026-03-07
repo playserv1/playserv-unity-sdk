@@ -9,6 +9,7 @@ namespace Playserv.Editor
     {
         // You can change this path if you want a different location.
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
+        private const string BackendServerAddressPropertyName = "backendServerAddress";
         private const string DeployApiServerAddressPropertyName = "deployApiServerAddress";
         private const string SchemaApiServerAddressPropertyName = "schemaApiServerAddress";
         private const string LegacyDefaultSdkVersion = "1.0.0";
@@ -19,7 +20,8 @@ namespace Playserv.Editor
             var config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (config != null)
             {
-                var changed = EnsureDeployApiServerAddress(config);
+                var changed = EnsureBackendServerAddress(config);
+                changed |= EnsureDeployApiServerAddress(config);
                 changed |= EnsureSchemaApiServerAddress(config);
                 changed |= EnsureDefaultSdkVersion(config);
                 changed |= ApplyEnvironmentProfile(config);
@@ -37,6 +39,7 @@ namespace Playserv.Editor
 
             config = ScriptableObject.CreateInstance<PlayServConfig>();
             AssetDatabase.CreateAsset(config, AssetPath);
+            EnsureBackendServerAddress(config);
             EnsureDeployApiServerAddress(config);
             EnsureSchemaApiServerAddress(config);
             EnsureDefaultSdkVersion(config);
@@ -64,6 +67,27 @@ namespace Playserv.Editor
             }
 
             return null;
+        }
+
+        private static bool EnsureBackendServerAddress(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var serializedObject = new SerializedObject(config);
+            var backendProperty = serializedObject.FindProperty(BackendServerAddressPropertyName);
+            if (backendProperty == null)
+                return false;
+
+            var currentValue = backendProperty.stringValue?.Trim();
+            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
+            if (!shouldReplace)
+                return false;
+
+            backendProperty.stringValue = PlayServEnvDefaultsProvider.ResolveBackendServerAddress(null);
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
+            return true;
         }
 
         private static void CreateFolders(string folderPath)
@@ -97,7 +121,7 @@ namespace Playserv.Editor
             if (!shouldReplace)
                 return false;
 
-            deployEndpointProperty.stringValue = PlayServSettings.DefaultDeployApiServerAddress;
+            deployEndpointProperty.stringValue = PlayServEnvDefaultsProvider.ResolveDeployApiServerAddress(null);
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
@@ -118,7 +142,7 @@ namespace Playserv.Editor
             if (!shouldReplace)
                 return false;
 
-            schemaEndpointProperty.stringValue = PlayServSettings.DefaultSchemaApiServerAddress;
+            schemaEndpointProperty.stringValue = PlayServEnvDefaultsProvider.ResolveSchemaApiServerAddress(null);
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
@@ -154,10 +178,16 @@ namespace Playserv.Editor
             var resolved = PlayServEnvironmentResolver.ResolveSettingsForEditor(
                 config,
                 out _,
-                out _,
+                out var profileApplied,
                 out _);
 
-            return config.ApplySettings(resolved);
+            if (profileApplied)
+                return config.ApplySettings(resolved);
+
+            if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
+                return config.ApplySettings(bakedSettings);
+
+            return false;
         }
     }
 }
