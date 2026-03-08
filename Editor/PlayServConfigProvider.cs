@@ -185,7 +185,15 @@ namespace Playserv.Editor
                 return config.ApplySettings(resolved);
 
             if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
-                return config.ApplySettings(bakedSettings);
+            {
+                // For Distributed package mode: keep user-entered auth/game values,
+                // but enforce baked endpoints from EnvDefaults.
+                var merged = config.ToSettings();
+                merged.BackendServerAddress = bakedSettings.BackendServerAddress;
+                merged.DeployApiServerAddress = bakedSettings.DeployApiServerAddress;
+                merged.SchemaApiServerAddress = bakedSettings.SchemaApiServerAddress;
+                return config.ApplySettings(merged);
+            }
 
             return false;
         }
