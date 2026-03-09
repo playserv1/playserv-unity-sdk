@@ -13,6 +13,8 @@ namespace Playserv.Wrapper
     public sealed class PlayServEnvDefaults : ScriptableObject
     {
         [SerializeField] private string environmentName = PlayServEnvironmentResolver.DefaultEnvironment;
+        [SerializeField] private string gameAccessToken = string.Empty;
+        [SerializeField] private string gameId = string.Empty;
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
         [SerializeField] private string deployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress;
         [SerializeField] private string schemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress;
@@ -23,6 +25,8 @@ namespace Playserv.Wrapper
         [SerializeField] private int timeoutSeconds = 120;
 
         public string EnvironmentName => environmentName;
+        public string GameAccessToken => gameAccessToken;
+        public string GameId => gameId;
         public string BackendServerAddress => backendServerAddress;
         public string DeployApiServerAddress => deployApiServerAddress;
         public string SchemaApiServerAddress => schemaApiServerAddress;
@@ -36,6 +40,8 @@ namespace Playserv.Wrapper
         {
             return new PlayServSettings
             {
+                GameAccessToken = ResolveOptionalText(gameAccessToken),
+                GameId = ResolveOptionalText(gameId),
                 BackendServerAddress = ResolveText(backendServerAddress, PlayServSettings.DefaultBackendServerAddress),
                 DeployApiServerAddress = ResolveText(deployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress),
                 SchemaApiServerAddress = ResolveText(schemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress),
@@ -56,6 +62,8 @@ namespace Playserv.Wrapper
                 ? PlayServEnvironmentResolver.DefaultEnvironment
                 : selectedEnvironment.Trim().ToLowerInvariant();
 
+            gameAccessToken = ResolveOptionalText(settings.GameAccessToken);
+            gameId = ResolveOptionalText(settings.GameId);
             backendServerAddress = ResolveText(settings.BackendServerAddress, PlayServSettings.DefaultBackendServerAddress);
             deployApiServerAddress = ResolveText(settings.DeployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress);
             schemaApiServerAddress = ResolveText(settings.SchemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress);
@@ -69,6 +77,11 @@ namespace Playserv.Wrapper
         private static string ResolveText(string? value, string fallback)
         {
             return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private static string ResolveOptionalText(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
     }
 }

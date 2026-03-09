@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: EnvDefaults
   m_EditorClassIdentifier: 
   environmentName: prod
-  backendServerAddress: wss://proxy.playserv.io
+  gameAccessToken: my-token2
+  gameId: my-game-id2
+  backendServerAddress: wss://proxy.playserv.io/ws
   deployApiServerAddress: https://deployment.playserv.io
   schemaApiServerAddress: https://backoffice.playserv.io/
   allowMultipleConnections: 1

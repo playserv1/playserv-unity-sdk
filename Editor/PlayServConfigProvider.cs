@@ -186,9 +186,15 @@ namespace Playserv.Editor
 
             if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
             {
-                // For Distributed package mode: keep user-entered auth/game values,
-                // but enforce baked endpoints from EnvDefaults.
+                // Distributed package mode:
+                // - keep user-entered values once set
+                // - seed auth/game fields from baked defaults only when currently empty
+                // - always enforce baked endpoints
                 var merged = config.ToSettings();
+                if (string.IsNullOrWhiteSpace(merged.GameAccessToken))
+                    merged.GameAccessToken = bakedSettings.GameAccessToken;
+                if (string.IsNullOrWhiteSpace(merged.GameId))
+                    merged.GameId = bakedSettings.GameId;
                 merged.BackendServerAddress = bakedSettings.BackendServerAddress;
                 merged.DeployApiServerAddress = bakedSettings.DeployApiServerAddress;
                 merged.SchemaApiServerAddress = bakedSettings.SchemaApiServerAddress;
