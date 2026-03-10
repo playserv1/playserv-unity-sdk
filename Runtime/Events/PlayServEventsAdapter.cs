@@ -106,7 +106,7 @@ namespace Playserv.Events
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
-            return ExecuteGroupCommandAsync(
+            return ExecuteGroupCommandAsync<SubscribeGroupRequest, SubscribeGroupResponse>(
                 new SubscribeGroupRequest(groupName),
                 groupName,
                 "subscribe",
@@ -116,7 +116,7 @@ namespace Playserv.Events
 
         public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
-            return ExecuteGroupCommandAsync(
+            return ExecuteGroupCommandAsync<UnsubscribeGroupRequest, UnsubscribeGroupResponse>(
                 new UnsubscribeGroupRequest(groupName),
                 groupName,
                 "unsubscribe",
