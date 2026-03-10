@@ -232,6 +232,24 @@ namespace Playserv.Wrapper
             Api.PublishForUser(userId, @event);
 
         /// <summary>
+        /// Joins named event group for group-scoped routing.
+        /// </summary>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group join succeeded.</returns>
+        public static Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
+            Api.SubscribeGroupAsync(groupName, ct);
+
+        /// <summary>
+        /// Leaves named event group.
+        /// </summary>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group leave succeeded.</returns>
+        public static Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
+            Api.UnsubscribeGroupAsync(groupName, ct);
+
+        /// <summary>
         /// Disconnects SDK transport and disposes internal runtime instance.
         /// </summary>
         public static void Disconnect() =>

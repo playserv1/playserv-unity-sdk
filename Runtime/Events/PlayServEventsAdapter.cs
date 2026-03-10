@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
@@ -17,6 +19,8 @@ namespace Playserv.Events
         private readonly Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
         private readonly HashSet<string> _suppressedInfrastructureEventTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _typeCacheLock = new object();
+        private readonly SemaphoreSlim _groupCommandGate = new SemaphoreSlim(1, 1);
+        private static readonly TimeSpan GroupCommandTimeout = TimeSpan.FromSeconds(10);
 
         private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
         {
@@ -98,6 +102,26 @@ namespace Playserv.Events
 
             var message = new UserEventMessage(userId, eventType, payload);
             _ = _transport.Send(message);
+        }
+
+        public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
+        {
+            return ExecuteGroupCommandAsync(
+                new SubscribeGroupRequest(groupName),
+                groupName,
+                "subscribe",
+                response => response.success,
+                ct);
+        }
+
+        public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default)
+        {
+            return ExecuteGroupCommandAsync(
+                new UnsubscribeGroupRequest(groupName),
+                groupName,
+                "unsubscribe",
+                response => response.success,
+                ct);
         }
 
         private void SetupEventHandlers()
@@ -269,6 +293,93 @@ namespace Playserv.Events
                    string.Equals(eventTypeName, "Heartbeat", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(eventTypeName, "Ping", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(eventTypeName, "Pong", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<bool> ExecuteGroupCommandAsync<TRequest, TResponse>(
+            TRequest request,
+            string groupName,
+            string operationName,
+            Func<TResponse, bool> getSuccess,
+            CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(groupName))
+                throw new ArgumentException("Group name is required.", nameof(groupName));
+
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            if (getSuccess == null)
+                throw new ArgumentNullException(nameof(getSuccess));
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(GroupCommandTimeout);
+
+            await _groupCommandGate.WaitAsync(timeoutCts.Token);
+            try
+            {
+                var completion = new TaskCompletionSource<GroupCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                using var responseSubscription = _transport.OnReceive<TResponse>().Subscribe(
+                    response => completion.TrySetResult(GroupCommandResult.FromResponse(getSuccess(response))),
+                    ex => completion.TrySetException(ex),
+                    () => completion.TrySetException(
+                        new InvalidOperationException($"Transport completed while waiting for {typeof(TResponse).Name}.")));
+
+                using var errorSubscription = _transport.OnReceive<ErrorResponse>().Subscribe(
+                    error => completion.TrySetResult(GroupCommandResult.FromError(error)));
+
+                using var cancellationRegistration =
+                    timeoutCts.Token.Register(() => completion.TrySetCanceled(timeoutCts.Token));
+
+                await _transport.Send(request);
+                _logger.Log($"Sent group {operationName} request: groupName={groupName}");
+
+                var result = await completion.Task;
+                if (result.Error != null)
+                {
+                    throw new InvalidOperationException(
+                        $"Group {operationName} failed for '{groupName}'. " +
+                        $"Code={result.Error.ErrorCode}, Message={result.Error.Message}");
+                }
+
+                if (result.Success)
+                    _logger.Log($"Group {operationName} successful: groupName={groupName}");
+                else
+                    _logger.LogWarning($"Group {operationName} returned unsuccessful response: groupName={groupName}");
+
+                return result.Success;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"Timed out waiting for {typeof(TResponse).Name} for group '{groupName}'.");
+            }
+            finally
+            {
+                _groupCommandGate.Release();
+            }
+        }
+
+        private sealed class GroupCommandResult
+        {
+            public bool Success { get; }
+            public ErrorResponse Error { get; }
+
+            private GroupCommandResult(bool success, ErrorResponse error)
+            {
+                Success = success;
+                Error = error;
+            }
+
+            public static GroupCommandResult FromResponse(bool success)
+            {
+                return new GroupCommandResult(success, null);
+            }
+
+            public static GroupCommandResult FromError(ErrorResponse error)
+            {
+                return new GroupCommandResult(false, error);
+            }
         }
     }
 }

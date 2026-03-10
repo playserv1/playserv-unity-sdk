@@ -246,6 +246,12 @@ namespace Playserv.Wrapper
             Instance.PublishForUser(userId, @event);
         }
 
+        public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
+            Instance.SubscribeGroupAsync(groupName, ct);
+
+        public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
+            Instance.UnsubscribeGroupAsync(groupName, ct);
+
 #if UNITY_5_3_OR_NEWER
         public Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
             Instance.Spawn(assetName, position, rotation);

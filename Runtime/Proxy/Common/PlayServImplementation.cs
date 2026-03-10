@@ -289,6 +289,16 @@ namespace Playserv.Proxy.Common
             _eventsAdapter.PublishForUser(userId, @event);
         }
 
+        public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
+        {
+            return _eventsAdapter.SubscribeGroupAsync(groupName, ct);
+        }
+
+        public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default)
+        {
+            return _eventsAdapter.UnsubscribeGroupAsync(groupName, ct);
+        }
+
         public ITransportImplementation GetTransportImplementation()
         {
             if (_transport is Transport transport)

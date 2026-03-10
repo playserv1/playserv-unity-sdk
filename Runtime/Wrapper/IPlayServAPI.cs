@@ -189,6 +189,22 @@ namespace Playserv.Wrapper
         /// <param name="event">Event payload.</param>
         void PublishForUser<T>(string userId, T @event);
 
+        /// <summary>
+        /// Joins named event group for group-scoped routing.
+        /// </summary>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group join succeeded.</returns>
+        Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default);
+
+        /// <summary>
+        /// Leaves named event group.
+        /// </summary>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group leave succeeded.</returns>
+        Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default);
+
 #if UNITY_5_3_OR_NEWER
         /// <summary>
         /// Spawns networked object at position and rotation.
