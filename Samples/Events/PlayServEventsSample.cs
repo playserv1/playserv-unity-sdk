@@ -35,6 +35,7 @@ namespace Playserv.Samples
         private IDisposable _subscription;
         private string _status = "Idle";
         private bool _showInfo;
+        private bool _isGroupJoined;
 
         private void OnEnable()
         {
@@ -86,6 +87,18 @@ namespace Playserv.Samples
             AddMessage(_status);
         }
 
+        [ContextMenu("Join Group")]
+        public void JoinGroup()
+        {
+            _ = JoinGroupAsync();
+        }
+
+        [ContextMenu("Leave Group")]
+        public void LeaveGroup()
+        {
+            _ = LeaveGroupAsync();
+        }
+
         [ContextMenu("Publish Global")]
         public void PublishGlobal()
         {
@@ -100,6 +113,9 @@ namespace Playserv.Samples
             PlayServ.PublishForGroup(groupName, BuildEvent());
             _status = $"Published group event ({groupName})";
             AddMessage($"Sent group({groupName}): {messageText}");
+
+            if (!_isGroupJoined)
+                AddMessage($"Note: this client is not joined to group '{groupName}', so it will not receive its own group event.");
         }
 
         [ContextMenu("Publish User")]
@@ -145,8 +161,79 @@ namespace Playserv.Samples
         private void DisconnectSdk()
         {
             PlayServ.Disconnect();
+            _isGroupJoined = false;
             _status = "SDK disconnected";
             AddMessage(_status);
+        }
+
+        private async Task JoinGroupAsync()
+        {
+            if (PlayServ.State != Playserv.Proxy.Common.PlayServState.Online)
+            {
+                _status = "Connect SDK first";
+                AddMessage(_status);
+                return;
+            }
+
+            if (_isGroupJoined)
+            {
+                _status = $"Already joined group '{groupName}'";
+                AddMessage(_status);
+                return;
+            }
+
+            try
+            {
+                var joined = await PlayServ.SubscribeGroupAsync(groupName);
+                _isGroupJoined = joined;
+                _status = joined
+                    ? $"Joined group '{groupName}'"
+                    : $"Join group returned false for '{groupName}'";
+                AddMessage(_status);
+
+                if (_subscription == null)
+                    AddMessage("Note: group membership alone is not enough. Subscribe to SampleChatEvent to receive group events.");
+            }
+            catch (Exception ex)
+            {
+                _status = $"Join group failed: {ex.Message}";
+                AddMessage(_status);
+            }
+        }
+
+        private async Task LeaveGroupAsync()
+        {
+            if (PlayServ.State != Playserv.Proxy.Common.PlayServState.Online)
+            {
+                _isGroupJoined = false;
+                _status = "SDK is offline. Local group state cleared.";
+                AddMessage(_status);
+                return;
+            }
+
+            if (!_isGroupJoined)
+            {
+                _status = $"Group '{groupName}' is not joined";
+                AddMessage(_status);
+                return;
+            }
+
+            try
+            {
+                var left = await PlayServ.UnsubscribeGroupAsync(groupName);
+                if (left)
+                    _isGroupJoined = false;
+
+                _status = left
+                    ? $"Left group '{groupName}'"
+                    : $"Leave group returned false for '{groupName}'";
+                AddMessage(_status);
+            }
+            catch (Exception ex)
+            {
+                _status = $"Leave group failed: {ex.Message}";
+                AddMessage(_status);
+            }
         }
 
         private void BackToSamples()
@@ -198,9 +285,11 @@ namespace Playserv.Samples
 
             GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ Events Sample");
-            GUILayout.Label("How to use: 1) Configure bootstrap in 0_Samples. 2) Connect SDK. 3) Subscribe. 4) Publish Global/Group/User and watch logs.");
+            GUILayout.Label("How to use: 1) Connect SDK. 2) Subscribe to SampleChatEvent. 3) Join Group for group routing. 4) Publish Global/Group/User and watch logs.");
             GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
+            GUILayout.Label($"Event subscription: {(_subscription != null ? "Active" : "Inactive")}");
+            GUILayout.Label($"Group '{groupName}': {(_isGroupJoined ? "Joined" : "Not joined")}");
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Connect SDK"))
@@ -219,8 +308,9 @@ namespace Playserv.Samples
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label("Info");
                 GUILayout.Label("Purpose: Demonstrates event-based communication via PlayServ events.");
-                GUILayout.Label("How to use: Connect, subscribe, publish Global/Group/User events, then inspect received messages.");
-                GUILayout.Label("Use in your game: Chat, notifications, lobby/match broadcasts, and user-targeted messages.");
+                GUILayout.Label("Server behavior: group events require both event-type subscription and explicit group join.");
+                GUILayout.Label("How to use: Connect, Subscribe, Join Group, then publish Group events and inspect received messages.");
+                GUILayout.Label("Use in your game: chat rooms, lobbies, clans, team channels, and user-targeted notifications.");
                 GUILayout.EndVertical();
             }
 
@@ -229,6 +319,13 @@ namespace Playserv.Samples
                 Subscribe();
             if (GUILayout.Button("Unsubscribe"))
                 Unsubscribe();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Join Group"))
+                JoinGroup();
+            if (GUILayout.Button("Leave Group"))
+                LeaveGroup();
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();

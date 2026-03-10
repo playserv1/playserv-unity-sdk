@@ -90,6 +90,7 @@ Shows event channels for global, group, and user-targeted scenarios.
 
 ### What it demonstrates
 - Subscription: `PlayServ.Subscribe<SampleChatEvent>(...)`.
+- Group membership: `PlayServ.SubscribeGroupAsync(groupName)` and `PlayServ.UnsubscribeGroupAsync(groupName)`.
 - Publishing:
   - `PlayServ.Publish(...)`,
   - `PlayServ.PublishForGroup(...)`,
@@ -99,12 +100,19 @@ Shows event channels for global, group, and user-targeted scenarios.
 ### How to use
 1. Connect to SDK.
 2. Click `Subscribe`.
-3. Send events with:
+3. Click `Join Group` if you want to receive group-scoped events for the configured group.
+4. Send events with:
    - `Publish Global`,
    - `Publish Group`,
    - `Publish User`.
-4. Check incoming messages in `Logs`.
-5. Click `Unsubscribe` when done.
+5. Check incoming messages in `Logs`.
+6. Click `Leave Group` and `Unsubscribe` when done.
+
+Important:
+- Group event delivery requires both:
+  - `PlayServ.Subscribe<SampleChatEvent>(...)`
+  - `PlayServ.SubscribeGroupAsync(groupName)`
+- Publishing to a group does not automatically join that group.
 
 ### What you can build with it
 - Chat, notifications, and system alerts.

@@ -182,6 +182,9 @@ namespace Playserv.Events
 
             _transport.OnReceive<EventMessage>()
                 .Subscribe(HandleEventMessage);
+
+            _transport.OnReceive<EventSubscribedMessage>()
+                .Subscribe(HandleSubscribedEventMessage);
         }
 
         private void HandleEventMessage(EventMessage message)
@@ -293,6 +296,39 @@ namespace Playserv.Events
                    string.Equals(eventTypeName, "Heartbeat", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(eventTypeName, "Ping", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(eventTypeName, "Pong", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void HandleSubscribedEventMessage(EventSubscribedMessage message)
+        {
+            if (message == null)
+                return;
+
+            if (string.IsNullOrWhiteSpace(message.EventSubscriptionId))
+            {
+                _logger.LogWarning("Received EventSubscribedMessage without EventSubscriptionId.");
+                return;
+            }
+
+            var eventType = _subscriptionManager.GetTopic(message.EventSubscriptionId);
+            if (string.IsNullOrWhiteSpace(eventType))
+            {
+                if (_subscriptionManager.TryBindOrphanSubscriptionToSingleObservedTopic(
+                        message.EventSubscriptionId,
+                        out var reboundTopic))
+                {
+                    eventType = reboundTopic;
+                    _logger.LogWarning(
+                        $"Recovered EventSubscribedMessage mapping: eventType={eventType}, subscriptionId={message.EventSubscriptionId}");
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        $"Received EventSubscribedMessage for unknown subscription id: {message.EventSubscriptionId}");
+                    return;
+                }
+            }
+
+            HandleEventMessage(new EventMessage(eventType, message.Payload));
         }
 
         private async Task<bool> ExecuteGroupCommandAsync<TRequest, TResponse>(

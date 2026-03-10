@@ -196,6 +196,12 @@ namespace Playserv.Proxy.Implementation
                 return true;
             }
 
+            if (string.Equals(commandName, "EventSubscribedMessage", StringComparison.Ordinal))
+            {
+                type = typeof(EventSubscribedMessage);
+                return true;
+            }
+
             type = null;
             return false;
         }
