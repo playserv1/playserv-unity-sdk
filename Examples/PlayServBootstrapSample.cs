@@ -13,7 +13,6 @@ namespace Playserv.Examples
     public sealed class PlayServBootstrapSample : MonoBehaviour
     {
         private static PlayServBootstrapSample _instance;
-        private static bool _applicationIsQuitting;
 
         [Header("Credentials")]
         [SerializeField] private string gameAccessToken = "your-token";
@@ -45,7 +44,6 @@ namespace Playserv.Examples
                 return;
             }
 
-            _applicationIsQuitting = false;
             _instance = this;
             _isOwner = true;
             DontDestroyOnLoad(gameObject);
@@ -89,13 +87,11 @@ namespace Playserv.Examples
             if (_instance == this)
                 _instance = null;
 
-            if (_isOwner && disconnectOnDestroy && _applicationIsQuitting)
+            // In Unity Editor (especially with Enter Play Mode options),
+            // OnDestroy may run without a reliable OnApplicationQuit signal.
+            // Disconnect on owner destroy to avoid background polling/transport leftovers.
+            if (_isOwner && disconnectOnDestroy)
                 PlayServ.Disconnect();
-        }
-
-        private void OnApplicationQuit()
-        {
-            _applicationIsQuitting = true;
         }
 
         private void OnValidate()
