@@ -25,6 +25,8 @@ namespace Playserv.Editor
     {
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://example.com";
+        private const string ClientProjectSettingsBridgeTypeName = "Playserv.ClientEditor.PlayServProjectSettingsBridge";
+        private const string DrawProjectConfigUiMethodName = "DrawProjectConfigUi";
         private static readonly string[] AllowedDeployUsingNamespaces =
         {
             "System",
@@ -56,7 +58,7 @@ namespace Playserv.Editor
 
         private EditorWebSocketTransport _wsTransport;
         private Vector2 _connectionScrollPos;
-        private string _wsEndpoint = "ws://localhost:8080";
+        private string _wsEndpoint = string.Empty;
         private string _testMessage = "{\"type\":\"ping\"}";
         
         private DefaultAsset _deployFolder;
@@ -113,9 +115,9 @@ namespace Playserv.Editor
 
             _showAvailableSchemaInfo = false;
 
-            _wsEndpoint = EditorPrefs.GetString(
+                _wsEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
-                PlayServEnvDefaultsProvider.ResolveBackendServerAddress(null)
+                PlayServPackageDefaultsProvider.ResolveBackendServerAddress(null)
             );
 
             EnsureConfig();
@@ -1016,7 +1018,7 @@ namespace Playserv.Editor
         private string ResolveDeployEndpointForDisplay()
         {
             var endpoint = _config?.DeployApiServerAddress?.Trim();
-            return PlayServEnvDefaultsProvider.ResolveDeployApiServerAddress(endpoint);
+            return PlayServPackageDefaultsProvider.ResolveDeployApiServerAddress(endpoint);
         }
 
         private async Task DeployWithRelativePathsAsync(
@@ -1363,10 +1365,15 @@ namespace Playserv.Editor
                 }
                 else
                 {
-                    if (CanSwitchEnvironmentInClientEditor())
+                    if (TryDrawClientProjectConfigUi(out var configUiChanged))
                     {
-                        DrawEnvironmentSummary();
                         GUILayout.Space(6);
+
+                        if (configUiChanged)
+                        {
+                            EnsureConfig();
+                            Repaint();
+                        }
                     }
 
                     EditorGUILayout.BeginHorizontal();
@@ -1407,91 +1414,47 @@ namespace Playserv.Editor
             EditorPrefs.SetBool(Const.PrefFoldConfig, _foldConfig);
         }
 
-        private void DrawEnvironmentSummary()
+        private static bool TryDrawClientProjectConfigUi(out bool changed)
         {
-            var environments = PlayServEnvironmentResolver.Environments;
-            if (environments.Length == 0)
-                return;
+            changed = false;
 
-            var activeEnvironment = ResolveActiveEnvironmentNameForDisplay();
-            var activeIndex = Array.IndexOf(environments, activeEnvironment);
-            if (activeIndex < 0)
-                activeIndex = 0;
-
-            var labels = environments
-                .Select(AsDisplayEnvironmentLabel)
-                .ToArray();
-
-            var canSwitchInClientEditor = CanSwitchEnvironmentInClientEditor();
-            int selectedIndex;
-            using (new EditorGUI.DisabledScope(!canSwitchInClientEditor))
-            {
-                selectedIndex = EditorGUILayout.Popup("Environment", activeIndex, labels);
-            }
-
-            if (canSwitchInClientEditor && selectedIndex != activeIndex)
-            {
-                var selectedEnvironment = environments[selectedIndex];
-                if (TrySetEnvironmentInClientEditor(selectedEnvironment, out var error))
-                {
-                    EnsureConfig();
-                    Repaint();
-                }
-                else
-                {
-                    Debug.LogError($"[PlayServ] Failed to switch environment: {error}");
-                }
-            }
-        }
-
-        private static string ResolveActiveEnvironmentNameForDisplay()
-        {
-            if (PlayServEnvironmentResolver.TryLoadConfigFromFile(out var config, out _))
-                return PlayServEnvironmentResolver.ResolveEnvironmentName(config.ActiveEnvironment);
-
-            return PlayServEnvironmentResolver.ResolveEnvironmentName(null);
-        }
-
-        private static bool CanSwitchEnvironmentInClientEditor()
-        {
-            return TryGetClientEnvironmentSetMethod(out _);
-        }
-
-        private static bool TrySetEnvironmentInClientEditor(string environmentName, out string error)
-        {
-            if (!TryGetClientEnvironmentSetMethod(out var setMethod))
-            {
-                error = "Client environment manager method TrySetActiveEnvironment is not available.";
-                return false;
-            }
-
-            var args = new object[] { environmentName, string.Empty };
-            var invocationResult = setMethod.Invoke(null, args);
-            var success = invocationResult is bool b && b;
-            error = args[1] as string ?? string.Empty;
-            return success;
-        }
-
-        private static bool TryGetClientEnvironmentSetMethod(out MethodInfo setMethod)
-        {
-            setMethod = null;
-
-            var managerType = FindClientEnvironmentManagerType();
-            if (managerType == null)
+            if (!TryGetClientProjectConfigUiMethod(out var drawMethod))
                 return false;
 
-            setMethod = managerType.GetMethod(
-                "TrySetActiveEnvironment",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
-            return setMethod != null;
+            try
+            {
+                var args = new object[] { false };
+                var result = drawMethod.Invoke(null, args);
+                changed = args[0] is bool hasChanged && hasChanged;
+                return result is bool drawn && drawn;
+            }
+            catch
+            {
+                changed = false;
+                return false;
+            }
         }
 
-        private static Type FindClientEnvironmentManagerType()
+        private static bool TryGetClientProjectConfigUiMethod(out MethodInfo drawMethod)
+        {
+            drawMethod = null;
+
+            var bridgeType = FindClientProjectSettingsBridgeType();
+            if (bridgeType == null)
+                return false;
+
+            drawMethod = bridgeType.GetMethod(
+                DrawProjectConfigUiMethodName,
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+
+            return drawMethod != null;
+        }
+
+        private static Type FindClientProjectSettingsBridgeType()
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                var type = assembly.GetType("Playserv.ClientEditor.PlayServEnvironmentManager", throwOnError: false);
+                var type = assembly.GetType(ClientProjectSettingsBridgeTypeName, throwOnError: false);
                 if (type != null)
                     return type;
             }
@@ -1509,22 +1472,6 @@ namespace Playserv.Editor
                     EditorStyles.textField,
                     GUILayout.Height(EditorGUIUtility.singleLineHeight));
             }
-        }
-
-        private static string AsDisplayEnvironmentLabel(string environmentName)
-        {
-            if (string.IsNullOrWhiteSpace(environmentName))
-                return "Unknown";
-
-            var normalized = environmentName.Trim().ToLowerInvariant();
-            return normalized switch
-            {
-                "local" => "Local",
-                "dev" => "Dev",
-                "test" => "Test",
-                "prod" => "Prod",
-                _ => environmentName
-            };
         }
 
         private void DrawFooter()

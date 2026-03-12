@@ -7,26 +7,26 @@ using UnityEngine;
 namespace Playserv.Wrapper
 {
     /// <summary>
-    /// Loads baked environment defaults from Resources/EnvDefaults when available.
+    /// Loads baked package defaults from Resources/PlayServPackageDefaults when available.
     /// </summary>
-    public static class PlayServEnvDefaultsProvider
+    public static class PlayServPackageDefaultsProvider
     {
-        public const string ResourceName = "EnvDefaults";
+        public const string ResourceName = "PlayServPackageDefaults";
 
 #if UNITY_5_3_OR_NEWER
-        public static bool TryLoadAsset(out PlayServEnvDefaults envDefaults)
+        public static bool TryLoadAsset(out PlayServPackageDefaults packageDefaults)
         {
-            envDefaults = Resources.Load<PlayServEnvDefaults>(ResourceName);
-            return envDefaults != null;
+            packageDefaults = Resources.Load<PlayServPackageDefaults>(ResourceName);
+            return packageDefaults != null;
         }
 #endif
 
         public static bool TryLoadSettings(out PlayServSettings settings)
         {
 #if UNITY_5_3_OR_NEWER
-            if (TryLoadAsset(out var envDefaults))
+            if (TryLoadAsset(out var packageDefaults))
             {
-                settings = envDefaults.ToSettings();
+                settings = packageDefaults.ToSettings();
                 return true;
             }
 #endif
@@ -46,8 +46,11 @@ namespace Playserv.Wrapper
                 return value.Trim();
 
 #if UNITY_5_3_OR_NEWER
-            if (TryLoadAsset(out var envDefaults) && !string.IsNullOrWhiteSpace(envDefaults.BackendServerAddress))
-                return envDefaults.BackendServerAddress.Trim();
+            if (TryLoadAsset(out var packageDefaults) &&
+                !string.IsNullOrWhiteSpace(packageDefaults.BackendServerAddress))
+            {
+                return packageDefaults.BackendServerAddress.Trim();
+            }
 #endif
 
             return PlayServSettings.DefaultBackendServerAddress;
@@ -59,8 +62,11 @@ namespace Playserv.Wrapper
                 return value.Trim();
 
 #if UNITY_5_3_OR_NEWER
-            if (TryLoadAsset(out var envDefaults) && !string.IsNullOrWhiteSpace(envDefaults.DeployApiServerAddress))
-                return envDefaults.DeployApiServerAddress.Trim();
+            if (TryLoadAsset(out var packageDefaults) &&
+                !string.IsNullOrWhiteSpace(packageDefaults.DeployApiServerAddress))
+            {
+                return packageDefaults.DeployApiServerAddress.Trim();
+            }
 #endif
 
             return PlayServSettings.DefaultDeployApiServerAddress;
@@ -72,8 +78,11 @@ namespace Playserv.Wrapper
                 return value.Trim();
 
 #if UNITY_5_3_OR_NEWER
-            if (TryLoadAsset(out var envDefaults) && !string.IsNullOrWhiteSpace(envDefaults.SchemaApiServerAddress))
-                return envDefaults.SchemaApiServerAddress.Trim();
+            if (TryLoadAsset(out var packageDefaults) &&
+                !string.IsNullOrWhiteSpace(packageDefaults.SchemaApiServerAddress))
+            {
+                return packageDefaults.SchemaApiServerAddress.Trim();
+            }
 #endif
 
             return PlayServSettings.DefaultSchemaApiServerAddress;

@@ -10,11 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d43cc861c6f4b2189a8f14d0c2f9dc1, type: 3}
-  m_Name: EnvDefaults
+  m_Name: PlayServPackageDefaults
   m_EditorClassIdentifier: 
-  environmentName: prod
-  gameAccessToken: my-token2
-  gameId: my-game-id2
+  gameAccessToken: 
+  gameId: 
   backendServerAddress: wss://proxy.playserv.io/ws
   deployApiServerAddress: https://deployment.playserv.io
   schemaApiServerAddress: https://backoffice.playserv.io/

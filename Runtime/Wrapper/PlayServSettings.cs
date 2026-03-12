@@ -10,17 +10,17 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Default backend websocket endpoint.
         /// </summary>
-        public const string DefaultBackendServerAddress = "wss://playserv-proxy.test.playserv.io/ws";
+        public const string DefaultBackendServerAddress = "";
 
         /// <summary>
         /// Default deployment API server address.
         /// </summary>
-        public const string DefaultDeployApiServerAddress = "http://playserv-deployment.test.playserv.io";
+        public const string DefaultDeployApiServerAddress = "";
 
         /// <summary>
         /// Default schema API server address.
         /// </summary>
-        public const string DefaultSchemaApiServerAddress = "https://playserv-backoffice.test.playserv.io";
+        public const string DefaultSchemaApiServerAddress = "";
 
         /// <summary>
         /// Access token used in handshake.

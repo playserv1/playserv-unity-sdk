@@ -1,6 +1,4 @@
 #if UNITY_EDITOR
-using System;
-using System.Reflection;
 using Playserv.Wrapper;
 using UnityEditor;
 using UnityEngine;
@@ -64,27 +62,7 @@ namespace Playserv.Editor
 
         private static bool CanEditSdkVersionInClientEditor()
         {
-            var managerType = FindClientEnvironmentManagerType();
-            if (managerType == null)
-                return false;
-
-            var setMethod = managerType.GetMethod(
-                "TrySetActiveEnvironment",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
-            return setMethod != null;
-        }
-
-        private static Type FindClientEnvironmentManagerType()
-        {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = assembly.GetType("Playserv.ClientEditor.PlayServEnvironmentManager", throwOnError: false);
-                if (type != null)
-                    return type;
-            }
-
-            return null;
+            return PlayServSettingsResolver.IsClientProjectContext();
         }
     }
 }

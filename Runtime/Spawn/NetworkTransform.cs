@@ -85,20 +85,14 @@ namespace Playserv.Spawn
             if (config != null)
             {
 #if UNITY_EDITOR
-                var resolvedSettings = PlayServEnvironmentResolver.ResolveSettingsForEditor(
-                    config,
-                    out _,
-                    out _,
-                    out _);
-
-                syncIntervalMs = resolvedSettings.NetworkTransformSyncIntervalMs;
+                syncIntervalMs = PlayServSettingsResolver.ResolveEditorSettings(config).NetworkTransformSyncIntervalMs;
 #else
                 syncIntervalMs = config.NetworkTransformSyncIntervalMs;
 #endif
             }
-            else if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
+            else if (PlayServPackageDefaultsProvider.TryLoadSettings(out var packageDefaults))
             {
-                syncIntervalMs = bakedSettings.NetworkTransformSyncIntervalMs;
+                syncIntervalMs = packageDefaults.NetworkTransformSyncIntervalMs;
             }
 
             _syncInterval = syncIntervalMs / 1000f;

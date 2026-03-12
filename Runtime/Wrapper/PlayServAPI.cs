@@ -18,10 +18,6 @@ namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServApi
     {
-#if UNITY_5_3_OR_NEWER
-        private const string ConfigResourceName = "PlayServConfig";
-#endif
-
         private PlayServImplementation? _instance;
         private PlayServSettings? _settings;
         private string? _instanceEndpoint;
@@ -561,33 +557,7 @@ namespace Playserv.Wrapper
 
         private static bool TryLoadSettingsFromUnityResources(out PlayServSettings settings)
         {
-#if UNITY_5_3_OR_NEWER
-            var config = Resources.Load<PlayServConfig>(ConfigResourceName);
-            if (config != null)
-            {
-#if UNITY_EDITOR
-                var resolvedSettings = PlayServEnvironmentResolver.ResolveSettingsForEditor(
-                    config,
-                    out _,
-                    out _,
-                    out _);
-
-                settings = resolvedSettings;
-#else
-                settings = config.ToSettings();
-#endif
-                return true;
-            }
-
-            if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
-            {
-                settings = bakedSettings;
-                return true;
-            }
-#endif
-
-            settings = null!;
-            return false;
+            return PlayServSettingsResolver.TryLoadSettingsFromResourcesOrPackageDefaults(out settings);
         }
     }
 }

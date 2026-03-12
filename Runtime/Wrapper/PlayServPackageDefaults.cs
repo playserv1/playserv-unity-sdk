@@ -7,12 +7,11 @@ using UnityEngine;
 namespace Playserv.Wrapper
 {
     /// <summary>
-    /// Baked environment defaults that can be shipped with exported SDK artifacts.
+    /// Baked package defaults that can be shipped with exported SDK artifacts.
     /// </summary>
-    [CreateAssetMenu(fileName = "EnvDefaults", menuName = "PlayServ/Env Defaults", order = 1)]
-    public sealed class PlayServEnvDefaults : ScriptableObject
+    [CreateAssetMenu(fileName = "PlayServPackageDefaults", menuName = "PlayServ/Package Defaults", order = 1)]
+    public sealed class PlayServPackageDefaults : ScriptableObject
     {
-        [SerializeField] private string environmentName = PlayServEnvironmentResolver.DefaultEnvironment;
         [SerializeField] private string gameAccessToken = string.Empty;
         [SerializeField] private string gameId = string.Empty;
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
@@ -24,7 +23,6 @@ namespace Playserv.Wrapper
         [SerializeField] private int networkTransformSyncIntervalMs = 100;
         [SerializeField] private int timeoutSeconds = 120;
 
-        public string EnvironmentName => environmentName;
         public string GameAccessToken => gameAccessToken;
         public string GameId => gameId;
         public string BackendServerAddress => backendServerAddress;
@@ -53,14 +51,10 @@ namespace Playserv.Wrapper
             };
         }
 
-        public void ApplyFromSettings(string selectedEnvironment, PlayServSettings settings)
+        public void ApplyFromSettings(PlayServSettings settings)
         {
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
-
-            environmentName = string.IsNullOrWhiteSpace(selectedEnvironment)
-                ? PlayServEnvironmentResolver.DefaultEnvironment
-                : selectedEnvironment.Trim().ToLowerInvariant();
 
             gameAccessToken = ResolveOptionalText(settings.GameAccessToken);
             gameId = ResolveOptionalText(settings.GameId);

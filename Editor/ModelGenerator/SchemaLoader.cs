@@ -72,42 +72,21 @@ public static class SchemaLoader
 
     private static string ResolveSchemaUrl()
     {
-        var selectedEnvironment = PlayServEnvironmentResolver.ResolveEnvironmentName(null);
-        PlayServEnvironmentConfig config;
+        var config = Resources.Load<PlayServConfig>("PlayServConfig");
+        if (config != null)
+            return BuildSchemaUrl(PlayServSettingsResolver.ResolveEditorSettings(config).SchemaApiServerAddress);
 
-        if (!PlayServEnvironmentResolver.TryLoadConfigFromFile(out config, out var error))
-        {
-            config = PlayServEnvironmentConfig.CreateDefault();
-            Debug.LogWarning($"[SchemaDownloader] {error} Falling back to default environment profiles.");
-        }
+        if (PlayServPackageDefaultsProvider.TryLoadSettings(out var packageDefaults))
+            return BuildSchemaUrl(packageDefaults.SchemaApiServerAddress);
 
-        selectedEnvironment = PlayServEnvironmentResolver.ResolveEnvironmentName(config.ActiveEnvironment);
-        if (!config.TryGetProfile(selectedEnvironment, out var profile) ||
-            string.IsNullOrWhiteSpace(profile.SchemaApiServerAddress))
-        {
-            if (PlayServEnvDefaultsProvider.TryLoadAsset(out var envDefaults) &&
-                !string.IsNullOrWhiteSpace(envDefaults.SchemaApiServerAddress))
-            {
-                selectedEnvironment = string.IsNullOrWhiteSpace(envDefaults.EnvironmentName)
-                    ? PlayServEnvironmentResolver.DefaultEnvironment
-                    : envDefaults.EnvironmentName;
-
-                return BuildSchemaUrl(envDefaults.SchemaApiServerAddress, selectedEnvironment);
-            }
-
-            profile = PlayServEnvironmentProfile.CreateDevDefaults();
-            selectedEnvironment = PlayServEnvironmentResolver.DevEnvironment;
-            Debug.LogWarning("[SchemaDownloader] schemaApiServerAddress is not configured for selected environment. Falling back to dev defaults.");
-        }
-
-        return BuildSchemaUrl(profile.SchemaApiServerAddress, selectedEnvironment);
+        throw new InvalidOperationException(
+            "schemaApiServerAddress is not configured in PlayServConfig or baked package defaults.");
     }
 
-    private static string BuildSchemaUrl(string serverAddress, string environmentName)
+    private static string BuildSchemaUrl(string serverAddress)
     {
         if (string.IsNullOrWhiteSpace(serverAddress))
-            throw new InvalidOperationException(
-                $"schemaApiServerAddress is required for environment '{environmentName}'.");
+            throw new InvalidOperationException("schemaApiServerAddress is required.");
 
         return serverAddress.Trim().TrimEnd('/') + SchemaBySdkKeyEndpointPath;
     }

@@ -84,7 +84,7 @@ namespace Playserv.Editor
             if (!shouldReplace)
                 return false;
 
-            backendProperty.stringValue = PlayServEnvDefaultsProvider.ResolveBackendServerAddress(null);
+            backendProperty.stringValue = PlayServPackageDefaultsProvider.ResolveBackendServerAddress(null);
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
@@ -121,7 +121,7 @@ namespace Playserv.Editor
             if (!shouldReplace)
                 return false;
 
-            deployEndpointProperty.stringValue = PlayServEnvDefaultsProvider.ResolveDeployApiServerAddress(null);
+            deployEndpointProperty.stringValue = PlayServPackageDefaultsProvider.ResolveDeployApiServerAddress(null);
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
@@ -142,7 +142,7 @@ namespace Playserv.Editor
             if (!shouldReplace)
                 return false;
 
-            schemaEndpointProperty.stringValue = PlayServEnvDefaultsProvider.ResolveSchemaApiServerAddress(null);
+            schemaEndpointProperty.stringValue = PlayServPackageDefaultsProvider.ResolveSchemaApiServerAddress(null);
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
@@ -175,20 +175,14 @@ namespace Playserv.Editor
             if (config == null)
                 return false;
 
-            var resolved = PlayServEnvironmentResolver.ResolveSettingsForEditor(
-                config,
-                out _,
-                out var profileApplied,
-                out _);
-
-            if (profileApplied)
+            if (PlayServSettingsResolver.TryResolveClientProjectSettings(config, out var resolved))
                 return config.ApplySettings(resolved);
 
-            if (PlayServEnvDefaultsProvider.TryLoadSettings(out var bakedSettings))
+            if (PlayServPackageDefaultsProvider.TryLoadSettings(out var bakedSettings))
             {
                 // Distributed package mode:
                 // - keep user-entered values once set
-                // - seed auth/game fields from baked defaults only when currently empty
+                // - seed auth/game fields from baked package defaults only when currently empty
                 // - always enforce baked endpoints
                 var merged = config.ToSettings();
                 if (string.IsNullOrWhiteSpace(merged.GameAccessToken))
