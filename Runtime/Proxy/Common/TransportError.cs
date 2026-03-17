@@ -40,6 +40,7 @@ namespace Playserv.Proxy.Common
             TransportErrorCode.GameVersionMismatch => new TransportError(code, "Game version mismatch. Please update your game client."),
             TransportErrorCode.ConnectionLimitReached => new TransportError(code, "Connection limit reached. Please try again later."),
             TransportErrorCode.SessionForceRejected => new TransportError(code, "Connection rejected. Server is in maintenance mode."),
+            TransportErrorCode.ForcedDisconnect => new TransportError(code, "Connection was terminated by the server."),
             _ => new TransportError(code, "Unknown transport error occurred.")
         };
 

@@ -375,6 +375,8 @@ namespace Playserv.Proxy.Common
         {
             OnCommand("error", OnCommandErrorReceived);
             OnCommand("Disconnect", OnDisconnectReceived);
+            OnCommand("ForcedDisconnect", OnForcedDisconnectReceived);
+            OnCommand("module_proxy.ForcedDisconnect", OnForcedDisconnectReceived);
             OnCommand("ClientSettingsResponse", OnClientSettingsResponseReceived);
             OnCommand("ParseErrorResponse", OnParseErrorReceived);
             OnCommand("ValidationErrorResponse", OnValidationErrorReceived);
@@ -389,6 +391,31 @@ namespace Playserv.Proxy.Common
             _disconnectedByServer = true;
             _reconnectionManager.Stop();
             State = PlayServState.Offline;
+        }
+
+        private void OnForcedDisconnectReceived(object command)
+        {
+            var response = command as ForcedDisconnectResponse;
+            var rawCode = response?.ErrorCode ?? (int)TransportErrorCode.ForcedDisconnect;
+            var code = Enum.IsDefined(typeof(TransportErrorCode), rawCode)
+                ? (TransportErrorCode)rawCode
+                : TransportErrorCode.ForcedDisconnect;
+
+            var message = string.IsNullOrWhiteSpace(response?.ErrorMessage)
+                ? TransportError.FromCode(code).Message
+                : response.ErrorMessage;
+            var reason = string.IsNullOrWhiteSpace(response?.Reason) ? "Unknown" : response.Reason;
+            var serverVersion = string.IsNullOrWhiteSpace(response?.ServerVersion) ? "n/a" : response.ServerVersion;
+
+            _logger.LogWarning(
+                $"Received forced disconnect command from server. code={rawCode:D5}, reason={reason}, serverVersion={serverVersion}, message={message}");
+
+            _disconnectedByServer = true;
+            _keepAliveManager.Stop();
+            _reconnectionManager.Stop();
+            State = PlayServState.Offline;
+
+            OnTransportError?.Invoke(new TransportError(code, message));
         }
 
         private void OnClientSettingsResponseReceived(object command)

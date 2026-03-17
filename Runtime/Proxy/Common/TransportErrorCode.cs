@@ -33,6 +33,11 @@ namespace Playserv.Proxy.Common
         /// <summary>
         /// Session rejected by server policy.
         /// </summary>
-        SessionForceRejected = 02002
+        SessionForceRejected = 02002,
+
+        /// <summary>
+        /// Session was forcefully disconnected by server.
+        /// </summary>
+        ForcedDisconnect = 02003
     }
 }

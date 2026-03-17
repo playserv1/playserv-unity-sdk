@@ -196,6 +196,12 @@ namespace Playserv.Proxy.Implementation
                 return true;
             }
 
+            if (string.Equals(commandName, "ForcedDisconnect", StringComparison.Ordinal))
+            {
+                type = typeof(ForcedDisconnectResponse);
+                return true;
+            }
+
             if (string.Equals(commandName, "EventSubscribedMessage", StringComparison.Ordinal))
             {
                 type = typeof(EventSubscribedMessage);
