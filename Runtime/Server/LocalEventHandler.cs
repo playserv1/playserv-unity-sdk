@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 
-#nullable enable
-
 namespace Playserv.Server
 {
     /// <summary>
@@ -21,7 +19,7 @@ namespace Playserv.Server
         /// <returns>Always true because event is handled locally.</returns>
         public bool TryPublish<T>(T @event)
         {
-            List<Delegate>? handlers = null;
+            List<Delegate> handlers = null;
             lock (_sync)
             {
                 if (_subscribers.TryGetValue(typeof(T), out var list) && list.Count > 0)
@@ -79,7 +77,7 @@ namespace Playserv.Server
         /// <param name="onNext">Event callback.</param>
         /// <param name="subscription">Disposable subscription handle.</param>
         /// <returns>Always true because subscription is handled locally.</returns>
-        public bool TrySubscribe<T>(Action<T> onNext, out IDisposable? subscription)
+        public bool TrySubscribe<T>(Action<T> onNext, out IDisposable subscription)
         {
             if (onNext == null)
                 throw new ArgumentNullException(nameof(onNext));
@@ -105,7 +103,7 @@ namespace Playserv.Server
         /// <typeparam name="T">Event payload type.</typeparam>
         /// <param name="observable">Observable stream.</param>
         /// <returns>Always true because subscription is handled locally.</returns>
-        public bool TrySubscribe<T>(out IObservable<T>? observable)
+        public bool TrySubscribe<T>(out IObservable<T> observable)
         {
             observable = new LocalObservable<T>(this);
             return true;
@@ -139,7 +137,7 @@ namespace Playserv.Server
                     throw new ArgumentNullException(nameof(observer));
 
                 _owner.TrySubscribe<T>(observer.OnNext, out var subscription);
-                return subscription!;
+                return subscription;
             }
         }
 
@@ -164,5 +162,3 @@ namespace Playserv.Server
         }
     }
 }
-
-#nullable restore

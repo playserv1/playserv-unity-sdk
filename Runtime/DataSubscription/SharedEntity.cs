@@ -13,8 +13,8 @@ namespace Playserv.DataSubscription
     {
         private readonly PlayServDataSubscriptionAdapter _adapter;
         private readonly long _subscriptionId;
-        private readonly LambdaExpression? _selector;
-        private readonly Func<object?, T>? _mapFunc;
+        private readonly LambdaExpression _selector;
+        private readonly Func<object, T> _mapFunc;
         private readonly IDisposable _subscription;
         private readonly string _query;
         private readonly Dictionary<string, object> _variables;
@@ -33,10 +33,10 @@ namespace Playserv.DataSubscription
         public SharedEntity(
             PlayServDataSubscriptionAdapter adapter,
             long subscriptionId,
-            LambdaExpression? selector,
+            LambdaExpression selector,
             string query,
             Dictionary<string, object> variables,
-            Func<object?, T>? mapFunc = null)
+            Func<object, T> mapFunc = null)
         {
             _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
             _subscriptionId = subscriptionId;
@@ -56,10 +56,10 @@ namespace Playserv.DataSubscription
             long subscriptionId,
             string key,
             string rootFieldName,
-            LambdaExpression? selector,
+            LambdaExpression selector,
             string query,
             Dictionary<string, object> variables,
-            Func<object?, T>? mapFunc = null)
+            Func<object, T> mapFunc = null)
         {
             if (string.IsNullOrWhiteSpace(key))
                 throw new ArgumentException("Subscription key is required.", nameof(key));
@@ -126,7 +126,7 @@ namespace Playserv.DataSubscription
             }
         }
 
-        private void OnPollingDataReceived(object? rawData)
+        private void OnPollingDataReceived(object rawData)
         {
             if (_isDisposed)
                 return;
@@ -172,7 +172,7 @@ namespace Playserv.DataSubscription
             Changed?.Invoke(Value);
         }
 
-        private T MapData(object? raw)
+        private T MapData(object raw)
         {
             if (raw == null)
                 return new T();

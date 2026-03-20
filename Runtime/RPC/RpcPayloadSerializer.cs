@@ -2,8 +2,6 @@ using System;
 using System.Text;
 using Newtonsoft.Json;
 
-#nullable enable
-
 namespace Playserv.RPC
 {
     /// <summary>
@@ -16,7 +14,7 @@ namespace Playserv.RPC
         /// </summary>
         /// <param name="payload">Payload object. Can be null.</param>
         /// <returns>Base64-encoded UTF8 JSON string.</returns>
-        public static string SerializeToBase64(object? payload)
+        public static string SerializeToBase64(object payload)
         {
             var json = JsonConvert.SerializeObject(payload);
             var bytes = Encoding.UTF8.GetBytes(json);
@@ -38,5 +36,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#nullable restore

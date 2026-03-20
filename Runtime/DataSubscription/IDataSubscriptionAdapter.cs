@@ -55,6 +55,6 @@ namespace Playserv.DataSubscription
             string query,
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
-            Action<Exception>? onError = null);
+            Action<Exception> onError = null);
     }
 }

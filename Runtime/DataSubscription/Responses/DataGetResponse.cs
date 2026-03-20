@@ -17,12 +17,12 @@ namespace Playserv.DataSubscription.Responses
         /// <summary>
         /// Successful response payload.
         /// </summary>
-        public DataGetResult? Result { get; set; }
+        public DataGetResult Result { get; set; }
 
         /// <summary>
         /// Error payload if request failed.
         /// </summary>
-        public DataGetError? Error { get; set; }
+        public DataGetError Error { get; set; }
 
         /// <summary>
         /// True when response contains error.
@@ -39,7 +39,7 @@ namespace Playserv.DataSubscription.Responses
         /// <summary>
         /// Returned data object from server.
         /// </summary>
-        public JToken? Data { get; set; }
+        public JToken Data { get; set; }
     }
 
     /// <summary>
