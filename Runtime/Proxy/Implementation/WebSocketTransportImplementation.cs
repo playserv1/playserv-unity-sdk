@@ -145,10 +145,52 @@ namespace Playserv.Proxy.Implementation
 
         public IObservable<byte[]> OnReceive() => _channel;
 
+        public void ResetConnection()
+        {
+            lock (_connectGate)
+            {
+                _connecting = false;
+
+                try
+                {
+                    _connectCTS?.Cancel();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    _socket?.Abort();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    _socket?.Dispose();
+                }
+                catch
+                {
+                }
+
+                _socket = new ClientWebSocket();
+                ResetChannel();
+                _logger.Log("[WebSocket] Transport connection state reset.");
+            }
+        }
+
         private async Task ReceiveLoop()
         {
             var buffer = new byte[4096];
             using var ms = new MemoryStream();
+            ByteArrayChannel channel;
+
+            lock (_gate)
+            {
+                channel = _channel;
+            }
 
             try
             {
@@ -181,7 +223,7 @@ namespace Playserv.Proxy.Implementation
                             _logger.LogWarning($"Failed to complete websocket close handshake: {ex.Message}");
                         }
 
-                        CompleteAll();
+                        channel.Complete();
                         return;
                     }
 
@@ -193,26 +235,20 @@ namespace Playserv.Proxy.Implementation
                     var data = ms.ToArray();
                     ms.SetLength(0);
 
-                    NextAll(data);
+                    channel.Next(data);
                 }
             }
             catch (OperationCanceledException)
             {
                 _logger.Log("WebSocket receive loop cancelled.");
-                CompleteAll();
+                channel.Complete();
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error in WebSocket receive loop: {ex.Message}");
-                ErrorAll(ex);
+                channel.Error(ex);
             }
         }
-
-        private void CompleteAll() => _channel.Complete();
-
-        private void ErrorAll(Exception ex) => _channel.Error(ex);
-
-        private void NextAll(byte[] data) => _channel.Next(data);
 
         private void ResetChannel()
         {

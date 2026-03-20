@@ -154,6 +154,26 @@ namespace Playserv.Proxy.Implementation
 
         public IObservable<byte[]> OnReceive() => _channel;
 
+        public void ResetConnection()
+        {
+            if (_isDisposed)
+                return;
+
+            TaskCompletionSource<bool> pendingConnect = null;
+            lock (_connectGate)
+            {
+                pendingConnect = _connectTcs;
+                _connectTcs = null;
+                _connecting = false;
+                _isConnected = false;
+            }
+
+            pendingConnect?.TrySetResult(false);
+            TryCloseSocket();
+            ResetChannel();
+            _logger.Log("WebGL WebSocket transport connection state reset.");
+        }
+
         private void CompleteAll() => _channel.Complete();
 
         private void EnsureBridgeEventHandlers()

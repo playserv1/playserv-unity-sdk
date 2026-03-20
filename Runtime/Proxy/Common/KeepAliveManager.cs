@@ -95,7 +95,7 @@ namespace Playserv.Proxy.Common
 
         private async Task SendLoopAsync(CancellationToken cancellationToken)
         {
-            var firstPingDelayMs = Math.Min(ResolveKeepAliveIntervalMs(), 5000);
+            var firstPingDelayMs = Math.Min(ResolveKeepAliveSendIntervalMs(), 5000);
             LogKeepAlive(
                 $"{KeepAliveLogPrefix} heartbeat loop started. first KeepAlive in {firstPingDelayMs}ms");
 
@@ -105,14 +105,14 @@ namespace Playserv.Proxy.Common
             {
                 try
                 {
-                    var delayMs = isFirstPing ? firstPingDelayMs : ResolveKeepAliveIntervalMs();
+                    var delayMs = isFirstPing ? firstPingDelayMs : ResolveKeepAliveSendIntervalMs();
                     isFirstPing = false;
                     await Task.Delay(delayMs, cancellationToken);
 
                     if (cancellationToken.IsCancellationRequested)
                         break;
 
-                    var success = await SendKeepAliveAsync(cancellationToken);
+                    var success = await SendKeepAliveAsync("periodic", cancellationToken, triggerTimeoutOnFailure: true);
                     if (!success)
                     {
                         break;
@@ -180,7 +180,10 @@ namespace Playserv.Proxy.Common
             }
         }
 
-        private async Task<bool> SendKeepAliveAsync(CancellationToken cancellationToken)
+        private async Task<bool> SendKeepAliveAsync(
+            string source,
+            CancellationToken cancellationToken,
+            bool triggerTimeoutOnFailure)
         {
             var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var sequence = Interlocked.Increment(ref _heartbeatSequence);
@@ -189,7 +192,7 @@ namespace Playserv.Proxy.Common
             var keepAliveEvent = new EventMessage(KeepAliveEventType, EmptyPayloadJson);
 
             LogKeepAlive(
-                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} send attempt. event={KeepAliveEventType}, ts={FormatTimestamp(nowMs)}");
+                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} send attempt. source={source}, event={KeepAliveEventType}, ts={FormatTimestamp(nowMs)}");
 
             try
             {
@@ -197,14 +200,15 @@ namespace Playserv.Proxy.Common
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                LogKeepAliveWarning($"{KeepAliveLogPrefix} heartbeat#{sequence} send failed: {ex.Message}");
-                TriggerTimeout("failed to send keepalive");
+                LogKeepAliveWarning($"{KeepAliveLogPrefix} heartbeat#{sequence} send failed. source={source}, error={ex.Message}");
+                if (triggerTimeoutOnFailure)
+                    TriggerTimeout("failed to send keepalive");
                 return false;
             }
 
             OnPingSent?.Invoke();
             LogKeepAlive(
-                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} sent. twait={ResolveKeepAliveIntervalMs()}ms");
+                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} sent. source={source}, sendEvery={ResolveKeepAliveSendIntervalMs()}ms, twait={ResolveKeepAliveIntervalMs()}ms");
             return true;
         }
 
@@ -233,6 +237,8 @@ namespace Playserv.Proxy.Common
                 LogKeepAlive(
                     $"{KeepAliveLogPrefix} <- first server event '{message.EventType}' received. at={FormatTimestamp(nowMs)}");
             }
+
+            _ = RespondToServerKeepAliveAsync();
         }
 
         private static bool IsKeepAliveEventType(string eventTypeName)
@@ -245,10 +251,21 @@ namespace Playserv.Proxy.Common
             return PingIntervalMs > 0 ? PingIntervalMs : DefaultKeepAliveIntervalMs;
         }
 
+        private int ResolveKeepAliveSendIntervalMs()
+        {
+            var intervalMs = ResolveKeepAliveIntervalMs();
+            var safetyMarginMs = Math.Min(5000, Math.Max(1000, intervalMs / 6));
+            return Math.Max(1000, intervalMs - safetyMarginMs);
+        }
+
         private int ResolveKeepAliveWaitWindowMs()
         {
             var intervalMs = ResolveKeepAliveIntervalMs();
-            return Math.Max(intervalMs, PongTimeoutMs > 0 ? PongTimeoutMs : intervalMs);
+            var graceMs = PongTimeoutMs > 0
+                ? PongTimeoutMs
+                : Math.Max(1000, intervalMs / 3);
+
+            return intervalMs + graceMs;
         }
 
         private int ResolveMonitorTickMs()
@@ -286,6 +303,25 @@ namespace Playserv.Proxy.Common
             catch (Exception ex)
             {
                 LogKeepAliveError($"{KeepAliveLogPrefix} failed to reply legacy KeepAliveResponse: {ex.Message}");
+            }
+        }
+
+        private async Task RespondToServerKeepAliveAsync()
+        {
+            CancellationToken cancellationToken;
+
+            lock (_lock)
+            {
+                if (!_isRunning || _cts == null || _cts.IsCancellationRequested)
+                    return;
+
+                cancellationToken = _cts.Token;
+            }
+
+            var success = await SendKeepAliveAsync("reply", cancellationToken, triggerTimeoutOnFailure: false);
+            if (!success)
+            {
+                LogKeepAliveWarning($"{KeepAliveLogPrefix} reply KeepAlive was not sent. Connection may already be closing.");
             }
         }
 

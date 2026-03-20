@@ -114,6 +114,9 @@ namespace Playserv.Proxy.Common
 
         private async Task<bool> ReconnectSessionAsync()
         {
+            _keepAliveManager.Stop();
+            _transport.ResetConnection();
+
             var connected = await _transport.Connect();
             if (!connected)
                 return false;
@@ -122,6 +125,7 @@ namespace Playserv.Proxy.Common
             if (!handshakeResult.Success)
             {
                 _logger.LogError($"Reconnection handshake failed: {handshakeResult.Error}");
+                _transport.ResetConnection();
                 return false;
             }
             
@@ -141,6 +145,7 @@ namespace Playserv.Proxy.Common
         private void HandleKeepAliveTimeout()
         {
             _logger.LogWarning("KeepAlive timeout. Connection may be lost.");
+            _keepAliveManager.Stop();
             _reconnectionManager.HandleConnectionLost();
         }
 
@@ -395,7 +400,9 @@ namespace Playserv.Proxy.Common
         {
             _logger.LogWarning("Received disconnect command from server.");
             _disconnectedByServer = true;
+            _keepAliveManager.Stop();
             _reconnectionManager.Stop();
+            _transport.ResetConnection();
             State = PlayServState.Offline;
         }
 
@@ -419,6 +426,7 @@ namespace Playserv.Proxy.Common
             _disconnectedByServer = true;
             _keepAliveManager.Stop();
             _reconnectionManager.Stop();
+            _transport.ResetConnection();
             State = PlayServState.Offline;
 
             OnTransportError?.Invoke(new TransportError(code, message));

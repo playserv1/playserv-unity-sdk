@@ -23,6 +23,11 @@ namespace Playserv.Proxy.Interfaces
         Task Send<T>(T command, string moduleName = null);
 
         /// <summary>
+        /// Resets current transport connection state so a following Connect call uses a fresh session.
+        /// </summary>
+        void ResetConnection();
+
+        /// <summary>
         /// Subscribes to received commands by deserialized payload type.
         /// </summary>
         /// <typeparam name="T">Expected payload type.</typeparam>

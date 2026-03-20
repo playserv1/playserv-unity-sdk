@@ -44,6 +44,16 @@ namespace Playserv.Proxy.Implementation
             return connected;
         }
 
+        public void ResetConnection()
+        {
+            if (_isDisposed)
+                return;
+
+            _rawSubscription?.Dispose();
+            _rawSubscription = null;
+            _implementation.ResetConnection();
+        }
+
         public async Task Send<T>(T command, string moduleName = null)
         {
             if (command == null)
@@ -270,7 +280,11 @@ namespace Playserv.Proxy.Implementation
         {
             _rawSubscription?.Dispose();
             _rawSubscription = null;
-            ErrorAll(error);
+
+            if (_isDisposed)
+                return;
+
+            _logger.LogWarning($"[Transport] Raw transport error received. Keeping command channels alive for reconnect. Error={error?.Message}");
             ConnectionLost?.Invoke(this, EventArgs.Empty);
         }
 
@@ -278,7 +292,11 @@ namespace Playserv.Proxy.Implementation
         {
             _rawSubscription?.Dispose();
             _rawSubscription = null;
-            CompleteAll();
+
+            if (_isDisposed)
+                return;
+
+            _logger.LogWarning("[Transport] Raw transport completed. Keeping command channels alive for reconnect.");
             ConnectionLost?.Invoke(this, EventArgs.Empty);
         }
 

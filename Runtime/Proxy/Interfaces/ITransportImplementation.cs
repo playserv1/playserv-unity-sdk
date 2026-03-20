@@ -21,6 +21,11 @@ namespace Playserv.Proxy.Interfaces
         Task Send(byte[] data);
 
         /// <summary>
+        /// Resets current connection state so the next Connect call starts with a fresh transport session.
+        /// </summary>
+        void ResetConnection();
+
+        /// <summary>
         /// Subscribes to incoming raw payload bytes.
         /// </summary>
         /// <returns>Observable byte stream.</returns>
