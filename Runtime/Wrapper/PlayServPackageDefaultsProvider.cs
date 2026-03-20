@@ -1,5 +1,3 @@
-#nullable enable
-
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -31,7 +29,7 @@ namespace Playserv.Wrapper
             }
 #endif
 
-            settings = null!;
+            settings = null;
             return false;
         }
 
@@ -40,7 +38,7 @@ namespace Playserv.Wrapper
             return TryLoadSettings(out var settings) ? settings : new PlayServSettings();
         }
 
-        public static string ResolveBackendServerAddress(string? value)
+        public static string ResolveBackendServerAddress(string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
                 return value.Trim();
@@ -56,7 +54,7 @@ namespace Playserv.Wrapper
             return PlayServSettings.DefaultBackendServerAddress;
         }
 
-        public static string ResolveDeployApiServerAddress(string? value)
+        public static string ResolveDeployApiServerAddress(string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
                 return value.Trim();
@@ -72,7 +70,7 @@ namespace Playserv.Wrapper
             return PlayServSettings.DefaultDeployApiServerAddress;
         }
 
-        public static string ResolveSchemaApiServerAddress(string? value)
+        public static string ResolveSchemaApiServerAddress(string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
                 return value.Trim();
@@ -89,5 +87,3 @@ namespace Playserv.Wrapper
         }
     }
 }
-
-#nullable restore

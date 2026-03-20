@@ -1,5 +1,4 @@
 // Shared.SDK.Annotations/SharedAttribute.cs
-#nullable enable
 using System;
 
 namespace Playserv.Shared
@@ -38,7 +37,7 @@ namespace Playserv.Shared
         /// <summary>
         /// Optional root model type.
         /// </summary>
-        public Type? RootType { get; set; }
+        public Type RootType { get; set; }
 
         /// <summary>
         /// Id field name used in query generation.
@@ -48,12 +47,12 @@ namespace Playserv.Shared
         /// <summary>
         /// Optional selection string for generated DTO fields.
         /// </summary>
-        public string? Selection { get; set; }
+        public string Selection { get; set; }
 
         /// <summary>
         /// Optional where clause metadata.
         /// </summary>
-        public string? Where { get; set; }
+        public string Where { get; set; }
 
         /// <summary>
         /// Enables two-way binding generation when true.
@@ -68,7 +67,6 @@ namespace Playserv.Shared
         /// <summary>
         /// Optional explicit generated DTO type name.
         /// </summary>
-        public string? GeneratedName { get; set; }
+        public string GeneratedName { get; set; }
     }
 }
-#nullable restore

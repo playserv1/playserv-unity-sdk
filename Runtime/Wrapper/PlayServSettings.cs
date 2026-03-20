@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace Playserv.Wrapper
 {
     /// <summary>
@@ -132,5 +130,3 @@ namespace Playserv.Wrapper
         }
     }
 }
-
-#nullable restore

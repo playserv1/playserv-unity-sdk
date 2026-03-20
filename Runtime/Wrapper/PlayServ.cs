@@ -12,8 +12,6 @@ using Playserv.Server;
 using UnityEngine;
 #endif
 
-#nullable enable
-
 namespace Playserv.Wrapper
 {
     /// <summary>
@@ -41,7 +39,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised when transport-level error happens (handshake, connection policy, protocol, etc.).
         /// </summary>
-        public static event Action<TransportError>? OnTransportError
+        public static event Action<TransportError> OnTransportError
         {
             add => Api.OnTransportError += value;
             remove => Api.OnTransportError -= value;
@@ -50,7 +48,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised every time keepalive ping is sent by the client.
         /// </summary>
-        public static event Action? OnKeepAlivePingSent
+        public static event Action OnKeepAlivePingSent
         {
             add => Api.OnKeepAlivePingSent += value;
             remove => Api.OnKeepAlivePingSent -= value;
@@ -59,7 +57,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised when keepalive pong is received from server.
         /// </summary>
-        public static event Action? OnKeepAlivePongReceived
+        public static event Action OnKeepAlivePongReceived
         {
             add => Api.OnKeepAlivePongReceived += value;
             remove => Api.OnKeepAlivePongReceived -= value;
@@ -68,7 +66,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised when RPC module returns InvokeRpcResponse command.
         /// </summary>
-        public static event Action<InvokeRpcResponse>? OnRpcInvokeResponse
+        public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {
             add => Api.OnRpcInvokeResponse += value;
             remove => Api.OnRpcInvokeResponse -= value;
@@ -89,7 +87,7 @@ namespace Playserv.Wrapper
         /// <param name="userId">Current player/user identifier.</param>
         /// <param name="gameVersion">Current game client version.</param>
         /// <param name="sdkVersion">Optional SDK version override. If null, default SDK version is used.</param>
-        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null) =>
+        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
         Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
 
         /// <summary>
@@ -128,7 +126,7 @@ namespace Playserv.Wrapper
         /// Sets optional local command handler for server-side/in-process execution.
         /// </summary>
         /// <param name="commandHandler">Local command handler. Pass null to disable local handling.</param>
-        public static void SetCommandHandler(ICommandHandler? commandHandler) =>
+        public static void SetCommandHandler(ICommandHandler commandHandler) =>
             Api.SetCommandHandler(commandHandler);
 
         /// <summary>
@@ -144,7 +142,7 @@ namespace Playserv.Wrapper
         /// Sets optional local event handler for server-side/in-process execution.
         /// </summary>
         /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
-        public static void SetEventHandler(IEventHandler? eventHandler) =>
+        public static void SetEventHandler(IEventHandler eventHandler) =>
             Api.SetEventHandler(eventHandler);
 
         /// <summary>
@@ -153,14 +151,14 @@ namespace Playserv.Wrapper
         /// <param name="serviceName">RPC service name.</param>
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payload">Payload object to serialize.</param>
-        public static void Invoke(string serviceName, string methodName, object? payload) =>
+        public static void Invoke(string serviceName, string methodName, object payload) =>
             Api.Invoke(serviceName, methodName, payload);
 
         /// <summary>
         /// Sets optional local RPC invoker for server-side/in-process execution.
         /// </summary>
         /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
-        public static void SetRpcInvoker(IRpcInvoker? rpcInvoker) =>
+        public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
             Api.SetRpcInvoker(rpcInvoker);
 
         /// <summary>
@@ -186,7 +184,7 @@ namespace Playserv.Wrapper
         /// <typeparam name="TService">RPC service type used to derive service name.</typeparam>
         /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll(default). Service class must have [Rpc] attribute.</param>
         /// <param name="payload">Payload object to serialize to base64 JSON.</param>
-        public static void Invoke<TService>(Expression<Action<TService>> method, object? payload) =>
+        public static void Invoke<TService>(Expression<Action<TService>> method, object payload) =>
             Api.Invoke(method, payload);
 
         /// <summary>
@@ -322,9 +320,7 @@ namespace Playserv.Wrapper
             string query,
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
-            Action<Exception>? onError = null) =>
+            Action<Exception> onError = null) =>
             Api.StartDataByKeyPolling(key, query, variables, onData, onError);
     }
 }
-
-#nullable restore

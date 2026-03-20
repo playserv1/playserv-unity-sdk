@@ -4,8 +4,6 @@ using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-#nullable enable
-
 namespace Playserv.RPC
 {
     /// <summary>
@@ -96,7 +94,7 @@ namespace Playserv.RPC
 
         private static MethodInfo ResolveMethod(Type serviceType, string methodName)
         {
-            MethodInfo? matchedMethod = null;
+            MethodInfo matchedMethod = null;
             foreach (var method in serviceType.GetMethods(BindingFlags.Instance | BindingFlags.Public))
             {
                 if (!string.Equals(method.Name, methodName, StringComparison.Ordinal))
@@ -116,11 +114,11 @@ namespace Playserv.RPC
                    throw new MissingMethodException(serviceType.FullName, methodName);
         }
 
-        private static object?[] BuildArguments(MethodInfo method, string payloadBase64)
+        private static object[] BuildArguments(MethodInfo method, string payloadBase64)
         {
             var parameters = method.GetParameters();
             if (parameters.Length == 0)
-                return Array.Empty<object?>();
+                return Array.Empty<object>();
 
             var payloadJson = RpcPayloadSerializer.DecodeToJson(payloadBase64);
             if (string.IsNullOrWhiteSpace(payloadJson) ||
@@ -148,12 +146,12 @@ namespace Playserv.RPC
                 $"RPC payload for '{method.DeclaringType?.Name}.{method.Name}' must be a JSON object or array.");
         }
 
-        private static object?[] BuildArgumentsFromObject(
+        private static object[] BuildArgumentsFromObject(
             ParameterInfo[] parameters,
             JObject payload,
             MethodInfo method)
         {
-            var arguments = new object?[parameters.Length];
+            var arguments = new object[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
                 var parameter = parameters[i];
@@ -170,7 +168,7 @@ namespace Playserv.RPC
             return arguments;
         }
 
-        private static object?[] BuildArgumentsFromArray(
+        private static object[] BuildArgumentsFromArray(
             ParameterInfo[] parameters,
             JArray payload,
             MethodInfo method)
@@ -182,7 +180,7 @@ namespace Playserv.RPC
                     $"'{method.DeclaringType?.Name}.{method.Name}' expects {parameters.Length}.");
             }
 
-            var arguments = new object?[parameters.Length];
+            var arguments = new object[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
                 if (i < payload.Count)
@@ -197,9 +195,9 @@ namespace Playserv.RPC
             return arguments;
         }
 
-        private static object?[] BuildArgumentsFromMissingPayload(ParameterInfo[] parameters, MethodInfo method)
+        private static object[] BuildArgumentsFromMissingPayload(ParameterInfo[] parameters, MethodInfo method)
         {
-            var arguments = new object?[parameters.Length];
+            var arguments = new object[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
                 arguments[i] = ResolveFallbackParameterValue(parameters[i], method);
@@ -208,7 +206,7 @@ namespace Playserv.RPC
             return arguments;
         }
 
-        private static object? ResolveFallbackParameterValue(ParameterInfo parameter, MethodInfo method)
+        private static object ResolveFallbackParameterValue(ParameterInfo parameter, MethodInfo method)
         {
             if (parameter.HasDefaultValue)
                 return parameter.DefaultValue;
@@ -221,7 +219,7 @@ namespace Playserv.RPC
                 $"'{method.DeclaringType?.Name}.{method.Name}'.");
         }
 
-        private static object? ConvertToken(JToken token, ParameterInfo parameter, MethodInfo method)
+        private static object ConvertToken(JToken token, ParameterInfo parameter, MethodInfo method)
         {
             if (token.Type == JTokenType.Null)
             {
@@ -264,5 +262,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#nullable restore

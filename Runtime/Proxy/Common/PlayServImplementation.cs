@@ -347,7 +347,7 @@ namespace Playserv.Proxy.Common
             string query,
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
-            Action<Exception>? onError = null)
+            Action<Exception> onError = null)
         {
             return _dataSubscriptionAdapter.StartDataByKeyPolling(
                 key,
