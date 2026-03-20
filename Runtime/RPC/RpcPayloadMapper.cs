@@ -390,8 +390,8 @@ namespace Playserv.RPC
                     ParameterNames[i] = parameterName;
                     HasDefaultValues[i] = parameter.HasDefaultValue;
                     DefaultValues[i] = parameter.DefaultValue;
-                    AllowsNull = !parameter.ParameterType.IsValueType ||
-                                 Nullable.GetUnderlyingType(parameter.ParameterType) != null;
+                    AllowsNull[i] = !parameter.ParameterType.IsValueType ||
+                                    Nullable.GetUnderlyingType(parameter.ParameterType) != null;
                     ParameterIndexByName[parameterName] = i;
                 }
             }
