@@ -1,5 +1,7 @@
 using System;
 
+#nullable enable
+
 namespace Playserv.Server
 {
     /// <summary>
@@ -40,7 +42,7 @@ namespace Playserv.Server
         /// <param name="onNext">Callback invoked on event.</param>
         /// <param name="subscription">Disposable subscription handle when handled.</param>
         /// <returns>True when handled locally; otherwise false.</returns>
-        bool TrySubscribe<T>(Action<T> onNext, out IDisposable subscription);
+        bool TrySubscribe<T>(Action<T> onNext, out IDisposable? subscription);
 
         /// <summary>
         /// Tries to create observable subscription in local context.
@@ -48,6 +50,8 @@ namespace Playserv.Server
         /// <typeparam name="T">Event payload type.</typeparam>
         /// <param name="observable">Observable stream when handled.</param>
         /// <returns>True when handled locally; otherwise false.</returns>
-        bool TrySubscribe<T>(out IObservable<T> observable);
+        bool TrySubscribe<T>(out IObservable<T>? observable);
     }
 }
+
+#nullable restore

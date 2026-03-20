@@ -12,6 +12,8 @@ using Playserv.Server;
 using UnityEngine;
 #endif
 
+#nullable enable
+
 namespace Playserv.Wrapper
 {
     /// <summary>
@@ -32,22 +34,22 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised when transport-level error occurs.
         /// </summary>
-        event Action<TransportError> OnTransportError;
+        event Action<TransportError>? OnTransportError;
 
         /// <summary>
         /// Raised when keepalive ping is sent.
         /// </summary>
-        event Action OnKeepAlivePingSent;
+        event Action? OnKeepAlivePingSent;
 
         /// <summary>
         /// Raised when keepalive pong is received.
         /// </summary>
-        event Action OnKeepAlivePongReceived;
+        event Action? OnKeepAlivePongReceived;
 
         /// <summary>
         /// Raised when RPC module returns InvokeRpcResponse.
         /// </summary>
-        event Action<InvokeRpcResponse> OnRpcInvokeResponse;
+        event Action<InvokeRpcResponse>? OnRpcInvokeResponse;
 
         /// <summary>
         /// Applies full SDK settings object.
@@ -63,7 +65,7 @@ namespace Playserv.Wrapper
         /// <param name="userId">User/player identifier.</param>
         /// <param name="gameVersion">Game client version.</param>
         /// <param name="sdkVersion">Optional SDK version override.</param>
-        void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null);
+        void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null);
 
         /// <summary>
         /// Connects transport and performs handshake.
@@ -97,7 +99,7 @@ namespace Playserv.Wrapper
         /// Sets optional local command handler for server-side/in-process execution.
         /// </summary>
         /// <param name="commandHandler">Local command handler. Pass null to disable local handling.</param>
-        void SetCommandHandler(ICommandHandler commandHandler);
+        void SetCommandHandler(ICommandHandler? commandHandler);
 
         /// <summary>
         /// Sends command to explicit module path.
@@ -111,7 +113,7 @@ namespace Playserv.Wrapper
         /// Sets optional local event handler for server-side/in-process execution.
         /// </summary>
         /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
-        void SetEventHandler(IEventHandler eventHandler);
+        void SetEventHandler(IEventHandler? eventHandler);
 
         /// <summary>
         /// Invokes server RPC method using object payload serialized to base64 JSON.
@@ -119,13 +121,13 @@ namespace Playserv.Wrapper
         /// <param name="serviceName">RPC service name.</param>
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payload">Payload object to serialize.</param>
-        void Invoke(string serviceName, string methodName, object payload);
+        void Invoke(string serviceName, string methodName, object? payload);
 
         /// <summary>
         /// Sets optional local RPC invoker for server-side/in-process execution.
         /// </summary>
         /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
-        void SetRpcInvoker(IRpcInvoker rpcInvoker);
+        void SetRpcInvoker(IRpcInvoker? rpcInvoker);
 
         /// <summary>
         /// Invokes server RPC method using already prepared base64 JSON payload.
@@ -148,7 +150,7 @@ namespace Playserv.Wrapper
         /// <typeparam name="TService">RPC service type used to derive service name.</typeparam>
         /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll(default). Service class must have [Rpc] attribute.</param>
         /// <param name="payload">Payload object to serialize to base64 JSON.</param>
-        void Invoke<TService>(Expression<Action<TService>> method, object payload);
+        void Invoke<TService>(Expression<Action<TService>> method, object? payload);
 
         /// <summary>
         /// Invokes server RPC method by passing method expression with pre-encoded base64 payload.
@@ -271,6 +273,8 @@ namespace Playserv.Wrapper
             string query,
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
-            Action<Exception> onError = null);
+            Action<Exception>? onError = null);
     }
 }
+
+#nullable restore

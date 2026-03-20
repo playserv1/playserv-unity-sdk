@@ -12,28 +12,30 @@ using Playserv.Proxy.Common;
 using UnityEngine;
 #endif
 
+#nullable enable
+
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServApi
     {
-        private PlayServImplementation _instance;
-        private PlayServSettings _settings;
-        private string _instanceEndpoint;
-        private ICommandHandler _commandHandler;
-        private IEventHandler _eventHandler;
-        private IRpcInvoker _rpcInvoker;
+        private PlayServImplementation? _instance;
+        private PlayServSettings? _settings;
+        private string? _instanceEndpoint;
+        private ICommandHandler? _commandHandler;
+        private IEventHandler? _eventHandler;
+        private IRpcInvoker? _rpcInvoker;
         private readonly object _connectGate = new();
-        private Task<bool> _connectTask;
+        private Task<bool>? _connectTask;
 
         public string SdkVersion => SdkInfo.Version;
         public PlayServSettings Settings => _settings;
 
         public PlayServState State => _instance?.State ?? PlayServState.Offline;
 
-        public event Action<TransportError> OnTransportError;
-        public event Action OnKeepAlivePingSent;
-        public event Action OnKeepAlivePongReceived;
-        public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
+        public event Action<TransportError>? OnTransportError;
+        public event Action? OnKeepAlivePingSent;
+        public event Action? OnKeepAlivePongReceived;
+        public event Action<InvokeRpcResponse>? OnRpcInvokeResponse;
 
         public void Config(PlayServSettings settings)
         {
@@ -44,7 +46,7 @@ namespace Playserv.Wrapper
             ApplySettings(_settings);
         }
 
-        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null)
+        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string? sdkVersion = null)
         {
             if (string.IsNullOrWhiteSpace(gameAccessToken))
                 throw new ArgumentException("Game access token is required.", nameof(gameAccessToken));
@@ -119,33 +121,33 @@ namespace Playserv.Wrapper
 
         public void Send<T>(T command)
         {
-            if (TryHandleLocalCommand(command, moduleName: null))
+            if (TryHandleLocalCommand(command!, moduleName: null))
                 return;
 
             Instance.Send(command);
         }
 
-        public void SetCommandHandler(ICommandHandler commandHandler) =>
+        public void SetCommandHandler(ICommandHandler? commandHandler) =>
             _commandHandler = commandHandler;
 
         public void Send<T>(T command, string moduleName)
         {
-            if (TryHandleLocalCommand(command, moduleName))
+            if (TryHandleLocalCommand(command!, moduleName))
                 return;
 
             Instance.Send(command, moduleName);
         }
 
-        public void SetEventHandler(IEventHandler eventHandler) =>
+        public void SetEventHandler(IEventHandler? eventHandler) =>
             _eventHandler = eventHandler;
 
-        public void Invoke(string serviceName, string methodName, object payload)
+        public void Invoke(string serviceName, string methodName, object? payload)
         {
             var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
             Invoke(serviceName, methodName, payloadBase64);
         }
 
-        public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
+        public void SetRpcInvoker(IRpcInvoker? rpcInvoker) =>
             _rpcInvoker = rpcInvoker;
 
         public void Invoke(string serviceName, string methodName, string payloadBase64)
@@ -193,7 +195,7 @@ namespace Playserv.Wrapper
             Invoke(serviceName, methodCall.Method.Name, payload);
         }
 
-        public void Invoke<TService>(Expression<Action<TService>> method, object payload)
+        public void Invoke<TService>(Expression<Action<TService>> method, object? payload)
         {
             if (method == null)
                 throw new ArgumentNullException(nameof(method));
@@ -284,7 +286,7 @@ namespace Playserv.Wrapper
             string query,
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
-            Action<Exception> onError = null) =>
+            Action<Exception>? onError = null) =>
             Instance.StartDataByKeyPolling(key, query, variables, onData, onError);
 
         private PlayServImplementation Instance =>
@@ -292,7 +294,7 @@ namespace Playserv.Wrapper
 
         private void SubscribeToInstanceEvents()
         {
-            _instance.OnTransportError -= HandleTransportError;
+            _instance!.OnTransportError -= HandleTransportError;
             _instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
             _instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
             _instance.OnRpcInvokeResponse -= HandleRpcInvokeResponse;
@@ -308,7 +310,7 @@ namespace Playserv.Wrapper
         private void HandleKeepAlivePongReceived() => OnKeepAlivePongReceived?.Invoke();
         private void HandleRpcInvokeResponse(InvokeRpcResponse response) => OnRpcInvokeResponse?.Invoke(response);
 
-        private bool TryHandleLocalCommand(object command, string moduleName)
+        private bool TryHandleLocalCommand(object command, string? moduleName)
         {
             if (_commandHandler == null)
                 return false;
@@ -341,7 +343,7 @@ namespace Playserv.Wrapper
                     "Provide event handler subscription or connect transport.");
             }
 
-            observable = null;
+            observable = null!;
             return false;
         }
 
@@ -362,7 +364,7 @@ namespace Playserv.Wrapper
                     "Provide event handler subscription or connect transport.");
             }
 
-            subscription = null;
+            subscription = null!;
             return false;
         }
 
@@ -460,9 +462,9 @@ namespace Playserv.Wrapper
         {
             var parameters = methodCall.Method.GetParameters();
             if (parameters.Length == 0)
-                return new Dictionary<string, object>(0);
+                return new Dictionary<string, object?>(0);
 
-            var payload = new Dictionary<string, object>(parameters.Length, StringComparer.Ordinal);
+            var payload = new Dictionary<string, object?>(parameters.Length, StringComparer.Ordinal);
             for (var i = 0; i < parameters.Length; i++)
             {
                 var parameterName = parameters[i].Name;
@@ -475,13 +477,13 @@ namespace Playserv.Wrapper
             return payload;
         }
 
-        private static object EvaluateExpressionValue(Expression expression)
+        private static object? EvaluateExpressionValue(Expression expression)
         {
             if (expression is ConstantExpression constantExpression)
                 return constantExpression.Value;
 
             var boxed = Expression.Convert(expression, typeof(object));
-            var getter = Expression.Lambda<Func<object>>(boxed).Compile();
+            var getter = Expression.Lambda<Func<object?>>(boxed).Compile();
             return getter();
         }
 
@@ -562,3 +564,5 @@ namespace Playserv.Wrapper
         }
     }
 }
+
+#nullable restore

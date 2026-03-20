@@ -10,8 +10,8 @@ namespace Playserv.RPC
         public string Message { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTimeOffset Timestamp { get; set; }
-        public InvokeRpcRequestInfo Request { get; set; }
-        public string Result { get; set; }
+        public InvokeRpcRequestInfo? Request { get; set; }
+        public string? Result { get; set; }
     }
 
     /// <summary>

@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 #if UNITY_EDITOR
 using System.Reflection;
@@ -69,7 +71,7 @@ namespace Playserv.Wrapper
             return FindClientBridgeType() != null;
         }
 
-        private static Type FindClientBridgeType()
+        private static Type? FindClientBridgeType()
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -103,7 +105,7 @@ namespace Playserv.Wrapper
             }
 #endif
 
-            settings = null;
+            settings = null!;
             return false;
         }
 
@@ -129,3 +131,5 @@ namespace Playserv.Wrapper
         }
     }
 }
+
+#nullable restore

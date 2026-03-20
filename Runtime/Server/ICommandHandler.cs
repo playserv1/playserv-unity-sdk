@@ -1,5 +1,7 @@
 using System;
 
+#nullable enable
+
 namespace Playserv.Server
 {
     /// <summary>
@@ -13,6 +15,8 @@ namespace Playserv.Server
         /// <param name="command">Command payload.</param>
         /// <param name="moduleName">Target module name, can be null.</param>
         /// <returns>True when command was handled locally; otherwise false.</returns>
-        bool TryHandle(object command, string moduleName);
+        bool TryHandle(object command, string? moduleName);
     }
 }
+
+#nullable restore

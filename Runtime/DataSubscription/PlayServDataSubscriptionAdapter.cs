@@ -106,8 +106,8 @@ namespace Playserv.DataSubscription
             string query,
             Dictionary<string, object> variables,
             string rootFieldName,
-            Action<object> onChanged,
-            Action<DataSubscriptionException> onError = null)
+            Action<object?> onChanged,
+            Action<DataSubscriptionException>? onError = null)
         {
             if (subscriptionId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(subscriptionId));
@@ -165,7 +165,7 @@ namespace Playserv.DataSubscription
 
         internal Task RefreshSubscriptionAsync(long subscriptionId, CancellationToken ct = default)
         {
-            PollingSubscriptionEntry entry;
+            PollingSubscriptionEntry? entry;
             lock (_subscriptionRegistryGate)
             {
                 _subscriptionRegistry.TryGetValue(subscriptionId, out entry);
@@ -179,7 +179,7 @@ namespace Playserv.DataSubscription
 
         internal void UnregisterSubscription(long subscriptionId)
         {
-            IDisposable polling = null;
+            IDisposable? polling = null;
             lock (_subscriptionRegistryGate)
             {
                 if (_subscriptionRegistry.TryGetValue(subscriptionId, out var entry))
@@ -220,7 +220,7 @@ namespace Playserv.DataSubscription
 
         public Task RequestFullStateAsync(long subscriptionId)
         {
-            PollingSubscriptionEntry entry;
+            PollingSubscriptionEntry? entry;
             lock (_subscriptionRegistryGate)
             {
                 _subscriptionRegistry.TryGetValue(subscriptionId, out entry);
@@ -239,13 +239,13 @@ namespace Playserv.DataSubscription
             CancellationToken ct = default)
         {
             var tcs = new TaskCompletionSource<DataSubscriptionResponse>();
-            IDisposable typedSubscription = null;
-            IDisposable byCommandSubscription = null;
-            IDisposable byModuleCommandSubscription = null;
-            IDisposable errorResponseSubscription = null;
-            IDisposable commandErrorSubscription = null;
-            IDisposable commandErrorNamedSubscription = null;
-            IDisposable commandErrorRpcSubscription = null;
+            IDisposable? typedSubscription = null;
+            IDisposable? byCommandSubscription = null;
+            IDisposable? byModuleCommandSubscription = null;
+            IDisposable? errorResponseSubscription = null;
+            IDisposable? commandErrorSubscription = null;
+            IDisposable? commandErrorNamedSubscription = null;
+            IDisposable? commandErrorRpcSubscription = null;
 
             typedSubscription = _transport.On<DataSubscriptionResponse>(response =>
             {
@@ -449,7 +449,7 @@ namespace Playserv.DataSubscription
             string query,
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
-            Action<Exception> onError = null)
+            Action<Exception>? onError = null)
         {
             return StartDataByKeyPollingInternal(
                 key,
@@ -468,7 +468,7 @@ namespace Playserv.DataSubscription
             int intervalMs,
             int requestTimeoutMs,
             Action<DataGetResponse> onData,
-            Action<Exception> onError = null)
+            Action<Exception>? onError = null)
         {
             if (onData == null)
                 throw new ArgumentNullException(nameof(onData));
@@ -495,12 +495,12 @@ namespace Playserv.DataSubscription
             CancellationToken ct)
         {
             var tcs = new TaskCompletionSource<DataGetResponse>();
-            IDisposable responseSubscription = null;
-            IDisposable responseByCommandSubscription = null;
-            IDisposable responseByModuleCommandSubscription = null;
-            IDisposable commandErrorSubscription = null;
-            IDisposable commandErrorNamedSubscription = null;
-            IDisposable commandErrorRpcSubscription = null;
+            IDisposable? responseSubscription = null;
+            IDisposable? responseByCommandSubscription = null;
+            IDisposable? responseByModuleCommandSubscription = null;
+            IDisposable? commandErrorSubscription = null;
+            IDisposable? commandErrorNamedSubscription = null;
+            IDisposable? commandErrorRpcSubscription = null;
 
             responseSubscription = _transport.On<DataGetResponse>(response =>
             {
@@ -639,7 +639,7 @@ namespace Playserv.DataSubscription
             int intervalMs,
             int requestTimeoutMs,
             Action<DataGetResponse> onData,
-            Action<Exception> onError,
+            Action<Exception>? onError,
             CancellationToken ct)
         {
             SafeLog($"[DataGet] Polling started. interval={intervalMs}ms, key={key}");
@@ -764,7 +764,7 @@ namespace Playserv.DataSubscription
                 return;
             }
 
-            PollingSubscriptionEntry entry;
+            PollingSubscriptionEntry? entry;
             lock (_subscriptionRegistryGate)
             {
                 _subscriptionRegistry.TryGetValue(subscriptionId, out entry);
@@ -777,8 +777,8 @@ namespace Playserv.DataSubscription
             var payloadFingerprint = payloadToken == null ? string.Empty : payloadToken.ToString(Formatting.None);
 
             var shouldNotify = false;
-            Action<object> onChanged = null;
-            object callbackPayload = null;
+            Action<object?>? onChanged = null;
+            object? callbackPayload = null;
 
             lock (_subscriptionRegistryGate)
             {
@@ -810,7 +810,7 @@ namespace Playserv.DataSubscription
 
         private void RaiseSubscriptionError(long subscriptionId, DataSubscriptionException exception)
         {
-            Action<DataSubscriptionException> onError = null;
+            Action<DataSubscriptionException>? onError = null;
             lock (_subscriptionRegistryGate)
             {
                 if (_subscriptionRegistry.TryGetValue(subscriptionId, out var entry))
@@ -830,7 +830,7 @@ namespace Playserv.DataSubscription
             }
         }
 
-        private static DataSubscriptionException MapDataGetError(DataGetError error)
+        private static DataSubscriptionException MapDataGetError(DataGetError? error)
         {
             if (error == null)
                 return new DataSubscriptionException(0, "Unknown data get error.");
@@ -894,7 +894,7 @@ namespace Playserv.DataSubscription
                    message.IndexOf("Timed out waiting for DataSubscriptionResponse", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static JToken ExtractSubscriptionPayload(JToken data, string rootFieldName)
+        private static JToken? ExtractSubscriptionPayload(JToken? data, string rootFieldName)
         {
             if (data == null)
                 return null;
@@ -1026,7 +1026,7 @@ namespace Playserv.DataSubscription
 
         private static bool TryMapDataGetResponse(object command, out DataGetResponse response)
         {
-            response = null;
+            response = null!;
             if (command == null)
                 return false;
 
@@ -1054,7 +1054,7 @@ namespace Playserv.DataSubscription
 
         private static bool TryMapDataSubscriptionResponse(object command, out DataSubscriptionResponse response)
         {
-            response = null;
+            response = null!;
             if (command == null)
                 return false;
 
@@ -1141,7 +1141,7 @@ namespace Playserv.DataSubscription
             }
         }
 
-        private static void SafeInvokeOnError(Action<Exception> onError, Exception ex)
+        private static void SafeInvokeOnError(Action<Exception>? onError, Exception ex)
         {
             if (onError == null)
                 return;
@@ -1183,8 +1183,8 @@ namespace Playserv.DataSubscription
                 string query,
                 Dictionary<string, object> variables,
                 string rootFieldName,
-                Action<object> onChanged,
-                Action<DataSubscriptionException> onError)
+                Action<object?> onChanged,
+                Action<DataSubscriptionException>? onError)
             {
                 SubscriptionId = subscriptionId;
                 Key = key;
@@ -1200,17 +1200,17 @@ namespace Playserv.DataSubscription
             public string Query { get; }
             public Dictionary<string, object> Variables { get; }
             public string RootFieldName { get; }
-            public Action<object> OnChanged { get; }
-            public Action<DataSubscriptionException> OnError { get; }
+            public Action<object?> OnChanged { get; }
+            public Action<DataSubscriptionException>? OnError { get; }
             public bool HasSnapshot { get; set; }
             public string LastSnapshotJson { get; set; } = string.Empty;
-            public IDisposable PollingHandle { get; set; }
+            public IDisposable? PollingHandle { get; set; }
         }
 
         private sealed class PollingHandle : IDisposable
         {
-            private CancellationTokenSource _cts;
-            private Task _pollingTask;
+            private CancellationTokenSource? _cts;
+            private Task? _pollingTask;
 
             public PollingHandle(CancellationTokenSource cts, Task pollingTask)
             {
@@ -1234,7 +1234,7 @@ namespace Playserv.DataSubscription
 
         private sealed class SubscriptionHandle : IDisposable
         {
-            private PlayServDataSubscriptionAdapter _adapter;
+            private PlayServDataSubscriptionAdapter? _adapter;
             private readonly long _subscriptionId;
 
             public SubscriptionHandle(PlayServDataSubscriptionAdapter adapter, long subscriptionId)

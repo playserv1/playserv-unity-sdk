@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+#nullable enable
+
 namespace Playserv.Server
 {
     /// <summary>
@@ -9,7 +11,7 @@ namespace Playserv.Server
     public sealed class LocalCommandHandler : ICommandHandler
     {
         private readonly Dictionary<string, Action<object>> _moduleHandlers = new(StringComparer.Ordinal);
-        private Action<object, string> _fallbackHandler;
+        private Action<object, string?>? _fallbackHandler;
 
         /// <summary>
         /// Registers command handler for exact module name.
@@ -34,7 +36,7 @@ namespace Playserv.Server
         /// </summary>
         /// <param name="handler">Fallback command handler.</param>
         /// <returns>Current handler instance for chaining.</returns>
-        public LocalCommandHandler RegisterFallback(Action<object, string> handler)
+        public LocalCommandHandler RegisterFallback(Action<object, string?> handler)
         {
             _fallbackHandler = handler ?? throw new ArgumentNullException(nameof(handler));
             return this;
@@ -55,7 +57,7 @@ namespace Playserv.Server
         /// <param name="command">Command payload.</param>
         /// <param name="moduleName">Module name.</param>
         /// <returns>True when command was handled; otherwise false.</returns>
-        public bool TryHandle(object command, string moduleName)
+        public bool TryHandle(object command, string? moduleName)
         {
             if (command == null)
                 throw new ArgumentNullException(nameof(command));
@@ -77,3 +79,5 @@ namespace Playserv.Server
         }
     }
 }
+
+#nullable restore

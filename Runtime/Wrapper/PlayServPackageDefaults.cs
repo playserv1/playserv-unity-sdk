@@ -1,3 +1,5 @@
+#nullable enable
+
 #if UNITY_5_3_OR_NEWER
 using System;
 using UnityEngine;
@@ -66,15 +68,17 @@ namespace Playserv.Wrapper
             timeoutSeconds = settings.TimeoutSeconds;
         }
 
-        private static string ResolveText(string value, string fallback)
+        private static string ResolveText(string? value, string fallback)
         {
             return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         }
 
-        private static string ResolveOptionalText(string value)
+        private static string ResolveOptionalText(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
     }
 }
 #endif
+
+#nullable restore
