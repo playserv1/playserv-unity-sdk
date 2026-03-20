@@ -189,18 +189,19 @@ namespace Playserv.Wrapper
 
             var serviceName = ResolveServiceName<TService>();
             var methodCall = ResolveMethodCall(method.Body, nameof(method));
-            var payload = BuildPayloadFromMethodCall(methodCall);
+            var payload = RpcPayloadMapper.BuildPayloadFromMethodCall(methodCall);
             Invoke(serviceName, methodCall.Method.Name, payload);
         }
 
-        public void Invoke<TService>(Expression<Action<TService>> method, object payload)
+        public void Invoke<TService>(Expression<Action<TService>> method, object? payload)
         {
             if (method == null)
                 throw new ArgumentNullException(nameof(method));
 
             var serviceName = ResolveServiceName<TService>();
             var methodCall = ResolveMethodCall(method.Body, nameof(method));
-            Invoke(serviceName, methodCall.Method.Name, payload);
+            var normalizedPayload = RpcPayloadMapper.BuildPayloadFromExplicitPayload(methodCall, payload);
+            Invoke(serviceName, methodCall.Method.Name, normalizedPayload);
         }
 
         public void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64)
@@ -454,35 +455,6 @@ namespace Playserv.Wrapper
 
             throw new InvalidOperationException(
                 $"RPC service type '{serviceType.FullName}' must be decorated with [Rpc] attribute.");
-        }
-
-        private static object BuildPayloadFromMethodCall(MethodCallExpression methodCall)
-        {
-            var parameters = methodCall.Method.GetParameters();
-            if (parameters.Length == 0)
-                return new Dictionary<string, object>(0);
-
-            var payload = new Dictionary<string, object>(parameters.Length, StringComparer.Ordinal);
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                var parameterName = parameters[i].Name;
-                if (string.IsNullOrWhiteSpace(parameterName))
-                    parameterName = $"arg{i}";
-
-                payload[parameterName] = EvaluateExpressionValue(methodCall.Arguments[i]);
-            }
-
-            return payload;
-        }
-
-        private static object EvaluateExpressionValue(Expression expression)
-        {
-            if (expression is ConstantExpression constantExpression)
-                return constantExpression.Value;
-
-            var boxed = Expression.Convert(expression, typeof(object));
-            var getter = Expression.Lambda<Func<object>>(boxed).Compile();
-            return getter();
         }
 
         private void ApplySettings(PlayServSettings settings)

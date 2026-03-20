@@ -24,7 +24,7 @@ namespace Playserv.Editor
     public sealed class PlayServWindow : EditorWindow
     {
         private const string MenuPath = "Tools/PlayServ/Settings";
-        private const string DocsUrl = "https://example.com";
+        private const string DocsUrl = "https://docs.playserv.io/";
         private const string ClientProjectSettingsBridgeTypeName = "Playserv.ClientEditor.PlayServProjectSettingsBridge";
         private const string DrawProjectConfigUiMethodName = "DrawProjectConfigUi";
         private static readonly string[] AllowedDeployUsingNamespaces =

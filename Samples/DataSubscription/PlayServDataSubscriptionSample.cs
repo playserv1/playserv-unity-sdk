@@ -45,11 +45,11 @@ namespace Playserv.Samples
         [SerializeField] private bool showTransportDataGetLogsInUi = true;
 
         private readonly List<string> _history = new List<string>();
-        private ISharedEntity<SamplePlayerDto>? _player;
-        private IDisposable? _playerDisposable;
+        private ISharedEntity<SamplePlayerDto> _player;
+        private IDisposable _playerDisposable;
         private Vector2 _historyScroll;
         private string _status = "Not subscribed";
-        private SamplePlayerDto? _snapshot;
+        private SamplePlayerDto _snapshot;
         private bool _showInfo;
         private bool _setLevelInProgress;
         private bool _logHooked;

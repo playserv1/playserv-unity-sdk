@@ -19,7 +19,6 @@ namespace Playserv.Samples
         private const string SamplesSceneFileName = "Samples.unity";
 
         [Header("Message")]
-        [SerializeField] private string senderId = "player-001";
         [SerializeField] private string messageText = "Hello from events sample";
 
         [Header("Targets")]
