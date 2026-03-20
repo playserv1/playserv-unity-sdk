@@ -17,6 +17,7 @@ namespace Playserv.DataSubscription
     internal sealed class PlayServDataSubscriptionAdapter : IDataSubscriptionAdapter, IDisposable
     {
         private const int DataGetResponseTimeoutMs = 15000;
+        private const int DataSubscriptionResponseTimeoutMs = 8000;
         private const int DefaultDataGetPollIntervalMs = 4000;
         private const int DefaultDataGetPollRequestTimeoutMs = 4000;
         private const int SubscriptionPollIntervalMs = 3000;
@@ -56,6 +57,47 @@ namespace Playserv.DataSubscription
         internal long NextSubscriptionId()
         {
             return Interlocked.Increment(ref _subscriptionIdCounter);
+        }
+
+        internal async Task<long?> TryOpenTransportSubscriptionAsync(
+            string query,
+            Dictionary<string, object> variables,
+            bool allowFallbackToPolling = true,
+            CancellationToken ct = default)
+        {
+            var request = new DataSubscriptionRequest(
+                Interlocked.Increment(ref _requestIdCounter),
+                query,
+                CloneVariables(variables));
+
+            var response = await SendSubscriptionRequestAsync(request, ct);
+
+            if (response.HasError)
+            {
+                var mapped = MapErrorToException(response.Error);
+                if (allowFallbackToPolling && ShouldFallbackToPolling(mapped))
+                {
+                    SafeLogWarning(
+                        $"[DataSubscription] Transport subscribe unavailable. Falling back to polling. reason={mapped.Message}");
+                    return null;
+                }
+
+                throw mapped;
+            }
+
+            var subscriptionId = response.Result?.SubscriptionId ?? 0;
+            if (subscriptionId <= 0)
+            {
+                if (allowFallbackToPolling)
+                {
+                    SafeLogWarning("[DataSubscription] Transport subscribe returned empty subscription id. Falling back to polling.");
+                    return null;
+                }
+
+                throw new DataSubscriptionException(0, "Invalid DataSubscriptionResponse: Result.SubscriptionId is empty.");
+            }
+
+            return subscriptionId;
         }
 
         internal IDisposable RegisterPollingSubscription(
@@ -178,10 +220,148 @@ namespace Playserv.DataSubscription
 
         public Task RequestFullStateAsync(long subscriptionId)
         {
-            return RefreshSubscriptionAsync(subscriptionId);
+            PollingSubscriptionEntry? entry;
+            lock (_subscriptionRegistryGate)
+            {
+                _subscriptionRegistry.TryGetValue(subscriptionId, out entry);
+            }
+
+            if (entry != null)
+                return RefreshEntryAsync(entry, CancellationToken.None);
+
+            SafeLogWarning(
+                "[DataSubscription] Transport refresh skipped. DataSubscriptionRefreshRequest is disabled for compatibility.");
+            return Task.CompletedTask;
         }
 
-        public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        internal async Task<DataSubscriptionResponse> SendSubscriptionRequestAsync(
+            DataSubscriptionRequest request,
+            CancellationToken ct = default)
+        {
+            var tcs = new TaskCompletionSource<DataSubscriptionResponse>();
+            IDisposable? typedSubscription = null;
+            IDisposable? byCommandSubscription = null;
+            IDisposable? byModuleCommandSubscription = null;
+            IDisposable? errorResponseSubscription = null;
+            IDisposable? commandErrorSubscription = null;
+            IDisposable? commandErrorNamedSubscription = null;
+            IDisposable? commandErrorRpcSubscription = null;
+
+            typedSubscription = _transport.On<DataSubscriptionResponse>(response =>
+            {
+                if (response != null && response.RequestId == request.RequestId)
+                    tcs.TrySetResult(response);
+            });
+
+            byCommandSubscription = _transport.OnCommand("DataSubscriptionResponse", command =>
+            {
+                if (!TryMapDataSubscriptionResponse(command, out var response))
+                    return;
+
+                if (response.RequestId == request.RequestId)
+                    tcs.TrySetResult(response);
+            });
+
+            byModuleCommandSubscription = _transport.OnCommand("module_dataflow.DataSubscriptionResponse", command =>
+            {
+                if (!TryMapDataSubscriptionResponse(command, out var response))
+                    return;
+
+                if (response.RequestId == request.RequestId)
+                    tcs.TrySetResult(response);
+            });
+
+            errorResponseSubscription = _transport.OnCommand("ErrorResponse", command =>
+            {
+                if (command is not ErrorResponse errorResponse)
+                    return;
+
+                tcs.TrySetResult(new DataSubscriptionResponse
+                {
+                    RequestId = request.RequestId,
+                    Error = new DataSubscriptionError
+                    {
+                        ErrorCode = errorResponse.ErrorCode,
+                        Message = errorResponse.Message
+                    }
+                });
+            });
+
+            commandErrorSubscription = _transport.OnCommand("error", command =>
+            {
+                if (command is not CommandErrorResponse errorResponse)
+                    return;
+
+                if (!LooksLikeDataSubscriptionCommandError(errorResponse))
+                    return;
+
+                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
+                    ? errorResponse.Error
+                    : errorResponse.Message;
+
+                tcs.TrySetResult(CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
+            });
+
+            commandErrorNamedSubscription = _transport.OnCommand("CommandErrorResponse", command =>
+            {
+                if (command is not CommandErrorResponse errorResponse)
+                    return;
+
+                if (!LooksLikeDataSubscriptionCommandError(errorResponse))
+                    return;
+
+                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
+                    ? errorResponse.Error
+                    : errorResponse.Message;
+
+                tcs.TrySetResult(CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
+            });
+
+            commandErrorRpcSubscription = _transport.OnCommand("RpcErrorResponse", command =>
+            {
+                if (command is not CommandErrorResponse errorResponse)
+                    return;
+
+                if (!LooksLikeDataSubscriptionCommandError(errorResponse))
+                    return;
+
+                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
+                    ? errorResponse.Error
+                    : errorResponse.Message;
+
+                tcs.TrySetResult(CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
+            });
+
+            try
+            {
+                await _transport.SendAsync(request, "module_dataflow");
+                var completedInTime = await WaitForCompletionOrTimeoutAsync(tcs.Task, DataSubscriptionResponseTimeoutMs, ct);
+                if (!completedInTime)
+                {
+                    return CreateDataSubscriptionErrorResponse(
+                        request.RequestId,
+                        0,
+                        $"Timed out waiting for DataSubscriptionResponse after {DataSubscriptionResponseTimeoutMs}ms.");
+                }
+
+                return await tcs.Task;
+            }
+            finally
+            {
+                typedSubscription?.Dispose();
+                byCommandSubscription?.Dispose();
+                byModuleCommandSubscription?.Dispose();
+                errorResponseSubscription?.Dispose();
+                commandErrorSubscription?.Dispose();
+                commandErrorNamedSubscription?.Dispose();
+                commandErrorRpcSubscription?.Dispose();
+            }
+        }
+
+        public async Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
+            string playerId,
+            Func<TEntity, TDto> map,
+            DataSubscriptionMode mode)
             where TEntity : class
             where TDto : class, new()
         {
@@ -195,7 +375,42 @@ namespace Playserv.DataSubscription
             var query = QueryBuilder.BuildQuery<TEntity>(entityTypeName, playerId);
             var variables = QueryBuilder.BuildVariables(playerId);
 
-            SafeLog($"[DataSubscription] Opening polling subscription. entity={entityTypeName}, key={playerId}, query={query}");
+            if (mode == DataSubscriptionMode.Transport)
+            {
+                var transportSubscriptionId = await TryOpenTransportSubscriptionAsync(
+                    query,
+                    variables,
+                    allowFallbackToPolling: false);
+
+                if (transportSubscriptionId.HasValue)
+                {
+                    SafeLog($"[DataSubscription] Opened transport subscription. id={transportSubscriptionId.Value}, key={playerId}");
+
+                    var transportEntity = new SharedEntity<TDto>(
+                        this,
+                        transportSubscriptionId.Value,
+                        null,
+                        query,
+                        variables,
+                        raw =>
+                        {
+                            if (raw == null)
+                                return new TDto();
+
+                            var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
+                            var entity = JsonConvert.DeserializeObject<TEntity>(json);
+                            return entity == null ? new TDto() : map(entity);
+                        });
+
+                    return transportEntity;
+                }
+
+                throw new DataSubscriptionException(
+                    0,
+                    "Transport subscription failed and fallback is disabled. Use polling subscription explicitly.");
+            }
+
+            SafeLog($"[DataSubscription] Opened polling subscription. entity={entityTypeName}, key={playerId}, query={query}");
 
             var subscriptionId = NextSubscriptionId();
             var sharedEntity = new SharedEntity<TDto>(
@@ -216,7 +431,7 @@ namespace Playserv.DataSubscription
                     return entity == null ? new TDto() : map(entity);
                 });
 
-            return Task.FromResult<ISharedEntity<TDto>>(sharedEntity);
+            return sharedEntity;
         }
 
         public async Task<DataGetResponse> GetDataByKeyAsync(
@@ -284,6 +499,8 @@ namespace Playserv.DataSubscription
             IDisposable? responseByCommandSubscription = null;
             IDisposable? responseByModuleCommandSubscription = null;
             IDisposable? commandErrorSubscription = null;
+            IDisposable? commandErrorNamedSubscription = null;
+            IDisposable? commandErrorRpcSubscription = null;
 
             responseSubscription = _transport.On<DataGetResponse>(response =>
             {
@@ -350,6 +567,42 @@ namespace Playserv.DataSubscription
 #endif
             });
 
+            commandErrorNamedSubscription = _transport.OnCommand("CommandErrorResponse", command =>
+            {
+                if (command is not CommandErrorResponse errorResponse)
+                    return;
+
+                if (!LooksLikeDataGetCommandError(errorResponse))
+                    return;
+
+                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
+                    ? errorResponse.Error
+                    : errorResponse.Message;
+
+                var set = tcs.TrySetResult(CreateDataGetErrorResponse(request.RequestId, 0, message));
+#if PlayServ_Logs
+                SafeLog($"[DataGet] named command error mapped to requestId={request.RequestId}, setResult={set}, message={message}");
+#endif
+            });
+
+            commandErrorRpcSubscription = _transport.OnCommand("RpcErrorResponse", command =>
+            {
+                if (command is not CommandErrorResponse errorResponse)
+                    return;
+
+                if (!LooksLikeDataGetCommandError(errorResponse))
+                    return;
+
+                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
+                    ? errorResponse.Error
+                    : errorResponse.Message;
+
+                var set = tcs.TrySetResult(CreateDataGetErrorResponse(request.RequestId, 0, message));
+#if PlayServ_Logs
+                SafeLog($"[DataGet] rpc error mapped to requestId={request.RequestId}, setResult={set}, message={message}");
+#endif
+            });
+
             try
             {
                 await _transport.SendAsync(request, "module_dataflow");
@@ -374,6 +627,8 @@ namespace Playserv.DataSubscription
                 responseByCommandSubscription?.Dispose();
                 responseByModuleCommandSubscription?.Dispose();
                 commandErrorSubscription?.Dispose();
+                commandErrorNamedSubscription?.Dispose();
+                commandErrorRpcSubscription?.Dispose();
             }
         }
 
@@ -592,6 +847,53 @@ namespace Playserv.DataSubscription
             };
         }
 
+        internal static DataSubscriptionException MapErrorToException(DataSubscriptionError error)
+        {
+            if (error == null)
+                return new DataSubscriptionException(0, "Unknown data subscription error.");
+
+            var message = error.Message ?? "Unknown data subscription error.";
+
+            return error.ErrorCode switch
+            {
+                30001 => new InvalidQuerySyntaxException(message),
+                31001 => new AccessDeniedException(message),
+                31002 => new TargetNotFoundException(message),
+                39001 => new MaxSubscriptionsReachedException(message),
+                UpdateDataCorruptionException.Code => new UpdateDataCorruptionException(message),
+                SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, message),
+                SubscriptionTerminatedException.Code => new SubscriptionTerminatedException(0, message),
+                _ => new DataSubscriptionException(error.ErrorCode, message)
+            };
+        }
+
+        private static bool ShouldFallbackToPolling(DataSubscriptionException exception)
+        {
+            if (exception == null)
+                return true;
+
+            switch (exception.ErrorCode)
+            {
+                case 30001:
+                case 31001:
+                case 31002:
+                case 39001:
+                case UpdateDataCorruptionException.Code:
+                case SubscriptionNotFoundException.Code:
+                case SubscriptionTerminatedException.Code:
+                    return false;
+            }
+
+            var message = exception.Message ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(message))
+                return exception.ErrorCode == 0;
+
+            return message.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("unknown command", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("DataSubscriptionRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("Timed out waiting for DataSubscriptionResponse", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static JToken? ExtractSubscriptionPayload(JToken? data, string rootFieldName)
         {
             if (data == null)
@@ -687,6 +989,30 @@ namespace Playserv.DataSubscription
             };
         }
 
+        private static DataSubscriptionResponse CreateDataSubscriptionErrorResponse(long requestId, int errorCode, string message)
+        {
+            return new DataSubscriptionResponse
+            {
+                RequestId = requestId,
+                Error = new DataSubscriptionError
+                {
+                    ErrorCode = errorCode,
+                    Message = message ?? "Unknown data subscription error."
+                }
+            };
+        }
+
+        private static bool LooksLikeDataSubscriptionCommandError(CommandErrorResponse response)
+        {
+            var error = response?.Error ?? string.Empty;
+            var message = response?.Message ?? string.Empty;
+
+            return message.IndexOf("DataSubscriptionRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataSubscriptionRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private static bool LooksLikeDataGetCommandError(CommandErrorResponse response)
         {
             var error = response?.Error ?? string.Empty;
@@ -714,6 +1040,34 @@ namespace Playserv.DataSubscription
             {
                 var json = JsonConvert.SerializeObject(command);
                 var mapped = JsonConvert.DeserializeObject<DataGetResponse>(json);
+                if (mapped == null)
+                    return false;
+
+                response = mapped;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryMapDataSubscriptionResponse(object command, out DataSubscriptionResponse response)
+        {
+            response = null!;
+            if (command == null)
+                return false;
+
+            if (command is DataSubscriptionResponse typed)
+            {
+                response = typed;
+                return true;
+            }
+
+            try
+            {
+                var json = JsonConvert.SerializeObject(command);
+                var mapped = JsonConvert.DeserializeObject<DataSubscriptionResponse>(json);
                 if (mapped == null)
                     return false;
 

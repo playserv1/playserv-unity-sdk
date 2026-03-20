@@ -283,11 +283,15 @@ namespace Playserv.Wrapper
         /// <typeparam name="TDto">Client DTO type used by gameplay/UI.</typeparam>
         /// <param name="playerId">Target player identifier used as entity key.</param>
         /// <param name="map">Projection function from entity model to DTO.</param>
+        /// <param name="mode">Subscription backend mode. Defaults to Polling.</param>
         /// <returns>Shared entity handle with updates, mutations and refresh operations.</returns>
-        public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
+            string playerId,
+            Func<TEntity, TDto> map,
+            DataSubscriptionMode mode = DataSubscriptionMode.Polling)
             where TEntity : class
             where TDto : class, new() =>
-            Api.SelectEntity<TEntity, TDto>(playerId, map);
+            Api.SelectEntity<TEntity, TDto>(playerId, map, mode);
 
         /// <summary>
         /// Sends simplified key-based retrieval request once.

@@ -323,11 +323,14 @@ namespace Playserv.Proxy.Common
             return _dataSubscriptionAdapter;
         }
 
-        public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
+            string playerId,
+            Func<TEntity, TDto> map,
+            DataSubscriptionMode mode = DataSubscriptionMode.Polling)
             where TEntity : class
             where TDto : class, new()
         {
-            return _dataSubscriptionAdapter.SelectEntity(playerId, map);
+            return _dataSubscriptionAdapter.SelectEntity(playerId, map, mode);
         }
 
         public Task<DataGetResponse> GetDataByKeyAsync(
@@ -374,6 +377,9 @@ namespace Playserv.Proxy.Common
         private void SetupCommandHandlers()
         {
             OnCommand("error", OnCommandErrorReceived);
+            OnCommand("CommandErrorResponse", OnCommandErrorReceived);
+            OnCommand("RpcErrorResponse", OnCommandErrorReceived);
+            OnCommand("rpc.RpcErrorResponse", OnCommandErrorReceived);
             OnCommand("Disconnect", OnDisconnectReceived);
             OnCommand("ForcedDisconnect", OnForcedDisconnectReceived);
             OnCommand("module_proxy.ForcedDisconnect", OnForcedDisconnectReceived);

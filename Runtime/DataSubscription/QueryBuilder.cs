@@ -345,8 +345,6 @@ namespace Playserv.DataSubscription
 
             var root = JObject.Parse(rawSchemaJson);
             var jsonSchema = root["jsonSchema"] as JObject ?? root;
-            if (jsonSchema == null)
-                return;
 
             if (jsonSchema["$defs"] is not JObject defs || defs.Count == 0)
                 return;

@@ -236,8 +236,12 @@ namespace Playserv.Wrapper
         /// <typeparam name="TDto">Client DTO type.</typeparam>
         /// <param name="playerId">Entity key/player id.</param>
         /// <param name="map">Projection function from entity to DTO.</param>
+        /// <param name="mode">Subscription backend mode. Defaults to Polling.</param>
         /// <returns>Shared entity instance for observing and mutating data.</returns>
-        Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
+            string playerId,
+            Func<TEntity, TDto> map,
+            DataSubscriptionMode mode = DataSubscriptionMode.Polling)
             where TEntity : class
             where TDto : class, new();
 

@@ -13,14 +13,20 @@ namespace Playserv.DataSubscription
         /// </summary>
         /// <typeparam name="T">Root entity type.</typeparam>
         /// <param name="proxy">Connected PlayServ implementation.</param>
+        /// <param name="mode">Subscription backend mode. Defaults to Polling.</param>
         /// <returns>Fluent shared entity builder.</returns>
-        public static ISharedEntityBuilder<T> Subscribe<T>(this PlayServImplementation proxy) where T : class, new()
+        public static ISharedEntityBuilder<T> Subscribe<T>(
+            this PlayServImplementation proxy,
+            DataSubscriptionMode mode = DataSubscriptionMode.Polling) where T : class, new()
         {
             if (proxy == null)
                 throw new ArgumentNullException(nameof(proxy));
 
             var adapter = proxy.GetDataSubscriptionAdapter();
-            return new SharedEntityBuilder<T>(adapter, typeof(T).Name);
+            var builder = new SharedEntityBuilder<T>(adapter, typeof(T).Name);
+            return mode == DataSubscriptionMode.Transport
+                ? builder.UseTransport()
+                : builder.UsePolling();
         }
     }
 }

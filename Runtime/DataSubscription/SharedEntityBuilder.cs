@@ -13,6 +13,7 @@ namespace Playserv.DataSubscription
         private Expression<Func<T, bool>> _wherePredicate;
         private readonly List<Expression> _includes = new List<Expression>();
         private LambdaExpression _selector;
+        private DataSubscriptionMode _mode = DataSubscriptionMode.Polling;
 
         public SharedEntityBuilder(PlayServDataSubscriptionAdapter adapter, string entityType)
         {
@@ -23,6 +24,18 @@ namespace Playserv.DataSubscription
         public ISharedEntityBuilder<T> Key(object id)
         {
             _key = id;
+            return this;
+        }
+
+        public ISharedEntityBuilder<T> UseTransport()
+        {
+            _mode = DataSubscriptionMode.Transport;
+            return this;
+        }
+
+        public ISharedEntityBuilder<T> UsePolling()
+        {
+            _mode = DataSubscriptionMode.Polling;
             return this;
         }
 
@@ -43,6 +56,7 @@ namespace Playserv.DataSubscription
             var builder = new SharedEntityBuilder<TResult>(_adapter, _entityType);
             builder.SetKey(_key);
             builder.SetSelector(selector);
+            builder.SetMode(_mode);
             return builder;
         }
 
@@ -56,12 +70,17 @@ namespace Playserv.DataSubscription
             _selector = selector;
         }
 
+        internal void SetMode(DataSubscriptionMode mode)
+        {
+            _mode = mode;
+        }
+
         public Task<ISharedEntity<T>> BindAsync()
         {
             return BindAsync<T>();
         }
 
-        public Task<ISharedEntity<TResult>> BindAsync<TResult>() where TResult : class, new()
+        public async Task<ISharedEntity<TResult>> BindAsync<TResult>() where TResult : class, new()
         {
             if (_key == null)
                 throw new InvalidOperationException("Key must be specified using Key() method");
@@ -69,18 +88,39 @@ namespace Playserv.DataSubscription
             var stringKey = ConvertKeyToString(_key);
             var query = QueryBuilder.BuildQuery<T>(_entityType, _key);
             var variables = QueryBuilder.BuildVariables(_key);
-            var subscriptionId = _adapter.NextSubscriptionId();
 
-            var entity = new SharedEntity<TResult>(
+            if (_mode == DataSubscriptionMode.Transport)
+            {
+                var transportSubscriptionId = await _adapter.TryOpenTransportSubscriptionAsync(
+                    query,
+                    variables,
+                    allowFallbackToPolling: false);
+
+                if (transportSubscriptionId.HasValue)
+                {
+                    var transportEntity = new SharedEntity<TResult>(
+                        _adapter,
+                        transportSubscriptionId.Value,
+                        _selector,
+                        query,
+                        variables);
+
+                    await _adapter.RequestFullStateAsync(transportSubscriptionId.Value);
+                    return transportEntity;
+                }
+            }
+
+            var pollingSubscriptionId = _adapter.NextSubscriptionId();
+            var pollingEntity = new SharedEntity<TResult>(
                 _adapter,
-                subscriptionId,
+                pollingSubscriptionId,
                 stringKey,
                 _entityType,
                 _selector,
                 query,
                 variables);
 
-            return Task.FromResult<ISharedEntity<TResult>>(entity);
+            return pollingEntity;
         }
 
         private static string ConvertKeyToString(object key)

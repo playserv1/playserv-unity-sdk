@@ -266,10 +266,13 @@ namespace Playserv.Wrapper
             }
         }
 
-        public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
+            string playerId,
+            Func<TEntity, TDto> map,
+            DataSubscriptionMode mode = DataSubscriptionMode.Polling)
             where TEntity : class
             where TDto : class, new() =>
-            Instance.SelectEntity(playerId, map);
+            Instance.SelectEntity(playerId, map, mode);
 
         public Task<DataGetResponse> GetDataByKeyAsync(
             string key,

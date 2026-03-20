@@ -18,6 +18,18 @@ namespace Playserv.DataSubscription
         ISharedEntityBuilder<T> Key(object id);
 
         /// <summary>
+        /// Forces transport-only subscription flow (DataSubscriptionRequest/DataSubscriptionUpdate).
+        /// </summary>
+        /// <returns>Current builder instance.</returns>
+        ISharedEntityBuilder<T> UseTransport();
+
+        /// <summary>
+        /// Forces polling-only subscription flow (DataGet loop).
+        /// </summary>
+        /// <returns>Current builder instance.</returns>
+        ISharedEntityBuilder<T> UsePolling();
+
+        /// <summary>
         /// Adds filter predicate. Reserved for future/extended query generation.
         /// </summary>
         /// <param name="predicate">Entity filter expression.</param>

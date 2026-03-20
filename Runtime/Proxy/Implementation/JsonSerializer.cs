@@ -160,6 +160,7 @@ namespace Playserv.Proxy.Implementation
 
             if (string.Equals(commandName, "Error", StringComparison.Ordinal) ||
                 string.Equals(commandName, "CommandErrorResponse", StringComparison.Ordinal) ||
+                string.Equals(commandName, "RpcErrorResponse", StringComparison.Ordinal) ||
                 commandName.EndsWith("+Error", StringComparison.OrdinalIgnoreCase))
             {
                 type = typeof(CommandErrorResponse);
@@ -262,6 +263,30 @@ namespace Playserv.Proxy.Implementation
                                          errorPayload["message"]?.Type == JTokenType.String
                     ? errorPayload["message"]!.ToString()
                     : errorPayload.ToString(Formatting.None);
+            }
+
+            if (HasStringMember(type, "error") &&
+                (!payloadObject.TryGetValue("error", StringComparison.OrdinalIgnoreCase, out var existingError) ||
+                 existingError.Type == JTokenType.Null ||
+                 (existingError.Type == JTokenType.String && string.IsNullOrWhiteSpace(existingError.ToString()))) &&
+                payloadObject.TryGetValue("Code", StringComparison.OrdinalIgnoreCase, out var codePayload) &&
+                codePayload.Type != JTokenType.Null)
+            {
+                payloadObject["error"] = codePayload.Type == JTokenType.String
+                    ? codePayload.ToString()
+                    : codePayload.ToString(Formatting.None);
+            }
+
+            if (HasStringMember(type, "timestamp") &&
+                (!payloadObject.TryGetValue("timestamp", StringComparison.OrdinalIgnoreCase, out var existingTimestamp) ||
+                 existingTimestamp.Type == JTokenType.Null ||
+                 (existingTimestamp.Type == JTokenType.String && string.IsNullOrWhiteSpace(existingTimestamp.ToString()))) &&
+                payloadObject.TryGetValue("TimestampUtc", StringComparison.OrdinalIgnoreCase, out var timestampPayload) &&
+                timestampPayload.Type != JTokenType.Null)
+            {
+                payloadObject["timestamp"] = timestampPayload.Type == JTokenType.String
+                    ? timestampPayload.ToString()
+                    : timestampPayload.ToString(Formatting.None);
             }
 
             return payloadObject.ToString(Formatting.None);

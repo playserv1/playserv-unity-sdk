@@ -18,8 +18,12 @@ namespace Playserv.DataSubscription
         /// <typeparam name="TDto">Client DTO type.</typeparam>
         /// <param name="playerId">Entity key/player id.</param>
         /// <param name="map">Projection from backend entity to DTO.</param>
+        /// <param name="mode">Subscription backend mode (Transport/Polling).</param>
         /// <returns>Shared entity instance.</returns>
-        Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(string playerId, Func<TEntity, TDto> map)
+        Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
+            string playerId,
+            Func<TEntity, TDto> map,
+            DataSubscriptionMode mode)
             where TEntity : class
             where TDto : class, new();
 

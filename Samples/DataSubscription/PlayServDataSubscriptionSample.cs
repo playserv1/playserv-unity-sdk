@@ -53,6 +53,7 @@ namespace Playserv.Samples
         private bool _showInfo;
         private bool _setLevelInProgress;
         private bool _logHooked;
+        private string _activeBackend = "none";
 
         private void OnEnable()
         {
@@ -67,7 +68,19 @@ namespace Playserv.Samples
         [ContextMenu("Bind")]
         public void Bind()
         {
-            _ = BindAsync();
+            _ = BindPollingAsync();
+        }
+
+        [ContextMenu("Bind Transport")]
+        public void BindTransport()
+        {
+            _ = BindTransportAsync();
+        }
+
+        [ContextMenu("Bind Polling")]
+        public void BindPolling()
+        {
+            _ = BindPollingAsync();
         }
 
         [ContextMenu("Unbind")]
@@ -127,7 +140,17 @@ namespace Playserv.Samples
             _ = RefreshInternalAsync();
         }
 
-        private async Task BindAsync()
+        private Task BindTransportAsync()
+        {
+            return BindInternalAsync(useTransport: true);
+        }
+
+        private Task BindPollingAsync()
+        {
+            return BindInternalAsync(useTransport: false);
+        }
+
+        private async Task BindInternalAsync(bool useTransport)
         {
             if (_player != null)
             {
@@ -138,13 +161,26 @@ namespace Playserv.Samples
 
             try
             {
-                _player = await PlayServ.SelectEntity<Player, SamplePlayerDto>(
-                    playerId,
-                    entity => new SamplePlayerDto
-                    {
-                        Nickname = entity?.Nickname ?? string.Empty,
-                        Level = entity?.Level ?? 1
-                    });
+                Func<Player, SamplePlayerDto> map = entity => new SamplePlayerDto
+                {
+                    Nickname = entity?.Nickname ?? string.Empty,
+                    Level = entity?.Level ?? 1
+                };
+
+                if (useTransport)
+                {
+                    _player = await PlayServ.SelectEntity<Player, SamplePlayerDto>(
+                        playerId,
+                        map,
+                        DataSubscriptionMode.Transport);
+                    _activeBackend = "transport";
+                }
+                else
+                {
+                    // mode omitted on purpose: defaults to polling
+                    _player = await PlayServ.SelectEntity<Player, SamplePlayerDto>(playerId, map);
+                    _activeBackend = "polling";
+                }
 
                 _player.Changed += OnPlayerChanged;
                 _player.Error += OnPlayerError;
@@ -154,9 +190,9 @@ namespace Playserv.Samples
                     _playerDisposable = disposable;
 
                 _snapshot = _player.Value;
-                _status = $"Bound to Player(id={playerId}) (poll {SubscriptionPollingInfo})";
+                _status = $"Bound to Player(id={playerId}), backend={_activeBackend}";
                 AddLog(_status);
-                AddLog("Subscription backend: in-memory registry + DataGetRequest polling.");
+                AddLog($"Subscription backend: {DescribeBackend(_activeBackend)}");
             }
             catch (Exception ex)
             {
@@ -298,6 +334,7 @@ namespace Playserv.Samples
             _playerDisposable = null;
             _player = null;
             _snapshot = null;
+            _activeBackend = "none";
             _status = "Unbound";
             AddLog(_status);
         }
@@ -388,6 +425,19 @@ namespace Playserv.Samples
             return $"{prefix}{suffix}";
         }
 
+        private static string DescribeBackend(string backend)
+        {
+            switch (backend)
+            {
+                case "transport":
+                    return "Transport only (DataSubscriptionRequest/DataSubscriptionUpdate)";
+                case "polling":
+                    return $"Polling only (DataGetRequest every {SubscriptionPollingInfo})";
+                default:
+                    return "Not bound";
+            }
+        }
+
         private void OnGUI()
         {
             if (!showOverlay)
@@ -401,8 +451,9 @@ namespace Playserv.Samples
 
             GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ DataSubscription Sample");
-            GUILayout.Label("How to use: connect SDK, click Bind, then run Rename/Add Level/Set Level/Reset and watch updates in logs.");
-            GUILayout.Label($"Subscription polling: Running every {SubscriptionPollingInfo} (internal).");
+            GUILayout.Label("How to use: connect SDK, click Bind Transport or Bind Polling, then run Rename/Add Level/Set Level/Reset and watch updates.");
+            GUILayout.Label($"Active backend: {_activeBackend}");
+            GUILayout.Label($"Backend details: {DescribeBackend(_activeBackend)}");
             GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
 
@@ -422,8 +473,9 @@ namespace Playserv.Samples
                 GUILayout.Space(6f);
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label("Info");
-                GUILayout.Label("Purpose: Shows shared subscription with automatic query generation and polling-based updates.");
-                GUILayout.Label("Flow: Bind -> SDK registers subscription in-memory -> polls DataGetRequest every 3s -> emits Changed only on real diff.");
+                GUILayout.Label("Purpose: Shows shared subscription with automatic query generation.");
+                GUILayout.Label("Transport flow: Bind Transport -> DataSubscriptionRequest/DataSubscriptionUpdate.");
+                GUILayout.Label("Polling flow: Bind Polling -> SDK registers local entry and polls DataGetRequest every 3s.");
                 GUILayout.Label("Dispose behavior: Unbind removes subscription from registry and stops polling.");
                 GUILayout.Label("Use in your game: HUD/profile sync, simple reactive state, low-risk replacement while server subscriptions are disabled.");
                 GUILayout.Label("UI transport logs: request/response DataGet lines are mirrored from Unity console.");
@@ -431,8 +483,10 @@ namespace Playserv.Samples
             }
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Bind"))
-                _ = BindAsync();
+            if (GUILayout.Button("Bind Transport"))
+                _ = BindTransportAsync();
+            if (GUILayout.Button("Bind Polling"))
+                _ = BindPollingAsync();
             if (GUILayout.Button("Unbind"))
                 UnbindInternal();
             GUILayout.EndHorizontal();
