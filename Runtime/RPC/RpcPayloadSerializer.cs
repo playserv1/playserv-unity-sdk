@@ -22,6 +22,19 @@ namespace Playserv.RPC
         }
 
         /// <summary>
+        /// Serializes normalized RPC payload to JSON and encodes it as base64.
+        /// </summary>
+        /// <param name="payload">Mapped payload.</param>
+        /// <returns>Base64-encoded UTF8 JSON string.</returns>
+        internal static string SerializeToBase64(RpcMappedPayload payload)
+        {
+            if (payload == null)
+                throw new ArgumentNullException(nameof(payload));
+
+            return SerializeToBase64(payload.ToSerializableObject());
+        }
+
+        /// <summary>
         /// Decodes base64 payload to UTF8 JSON string.
         /// </summary>
         /// <param name="payloadBase64">Base64 payload string.</param>

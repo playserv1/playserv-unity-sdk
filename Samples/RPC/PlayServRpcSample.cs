@@ -26,7 +26,8 @@ namespace Playserv.Samples
         private const string NotificationServiceName = nameof(NotificationService);
         private const string BroadcastMethodName = nameof(NotificationService.BroadcastToAll);
 
-        private readonly string messageText = "WyJIZWxsbyJd";
+        [Header("Message")]
+        [SerializeField] private string messageText = "Hello from RPC sample";
 
         [Header("Execution")]
         [SerializeField] private bool enableLocalInvokerOnEnable = false;
@@ -77,22 +78,57 @@ namespace Playserv.Samples
             _pendingAutoSubscribe = false;
         }
 
-        [ContextMenu("Invoke RPC")]
-        public void InvokeRpc()
+        [ContextMenu("Invoke RPC (Expression)")]
+        public void InvokeRpcExpression()
         {
             try
             {
-                PlayServ.Invoke(
-                    NotificationServiceName,
-                    BroadcastMethodName,
-                    messageText);
-
-                _status = "RPC invoke sent";
-                AddHistory($"-> {NotificationServiceName}.{BroadcastMethodName} payload={messageText}");
+                PlayServ.Invoke<NotificationService>(x => x.BroadcastToAll(messageText));
+                _status = "RPC expression invoke sent";
+                AddHistory($"-> expr {NotificationServiceName}.{BroadcastMethodName}(message={messageText})");
             }
             catch (Exception ex)
             {
                 _status = $"RPC invoke failed: {ex.Message}";
+                AddHistory(_status);
+            }
+        }
+
+        [ContextMenu("Invoke RPC (Args)")]
+        public void InvokeRpcArgs()
+        {
+            try
+            {
+                PlayServ.InvokeArgs(NotificationServiceName, BroadcastMethodName, messageText);
+                _status = "RPC args invoke sent";
+                AddHistory($"-> args {NotificationServiceName}.{BroadcastMethodName}([message={messageText}])");
+            }
+            catch (Exception ex)
+            {
+                _status = $"RPC args invoke failed: {ex.Message}";
+                AddHistory(_status);
+            }
+        }
+
+        [ContextMenu("Invoke RPC (Named)")]
+        public void InvokeRpcNamed()
+        {
+            try
+            {
+                PlayServ.InvokeNamed(
+                    NotificationServiceName,
+                    BroadcastMethodName,
+                    new Dictionary<string, object>
+                    {
+                        ["message"] = messageText
+                    });
+
+                _status = "RPC named invoke sent";
+                AddHistory($"-> named {NotificationServiceName}.{BroadcastMethodName}({{ message = {messageText} }})");
+            }
+            catch (Exception ex)
+            {
+                _status = $"RPC named invoke failed: {ex.Message}";
                 AddHistory(_status);
             }
         }
@@ -221,10 +257,11 @@ namespace Playserv.Samples
 
             GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ RPC Sample");
-            GUILayout.Label("How to use: connect SDK, subscribe NotificationEvent, click Invoke RPC, and watch incoming event/response logs.");
+            GUILayout.Label("How to use: connect SDK, subscribe NotificationEvent, then invoke RPC via expression, args or named payload and watch logs.");
             GUILayout.Label($"SDK state: {PlayServ.State}");
             GUILayout.Label($"Status: {_status}");
             GUILayout.Label($"Notification subscription: {(_notificationSubscription != null ? "Active" : "Inactive")}");
+            GUILayout.Label($"Message: {messageText}");
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Connect SDK"))
@@ -243,14 +280,23 @@ namespace Playserv.Samples
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label("Info");
                 GUILayout.Label("Purpose: Demonstrates RPC invocation through transport and event-based response handling.");
-                GUILayout.Label("How to use: Connect, subscribe to NotificationEvent, invoke RPC, then verify InvokeRpcResponse and event logs.");
-                GUILayout.Label("Use in your game: Gameplay server actions, backend workflows, and follow-up notifications.");
+                GUILayout.Label("Invoke Expression uses PlayServ.Invoke<TService>(x => x.Method(...)).");
+                GUILayout.Label("Invoke Args uses PlayServ.InvokeArgs(service, method, args...) as the fast positional path.");
+                GUILayout.Label("Invoke Named uses PlayServ.InvokeNamed(service, method, payload) as the fast named path.");
+                GUILayout.Label("Use in your game: gameplay actions, backend workflows, and follow-up notifications.");
                 GUILayout.EndVertical();
             }
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Invoke RPC"))
-                InvokeRpc();
+            if (GUILayout.Button("Invoke Expr"))
+                InvokeRpcExpression();
+            if (GUILayout.Button("Invoke Args"))
+                InvokeRpcArgs();
+            if (GUILayout.Button("Invoke Named"))
+                InvokeRpcNamed();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
             if (GUILayout.Button("Subscribe"))
                 SubscribeNotifications();
             if (GUILayout.Button("Unsubscribe"))

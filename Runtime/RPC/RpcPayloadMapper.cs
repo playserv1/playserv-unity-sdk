@@ -13,56 +13,52 @@ namespace Playserv.RPC
     /// </summary>
     internal static class RpcPayloadMapper
     {
-        private static readonly ConcurrentDictionary<MethodInfo, ParameterInfo[]> MethodParametersCache = new();
+        private static readonly ConcurrentDictionary<MethodInfo, RpcMethodBindingPlan> MethodBindingPlanCache = new();
         private static readonly ConcurrentDictionary<Type, PayloadPropertyAccessor[]> PayloadAccessorCache = new();
         private static readonly ConditionalWeakTable<Expression, Func<object>> ExpressionValueGetterCache = new();
 
-        public static object BuildPayloadFromMethodCall(MethodCallExpression methodCall)
+        public static RpcMappedPayload BuildPayloadFromMethodCall(MethodCallExpression methodCall)
         {
             if (methodCall == null)
                 throw new ArgumentNullException(nameof(methodCall));
 
-            var parameters = GetCachedMethodParameters(methodCall.Method);
-            if (parameters.Length == 0)
-                return new Dictionary<string, object>(0);
+            var bindingPlan = GetCachedMethodBindingPlan(methodCall.Method);
+            if (bindingPlan.ParameterCount == 0)
+                return RpcMappedPayload.Named(new Dictionary<string, object>(0, StringComparer.Ordinal));
 
-            var payload = new Dictionary<string, object>(parameters.Length, StringComparer.Ordinal);
-            for (var i = 0; i < parameters.Length; i++)
+            var payload = new Dictionary<string, object>(bindingPlan.ParameterCount, StringComparer.Ordinal);
+            for (var i = 0; i < bindingPlan.ParameterCount; i++)
             {
-                var parameterName = parameters[i].Name;
-                if (string.IsNullOrWhiteSpace(parameterName))
-                    parameterName = $"arg{i}";
-
-                payload[parameterName] = EvaluateExpressionValue(methodCall.Arguments[i]);
+                payload[bindingPlan.ParameterNames[i]] = EvaluateExpressionValue(methodCall.Arguments[i]);
             }
 
-            return payload;
+            return RpcMappedPayload.Named(payload);
         }
 
-        public static object BuildPayloadFromExplicitPayload(MethodCallExpression methodCall, object payload)
+        public static RpcMappedPayload BuildPayloadFromExplicitPayload(MethodCallExpression methodCall, object payload)
         {
             if (methodCall == null)
                 throw new ArgumentNullException(nameof(methodCall));
 
-            var parameters = GetCachedMethodParameters(methodCall.Method);
-            if (parameters.Length == 0)
-                return Array.Empty<object>();
+            var bindingPlan = GetCachedMethodBindingPlan(methodCall.Method);
+            if (bindingPlan.ParameterCount == 0)
+                return RpcMappedPayload.Positional(Array.Empty<object>());
 
             if (payload == null)
-                return BuildArgumentsFromEmptyPayload(parameters, methodCall.Method);
+                return RpcMappedPayload.Positional(BuildArgumentsFromEmptyPayload(bindingPlan));
 
             if (TryConvertToPositionalArray(payload, out var positionalArray))
-                return MapPositionalPayload(parameters, positionalArray, methodCall.Method);
+                return RpcMappedPayload.Positional(MapPositionalPayload(bindingPlan, positionalArray));
 
-            if (parameters.Length == 1)
-                return new object[] { payload };
+            if (bindingPlan.ParameterCount == 1)
+                return RpcMappedPayload.Positional(new object[] { payload });
 
-            if (TryBuildArgumentsFromNamedPayload(payload, parameters, methodCall.Method, out var namedArguments))
-                return namedArguments;
+            if (TryBuildArgumentsFromNamedPayload(payload, bindingPlan, out var namedArguments))
+                return RpcMappedPayload.Positional(namedArguments);
 
             throw new InvalidOperationException(
                 $"Cannot map payload of type '{payload.GetType().FullName}' to method " +
-                $"'{methodCall.Method.DeclaringType?.Name}.{methodCall.Method.Name}' with {parameters.Length} parameters. " +
+                $"'{bindingPlan.MethodDisplayName}' with {bindingPlan.ParameterCount} parameters. " +
                 "Provide an array payload in parameter order or an object/dictionary with matching parameter names.");
         }
 
@@ -74,42 +70,42 @@ namespace Playserv.RPC
             return GetCachedExpressionValueGetter(expression).Invoke();
         }
 
-        private static object[] BuildArgumentsFromEmptyPayload(ParameterInfo[] parameters, MethodInfo method)
+        private static object[] BuildArgumentsFromEmptyPayload(RpcMethodBindingPlan bindingPlan)
         {
-            var args = new object[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
+            var args = new object[bindingPlan.ParameterCount];
+            for (var i = 0; i < bindingPlan.ParameterCount; i++)
             {
-                if (parameters[i].HasDefaultValue)
+                if (bindingPlan.HasDefaultValues[i])
                 {
-                    args[i] = parameters[i].DefaultValue;
+                    args[i] = bindingPlan.DefaultValues[i];
                     continue;
                 }
 
-                if (!parameters[i].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[i].ParameterType) != null)
+                if (bindingPlan.AllowsNull[i])
                 {
                     args[i] = null;
                     continue;
                 }
 
                 throw new InvalidOperationException(
-                    $"RPC payload is empty but parameter '{parameters[i].Name}' is required for method " +
-                    $"'{method.DeclaringType?.Name}.{method.Name}'.");
+                    $"RPC payload is empty but parameter '{bindingPlan.ParameterNames[i]}' is required for method " +
+                    $"'{bindingPlan.MethodDisplayName}'.");
             }
 
             return args;
         }
 
-        private static object[] MapPositionalPayload(ParameterInfo[] parameters, object[] payloadArray, MethodInfo method)
+        private static object[] MapPositionalPayload(RpcMethodBindingPlan bindingPlan, object[] payloadArray)
         {
-            if (payloadArray.Length > parameters.Length)
+            if (payloadArray.Length > bindingPlan.ParameterCount)
             {
                 throw new InvalidOperationException(
                     $"RPC positional payload contains {payloadArray.Length} value(s), but method " +
-                    $"'{method.DeclaringType?.Name}.{method.Name}' expects {parameters.Length} parameter(s).");
+                    $"'{bindingPlan.MethodDisplayName}' expects {bindingPlan.ParameterCount} parameter(s).");
             }
 
-            var args = new object[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
+            var args = new object[bindingPlan.ParameterCount];
+            for (var i = 0; i < bindingPlan.ParameterCount; i++)
             {
                 if (i < payloadArray.Length)
                 {
@@ -117,21 +113,21 @@ namespace Playserv.RPC
                     continue;
                 }
 
-                if (parameters[i].HasDefaultValue)
+                if (bindingPlan.HasDefaultValues[i])
                 {
-                    args[i] = parameters[i].DefaultValue;
+                    args[i] = bindingPlan.DefaultValues[i];
                     continue;
                 }
 
-                if (!parameters[i].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[i].ParameterType) != null)
+                if (bindingPlan.AllowsNull[i])
                 {
                     args[i] = null;
                     continue;
                 }
 
                 throw new InvalidOperationException(
-                    $"RPC positional payload is missing required parameter '{parameters[i].Name}' for method " +
-                    $"'{method.DeclaringType?.Name}.{method.Name}'.");
+                    $"RPC positional payload is missing required parameter '{bindingPlan.ParameterNames[i]}' for method " +
+                    $"'{bindingPlan.MethodDisplayName}'.");
             }
 
             return args;
@@ -163,19 +159,20 @@ namespace Playserv.RPC
 
         private static bool TryBuildArgumentsFromNamedPayload(
             object payload,
-            ParameterInfo[] parameters,
-            MethodInfo method,
+            RpcMethodBindingPlan bindingPlan,
             out object[] args)
         {
             args = Array.Empty<object>();
 
             if (payload is IDictionary<string, object> genericDictionary)
-                return TryBuildArgumentsFromGenericDictionary(genericDictionary, parameters, method, out args);
+                return TryBuildArgumentsFromGenericDictionary(genericDictionary, bindingPlan, out args);
 
             if (payload is IReadOnlyDictionary<string, object> readOnlyDictionary)
-                return TryBuildArgumentsFromReadOnlyDictionary(readOnlyDictionary, parameters, method, out args);
+                return TryBuildArgumentsFromReadOnlyDictionary(readOnlyDictionary, bindingPlan, out args);
 
-            var valuesByName = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            args = new object[bindingPlan.ParameterCount];
+            var assigned = new bool[bindingPlan.ParameterCount];
+            var hasAssignedValues = false;
 
             if (payload is IDictionary dictionary)
             {
@@ -188,7 +185,12 @@ namespace Playserv.RPC
                     if (string.IsNullOrWhiteSpace(key))
                         continue;
 
-                    valuesByName[key] = entry.Value;
+                    if (!bindingPlan.ParameterIndexByName.TryGetValue(key, out var parameterIndex))
+                        continue;
+
+                    args[parameterIndex] = entry.Value;
+                    assigned[parameterIndex] = true;
+                    hasAssignedValues = true;
                 }
             }
             else
@@ -197,47 +199,24 @@ namespace Playserv.RPC
                 for (var i = 0; i < accessors.Length; i++)
                 {
                     var accessor = accessors[i];
-                    valuesByName[accessor.Name] = accessor.Getter(payload);
+                    if (!bindingPlan.ParameterIndexByName.TryGetValue(accessor.Name, out var parameterIndex))
+                        continue;
+
+                    args[parameterIndex] = accessor.Getter(payload);
+                    assigned[parameterIndex] = true;
+                    hasAssignedValues = true;
                 }
             }
 
-            if (valuesByName.Count == 0)
+            if (!hasAssignedValues)
                 return false;
 
-            args = new object[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                var parameterName = parameters[i].Name ?? $"arg{i}";
-                if (valuesByName.TryGetValue(parameterName, out var value))
-                {
-                    args[i] = value;
-                    continue;
-                }
-
-                if (parameters[i].HasDefaultValue)
-                {
-                    args[i] = parameters[i].DefaultValue;
-                    continue;
-                }
-
-                if (!parameters[i].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[i].ParameterType) != null)
-                {
-                    args[i] = null;
-                    continue;
-                }
-
-                throw new InvalidOperationException(
-                    $"Named RPC payload does not contain required parameter '{parameterName}' for method " +
-                    $"'{method.DeclaringType?.Name}.{method.Name}'.");
-            }
-
-            return true;
+            return FinalizeNamedArguments(bindingPlan, args, assigned);
         }
 
         private static bool TryBuildArgumentsFromGenericDictionary(
             IDictionary<string, object> valuesByName,
-            ParameterInfo[] parameters,
-            MethodInfo method,
+            RpcMethodBindingPlan bindingPlan,
             out object[] args)
         {
             if (valuesByName == null || valuesByName.Count == 0)
@@ -246,40 +225,29 @@ namespace Playserv.RPC
                 return false;
             }
 
-            args = new object[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
+            args = new object[bindingPlan.ParameterCount];
+            var assigned = new bool[bindingPlan.ParameterCount];
+            var hasAssignedValues = false;
+
+            foreach (var pair in valuesByName)
             {
-                var parameterName = parameters[i].Name ?? $"arg{i}";
-                if (TryGetValueIgnoreCase(valuesByName, parameterName, out var value))
-                {
-                    args[i] = value;
+                if (!bindingPlan.ParameterIndexByName.TryGetValue(pair.Key, out var parameterIndex))
                     continue;
-                }
 
-                if (parameters[i].HasDefaultValue)
-                {
-                    args[i] = parameters[i].DefaultValue;
-                    continue;
-                }
-
-                if (!parameters[i].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[i].ParameterType) != null)
-                {
-                    args[i] = null;
-                    continue;
-                }
-
-                throw new InvalidOperationException(
-                    $"Named RPC payload does not contain required parameter '{parameterName}' for method " +
-                    $"'{method.DeclaringType?.Name}.{method.Name}'.");
+                args[parameterIndex] = pair.Value;
+                assigned[parameterIndex] = true;
+                hasAssignedValues = true;
             }
 
-            return true;
+            if (!hasAssignedValues)
+                return false;
+
+            return FinalizeNamedArguments(bindingPlan, args, assigned);
         }
 
         private static bool TryBuildArgumentsFromReadOnlyDictionary(
             IReadOnlyDictionary<string, object> valuesByName,
-            ParameterInfo[] parameters,
-            MethodInfo method,
+            RpcMethodBindingPlan bindingPlan,
             out object[] args)
         {
             if (valuesByName == null || valuesByName.Count == 0)
@@ -288,84 +256,62 @@ namespace Playserv.RPC
                 return false;
             }
 
-            args = new object[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
+            args = new object[bindingPlan.ParameterCount];
+            var assigned = new bool[bindingPlan.ParameterCount];
+            var hasAssignedValues = false;
+
+            foreach (var pair in valuesByName)
             {
-                var parameterName = parameters[i].Name ?? $"arg{i}";
-                if (TryGetValueIgnoreCase(valuesByName, parameterName, out var value))
+                if (!bindingPlan.ParameterIndexByName.TryGetValue(pair.Key, out var parameterIndex))
+                    continue;
+
+                args[parameterIndex] = pair.Value;
+                assigned[parameterIndex] = true;
+                hasAssignedValues = true;
+            }
+
+            if (!hasAssignedValues)
+                return false;
+
+            return FinalizeNamedArguments(bindingPlan, args, assigned);
+        }
+
+        private static bool FinalizeNamedArguments(
+            RpcMethodBindingPlan bindingPlan,
+            object[] args,
+            bool[] assigned)
+        {
+            for (var i = 0; i < bindingPlan.ParameterCount; i++)
+            {
+                if (assigned[i])
+                    continue;
+
+                if (bindingPlan.HasDefaultValues[i])
                 {
-                    args[i] = value;
+                    args[i] = bindingPlan.DefaultValues[i];
                     continue;
                 }
 
-                if (parameters[i].HasDefaultValue)
-                {
-                    args[i] = parameters[i].DefaultValue;
-                    continue;
-                }
-
-                if (!parameters[i].ParameterType.IsValueType || Nullable.GetUnderlyingType(parameters[i].ParameterType) != null)
+                if (bindingPlan.AllowsNull[i])
                 {
                     args[i] = null;
                     continue;
                 }
 
                 throw new InvalidOperationException(
-                    $"Named RPC payload does not contain required parameter '{parameterName}' for method " +
-                    $"'{method.DeclaringType?.Name}.{method.Name}'.");
+                    $"Named RPC payload does not contain required parameter '{bindingPlan.ParameterNames[i]}' for method " +
+                    $"'{bindingPlan.MethodDisplayName}'.");
             }
 
             return true;
         }
 
-        private static bool TryGetValueIgnoreCase(
-            IDictionary<string, object> valuesByName,
-            string key,
-            out object value)
-        {
-            if (valuesByName.TryGetValue(key, out value))
-                return true;
-
-            foreach (var pair in valuesByName)
-            {
-                if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
-                {
-                    value = pair.Value;
-                    return true;
-                }
-            }
-
-            value = null;
-            return false;
-        }
-
-        private static bool TryGetValueIgnoreCase(
-            IReadOnlyDictionary<string, object> valuesByName,
-            string key,
-            out object value)
-        {
-            if (valuesByName.TryGetValue(key, out value))
-                return true;
-
-            foreach (var pair in valuesByName)
-            {
-                if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
-                {
-                    value = pair.Value;
-                    return true;
-                }
-            }
-
-            value = null;
-            return false;
-        }
-
-        private static ParameterInfo[] GetCachedMethodParameters(MethodInfo method)
+        private static RpcMethodBindingPlan GetCachedMethodBindingPlan(MethodInfo method)
         {
             if (method == null)
                 throw new ArgumentNullException(nameof(method));
 
-            return MethodParametersCache.GetOrAdd(method, static m => m.GetParameters());
+            return MethodBindingPlanCache.GetOrAdd(method, static m => new RpcMethodBindingPlan(m));
         }
 
         private static PayloadPropertyAccessor[] GetCachedPayloadAccessors(Type payloadType)
@@ -418,6 +364,47 @@ namespace Playserv.RPC
 
             public string Name { get; }
             public Func<object, object> Getter { get; }
+        }
+
+        private sealed class RpcMethodBindingPlan
+        {
+            public RpcMethodBindingPlan(MethodInfo method)
+            {
+                Method = method ?? throw new ArgumentNullException(nameof(method));
+                Parameters = method.GetParameters();
+                ParameterCount = Parameters.Length;
+                MethodDisplayName = $"{method.DeclaringType?.Name}.{method.Name}";
+                ParameterNames = new string[ParameterCount];
+                HasDefaultValues = new bool[ParameterCount];
+                DefaultValues = new object[ParameterCount];
+                AllowsNull = new bool[ParameterCount];
+                ParameterIndexByName = new Dictionary<string, int>(ParameterCount, StringComparer.OrdinalIgnoreCase);
+
+                for (var i = 0; i < ParameterCount; i++)
+                {
+                    var parameter = Parameters[i];
+                    var parameterName = parameter.Name;
+                    if (string.IsNullOrWhiteSpace(parameterName))
+                        parameterName = $"arg{i}";
+
+                    ParameterNames[i] = parameterName;
+                    HasDefaultValues[i] = parameter.HasDefaultValue;
+                    DefaultValues[i] = parameter.DefaultValue;
+                    AllowsNull = !parameter.ParameterType.IsValueType ||
+                                 Nullable.GetUnderlyingType(parameter.ParameterType) != null;
+                    ParameterIndexByName[parameterName] = i;
+                }
+            }
+
+            public MethodInfo Method { get; }
+            public ParameterInfo[] Parameters { get; }
+            public int ParameterCount { get; }
+            public string MethodDisplayName { get; }
+            public string[] ParameterNames { get; }
+            public bool[] HasDefaultValues { get; }
+            public object[] DefaultValues { get; }
+            public bool[] AllowsNull { get; }
+            public Dictionary<string, int> ParameterIndexByName { get; }
         }
     }
 }

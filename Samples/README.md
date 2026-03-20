@@ -127,14 +127,19 @@ Important:
 Shows backend RPC invocation and receiving the outcome through events.
 
 ### What it demonstrates
-- RPC call: `PlayServ.Invoke(serviceName, methodName, payloadBase64)`.
+- RPC call via expression: `PlayServ.Invoke<TService>(x => x.Method(...))`.
+- RPC call via fast positional path: `PlayServ.InvokeArgs(serviceName, methodName, args...)`.
+- RPC call via fast named path: `PlayServ.InvokeNamed(serviceName, methodName, payload)`.
 - `NotificationEvent` subscription for transport-level responses/notifications.
 - Transport error logging via `PlayServ.OnTransportError`.
 
 ### How to use
 1. Connect to SDK.
 2. Click `Subscribe` (for `NotificationEvent`).
-3. Click `Invoke RPC`.
+3. Click one of:
+   - `Invoke Expr`
+   - `Invoke Args`
+   - `Invoke Named`
 4. Check `Logs` for:
    - outbound RPC (`-> ...`),
    - inbound event (`<- ...`).
@@ -144,6 +149,7 @@ Shows backend RPC invocation and receiving the outcome through events.
 - Gameplay RPC operations (rewards, matchmaking, match actions).
 - Push-style notifications after RPC execution.
 - Unified transport flow for RPC + events.
+- Fast-path RPC calls without expression parsing in hot paths.
 
 ---
 

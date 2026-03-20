@@ -155,6 +155,24 @@ namespace Playserv.Wrapper
             Api.Invoke(serviceName, methodName, payload);
 
         /// <summary>
+        /// Invokes server RPC method using positional argument array without expression parsing.
+        /// </summary>
+        /// <param name="serviceName">RPC service name.</param>
+        /// <param name="methodName">RPC method name.</param>
+        /// <param name="args">Positional RPC arguments in declared method order.</param>
+        public static void InvokeArgs(string serviceName, string methodName, params object[] args) =>
+            Api.InvokeArgs(serviceName, methodName, args);
+
+        /// <summary>
+        /// Invokes server RPC method using named argument payload without expression parsing.
+        /// </summary>
+        /// <param name="serviceName">RPC service name.</param>
+        /// <param name="methodName">RPC method name.</param>
+        /// <param name="payload">Named RPC arguments keyed by parameter name.</param>
+        public static void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
+            Api.InvokeNamed(serviceName, methodName, payload);
+
+        /// <summary>
         /// Sets optional local RPC invoker for server-side/in-process execution.
         /// </summary>
         /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>

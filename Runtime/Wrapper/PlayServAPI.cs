@@ -145,6 +145,17 @@ namespace Playserv.Wrapper
             Invoke(serviceName, methodName, payloadBase64);
         }
 
+        public void InvokeArgs(string serviceName, string methodName, params object[] args) =>
+            InvokeMapped(serviceName, methodName, RpcMappedPayload.Positional(args ?? Array.Empty<object>()));
+
+        public void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload)
+        {
+            if (payload == null)
+                throw new ArgumentNullException(nameof(payload));
+
+            InvokeMapped(serviceName, methodName, RpcMappedPayload.Named(payload));
+        }
+
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
             _rpcInvoker = rpcInvoker;
 
@@ -190,7 +201,7 @@ namespace Playserv.Wrapper
             var serviceName = ResolveServiceName<TService>();
             var methodCall = ResolveMethodCall(method.Body, nameof(method));
             var payload = RpcPayloadMapper.BuildPayloadFromMethodCall(methodCall);
-            Invoke(serviceName, methodCall.Method.Name, payload);
+            InvokeMapped(serviceName, methodCall.Method.Name, payload);
         }
 
         public void Invoke<TService>(Expression<Action<TService>> method, object? payload)
@@ -201,7 +212,7 @@ namespace Playserv.Wrapper
             var serviceName = ResolveServiceName<TService>();
             var methodCall = ResolveMethodCall(method.Body, nameof(method));
             var normalizedPayload = RpcPayloadMapper.BuildPayloadFromExplicitPayload(methodCall, payload);
-            Invoke(serviceName, methodCall.Method.Name, normalizedPayload);
+            InvokeMapped(serviceName, methodCall.Method.Name, normalizedPayload);
         }
 
         public void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64)
@@ -212,6 +223,12 @@ namespace Playserv.Wrapper
             var serviceName = ResolveServiceName<TService>();
             var methodCall = ResolveMethodCall(method.Body, nameof(method));
             Invoke(serviceName, methodCall.Method.Name, payloadBase64);
+        }
+
+        private void InvokeMapped(string serviceName, string methodName, RpcMappedPayload payload)
+        {
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
+            Invoke(serviceName, methodName, payloadBase64);
         }
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
