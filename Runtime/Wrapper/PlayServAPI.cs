@@ -24,6 +24,7 @@ namespace Playserv.Wrapper
         private IRpcInvoker _rpcInvoker;
         private readonly object _connectGate = new();
         private Task<bool> _connectTask;
+        private int _shutdownIgnoreWarningLogged;
 
         public string SdkVersion => SdkInfo.Version;
         public PlayServSettings Settings => _settings;
@@ -122,7 +123,10 @@ namespace Playserv.Wrapper
             if (TryHandleLocalCommand(command, moduleName: null))
                 return;
 
-            Instance.Send(command);
+            if (!TryGetInstanceForFireAndForget("command send", out var instance))
+                return;
+
+            instance.Send(command);
         }
 
         public void SetCommandHandler(ICommandHandler commandHandler) =>
@@ -133,7 +137,10 @@ namespace Playserv.Wrapper
             if (TryHandleLocalCommand(command, moduleName))
                 return;
 
-            Instance.Send(command, moduleName);
+            if (!TryGetInstanceForFireAndForget("command send", out var instance))
+                return;
+
+            instance.Send(command, moduleName);
         }
 
         public void SetEventHandler(IEventHandler eventHandler) =>
@@ -190,7 +197,10 @@ namespace Playserv.Wrapper
                 Payload = payloadBase64
             };
 
-            Instance.Send(request, RpcConstants.InvokeModuleServiceName);
+            if (!TryGetInstanceForFireAndForget("RPC invoke", out var instance))
+                return;
+
+            instance.Send(request, RpcConstants.InvokeModuleServiceName);
         }
 
         public void Invoke<TService>(Expression<Action<TService>> method)
@@ -239,7 +249,10 @@ namespace Playserv.Wrapper
             if (TryPublishLocal(@event))
                 return;
 
-            Instance.Publish(@event);
+            if (!TryGetInstanceForFireAndForget("event publish", out var instance))
+                return;
+
+            instance.Publish(@event);
         }
 
         public void PublishForGroup<T>(string groupName, T @event)
@@ -247,7 +260,10 @@ namespace Playserv.Wrapper
             if (TryPublishForGroupLocal(groupName, @event))
                 return;
 
-            Instance.PublishForGroup(groupName, @event);
+            if (!TryGetInstanceForFireAndForget("group event publish", out var instance))
+                return;
+
+            instance.PublishForGroup(groupName, @event);
         }
 
         public void PublishForUser<T>(string userId, T @event)
@@ -255,7 +271,10 @@ namespace Playserv.Wrapper
             if (TryPublishForUserLocal(userId, @event))
                 return;
 
-            Instance.PublishForUser(userId, @event);
+            if (!TryGetInstanceForFireAndForget("user event publish", out var instance))
+                return;
+
+            instance.PublishForUser(userId, @event);
         }
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
@@ -307,6 +326,33 @@ namespace Playserv.Wrapper
 
         private PlayServImplementation Instance =>
             _instance ?? throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
+
+        private bool TryGetInstanceForFireAndForget(string operationName, out PlayServImplementation instance)
+        {
+            instance = _instance;
+            if (instance != null)
+                return true;
+
+#if UNITY_5_3_OR_NEWER
+            if (!Application.isPlaying)
+            {
+                LogShutdownIgnoreWarning(operationName);
+                return false;
+            }
+#endif
+
+            throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
+        }
+
+        private void LogShutdownIgnoreWarning(string operationName)
+        {
+            if (Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 1) != 0)
+                return;
+
+#if UNITY_5_3_OR_NEWER
+            Debug.LogWarning($"[PlayServ] Ignoring {operationName} because Unity is shutting down or exiting play mode.");
+#endif
+        }
 
         private void SubscribeToInstanceEvents()
         {
