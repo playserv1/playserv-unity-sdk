@@ -90,6 +90,8 @@ namespace Playserv.Wrapper
                 if (State is PlayServState.Online or PlayServState.Connecting or PlayServState.Handshaking)
                     throw new InvalidOperationException("PlayServ is already connected or connecting.");
 
+                PlayServRuntimeShutdownState.Reset();
+                Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 0);
                 var settings = GetOrCreateSettings();
                 ApplySettings(settings);
                 var connected = await Instance.Connect();
@@ -334,7 +336,7 @@ namespace Playserv.Wrapper
                 return true;
 
 #if UNITY_5_3_OR_NEWER
-            if (!Application.isPlaying)
+            if (!Application.isPlaying || PlayServRuntimeShutdownState.IsShuttingDown)
             {
                 LogShutdownIgnoreWarning(operationName);
                 return false;
