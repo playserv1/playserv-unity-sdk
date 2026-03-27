@@ -72,6 +72,14 @@ namespace Playserv.Wrapper
         Task<bool> Connect();
 
         /// <summary>
+        /// Requests latest deployed game version from deployment API by game identifier.
+        /// </summary>
+        /// <param name="gameId">Game identifier.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>Latest deployed game version.</returns>
+        Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default);
+
+        /// <summary>
         /// Subscribes to incoming events of type <typeparamref name="T"/>.
         /// </summary>
         /// <typeparam name="T">Event payload type.</typeparam>

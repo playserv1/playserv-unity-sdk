@@ -19,6 +19,7 @@ namespace Playserv.Examples
         [SerializeField] private string gameId = "game-001";
         [SerializeField] private string userId = "player-001";
         [SerializeField] private string gameVersion = "1.0.0";
+        [SerializeField] private bool overrideCredentialsFromInspector;
 
         [Header("Resolved Endpoints (Read Only)")]
         [FormerlySerializedAs("remoteEndpoint")]
@@ -103,17 +104,22 @@ namespace Playserv.Examples
         public void Configure()
         {
             var settings = BuildSettingsFromConfig();
-            settings.GameAccessToken = gameAccessToken;
-            settings.GameId = gameId;
-            settings.UserId = userId;
-            settings.GameVersion = gameVersion;
+
+            if (overrideCredentialsFromInspector)
+            {
+                settings.GameAccessToken = gameAccessToken;
+                settings.GameId = gameId;
+                settings.UserId = userId;
+                settings.GameVersion = gameVersion;
+            }
+
             settings.KeepAlivePingIntervalMs = keepAlivePingIntervalMs;
             settings.KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs;
 
             PlayServ.Config(settings);
             ApplyResolvedEndpointsPreview(settings);
             Debug.Log(
-                $"[PlayServ][Sample] Configured. backend={settings.BackendServerAddress}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
+                $"[PlayServ][Sample] Configured. gameId={settings.GameId}, credentialsSource={(overrideCredentialsFromInspector ? "inspector" : "config")}, backend={settings.BackendServerAddress}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
         }
 
         [ContextMenu("Connect SDK")]

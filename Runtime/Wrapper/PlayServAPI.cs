@@ -16,6 +16,9 @@ namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServApi
     {
+#if UNITY_5_3_OR_NEWER
+        private const string ConfigResourceName = "PlayServConfig";
+#endif
         private PlayServImplementation _instance;
         private PlayServSettings _settings;
         private string _instanceEndpoint;
@@ -93,6 +96,7 @@ namespace Playserv.Wrapper
                 PlayServRuntimeShutdownState.Reset();
                 Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 0);
                 var settings = GetOrCreateSettings();
+                await RefreshConfiguredGameVersionAsync(settings);
                 ApplySettings(settings);
                 var connected = await Instance.Connect();
                 if (!connected)
@@ -108,6 +112,17 @@ namespace Playserv.Wrapper
                         _connectTask = null;
                 }
             }
+        }
+
+        public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
+        {
+#if UNITY_5_3_OR_NEWER
+            var settings = GetOrCreateSettings();
+            return GetLatestVersionOrFallbackAsync(settings, gameId, ct);
+#else
+            return Task.FromException<string>(
+                new PlatformNotSupportedException("Latest version lookup requires Unity runtime."));
+#endif
         }
 
         public IDisposable Subscribe<T>(Action<T> onNext) =>
@@ -540,6 +555,27 @@ namespace Playserv.Wrapper
             SubscribeToInstanceEvents();
         }
 
+        private async Task RefreshConfiguredGameVersionAsync(PlayServSettings settings, CancellationToken ct = default)
+        {
+#if UNITY_5_3_OR_NEWER
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            if (string.IsNullOrWhiteSpace(settings.DeployApiServerAddress) ||
+                string.IsNullOrWhiteSpace(settings.GameId))
+            {
+                return;
+            }
+
+            var latestVersion = await GetLatestVersionOrFallbackAsync(settings, settings.GameId, ct);
+            settings.GameVersion = latestVersion;
+            _settings = settings;
+            SyncLoadedConfigGameVersion(latestVersion);
+#else
+            await Task.CompletedTask;
+#endif
+        }
+
         private void EnsureInstanceForEndpoint(string endpoint)
         {
             if (string.IsNullOrWhiteSpace(endpoint))
@@ -597,5 +633,44 @@ namespace Playserv.Wrapper
         {
             return PlayServSettingsResolver.TryLoadSettingsFromResourcesOrPackageDefaults(out settings);
         }
+
+#if UNITY_5_3_OR_NEWER
+        private static async Task<string> GetLatestVersionOrFallbackAsync(
+            PlayServSettings settings,
+            string gameId,
+            CancellationToken ct = default)
+        {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            var fallbackVersion = settings.GameVersion?.Trim();
+
+            try
+            {
+                var latestVersion = await new PlayServRuntimeApiClient(settings).GetLatestVersionAsync(gameId, ct);
+                Debug.Log($"[PlayServ] Latest game version resolved from deployment API: {latestVersion}");
+                return latestVersion;
+            }
+            catch (Exception ex) when (!string.IsNullOrWhiteSpace(fallbackVersion))
+            {
+                Debug.LogWarning(
+                    $"[PlayServ] Failed to fetch latest game version for gameId={gameId}. " +
+                    $"Falling back to configured GameVersion={fallbackVersion}. Error: {ex.Message}");
+                return fallbackVersion;
+            }
+        }
+
+        private static void SyncLoadedConfigGameVersion(string gameVersion)
+        {
+            if (string.IsNullOrWhiteSpace(gameVersion))
+                return;
+
+            var config = Resources.Load<PlayServConfig>(ConfigResourceName);
+            if (config == null)
+                return;
+
+            config.SetGameVersion(gameVersion);
+        }
+#endif
     }
 }

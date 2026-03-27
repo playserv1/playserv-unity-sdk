@@ -7,18 +7,6 @@ namespace Playserv.Editor
     [CustomEditor(typeof(PlayServBootstrapSample))]
     internal sealed class PlayServBootstrapSampleInspector : UnityEditor.Editor
     {
-        private static readonly string[] EditablePropertyOrder =
-        {
-            "gameAccessToken",
-            "gameId",
-            "userId",
-            "gameVersion",
-            "autoConnect",
-            "disconnectOnDestroy",
-            "keepAlivePingIntervalMs",
-            "keepAlivePongTimeoutMs"
-        };
-
         private static readonly string[] ReadOnlyEndpointPropertyOrder =
         {
             "backendServerAddress",
@@ -30,13 +18,55 @@ namespace Playserv.Editor
         {
             serializedObject.Update();
 
-            DrawProperties(EditablePropertyOrder, readOnly: false);
+            var overrideProperty = serializedObject.FindProperty("overrideCredentialsFromInspector");
+            var useInspectorCredentials = overrideProperty != null && overrideProperty.boolValue;
+
+            DrawOverrideProperty(overrideProperty);
+            DrawCredentialProperties(useInspectorCredentials);
+            DrawBehaviorProperties();
 
             EditorGUILayout.Space(4);
             DrawProperties(ReadOnlyEndpointPropertyOrder, readOnly: true);
 
             if (serializedObject.ApplyModifiedProperties())
                 EditorUtility.SetDirty(target);
+        }
+
+        private void DrawOverrideProperty(SerializedProperty property)
+        {
+            if (property == null)
+                return;
+
+            EditorGUILayout.PropertyField(property, includeChildren: true);
+        }
+
+        private void DrawCredentialProperties(bool useInspectorCredentials)
+        {
+            var credentialProperties = new[]
+            {
+                "gameAccessToken",
+                "gameId",
+                "userId",
+                "gameVersion"
+            };
+
+            using (new EditorGUI.DisabledScope(!useInspectorCredentials))
+            {
+                DrawProperties(credentialProperties, readOnly: false);
+            }
+        }
+
+        private void DrawBehaviorProperties()
+        {
+            var behaviorProperties = new[]
+            {
+                "autoConnect",
+                "disconnectOnDestroy",
+                "keepAlivePingIntervalMs",
+                "keepAlivePongTimeoutMs"
+            };
+
+            DrawProperties(behaviorProperties, readOnly: false);
         }
 
         private void DrawProperties(string[] propertyNames, bool readOnly)
