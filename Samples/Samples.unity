@@ -132,6 +132,7 @@ GameObject:
   m_Component:
   - component: {fileID: 200345671}
   - component: {fileID: 200345672}
+  - component: {fileID: 200345676}
   m_Layer: 0
   m_Name: Samples Scene Menu
   m_TagString: Untagged
@@ -161,7 +162,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 200345670}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5e69b50cf3ad43d2a5628cf0a604fcb7, type: 3}
   m_Name: 
@@ -217,11 +218,35 @@ MonoBehaviour:
   gameId: development-test-x8hh
   userId: player-001
   gameVersion: 1.0.0
-  backendServerAddress: wss://playserv-proxy.test.playserv.io/ws
+  overrideCredentialsFromInspector: 0
+  backendServerAddress: wss://proxy.playserv.io/ws
+  deployApiServerAddress: https://deployment.playserv.io
+  schemaApiServerAddress: https://backoffice.playserv.io/
   autoConnect: 1
   disconnectOnDestroy: 1
   keepAlivePingIntervalMs: 30000
   keepAlivePongTimeoutMs: 30000
+--- !u!114 &200345676
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200345670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d03fbbfda83ae4c899fcf02cab7d8c09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  showOverlay: 1
+  focusInputOnEnable: 1
+  maxLogEntries: 300
+  defaultPlayerId: player-001
+  defaultGroupName: demo-group
+  defaultTargetUserId: player-002
+  defaultSpawnAssetName: TestCube
+  spawnCenter: {x: 0, y: 0, z: 0}
+  spawnRadius: 6
 --- !u!1 &228641480
 GameObject:
   m_ObjectHideFlags: 0
