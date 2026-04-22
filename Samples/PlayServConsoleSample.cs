@@ -39,6 +39,7 @@ namespace Playserv.Samples
         private string _status = "Idle";
         private Vector2 _scroll;
         private bool _focusInputNextFrame;
+        private bool _inputHasFocus;
 
         private ISharedEntity<SamplePlayerDto> _player;
         private IDisposable _playerDisposable;
@@ -49,9 +50,66 @@ namespace Playserv.Samples
         private string _activeBackend = "none";
         private GameObject _lastSpawned;
 
+        private static readonly string[] AvailableCommands =
+        {
+            "connect",
+            "disconnect",
+            "state",
+            "bind",
+            "unbind",
+            "rename",
+            "addlevel",
+            "setlevel",
+            "refresh",
+            "subevent",
+            "unsubevent",
+            "joingroup",
+            "leavegroup",
+            "publishglobal",
+            "publishgroup",
+            "publishuser",
+            "subrpc",
+            "unsubrpc",
+            "rpc",
+            "spawn",
+            "clear",
+            "help"
+        };
+
+        private static readonly Dictionary<string, string> CommandUsages = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["connect"] = "connect",
+            ["disconnect"] = "disconnect",
+            ["state"] = "state",
+            ["bind"] = "bind <playerId> [polling|transport]",
+            ["unbind"] = "unbind",
+            ["rename"] = "rename <new name>",
+            ["addlevel"] = "addlevel [amount]",
+            ["setlevel"] = "setlevel <value>",
+            ["refresh"] = "refresh",
+            ["subevent"] = "subevent",
+            ["unsubevent"] = "unsubevent",
+            ["joingroup"] = "joingroup [group]",
+            ["leavegroup"] = "leavegroup [group]",
+            ["publishglobal"] = "publishglobal <text>",
+            ["publishgroup"] = "publishgroup [group] <text>",
+            ["publishuser"] = "publishuser [userId] <text>",
+            ["subrpc"] = "subrpc",
+            ["unsubrpc"] = "unsubrpc",
+            ["rpc"] = "rpc [expr|args|named] <text>",
+            ["spawn"] = "spawn [assetName]",
+            ["clear"] = "clear",
+            ["help"] = "help"
+        };
+
         private const string InputControlName = "playserv_console_input";
         private const string NotificationServiceName = nameof(NotificationService);
         private const string BroadcastMethodName = nameof(NotificationService.BroadcastToAll);
+
+        private bool IsInputFocused()
+        {
+            return _inputHasFocus;
+        }
 
         private void OnEnable()
         {
@@ -106,6 +164,15 @@ namespace Playserv.Samples
             GUILayout.Label($"Bound Player: {_boundPlayerId ?? "-"} | Backend: {_activeBackend} | Group Joined: {_isGroupJoined}");
             GUILayout.Label("Examples: connect | bind player-001 polling | subevent | publishglobal hello | rpc named hi | spawn TestCube");
 
+            if (_focusInputNextFrame)
+            {
+                GUI.FocusControl(InputControlName);
+                _focusInputNextFrame = false;
+                _inputHasFocus = true;
+            }
+
+            HandleKeyboard();
+
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.ExpandHeight(true));
             foreach (var line in _logs)
                 GUILayout.Label(line);
@@ -113,22 +180,39 @@ namespace Playserv.Samples
 
             GUI.SetNextControlName(InputControlName);
             _input = GUILayout.TextField(_input);
+            _inputHasFocus = GUI.GetNameOfFocusedControl() == InputControlName;
 
-            if (_focusInputNextFrame)
+            if (IsInputFocused())
             {
-                GUI.FocusControl(InputControlName);
-                _focusInputNextFrame = false;
-            }
+                var suggestions = GetCommandSuggestions(_input);
+                if (suggestions.Count > 0)
+                {
+                    GUILayout.Label($"Commands: {string.Join(", ", suggestions)}");
+                }
 
-            HandleKeyboard();
+                var usageHint = GetCommandUsageHint(_input, suggestions);
+                if (!string.IsNullOrEmpty(usageHint))
+                {
+                    GUILayout.Label($"Usage: {usageHint}");
+                }
+            }
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Run", GUILayout.Height(28f)))
+            {
+                _inputHasFocus = true;
                 SubmitInput();
+            }
             if (GUILayout.Button("Clear", GUILayout.Height(28f)))
+            {
+                _inputHasFocus = false;
                 _logs.Clear();
+            }
             if (GUILayout.Button("Help", GUILayout.Height(28f)))
+            {
+                _inputHasFocus = false;
                 PrintHelp();
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.EndArea();
@@ -137,8 +221,24 @@ namespace Playserv.Samples
         private void HandleKeyboard()
         {
             var e = Event.current;
-            if (e == null || e.type != EventType.KeyDown)
+            if (e == null)
                 return;
+
+            if (e.type == EventType.MouseDown)
+                return;
+
+            if (e.type != EventType.KeyDown)
+                return;
+
+            if (!_inputHasFocus)
+                return;
+
+            if (e.keyCode == KeyCode.Tab)
+            {
+                TryAutocompleteCommand();
+                e.Use();
+                return;
+            }
 
             if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
             {
@@ -159,6 +259,93 @@ namespace Playserv.Samples
                 NavigateHistory(1);
                 e.Use();
             }
+        }
+        private static List<string> GetCommandSuggestions(string input)
+        {
+            var query = (input ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(query))
+                return AvailableCommands.ToList();
+
+            var firstToken = Tokenize(query).FirstOrDefault() ?? string.Empty;
+            if (string.IsNullOrEmpty(firstToken))
+                return AvailableCommands.ToList();
+
+            return AvailableCommands
+                .Where(x => x.StartsWith(firstToken, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        private string GetCommandUsageHint(string input, IReadOnlyList<string> suggestions)
+        {
+            var trimmed = (input ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                return string.Empty;
+
+            var parts = Tokenize(trimmed);
+            if (parts.Count == 0)
+                return string.Empty;
+
+            var command = parts[0];
+            if (CommandUsages.TryGetValue(command, out var exactUsage))
+                return exactUsage;
+
+            if (suggestions.Count == 1 && CommandUsages.TryGetValue(suggestions[0], out var suggestedUsage))
+                return suggestedUsage;
+
+            return string.Empty;
+        }
+
+        private void TryAutocompleteCommand()
+        {
+            var trimmedStart = _input ?? string.Empty;
+            var parts = Tokenize(trimmedStart);
+            if (parts.Count > 1)
+                return;
+
+            var hasTrailingSpace = !string.IsNullOrEmpty(trimmedStart) && char.IsWhiteSpace(trimmedStart[trimmedStart.Length - 1]);
+            if (hasTrailingSpace)
+                return;
+
+            var suggestions = GetCommandSuggestions(trimmedStart);
+            if (suggestions.Count == 0)
+                return;
+
+            if (suggestions.Count == 1)
+            {
+                _input = suggestions[0] + " ";
+                _focusInputNextFrame = true;
+                return;
+            }
+
+            var commonPrefix = GetCommonPrefix(suggestions);
+            if (!string.IsNullOrEmpty(commonPrefix) && commonPrefix.Length > trimmedStart.Trim().Length)
+            {
+                _input = commonPrefix;
+                _focusInputNextFrame = true;
+            }
+        }
+
+        private static string GetCommonPrefix(IReadOnlyList<string> values)
+        {
+            if (values == null || values.Count == 0)
+                return string.Empty;
+
+            var prefix = values[0];
+            for (var i = 1; i < values.Count; i++)
+            {
+                var current = values[i];
+                var max = Mathf.Min(prefix.Length, current.Length);
+                var length = 0;
+
+                while (length < max && char.ToLowerInvariant(prefix[length]) == char.ToLowerInvariant(current[length]))
+                    length++;
+
+                prefix = prefix.Substring(0, length);
+                if (prefix.Length == 0)
+                    break;
+            }
+
+            return prefix;
         }
 
         private void NavigateHistory(int direction)
@@ -661,25 +848,13 @@ namespace Playserv.Samples
         private void PrintHelp()
         {
             AddLog("=== COMMANDS ===");
-            AddLog("connect");
-            AddLog("disconnect");
-            AddLog("state");
-            AddLog("bind <playerId> [polling|transport]");
-            AddLog("unbind");
-            AddLog("rename <new name>");
-            AddLog("addlevel [amount]");
-            AddLog("setlevel <value>");
-            AddLog("refresh");
-            AddLog("subevent / unsubevent");
-            AddLog("joingroup [group]");
-            AddLog("leavegroup [group]");
-            AddLog("publishglobal <text>");
-            AddLog("publishgroup [group] <text>");
-            AddLog("publishuser [userId] <text>");
-            AddLog("subrpc / unsubrpc");
-            AddLog("rpc [expr|args|named] <text>");
-            AddLog("spawn [assetName]");
-            AddLog("clear");
+            foreach (var command in AvailableCommands)
+            {
+                if (CommandUsages.TryGetValue(command, out var usage))
+                    AddLog(usage);
+                else
+                    AddLog(command);
+            }
         }
 
         private void AddLog(string line)
