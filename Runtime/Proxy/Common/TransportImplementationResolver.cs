@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
@@ -75,47 +72,9 @@ namespace Playserv.Proxy.Common
                 if (_factories != null)
                     return _factories;
 
-                _factories = DiscoverFactories();
+                _factories = TransportModuleRegistry.GetFactories();
                 return _factories;
             }
-        }
-
-        private static ITransportModuleFactory[] DiscoverFactories()
-        {
-            var result = new List<ITransportModuleFactory>();
-            var assembly = typeof(TransportImplementationResolver).Assembly;
-            var contractType = typeof(ITransportModuleFactory);
-            Type[] types;
-
-            try
-            {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types ?? Array.Empty<Type>();
-            }
-
-            foreach (var type in types)
-            {
-                if (type == null || type.IsAbstract || type.IsInterface)
-                    continue;
-
-                if (!contractType.IsAssignableFrom(type))
-                    continue;
-
-                if (type.GetConstructor(Type.EmptyTypes) == null)
-                    continue;
-
-                if (!(Activator.CreateInstance(type) is ITransportModuleFactory factory))
-                    continue;
-
-                result.Add(factory);
-            }
-
-            return result
-                .OrderBy(x => x.Scheme, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
         }
 
         private static bool IsWebSocketCompatibleScheme(string scheme)
