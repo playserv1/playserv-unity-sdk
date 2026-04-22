@@ -122,6 +122,11 @@ namespace Playserv.Wrapper
                 merged.GameId = packageDefaults.GameId;
 
             merged.BackendServerAddress = packageDefaults.BackendServerAddress;
+            merged.WebRtcSignalingServerAddress = packageDefaults.WebRtcSignalingServerAddress;
+            merged.WebRtcDataChannelLabel = packageDefaults.WebRtcDataChannelLabel;
+            merged.WebRtcIceServers = packageDefaults.WebRtcIceServers == null
+                ? Array.Empty<string>()
+                : (string[])packageDefaults.WebRtcIceServers.Clone();
             merged.DeployApiServerAddress = packageDefaults.DeployApiServerAddress;
             merged.SchemaApiServerAddress = packageDefaults.SchemaApiServerAddress;
 

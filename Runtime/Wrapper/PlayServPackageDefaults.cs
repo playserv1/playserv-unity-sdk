@@ -13,6 +13,9 @@ namespace Playserv.Wrapper
         [SerializeField] private string gameAccessToken = string.Empty;
         [SerializeField] private string gameId = string.Empty;
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
+        [SerializeField] private string webRtcSignalingServerAddress = PlayServSettings.DefaultWebRtcSignalingServerAddress;
+        [SerializeField] private string webRtcDataChannelLabel = PlayServSettings.DefaultWebRtcDataChannelLabel;
+        [SerializeField] private string[] webRtcIceServers = Array.Empty<string>();
         [SerializeField] private string deployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress;
         [SerializeField] private string schemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress;
         [SerializeField] private bool allowMultipleConnections = true;
@@ -24,6 +27,9 @@ namespace Playserv.Wrapper
         public string GameAccessToken => gameAccessToken;
         public string GameId => gameId;
         public string BackendServerAddress => backendServerAddress;
+        public string WebRtcSignalingServerAddress => webRtcSignalingServerAddress;
+        public string WebRtcDataChannelLabel => webRtcDataChannelLabel;
+        public string[] WebRtcIceServers => webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone();
         public string DeployApiServerAddress => deployApiServerAddress;
         public string SchemaApiServerAddress => schemaApiServerAddress;
         public bool AllowMultipleConnections => allowMultipleConnections;
@@ -39,6 +45,9 @@ namespace Playserv.Wrapper
                 GameAccessToken = ResolveOptionalText(gameAccessToken),
                 GameId = ResolveOptionalText(gameId),
                 BackendServerAddress = ResolveText(backendServerAddress, PlayServSettings.DefaultBackendServerAddress),
+                WebRtcSignalingServerAddress = ResolveText(webRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress),
+                WebRtcDataChannelLabel = ResolveText(webRtcDataChannelLabel, PlayServSettings.DefaultWebRtcDataChannelLabel),
+                WebRtcIceServers = webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone(),
                 DeployApiServerAddress = ResolveText(deployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress),
                 SchemaApiServerAddress = ResolveText(schemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress),
                 AllowMultipleConnections = allowMultipleConnections,
@@ -57,6 +66,9 @@ namespace Playserv.Wrapper
             gameAccessToken = ResolveOptionalText(settings.GameAccessToken);
             gameId = ResolveOptionalText(settings.GameId);
             backendServerAddress = ResolveText(settings.BackendServerAddress, PlayServSettings.DefaultBackendServerAddress);
+            webRtcSignalingServerAddress = ResolveText(settings.WebRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress);
+            webRtcDataChannelLabel = ResolveText(settings.WebRtcDataChannelLabel, PlayServSettings.DefaultWebRtcDataChannelLabel);
+            webRtcIceServers = settings.WebRtcIceServers == null ? Array.Empty<string>() : (string[])settings.WebRtcIceServers.Clone();
             deployApiServerAddress = ResolveText(settings.DeployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress);
             schemaApiServerAddress = ResolveText(settings.SchemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress);
             allowMultipleConnections = settings.AllowMultipleConnections;
