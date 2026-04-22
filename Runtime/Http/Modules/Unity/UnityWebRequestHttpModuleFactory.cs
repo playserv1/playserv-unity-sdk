@@ -1,6 +1,6 @@
 #if UNITY_5_3_OR_NEWER
-using Playserv.Http.Common;
 using Playserv.Http.Interfaces;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Http.Modules.Unity
 {

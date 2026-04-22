@@ -8,8 +8,7 @@ using Newtonsoft.Json;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
-using Playserv.Proxy.WebRtc;
-using Playserv.Wrapper;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Implementation
 {
@@ -18,7 +17,7 @@ namespace Playserv.Proxy.Implementation
         private const int ConnectTimeoutMs = 15000;
 
         private readonly string _endpoint;
-        private readonly PlayServSettings _settings;
+        private readonly PlayServRuntimeSettings _settings;
         private readonly IWebRtcSignalingClient _signalingClient;
         private readonly ILogger _logger;
         private readonly object _gate = new object();
@@ -53,7 +52,7 @@ namespace Playserv.Proxy.Implementation
 
         public WebRtcDataChannelTransportImplementation(
             string endpoint,
-            PlayServSettings settings,
+            PlayServRuntimeSettings settings,
             IWebRtcSignalingClient signalingClient,
             ILogger logger = null)
         {
@@ -82,8 +81,8 @@ namespace Playserv.Proxy.Implementation
             if (_signalingClient == null)
             {
                 _logger.LogError(
-                    "WebRTC DataChannel transport requires signaling client factory. " +
-                    "Call PlayServ.SetWebRtcSignalingClientFactory(...) before Connect().");
+                    "WebRTC DataChannel transport requires configured signaling client integration " +
+                    "before Connect().");
                 return false;
             }
 
@@ -146,7 +145,7 @@ namespace Playserv.Proxy.Implementation
                 EnsureBridgeEventHandlers();
                 var rtcConfigJson = BuildRtcConfigJson();
                 var label = string.IsNullOrWhiteSpace(_settings.WebRtcDataChannelLabel)
-                    ? PlayServSettings.DefaultWebRtcDataChannelLabel
+                    ? PlayServRuntimeSettings.DefaultWebRtcDataChannelLabel
                     : _settings.WebRtcDataChannelLabel.Trim();
 
                 _logger.Log($"Connecting WebGL WebRTC DataChannel. endpoint={_endpoint}, signaling={_settings.WebRtcSignalingServerAddress}");

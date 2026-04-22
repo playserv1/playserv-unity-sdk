@@ -2,6 +2,7 @@ using System;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Common
 {

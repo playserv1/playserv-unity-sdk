@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Logging;
-using Playserv.Wrapper;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.WebRtc
 {
@@ -23,7 +23,7 @@ namespace Playserv.Proxy.WebRtc
         private const string HttpScheme = "http";
         private const string HttpsScheme = "https";
 
-        private readonly PlayServSettings _settings;
+        private readonly PlayServRuntimeSettings _settings;
         private readonly ILogger _logger;
         private readonly Uri _uri;
         private readonly string _sessionId = Guid.NewGuid().ToString("N");
@@ -55,7 +55,7 @@ namespace Playserv.Proxy.WebRtc
         private bool _bridgeEventsSubscribed;
 #endif
 
-        public WebSocketWebRtcSignalingClient(PlayServSettings settings, ILogger logger = null)
+        public WebSocketWebRtcSignalingClient(PlayServRuntimeSettings settings, ILogger logger = null)
         {
             _settings = settings?.Clone() ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? new ConsoleLogger();
@@ -63,7 +63,7 @@ namespace Playserv.Proxy.WebRtc
             if (string.IsNullOrWhiteSpace(_settings.WebRtcSignalingServerAddress))
             {
                 throw new InvalidOperationException(
-                    "PlayServSettings.WebRtcSignalingServerAddress is required for default WebRTC signaling client.");
+                    "PlayServRuntimeSettings.WebRtcSignalingServerAddress is required for default WebRTC signaling client.");
             }
 
             _uri = BuildWebSocketUri(_settings.WebRtcSignalingServerAddress);

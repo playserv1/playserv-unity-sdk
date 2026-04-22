@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
-using Playserv.Proxy.WebRtc;
 using Playserv.RPC;
+using Playserv.Runtime.Abstractions;
 using Playserv.Server;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
@@ -102,10 +102,10 @@ namespace Playserv.Wrapper
         /// Registers application-provided signaling client factory for WebRTC DataChannel transport.
         /// </summary>
         /// <param name="signalingClientFactory">
-        /// Factory that creates signaling client instance from effective PlayServ settings.
+        /// Factory that creates signaling client instance from effective runtime settings abstraction.
         /// Pass null to clear WebRTC signaling integration.
         /// </param>
-        public static void SetWebRtcSignalingClientFactory(Func<PlayServSettings, IWebRtcSignalingClient> signalingClientFactory) =>
+        public static void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
             Api.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
         /// <summary>

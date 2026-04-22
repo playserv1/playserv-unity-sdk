@@ -1,27 +1,25 @@
 using System;
 using Playserv.Proxy.Logging;
-using Playserv.Proxy.WebRtc;
-using Playserv.Wrapper;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.Runtime.Abstractions
 {
     internal sealed class TransportModuleContext
     {
         public TransportModuleContext(
             string endpoint,
             ILogger logger,
-            PlayServSettings settings = null,
-            Func<PlayServSettings, IWebRtcSignalingClient> webRtcSignalingClientFactory = null)
+            PlayServRuntimeSettings settings = null,
+            Func<PlayServRuntimeSettings, IWebRtcSignalingClient> webRtcSignalingClientFactory = null)
         {
             Endpoint = endpoint ?? string.Empty;
             Logger = logger;
-            Settings = settings;
+            Settings = settings?.Clone();
             WebRtcSignalingClientFactory = webRtcSignalingClientFactory;
         }
 
         public string Endpoint { get; }
         public ILogger Logger { get; }
-        public PlayServSettings Settings { get; }
-        public Func<PlayServSettings, IWebRtcSignalingClient> WebRtcSignalingClientFactory { get; }
+        public PlayServRuntimeSettings Settings { get; }
+        public Func<PlayServRuntimeSettings, IWebRtcSignalingClient> WebRtcSignalingClientFactory { get; }
     }
 }

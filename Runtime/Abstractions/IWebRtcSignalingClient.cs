@@ -2,36 +2,18 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Playserv.Proxy.WebRtc
+namespace Playserv.Runtime.Abstractions
 {
     /// <summary>
     /// Application-provided signaling bridge used by PlayServ WebRTC transport.
     /// </summary>
     public interface IWebRtcSignalingClient : IDisposable
     {
-        /// <summary>
-        /// Raised when remote signaling message arrives from signaling backend.
-        /// </summary>
         event Action<WebRtcSignalMessage> MessageReceived;
-
-        /// <summary>
-        /// Raised when signaling layer reports an unrecoverable error.
-        /// </summary>
         event Action<Exception> ErrorReceived;
 
-        /// <summary>
-        /// Opens signaling session/channel.
-        /// </summary>
         Task<bool> Connect(CancellationToken ct = default);
-
-        /// <summary>
-        /// Sends local signaling message to remote peer/backend.
-        /// </summary>
         Task SendAsync(WebRtcSignalMessage message, CancellationToken ct = default);
-
-        /// <summary>
-        /// Resets current signaling session state.
-        /// </summary>
         void Reset();
     }
 

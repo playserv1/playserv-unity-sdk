@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Playserv.Http.Interfaces;
-using Playserv.Wrapper;
+using Playserv.Runtime.Abstractions;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -16,9 +16,9 @@ namespace Playserv.Http.Modules.Unity
         private const string DeploymentEndpointPath = "/deployments";
         private const string LatestVersionPathTemplate = "games/{0}/version/latest";
 
-        private readonly PlayServSettings _settings;
+        private readonly PlayServRuntimeSettings _settings;
 
-        public UnityWebRequestRuntimeHttpClient(PlayServSettings settings)
+        public UnityWebRequestRuntimeHttpClient(PlayServRuntimeSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
@@ -26,7 +26,7 @@ namespace Playserv.Http.Modules.Unity
         public async Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(_settings.DeployApiServerAddress))
-                throw new InvalidOperationException("PlayServSettings.DeployApiServerAddress is empty.");
+                throw new InvalidOperationException("PlayServRuntimeSettings.DeployApiServerAddress is empty.");
 
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
@@ -57,7 +57,7 @@ namespace Playserv.Http.Modules.Unity
             serverAddress = NormalizeEndpoint(serverAddress);
 
             if (!Uri.TryCreate(serverAddress, UriKind.Absolute, out var endpointUri))
-                throw new InvalidOperationException($"PlayServSettings.DeployApiServerAddress is invalid: {serverAddress}");
+                throw new InvalidOperationException($"PlayServRuntimeSettings.DeployApiServerAddress is invalid: {serverAddress}");
 
             var builder = new UriBuilder(endpointUri);
             var normalizedPath = (builder.Path ?? string.Empty).TrimEnd('/');

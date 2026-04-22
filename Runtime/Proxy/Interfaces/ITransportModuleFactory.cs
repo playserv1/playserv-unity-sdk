@@ -1,4 +1,4 @@
-using Playserv.Proxy.Common;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Interfaces
 {

@@ -2,6 +2,7 @@ using System;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.WebRtc;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Implementation
 {
@@ -16,7 +17,7 @@ namespace Playserv.Proxy.Implementation
 
             var settings = context.Settings?.Clone()
                 ?? throw new InvalidOperationException(
-                    "WebRTC transport requires PlayServSettings context. Use PlayServAPI transport resolver path.");
+                    "WebRTC transport requires runtime settings context.");
 
             IWebRtcSignalingClient signalingClient = null;
             if (context.WebRtcSignalingClientFactory != null)
