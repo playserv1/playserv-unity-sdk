@@ -18,20 +18,9 @@ namespace Playserv.Proxy.Common
         private readonly ILogger _logger;
         private readonly PlayServEventsAdapter _eventsAdapter;
         private readonly PlayServDataSubscriptionAdapter _dataSubscriptionAdapter;
-        private readonly ReconnectionManager _reconnectionManager;
-        private readonly HandshakeService _handshakeService;
-        private readonly KeepAliveManager _keepAliveManager;
-        private readonly SynchronizationContext _mainThreadContext;
+        private readonly PlayServTransportSession _transportSession;
 
-        private string _gameAccessToken;
-        private string _gameId;
-        private string _userId;
-        private string _gameVersion;
-        private string _sdkVersion = SdkInfo.Version;
-        private bool _disconnectedByServer;
-        private bool _allowMultipleConnections = true;
-
-        public PlayServState State { get; private set; } = PlayServState.Offline;
+        public PlayServState State => _transportSession.State;
 
         public event Action<TransportError> OnTransportError;
         public event Action OnKeepAlivePingSent;
@@ -66,7 +55,6 @@ namespace Playserv.Proxy.Common
                 throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
 
             _logger = logger;
-            _mainThreadContext = SynchronizationContext.Current;
 
             if (transportImplementationFactory == null)
                 transportImplementationFactory = ep => TransportImplementationResolver.Create(new TransportModuleContext(ep, logger));
@@ -76,76 +64,17 @@ namespace Playserv.Proxy.Common
             _transport = new Transport(implementation, serializer, requestIdGenerator, logger);
             _eventsAdapter = new PlayServEventsAdapter(_transport, _logger);
             _dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(this, _logger);
-            _reconnectionManager = new ReconnectionManager(_transport, _logger, state => State = state, IsReconnectEnvironmentReadyAsync, ReconnectSessionAsync);
-            _handshakeService = new HandshakeService(_transport, _logger);
-            _keepAliveManager = new KeepAliveManager(_transport, _logger);
-
-            _handshakeService.OnError += HandleTransportError;
-            _keepAliveManager.OnTimeout += HandleKeepAliveTimeout;
-            _keepAliveManager.OnPingSent += () => OnKeepAlivePingSent?.Invoke();
-            _keepAliveManager.PongReceived += () => OnKeepAlivePongReceived?.Invoke();
-
-            if (_transport is Transport transport)
-            {
-                transport.ConnectionLost += OnConnectionLost;
-            }
+            _transportSession = new PlayServTransportSession(
+                _transport,
+                _logger,
+                SynchronizationContext.Current,
+                error => OnTransportError?.Invoke(error),
+                () => OnKeepAlivePingSent?.Invoke(),
+                () => OnKeepAlivePongReceived?.Invoke(),
+                response => OnRpcInvokeResponse?.Invoke(response),
+                InitializeSpawnManager);
 
             SetupCommandHandlers();
-        }
-
-        private Task<bool> IsReconnectEnvironmentReadyAsync()
-        {
-#if UNITY_EDITOR
-            if (_mainThreadContext != null)
-            {
-                var tcs = new TaskCompletionSource<bool>();
-                _mainThreadContext.Post(_ =>
-                {
-                    tcs.SetResult(UnityEngine.Application.isPlaying);
-                }, null);
-                return tcs.Task;
-            }
-            return Task.FromResult(false);
-#else
-            return Task.FromResult(true);
-#endif
-        }
-
-        private async Task<bool> ReconnectSessionAsync()
-        {
-            _keepAliveManager.Stop();
-            _transport.ResetConnection();
-
-            var connected = await _transport.Connect();
-            if (!connected)
-                return false;
-            
-            var handshakeResult = await _handshakeService.PerformHandshakeAsync(_gameAccessToken, _gameId, _userId, _gameVersion, _sdkVersion);
-            if (!handshakeResult.Success)
-            {
-                _logger.LogError($"Reconnection handshake failed: {handshakeResult.Error}");
-                _transport.ResetConnection();
-                return false;
-            }
-            
-            await SendClientSettingsAsync();
-            _keepAliveManager.Start();
-            InitializeSpawnManager();
-
-            return true;
-        }
-
-        private void HandleTransportError(TransportError error)
-        {
-            _logger.LogError($"Transport error: {error}");
-            OnTransportError?.Invoke(error);
-        }
-
-        private void HandleKeepAliveTimeout()
-        {
-            _logger.LogWarning("KeepAlive timeout. Connection may be lost.");
-            _keepAliveManager.Stop();
-            _reconnectionManager.HandleConnectionLost();
         }
 
         public void SetConfig(
@@ -157,71 +86,17 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
             int keepAlivePongTimeoutMs = 10000)
-        {
-            if (string.IsNullOrWhiteSpace(gameAccessToken))
-                throw new ArgumentException("Game access token cannot be null or empty.", nameof(gameAccessToken));
+            => _transportSession.Configure(
+                gameAccessToken,
+                gameId,
+                userId,
+                gameVersion,
+                sdkVersion,
+                allowMultipleConnections,
+                keepAlivePingIntervalMs,
+                keepAlivePongTimeoutMs);
 
-            if (string.IsNullOrWhiteSpace(gameId))
-                throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
-
-            if (string.IsNullOrWhiteSpace(userId))
-                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
-
-            if (string.IsNullOrWhiteSpace(gameVersion))
-                throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
-
-            _gameAccessToken = gameAccessToken;
-            _gameId = gameId;
-            _userId = userId;
-            _gameVersion = gameVersion;
-            _sdkVersion = string.IsNullOrWhiteSpace(sdkVersion) ? SdkInfo.Version : sdkVersion;
-            _allowMultipleConnections = allowMultipleConnections;
-            _keepAliveManager.PingIntervalMs = keepAlivePingIntervalMs;
-            _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
-
-            _logger.Log($"Config set: token={gameAccessToken}, gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}");
-        }
-
-        public async Task<bool> Connect()
-        {
-            if (string.IsNullOrWhiteSpace(_gameAccessToken) || string.IsNullOrWhiteSpace(_gameId) ||
-                string.IsNullOrWhiteSpace(_userId) || string.IsNullOrWhiteSpace(_gameVersion))
-                throw new InvalidOperationException("SDK is not configured. Call SetConfig() first.");
-
-            _disconnectedByServer = false;
-            _reconnectionManager.Start();
-
-            State = PlayServState.Connecting;
-            _logger.Log("Connecting to SDK...");
-
-            var connected = await _transport.Connect();
-            if (!connected)
-            {
-                State = PlayServState.Offline;
-                _logger.LogError("Failed to connect to SDK.");
-                return false;
-            }
-
-            State = PlayServState.Handshaking;
-            _logger.Log("Transport connected. Performing handshake...");
-
-            var handshakeResult = await _handshakeService.PerformHandshakeAsync(_gameAccessToken, _gameId, _userId, _gameVersion, _sdkVersion);
-            if (!handshakeResult.Success)
-            {
-                _logger.LogError($"Handshake failed: {handshakeResult.Error}");
-                OnTransportError?.Invoke(handshakeResult.Error);
-                State = PlayServState.Offline;
-                return false;
-            }
-
-            await SendClientSettingsAsync();
-            _keepAliveManager.Start();
-            InitializeSpawnManager();
-
-            State = PlayServState.Online;
-            _logger.Log("SDK connection established successfully. Ready for login.");
-            return true;
-        }
+        public Task<bool> Connect() => _transportSession.ConnectAsync();
 
         public IDisposable On<T>(Action<T> onNext)
         {
@@ -361,23 +236,6 @@ namespace Playserv.Proxy.Common
                 onError);
         }
 
-        private void OnConnectionLost(object sender, EventArgs e)
-        {
-            _logger.LogWarning(
-                $"[PlayServ][Connection] Transport connection lost event received. state={State}, disconnectedByServer={_disconnectedByServer}");
-            _keepAliveManager.Stop();
-
-            if (!_disconnectedByServer)
-            {
-                _reconnectionManager.HandleConnectionLost();
-            }
-            else
-            {
-                _logger.Log("Connection lost due to server disconnect. Reconnection disabled.");
-                State = PlayServState.Offline;
-            }
-        }
-
         private void SetupCommandHandlers()
         {
             OnCommand("error", OnCommandErrorReceived);
@@ -395,48 +253,19 @@ namespace Playserv.Proxy.Common
             OnCommand("rpc.InvokeRpc.InvokeRpcResponse", OnInvokeRpcResponseReceived);
         }
 
-        private void OnDisconnectReceived(object command)
-        {
-            _logger.LogWarning("Received disconnect command from server.");
-            _disconnectedByServer = true;
-            _keepAliveManager.Stop();
-            _reconnectionManager.Stop();
-            _transport.ResetConnection();
-            State = PlayServState.Offline;
-        }
+        private void OnDisconnectReceived(object command) => _transportSession.HandleDisconnect();
 
         private void OnForcedDisconnectReceived(object command)
         {
             var response = command as ForcedDisconnectResponse;
-            var rawCode = response?.ErrorCode ?? (int)TransportErrorCode.ForcedDisconnect;
-            var code = Enum.IsDefined(typeof(TransportErrorCode), rawCode)
-                ? (TransportErrorCode)rawCode
-                : TransportErrorCode.ForcedDisconnect;
-
-            var message = string.IsNullOrWhiteSpace(response?.ErrorMessage)
-                ? TransportError.FromCode(code).Message
-                : response.ErrorMessage;
-            var reason = string.IsNullOrWhiteSpace(response?.Reason) ? "Unknown" : response.Reason;
-            var serverVersion = string.IsNullOrWhiteSpace(response?.ServerVersion) ? "n/a" : response.ServerVersion;
-
-            _logger.LogWarning(
-                $"Received forced disconnect command from server. code={rawCode:D5}, reason={reason}, serverVersion={serverVersion}, message={message}");
-
-            _disconnectedByServer = true;
-            _keepAliveManager.Stop();
-            _reconnectionManager.Stop();
-            _transport.ResetConnection();
-            State = PlayServState.Offline;
-
-            OnTransportError?.Invoke(new TransportError(code, message));
+            _transportSession.HandleForcedDisconnect(response);
         }
 
         private void OnClientSettingsResponseReceived(object command)
         {
             if (command is ClientSettingsResponse response)
             {
-                _allowMultipleConnections = response.AllowMultipleConnections;
-                _logger.Log($"Received client settings response. AllowMultipleConnections = {_allowMultipleConnections}");
+                _transportSession.HandleClientSettingsResponse(response);
             }
             else
             {
@@ -503,37 +332,12 @@ namespace Playserv.Proxy.Common
         {
             if (command is InvokeRpcResponse response)
             {
-                var requestInfo = response.Request == null
-                    ? "n/a"
-                    : $"{response.Request.ServiceName}.{response.Request.MethodName}";
-                var resultInfo = string.IsNullOrWhiteSpace(response.Result) ? "<empty>" : response.Result;
-
-                _logger.Log(
-                    $"[PlayServ][RPC] InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
-                OnRpcInvokeResponse?.Invoke(response);
+                _transportSession.HandleInvokeRpcResponse(response);
             }
             else
             {
                 _logger.LogWarning(
                     $"[PlayServ][RPC] Received InvokeRpcResponse with unexpected payload type: {command?.GetType().Name ?? "null"}");
-            }
-        }
-
-        private async Task SendClientSettingsAsync()
-        {
-            try
-            {
-                var settings = new ClientSettingsRequest
-                {
-                    allowMultipleConnections = _allowMultipleConnections
-                };
-
-                await _transport.Send(settings, "module_auth");
-                _logger.Log($"Client settings sent: AllowMultipleConnections = {_allowMultipleConnections}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Failed to send client settings: {ex.Message}");
             }
         }
 
@@ -543,21 +347,7 @@ namespace Playserv.Proxy.Common
 
             _dataSubscriptionAdapter.Dispose();
 
-            _keepAliveManager.Stop();
-            _keepAliveManager.Dispose();
-
-            _handshakeService.OnError -= HandleTransportError;
-            _handshakeService.Dispose();
-
-            _reconnectionManager.Stop();
-            _reconnectionManager.Dispose();
-
-            State = PlayServState.Offline;
-
-            if (_transport is Transport transport)
-            {
-                transport.ConnectionLost -= OnConnectionLost;
-            }
+            _transportSession.Dispose();
 
             _transport.Dispose();
         }

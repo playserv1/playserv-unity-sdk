@@ -19,22 +19,21 @@ namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServApi
     {
+        private const int ConnectVersionRefreshTimeoutSeconds = 5;
 #if UNITY_5_3_OR_NEWER
         private const string ConfigResourceName = "PlayServConfig";
-        private const int ConnectVersionRefreshTimeoutSeconds = 5;
 #endif
         private const string WebRtcScheme = "webrtc";
         private PlayServImplementation _instance;
         private PlayServSettings _settings;
         private string _instanceEndpoint;
         private string _instanceTransportKey;
-        private ICommandHandler _commandHandler;
-        private IEventHandler _eventHandler;
-        private IRpcInvoker _rpcInvoker;
         private Func<PlayServSettings, IWebRtcSignalingClient> _webRtcSignalingClientFactory;
-        private readonly object _connectGate = new();
-        private Task<bool> _connectTask;
         private int _shutdownIgnoreWarningLogged;
+        private readonly PlayServApiLocalExecutionFacade _localExecution;
+        private readonly PlayServApiRpcFacade _rpcFacade;
+        private readonly PlayServRuntimeSettingsService _settingsService;
+        private readonly PlayServApiConnectionOrchestrator _connectionOrchestrator;
 
         public string SdkVersion => SdkInfo.Version;
         public PlayServSettings Settings => _settings;
@@ -45,6 +44,35 @@ namespace Playserv.Wrapper
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
+
+        public PlayServApi()
+        {
+            _localExecution = new PlayServApiLocalExecutionFacade();
+            _settingsService = new PlayServRuntimeSettingsService(
+                loadSettings: LoadSettingsFromUnityResources,
+                createTransportImplementationFactory: CreateTransportImplementationFactory,
+                buildTransportKey: BuildTransportKey,
+                subscribeToInstanceEvents: SubscribeToInstanceEvents,
+                resolveLatestVersion: GetLatestVersionOrFallbackAsync,
+                syncLoadedConfigGameVersion: SyncLoadedConfigGameVersion,
+                logTrace: ForwardLogTrace,
+                versionRefreshTimeoutSeconds: ConnectVersionRefreshTimeoutSeconds);
+            _connectionOrchestrator = new PlayServApiConnectionOrchestrator(
+                getState: () => State,
+                getOrCreateSettings: GetOrCreateSettings,
+                refreshConfiguredGameVersionAsync: RefreshConfiguredGameVersionAsync,
+                applySettings: ApplySettings,
+                getCurrentInstance: () => _instance,
+                disconnect: Disconnect,
+                resetShutdownState: ResetShutdownState,
+                logTrace: ForwardLogTrace,
+                shouldIgnoreMissingInstance: ShouldIgnoreMissingInstance,
+                logShutdownIgnoreWarning: LogShutdownIgnoreWarning);
+            _rpcFacade = new PlayServApiRpcFacade(
+                _localExecution,
+                () => _instance,
+                GetInstanceForFireAndForget);
+        }
 
         public void Config(PlayServSettings settings)
         {
@@ -81,17 +109,7 @@ namespace Playserv.Wrapper
             ApplySettings(settings);
         }
 
-        public Task<bool> Connect()
-        {
-            lock (_connectGate)
-            {
-                if (_connectTask != null && !_connectTask.IsCompleted)
-                    return _connectTask;
-
-                _connectTask = ConnectInternalAsync();
-                return _connectTask;
-            }
-        }
+        public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
 
         public void SetWebRtcSignalingClientFactory(Func<PlayServSettings, IWebRtcSignalingClient> signalingClientFactory)
         {
@@ -101,42 +119,10 @@ namespace Playserv.Wrapper
                 Disconnect();
         }
 
-        private async Task<bool> ConnectInternalAsync()
-        {
-            try
-            {
-                if (State is PlayServState.Online or PlayServState.Connecting or PlayServState.Handshaking)
-                    throw new InvalidOperationException("PlayServ is already connected or connecting.");
-
-                PlayServRuntimeShutdownState.Reset();
-                Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 0);
-                var settings = GetOrCreateSettings();
-                LogTrace($"[PlayServ] Connect started. state={State}, gameId={settings.GameId}, endpoint={settings.Endpoint}");
-                await RefreshConfiguredGameVersionAsync(settings);
-                LogTrace($"[PlayServ] Connect continue after version refresh. resolvedGameVersion={settings.GameVersion}");
-                ApplySettings(settings);
-                LogTrace("[PlayServ] Connect applied settings. Starting transport connect.");
-                var connected = await Instance.Connect();
-                LogTrace($"[PlayServ] Connect transport completed. connected={connected}, state={State}");
-                if (!connected)
-                    Disconnect();
-
-                return connected;
-            }
-            finally
-            {
-                lock (_connectGate)
-                {
-                    if (_connectTask?.IsCompleted == true)
-                        _connectTask = null;
-                }
-            }
-        }
-
         public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
         {
 #if UNITY_5_3_OR_NEWER
-            var settings = GetOrCreateSettings();
+            var settings = _settingsService.GetOrCreateSettings(ref _settings);
             return GetLatestVersionOrFallbackAsync(settings, gameId, ct);
 #else
             return Task.FromException<string>(
@@ -145,147 +131,76 @@ namespace Playserv.Wrapper
         }
 
         public IDisposable Subscribe<T>(Action<T> onNext) =>
-            TrySubscribeLocal(onNext, out var subscription)
+            _localExecution.TrySubscribe(onNext, _instance != null, out var subscription)
                 ? subscription
                 : Instance.Subscribe(onNext);
 
         public IObservable<T> Subscribe<T>() =>
-            TrySubscribeLocal<T>(out var observable)
+            _localExecution.TrySubscribe<T>(_instance != null, out var observable)
                 ? observable
                 : Instance.Subscribe<T>();
 
         public void Send<T>(T command)
         {
-            if (TryHandleLocalCommand(command, moduleName: null))
+            if (_localExecution.TryHandleCommand(command, moduleName: null, _instance != null))
                 return;
 
-            if (!TryGetInstanceForFireAndForget("command send", out var instance))
+            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("command send", out var instance))
                 return;
 
             instance.Send(command);
         }
 
         public void SetCommandHandler(ICommandHandler commandHandler) =>
-            _commandHandler = commandHandler;
+            _localExecution.SetCommandHandler(commandHandler);
 
         public void Send<T>(T command, string moduleName)
         {
-            if (TryHandleLocalCommand(command, moduleName))
+            if (_localExecution.TryHandleCommand(command, moduleName, _instance != null))
                 return;
 
-            if (!TryGetInstanceForFireAndForget("command send", out var instance))
+            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("command send", out var instance))
                 return;
 
             instance.Send(command, moduleName);
         }
 
         public void SetEventHandler(IEventHandler eventHandler) =>
-            _eventHandler = eventHandler;
+            _localExecution.SetEventHandler(eventHandler);
 
-        public void Invoke(string serviceName, string methodName, object payload)
-        {
-            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
-            Invoke(serviceName, methodName, payloadBase64);
-        }
+        public void Invoke(string serviceName, string methodName, object payload) =>
+            _rpcFacade.Invoke(serviceName, methodName, payload);
 
         public void InvokeArgs(string serviceName, string methodName, params object[] args) =>
-            InvokeMapped(serviceName, methodName, RpcMappedPayload.Positional(args ?? Array.Empty<object>()));
+            _rpcFacade.InvokeArgs(serviceName, methodName, args);
 
-        public void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload)
-        {
-            if (payload == null)
-                throw new ArgumentNullException(nameof(payload));
-
-            InvokeMapped(serviceName, methodName, RpcMappedPayload.Named(payload));
-        }
+        public void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
+            _rpcFacade.InvokeNamed(serviceName, methodName, payload);
 
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
-            _rpcInvoker = rpcInvoker;
+            _localExecution.SetRpcInvoker(rpcInvoker);
 
-        public void Invoke(string serviceName, string methodName, string payloadBase64)
-        {
-            if (string.IsNullOrWhiteSpace(serviceName))
-                throw new ArgumentException("Service name is required.", nameof(serviceName));
+        public void Invoke(string serviceName, string methodName, string payloadBase64) =>
+            _rpcFacade.Invoke(serviceName, methodName, payloadBase64);
 
-            if (string.IsNullOrWhiteSpace(methodName))
-                throw new ArgumentException("Method name is required.", nameof(methodName));
+        public void Invoke<TService>(Expression<Action<TService>> method) =>
+            _rpcFacade.Invoke(method);
 
-            if (string.IsNullOrWhiteSpace(payloadBase64))
-                throw new ArgumentException("Payload base64 is required.", nameof(payloadBase64));
+        public void Invoke<TService>(Expression<Action<TService>> method, object payload) =>
+            _rpcFacade.Invoke(method, payload);
 
-            if (_rpcInvoker != null)
-            {
-                if (_rpcInvoker.TryInvoke(serviceName, methodName, payloadBase64))
-                    return;
-
-                if (_instance == null)
-                {
-                    throw new InvalidOperationException(
-                        $"Local RPC invoker did not handle '{serviceName}.{methodName}'. " +
-                        "Register service in invoker or connect transport.");
-                }
-            }
-
-            var request = new InvokeRpc
-            {
-                ServiceName = serviceName,
-                MethodName = methodName,
-                Payload = payloadBase64
-            };
-
-            if (!TryGetInstanceForFireAndForget("RPC invoke", out var instance))
-                return;
-
-            instance.Send(request, RpcConstants.InvokeModuleServiceName);
-        }
-
-        public void Invoke<TService>(Expression<Action<TService>> method)
-        {
-            if (method == null)
-                throw new ArgumentNullException(nameof(method));
-
-            var serviceName = ResolveServiceName<TService>();
-            var methodCall = ResolveMethodCall(method.Body, nameof(method));
-            var payload = RpcPayloadMapper.BuildPayloadFromMethodCall(methodCall);
-            InvokeMapped(serviceName, methodCall.Method.Name, payload);
-        }
-
-        public void Invoke<TService>(Expression<Action<TService>> method, object payload)
-        {
-            if (method == null)
-                throw new ArgumentNullException(nameof(method));
-
-            var serviceName = ResolveServiceName<TService>();
-            var methodCall = ResolveMethodCall(method.Body, nameof(method));
-            var normalizedPayload = RpcPayloadMapper.BuildPayloadFromExplicitPayload(methodCall, payload);
-            InvokeMapped(serviceName, methodCall.Method.Name, normalizedPayload);
-        }
-
-        public void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64)
-        {
-            if (method == null)
-                throw new ArgumentNullException(nameof(method));
-
-            var serviceName = ResolveServiceName<TService>();
-            var methodCall = ResolveMethodCall(method.Body, nameof(method));
-            Invoke(serviceName, methodCall.Method.Name, payloadBase64);
-        }
-
-        private void InvokeMapped(string serviceName, string methodName, RpcMappedPayload payload)
-        {
-            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
-            Invoke(serviceName, methodName, payloadBase64);
-        }
+        public void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
+            _rpcFacade.Invoke(method, payloadBase64);
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             Instance.GetTransportImplementation();
 
         public void Publish<T>(T @event)
         {
-            if (TryPublishLocal(@event))
+            if (_localExecution.TryPublish(@event, _instance != null))
                 return;
 
-            if (!TryGetInstanceForFireAndForget("event publish", out var instance))
+            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("event publish", out var instance))
                 return;
 
             instance.Publish(@event);
@@ -293,10 +208,10 @@ namespace Playserv.Wrapper
 
         public void PublishForGroup<T>(string groupName, T @event)
         {
-            if (TryPublishForGroupLocal(groupName, @event))
+            if (_localExecution.TryPublishForGroup(groupName, @event, _instance != null))
                 return;
 
-            if (!TryGetInstanceForFireAndForget("group event publish", out var instance))
+            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("group event publish", out var instance))
                 return;
 
             instance.PublishForGroup(groupName, @event);
@@ -304,10 +219,10 @@ namespace Playserv.Wrapper
 
         public void PublishForUser<T>(string userId, T @event)
         {
-            if (TryPublishForUserLocal(userId, @event))
+            if (_localExecution.TryPublishForUser(userId, @event, _instance != null))
                 return;
 
-            if (!TryGetInstanceForFireAndForget("user event publish", out var instance))
+            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("user event publish", out var instance))
                 return;
 
             instance.PublishForUser(userId, @event);
@@ -364,23 +279,6 @@ namespace Playserv.Wrapper
         private PlayServImplementation Instance =>
             _instance ?? throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
 
-        private bool TryGetInstanceForFireAndForget(string operationName, out PlayServImplementation instance)
-        {
-            instance = _instance;
-            if (instance != null)
-                return true;
-
-#if UNITY_5_3_OR_NEWER
-            if (!Application.isPlaying || PlayServRuntimeShutdownState.IsShuttingDown)
-            {
-                LogShutdownIgnoreWarning(operationName);
-                return false;
-            }
-#endif
-
-            throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
-        }
-
         private void LogShutdownIgnoreWarning(string operationName)
         {
             if (Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 1) != 0)
@@ -391,17 +289,20 @@ namespace Playserv.Wrapper
 #endif
         }
 
-        private void SubscribeToInstanceEvents()
+        private void SubscribeToInstanceEvents(PlayServImplementation instance)
         {
-            _instance.OnTransportError -= HandleTransportError;
-            _instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
-            _instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
-            _instance.OnRpcInvokeResponse -= HandleRpcInvokeResponse;
+            if (instance == null)
+                throw new ArgumentNullException(nameof(instance));
 
-            _instance.OnTransportError += HandleTransportError;
-            _instance.OnKeepAlivePingSent += HandleKeepAlivePingSent;
-            _instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
-            _instance.OnRpcInvokeResponse += HandleRpcInvokeResponse;
+            instance.OnTransportError -= HandleTransportError;
+            instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
+            instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
+            instance.OnRpcInvokeResponse -= HandleRpcInvokeResponse;
+
+            instance.OnTransportError += HandleTransportError;
+            instance.OnKeepAlivePingSent += HandleKeepAlivePingSent;
+            instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
+            instance.OnRpcInvokeResponse += HandleRpcInvokeResponse;
         }
 
         private void HandleTransportError(TransportError error) => OnTransportError?.Invoke(error);
@@ -409,272 +310,30 @@ namespace Playserv.Wrapper
         private void HandleKeepAlivePongReceived() => OnKeepAlivePongReceived?.Invoke();
         private void HandleRpcInvokeResponse(InvokeRpcResponse response) => OnRpcInvokeResponse?.Invoke(response);
 
-        private bool TryHandleLocalCommand(object command, string moduleName)
-        {
-            if (_commandHandler == null)
-                return false;
-
-            if (_commandHandler.TryHandle(command, moduleName))
-                return true;
-
-            if (_instance == null)
-                throw new InvalidOperationException(
-                    $"Local command handler did not handle module '{moduleName ?? "<default>"}'. " +
-                    "Register handler for module or connect transport.");
-
-            return false;
-        }
-
-        private bool TrySubscribeLocal<T>(out IObservable<T> observable)
-        {
-            if (_eventHandler != null &&
-                _eventHandler.TrySubscribe<T>(out var localObservable) &&
-                localObservable != null)
-            {
-                observable = localObservable;
-                return true;
-            }
-
-            if (_eventHandler != null && _instance == null)
-            {
-                throw new InvalidOperationException(
-                    $"Local event handler did not provide observable subscription for '{typeof(T).Name}'. " +
-                    "Provide event handler subscription or connect transport.");
-            }
-
-            observable = null;
-            return false;
-        }
-
-        private bool TrySubscribeLocal<T>(Action<T> onNext, out IDisposable subscription)
-        {
-            if (_eventHandler != null &&
-                _eventHandler.TrySubscribe(onNext, out var localSubscription) &&
-                localSubscription != null)
-            {
-                subscription = localSubscription;
-                return true;
-            }
-
-            if (_eventHandler != null && _instance == null)
-            {
-                throw new InvalidOperationException(
-                    $"Local event handler did not handle callback subscription for '{typeof(T).Name}'. " +
-                    "Provide event handler subscription or connect transport.");
-            }
-
-            subscription = null;
-            return false;
-        }
-
-        private bool TryPublishLocal<T>(T @event)
-        {
-            if (_eventHandler == null)
-                return false;
-
-            if (_eventHandler.TryPublish(@event))
-                return true;
-
-            if (_instance == null)
-            {
-                throw new InvalidOperationException(
-                    $"Local event handler did not handle publish for '{typeof(T).Name}'. " +
-                    "Provide event handler publish route or connect transport.");
-            }
-
-            return false;
-        }
-
-        private bool TryPublishForGroupLocal<T>(string groupName, T @event)
-        {
-            if (_eventHandler == null)
-                return false;
-
-            if (_eventHandler.TryPublishForGroup(groupName, @event))
-                return true;
-
-            if (_instance == null)
-            {
-                throw new InvalidOperationException(
-                    $"Local event handler did not handle group publish '{groupName}' for '{typeof(T).Name}'. " +
-                    "Provide event handler group route or connect transport.");
-            }
-
-            return false;
-        }
-
-        private bool TryPublishForUserLocal<T>(string userId, T @event)
-        {
-            if (_eventHandler == null)
-                return false;
-
-            if (_eventHandler.TryPublishForUser(userId, @event))
-                return true;
-
-            if (_instance == null)
-            {
-                throw new InvalidOperationException(
-                    $"Local event handler did not handle user publish '{userId}' for '{typeof(T).Name}'. " +
-                    "Provide event handler user route or connect transport.");
-            }
-
-            return false;
-        }
-
-        private static MethodCallExpression ResolveMethodCall(Expression expression, string paramName)
-        {
-            if (expression is not MethodCallExpression methodCall)
-                throw new ArgumentException("RPC expression must be a method call.", paramName);
-
-            if (string.IsNullOrWhiteSpace(methodCall.Method.Name))
-                throw new ArgumentException("Unable to resolve RPC method name from expression.", paramName);
-
-            return methodCall;
-        }
-
-        private static string ResolveServiceName<TService>()
-        {
-            var serviceType = typeof(TService);
-            EnsureRpcServiceAttribute(serviceType);
-            return serviceType.Name;
-        }
-
-        private static void EnsureRpcServiceAttribute(Type serviceType)
-        {
-            foreach (var attribute in serviceType.GetCustomAttributes(inherit: true))
-            {
-                if (attribute is RpcAttribute)
-                    return;
-
-                var attributeTypeName = attribute.GetType().Name;
-                if (string.Equals(attributeTypeName, "RpcAttribute", StringComparison.Ordinal))
-                {
-                    return;
-                }
-            }
-
-            throw new InvalidOperationException(
-                $"RPC service type '{serviceType.FullName}' must be decorated with [Rpc] attribute.");
-        }
-
         private void ApplySettings(PlayServSettings settings)
         {
-            EnsureConfigured(settings);
-            EnsureInstanceForSettings(settings);
-
-            Instance.SetConfig(
-                settings.GameAccessToken,
-                settings.GameId,
-                settings.UserId,
-                settings.GameVersion,
-                settings.SdkVersion,
-                settings.AllowMultipleConnections,
-                settings.KeepAlivePingIntervalMs,
-                settings.KeepAlivePongTimeoutMs);
-
-            SubscribeToInstanceEvents();
+            _settingsService.ApplySettings(
+                settings,
+                ref _settings,
+                ref _instance,
+                ref _instanceEndpoint,
+                ref _instanceTransportKey);
         }
 
-        private async Task RefreshConfiguredGameVersionAsync(PlayServSettings settings, CancellationToken ct = default)
-        {
-#if UNITY_5_3_OR_NEWER
-            if (settings == null)
-                throw new ArgumentNullException(nameof(settings));
-
-            if (string.IsNullOrWhiteSpace(settings.DeployApiServerAddress) ||
-                string.IsNullOrWhiteSpace(settings.GameId))
-            {
-                return;
-            }
-
-            var timeoutSeconds = Math.Max(
-                1,
-                Math.Min(settings.TimeoutSeconds, ConnectVersionRefreshTimeoutSeconds));
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-
-            LogTrace(
-                $"[PlayServ] Refreshing game version before connect. gameId={settings.GameId}, deployApi={settings.DeployApiServerAddress}, timeout={timeoutSeconds}s");
-
-            var latestVersion = await GetLatestVersionOrFallbackAsync(settings, settings.GameId, timeoutCts.Token);
-            settings.GameVersion = latestVersion;
-            _settings = settings;
-            SyncLoadedConfigGameVersion(latestVersion);
-#else
-            await Task.CompletedTask;
-#endif
-        }
-
-        private void EnsureInstanceForSettings(PlayServSettings settings)
-        {
-            if (settings == null)
-                throw new ArgumentNullException(nameof(settings));
-
-            var endpoint = settings.Endpoint;
-            if (string.IsNullOrWhiteSpace(endpoint))
-                throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
-
-            var transportKey = BuildTransportKey(settings);
-            if (_instance == null)
-            {
-                var transportFactory = CreateTransportImplementationFactory(settings);
-                _instance = transportFactory == null
-                    ? new PlayServImplementation(endpoint)
-                    : new PlayServImplementation(endpoint, transportFactory);
-                _instanceEndpoint = endpoint;
-                _instanceTransportKey = transportKey;
-                return;
-            }
-
-            if (string.Equals(_instanceTransportKey, transportKey, StringComparison.Ordinal))
-                return;
-
-            _instance.Dispose();
-            var replacementTransportFactory = CreateTransportImplementationFactory(settings);
-            _instance = replacementTransportFactory == null
-                ? new PlayServImplementation(endpoint)
-                : new PlayServImplementation(endpoint, replacementTransportFactory);
-            _instanceEndpoint = endpoint;
-            _instanceTransportKey = transportKey;
-        }
+        private async Task<PlayServSettings> RefreshConfiguredGameVersionAsync(PlayServSettings settings, CancellationToken ct = default) =>
+            await _settingsService.RefreshConfiguredGameVersionAsync(settings, ct);
 
         private PlayServSettings GetOrCreateSettings()
-        {
-            if (_settings != null)
-                return _settings;
-
-            if (TryLoadSettingsFromUnityResources(out var settings))
-            {
-                _settings = settings;
-                return _settings;
-            }
-
-            _settings = new PlayServSettings();
-            return _settings;
-        }
-
-        private static void EnsureConfigured(PlayServSettings settings)
-        {
-            if (string.IsNullOrWhiteSpace(settings.GameAccessToken))
-                throw new InvalidOperationException("Game access token is required. Call Config(...) first.");
-
-            if (string.IsNullOrWhiteSpace(settings.GameId))
-                throw new InvalidOperationException("Game ID is required. Call Config(...) first.");
-
-            if (string.IsNullOrWhiteSpace(settings.UserId))
-                throw new InvalidOperationException("User ID is required. Call Config(...) first.");
-
-            if (string.IsNullOrWhiteSpace(settings.GameVersion))
-                throw new InvalidOperationException("Game version is required. Call Config(...) first.");
-
-            if (string.IsNullOrWhiteSpace(settings.Endpoint))
-                throw new InvalidOperationException("Endpoint is required. Provide BackendServerAddress.");
-        }
+            => _settingsService.GetOrCreateSettings(ref _settings);
 
         private static bool TryLoadSettingsFromUnityResources(out PlayServSettings settings)
         {
             return PlayServSettingsResolver.TryLoadSettingsFromResourcesOrPackageDefaults(out settings);
+        }
+
+        private static PlayServSettings LoadSettingsFromUnityResources()
+        {
+            return TryLoadSettingsFromUnityResources(out var settings) ? settings : null;
         }
 
         private Func<string, ITransportImplementation> CreateTransportImplementationFactory(PlayServSettings settings)
@@ -754,7 +413,33 @@ namespace Playserv.Wrapper
             config.SetGameVersion(gameVersion);
         }
 
-        #endif
+        private void ResetShutdownState()
+        {
+            PlayServRuntimeShutdownState.Reset();
+            Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 0);
+        }
+
+        private bool ShouldIgnoreMissingInstance()
+        {
+            return !Application.isPlaying || PlayServRuntimeShutdownState.IsShuttingDown;
+        }
+#else
+        private void ResetShutdownState()
+        {
+            Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 0);
+        }
+
+        private static bool ShouldIgnoreMissingInstance() => false;
+#endif
+
+        private PlayServImplementation GetInstanceForFireAndForget(string operationName)
+        {
+            return _connectionOrchestrator.TryGetInstanceForFireAndForget(operationName, out var instance)
+                ? instance
+                : null;
+        }
+
+        private static void ForwardLogTrace(string message) => LogTrace(message);
 
         [System.Diagnostics.Conditional("PlayServ_Logs")]
         private static void LogTrace(string message)
