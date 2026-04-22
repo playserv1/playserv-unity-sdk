@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 
@@ -17,7 +17,7 @@ namespace Playserv.Proxy.Implementation
 
         private readonly Uri _uri;
         private readonly ILogger _logger;
-        private ByteArrayChannel _channel;
+        private ObservableByteChannel _channel;
         private readonly List<IObserver<byte[]>> _observers = new List<IObserver<byte[]>>();
         private readonly object _gate = new object();
         private readonly object _connectGate = new object();
@@ -35,7 +35,7 @@ namespace Playserv.Proxy.Implementation
             _uri = new Uri(uri);
             _logger = logger ?? new ConsoleLogger();
             _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
-            _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
+            _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
         }
 
         [DllImport("__Internal")]
@@ -282,13 +282,13 @@ namespace Playserv.Proxy.Implementation
             lock (_gate)
             {
                 _observers.Clear();
-                _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
+                _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
             }
         }
 
         private async Task WatchConnectTimeoutAsync(TaskCompletionSource<bool> connectTcs)
         {
-            var completed = await WaitForCompletionOrTimeoutAsync(connectTcs.Task, ConnectTimeoutMs);
+            var completed = await AsyncTimeoutHelper.WaitForCompletionOrTimeoutAsync(connectTcs.Task, ConnectTimeoutMs);
             if (completed)
                 return;
 
@@ -306,33 +306,6 @@ namespace Playserv.Proxy.Implementation
             TryCloseSocket();
             connectTcs.TrySetResult(false);
         }
-
-        private static async Task<bool> WaitForCompletionOrTimeoutAsync(Task task, int timeoutMs)
-        {
-            if (task.IsCompleted)
-                return true;
-
-            if (timeoutMs <= 0)
-                timeoutMs = 1;
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-            var stopwatch = Stopwatch.StartNew();
-            while (!task.IsCompleted)
-            {
-                if (stopwatch.ElapsedMilliseconds >= timeoutMs)
-                    return false;
-
-                await Task.Yield();
-            }
-
-            return true;
-#else
-            var timeoutTask = Task.Delay(timeoutMs);
-            var completedTask = await Task.WhenAny(task, timeoutTask);
-            return completedTask == task;
-#endif
-        }
-
         private void TryCloseSocket()
         {
             try
@@ -357,117 +330,6 @@ namespace Playserv.Proxy.Implementation
 
             RemoveBridgeEventHandlers();
             _channel.Complete();
-        }
-
-        private sealed class ByteArrayChannel : IObservable<byte[]>
-        {
-            private readonly List<IObserver<byte[]>> _observers;
-            private readonly object _gate;
-            private readonly SynchronizationContext _syncContext;
-            private bool _completed;
-
-            public ByteArrayChannel(List<IObserver<byte[]>> observers, object gate, SynchronizationContext syncContext)
-            {
-                _observers = observers;
-                _gate = gate;
-                _syncContext = syncContext ?? new SynchronizationContext();
-            }
-
-            public IDisposable Subscribe(IObserver<byte[]> observer)
-            {
-                if (observer == null)
-                    throw new ArgumentNullException(nameof(observer));
-
-                lock (_gate)
-                {
-                    if (_completed)
-                    {
-                        observer.OnCompleted();
-                        return new Unsubscriber(_observers, observer, _gate, false);
-                    }
-
-                    _observers.Add(observer);
-                    return new Unsubscriber(_observers, observer, _gate, true);
-                }
-            }
-
-            public void Next(byte[] value)
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    snapshot = _observers.ToArray();
-                }
-
-                foreach (var o in snapshot)
-                {
-                    _syncContext.Post(_ => o.OnNext(value), null);
-                }
-            }
-
-            public void Complete()
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    _completed = true;
-                    snapshot = _observers.ToArray();
-                    _observers.Clear();
-                }
-
-                foreach (var o in snapshot)
-                {
-                    _syncContext.Post(_ => o.OnCompleted(), null);
-                }
-            }
-
-            public bool IsCompleted
-            {
-                get
-                {
-                    lock (_gate)
-                    {
-                        return _completed;
-                    }
-                }
-            }
-
-            private sealed class Unsubscriber : IDisposable
-            {
-                private readonly List<IObserver<byte[]>> _observers;
-                private readonly IObserver<byte[]> _observer;
-                private readonly object _gate;
-                private bool _active;
-
-                public Unsubscriber(List<IObserver<byte[]>> observers, IObserver<byte[]> observer, object gate, bool active)
-                {
-                    _observers = observers;
-                    _observer = observer;
-                    _gate = gate;
-                    _active = active;
-                }
-
-                public void Dispose()
-                {
-                    if (!_active)
-                        return;
-
-                    _active = false;
-
-                    lock (_gate)
-                    {
-                        _observers.Remove(_observer);
-                    }
-                }
-            }
         }
     }
 #endif

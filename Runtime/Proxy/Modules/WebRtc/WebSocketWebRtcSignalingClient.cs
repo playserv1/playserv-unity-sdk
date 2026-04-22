@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
@@ -7,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Playserv.Proxy.Implementation;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Logging;
 using Playserv.Wrapper;
 
@@ -380,7 +379,7 @@ namespace Playserv.Proxy.WebRtc
 
         private async Task WatchConnectTimeoutAsync(TaskCompletionSource<bool> connectTcs)
         {
-            var completed = await WaitForCompletionOrTimeoutAsync(connectTcs.Task, ConnectTimeoutMs);
+            var completed = await AsyncTimeoutHelper.WaitForCompletionOrTimeoutAsync(connectTcs.Task, ConnectTimeoutMs);
             if (completed)
                 return;
 
@@ -545,33 +544,6 @@ namespace Playserv.Proxy.WebRtc
             throw new InvalidOperationException(
                 $"Unsupported WebRTC signaling scheme '{uri.Scheme}'. Use ws://, wss://, http:// or https://.");
         }
-
-        private static async Task<bool> WaitForCompletionOrTimeoutAsync(Task task, int timeoutMs)
-        {
-            if (task.IsCompleted)
-                return true;
-
-            if (timeoutMs <= 0)
-                timeoutMs = 1;
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-            var stopwatch = Stopwatch.StartNew();
-            while (!task.IsCompleted)
-            {
-                if (stopwatch.ElapsedMilliseconds >= timeoutMs)
-                    return false;
-
-                await Task.Yield();
-            }
-
-            return true;
-#else
-            var timeoutTask = Task.Delay(timeoutMs);
-            var completedTask = await Task.WhenAny(task, timeoutTask);
-            return completedTask == task;
-#endif
-        }
-
         private sealed class WebRtcSignalingHelloMessage
         {
             public string MessageType { get; set; }
