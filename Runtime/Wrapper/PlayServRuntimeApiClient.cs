@@ -30,6 +30,7 @@ namespace Playserv.Wrapper
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
 
             var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildPath(LatestVersionPathTemplate, gameId));
+            LogTrace($"[PlayServ] Requesting latest game version. url={url}");
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
@@ -45,6 +46,7 @@ namespace Playserv.Wrapper
             if (string.IsNullOrWhiteSpace(version))
                 throw new InvalidOperationException("Latest version was not found in response.");
 
+            LogTrace($"[PlayServ] Latest game version response parsed. version={version}");
             return version;
         }
 
@@ -107,14 +109,31 @@ namespace Playserv.Wrapper
 
         private async Task SendRequestAsync(UnityWebRequest req, CancellationToken ct)
         {
-            req.timeout = Mathf.Max(1, _settings.TimeoutSeconds);
-            var op = req.SendWebRequest();
+            if (req == null)
+                throw new ArgumentNullException(nameof(req));
 
+            var timeoutSeconds = Mathf.Max(1, _settings.TimeoutSeconds);
+            req.timeout = timeoutSeconds;
+            var op = req.SendWebRequest();
+            
             while (!op.isDone)
             {
-                ct.ThrowIfCancellationRequested();
+                if (ct.IsCancellationRequested)
+                {
+                    TryAbort(req);
+                    LogTraceWarning($"[PlayServ] Runtime API request cancelled before completion. url={req.url}");
+                    ct.ThrowIfCancellationRequested();
+                }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+                await Task.Yield();
+#else
                 await Task.Delay(50, ct);
+#endif
             }
+
+            LogTrace(
+                $"[PlayServ] Runtime API request completed. code={req.responseCode}, error={req.error ?? "<none>"}, url={req.url}");
 
 #if UNITY_2020_2_OR_NEWER
             if (req.result != UnityWebRequest.Result.Success)
@@ -127,6 +146,30 @@ namespace Playserv.Wrapper
                 throw new InvalidOperationException(
                     $"Request failed. HTTP {(int)req.responseCode}. Endpoint: {req.url}. Details: {detailText}");
             }
+        }
+
+        private static void TryAbort(UnityWebRequest req)
+        {
+            try
+            {
+                req.Abort();
+            }
+            catch
+            {
+                // ignored
+            }
+        }
+
+        [System.Diagnostics.Conditional("PlayServ_Logs")]
+        private static void LogTrace(string message)
+        {
+            Debug.Log(message);
+        }
+
+        [System.Diagnostics.Conditional("PlayServ_Logs")]
+        private static void LogTraceWarning(string message)
+        {
+            Debug.LogWarning(message);
         }
 
         private static string NormalizeEndpoint(string endpoint)

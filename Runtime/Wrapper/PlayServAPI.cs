@@ -18,6 +18,7 @@ namespace Playserv.Wrapper
     {
 #if UNITY_5_3_OR_NEWER
         private const string ConfigResourceName = "PlayServConfig";
+        private const int ConnectVersionRefreshTimeoutSeconds = 5;
 #endif
         private PlayServImplementation _instance;
         private PlayServSettings _settings;
@@ -96,9 +97,13 @@ namespace Playserv.Wrapper
                 PlayServRuntimeShutdownState.Reset();
                 Interlocked.Exchange(ref _shutdownIgnoreWarningLogged, 0);
                 var settings = GetOrCreateSettings();
+                LogTrace($"[PlayServ] Connect started. state={State}, gameId={settings.GameId}, endpoint={settings.Endpoint}");
                 await RefreshConfiguredGameVersionAsync(settings);
+                LogTrace($"[PlayServ] Connect continue after version refresh. resolvedGameVersion={settings.GameVersion}");
                 ApplySettings(settings);
+                LogTrace("[PlayServ] Connect applied settings. Starting transport connect.");
                 var connected = await Instance.Connect();
+                LogTrace($"[PlayServ] Connect transport completed. connected={connected}, state={State}");
                 if (!connected)
                     Disconnect();
 
@@ -567,7 +572,17 @@ namespace Playserv.Wrapper
                 return;
             }
 
-            var latestVersion = await GetLatestVersionOrFallbackAsync(settings, settings.GameId, ct);
+            var timeoutSeconds = Math.Max(
+                1,
+                Math.Min(settings.TimeoutSeconds, ConnectVersionRefreshTimeoutSeconds));
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+            LogTrace(
+                $"[PlayServ] Refreshing game version before connect. gameId={settings.GameId}, deployApi={settings.DeployApiServerAddress}, timeout={timeoutSeconds}s");
+
+            var latestVersion = await GetLatestVersionOrFallbackAsync(settings, settings.GameId, timeoutCts.Token);
             settings.GameVersion = latestVersion;
             _settings = settings;
             SyncLoadedConfigGameVersion(latestVersion);
@@ -648,12 +663,12 @@ namespace Playserv.Wrapper
             try
             {
                 var latestVersion = await new PlayServRuntimeApiClient(settings).GetLatestVersionAsync(gameId, ct);
-                Debug.Log($"[PlayServ] Latest game version resolved from deployment API: {latestVersion}");
+                LogTrace($"[PlayServ] Latest game version resolved from deployment API: {latestVersion}");
                 return latestVersion;
             }
             catch (Exception ex) when (!string.IsNullOrWhiteSpace(fallbackVersion))
             {
-                Debug.LogWarning(
+                LogTraceWarning(
                     $"[PlayServ] Failed to fetch latest game version for gameId={gameId}. " +
                     $"Falling back to configured GameVersion={fallbackVersion}. Error: {ex.Message}");
                 return fallbackVersion;
@@ -670,6 +685,18 @@ namespace Playserv.Wrapper
                 return;
 
             config.SetGameVersion(gameVersion);
+        }
+
+        [System.Diagnostics.Conditional("PlayServ_Logs")]
+        private static void LogTrace(string message)
+        {
+            Debug.Log(message);
+        }
+
+        [System.Diagnostics.Conditional("PlayServ_Logs")]
+        private static void LogTraceWarning(string message)
+        {
+            Debug.LogWarning(message);
         }
 #endif
     }

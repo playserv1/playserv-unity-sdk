@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Events.Requests;
@@ -64,8 +65,17 @@ namespace Playserv.Proxy.Common
                 _eventKeepAliveSubscription = _transport.OnReceive<EventMessage>()
                     .Subscribe(OnEventMessageReceived);
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+                // WebGL is single-threaded: Task.Run would detach the continuation from
+                // the Unity SynchronizationContext and _transport.Send (which ends up in a
+                // [DllImport("__Internal")] call) must run on the main thread. Keep loops
+                // on the main thread scheduler via direct invocation + Task.Yield-based delays.
+                _sendLoop = SendLoopAsync(_cts.Token);
+                _monitorLoop = MonitorLoopAsync(_cts.Token);
+#else
                 _sendLoop = Task.Run(() => SendLoopAsync(_cts.Token));
                 _monitorLoop = Task.Run(() => MonitorLoopAsync(_cts.Token));
+#endif
                 LogKeepAlive(
                     $"{KeepAliveLogPrefix} manager started. twait={ResolveKeepAliveIntervalMs()}ms, " +
                     $"waitWindow={ResolveKeepAliveWaitWindowMs()}ms");
@@ -107,7 +117,7 @@ namespace Playserv.Proxy.Common
                 {
                     var delayMs = isFirstPing ? firstPingDelayMs : ResolveKeepAliveSendIntervalMs();
                     isFirstPing = false;
-                    await Task.Delay(delayMs, cancellationToken);
+                    await DelayWithCancellationAsync(delayMs, cancellationToken);
 
                     if (cancellationToken.IsCancellationRequested)
                         break;
@@ -142,7 +152,7 @@ namespace Playserv.Proxy.Common
             {
                 try
                 {
-                    await Task.Delay(monitorTickMs, cancellationToken);
+                    await DelayWithCancellationAsync(monitorTickMs, cancellationToken);
 
                     if (cancellationToken.IsCancellationRequested)
                         break;
@@ -343,6 +353,28 @@ namespace Playserv.Proxy.Common
         {
 #if PlayServ_Logs
             _logger.LogError(message);
+#endif
+        }
+
+        private static async Task DelayWithCancellationAsync(int delayMs, CancellationToken ct)
+        {
+            if (delayMs <= 0)
+                return;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!ct.IsCancellationRequested)
+            {
+                if (stopwatch.ElapsedMilliseconds >= delayMs)
+                    break;
+
+                await Task.Yield();
+            }
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+#else
+            await Task.Delay(delayMs, ct);
 #endif
         }
 

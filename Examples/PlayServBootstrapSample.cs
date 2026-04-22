@@ -63,8 +63,13 @@ namespace Playserv.Examples
                 PlayServ.State != PlayServState.Connecting &&
                 PlayServ.State != PlayServState.Handshaking)
             {
+                LogTrace("[PlayServ][Sample] AutoConnect is enabled. Starting ConnectAsync().");
                 _ = ConnectAsync();
+                return;
             }
+
+            LogTrace(
+                $"[PlayServ][Sample] AutoConnect is disabled. SDK is configured only; Connect() was not called. Current state={PlayServ.State}.");
         }
 
         private void OnEnable()
@@ -182,6 +187,12 @@ namespace Playserv.Examples
 #else
             return config.ToSettings();
 #endif
+        }
+
+        [System.Diagnostics.Conditional("PlayServ_Logs")]
+        private static void LogTrace(string message)
+        {
+            Debug.Log(message);
         }
     }
 }

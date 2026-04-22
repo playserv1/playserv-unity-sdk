@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
@@ -55,10 +56,12 @@ namespace Playserv.Proxy.Common
 
             try
             {
-                var timeoutTask = Task.Delay(HandshakeTimeoutMs, cts.Token);
-                var completedTask = await Task.WhenAny(_handshakeTcs.Task, timeoutTask);
+                var completedInTime = await WaitForCompletionOrTimeoutAsync(
+                    _handshakeTcs.Task,
+                    HandshakeTimeoutMs,
+                    cts.Token);
 
-                if (completedTask == timeoutTask && !_handshakeTcs.Task.IsCompleted)
+                if (!completedInTime && !_handshakeTcs.Task.IsCompleted)
                 {
                     _logger.LogError("Handshake timed out.");
                     return HandshakeResult.Failed(new TransportError(TransportErrorCode.None, "Handshake timed out."));
@@ -104,6 +107,41 @@ namespace Playserv.Proxy.Common
         private void HandleError(TransportError error)
         {
             OnError?.Invoke(error);
+        }
+
+        private static async Task<bool> WaitForCompletionOrTimeoutAsync(Task task, int timeoutMs, CancellationToken ct)
+        {
+            if (task.IsCompleted)
+                return true;
+
+            if (timeoutMs <= 0)
+                timeoutMs = 1;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            var stopwatch = Stopwatch.StartNew();
+            while (!task.IsCompleted)
+            {
+                if (ct.IsCancellationRequested)
+                    throw new OperationCanceledException(ct);
+
+                if (stopwatch.ElapsedMilliseconds >= timeoutMs)
+                    return false;
+
+                await Task.Yield();
+            }
+
+            return true;
+#else
+            var timeoutTask = Task.Delay(timeoutMs, ct);
+            var completedTask = await Task.WhenAny(task, timeoutTask);
+            if (completedTask == task)
+                return true;
+
+            if (ct.IsCancellationRequested)
+                throw new OperationCanceledException(ct);
+
+            return false;
+#endif
         }
 
         public void Dispose()

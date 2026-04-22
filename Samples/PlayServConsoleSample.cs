@@ -164,6 +164,22 @@ namespace Playserv.Samples
             GUILayout.Label($"SDK: {PlayServ.State} | Status: {_status}");
             GUILayout.Label($"Bound Player: {_boundPlayerId ?? "-"} | Backend: {_activeBackend} | Group Joined: {_isGroupJoined}");
             GUILayout.Label("Examples: connect | bind player-001 polling | subevent | publishglobal hello | rpc named hi | spawn TestCube");
+            GUILayout.Label("WebGL note: if browser Enter is swallowed, use Run or Connect SDK buttons.");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Connect SDK", GUILayout.Height(28f)))
+            {
+                _ = ConnectAsync();
+            }
+            if (GUILayout.Button("Disconnect SDK", GUILayout.Height(28f)))
+            {
+                Disconnect();
+            }
+            if (GUILayout.Button("State", GUILayout.Height(28f)))
+            {
+                AddLog($"SDK state = {PlayServ.State}");
+            }
+            GUILayout.EndHorizontal();
 
             if (_focusInputNextFrame)
             {
@@ -241,7 +257,7 @@ namespace Playserv.Samples
                 return;
             }
 
-            if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+            if (IsSubmitEvent(e))
             {
                 SubmitInput();
                 e.Use();
@@ -260,6 +276,17 @@ namespace Playserv.Samples
                 NavigateHistory(1);
                 e.Use();
             }
+        }
+
+        private static bool IsSubmitEvent(Event e)
+        {
+            if (e == null)
+                return false;
+
+            if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter)
+                return true;
+
+            return e.character == '\n' || e.character == '\r';
         }
         private static List<string> GetCommandSuggestions(string input)
         {
@@ -746,9 +773,15 @@ namespace Playserv.Samples
             {
                 case "expr":
                 case "expression":
+#if UNITY_WEBGL && !UNITY_EDITOR
+                    AddLog("rpc expr is not supported in WebGL (Expression.Compile is unavailable under IL2CPP). Use 'rpc named' or 'rpc args'.");
+                    _status = "rpc expr unsupported in WebGL";
+                    return;
+#else
                     PlayServ.Invoke<NotificationService>(x => x.BroadcastToAll(text));
                     AddLog($"RPC expr => {text}");
                     break;
+#endif
 
                 case "args":
                     PlayServ.InvokeArgs(NotificationServiceName, BroadcastMethodName, text);
