@@ -23,8 +23,13 @@ namespace Playserv.Editor
 {
     public sealed class PlayServWindow : EditorWindow
     {
+        private const string WindowTitlePrefix = "PlayServ";
+        private const string FallbackSdkVersion = "0.1.0";
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://docs.playserv.io/";
+        private const float DefaultWindowWidth = 720f;
+        private const float MinWindowWidth = 640f;
+        private const float StyledFieldHeight = 26f;
         private const string ClientProjectSettingsBridgeTypeName = "Playserv.ClientEditor.PlayServProjectSettingsBridge";
         private const string DrawProjectConfigUiMethodName = "DrawProjectConfigUi";
         private static readonly string[] AllowedDeployUsingNamespaces =
@@ -55,6 +60,7 @@ namespace Playserv.Editor
         private bool _foldDeployment;
 
         private bool _showAvailableSchemaInfo;
+        private Vector2 _mainScrollPos;
 
         private EditorWebSocketTransport _wsTransport;
         private Vector2 _connectionScrollPos;
@@ -75,6 +81,14 @@ namespace Playserv.Editor
         private CancellationTokenSource _deployCts;
         private bool _versionSyncRunning;
         private string _versionSyncStatus = "";
+
+        private enum ButtonTone
+        {
+            Primary,
+            Secondary,
+            Ghost,
+            Danger
+        }
 
         [MenuItem(MenuPath)]
         public static void ShowFromMenu() => ShowWindow();
@@ -100,8 +114,11 @@ namespace Playserv.Editor
             if (EditorApplication.isPlayingOrWillChangePlaymode)
                 return;
 
-            var wnd = GetWindow<PlayServWindow>(utility: true, title: "PlayServ");
-            wnd.minSize = new Vector2(520, 520);
+            var wnd = GetWindow<PlayServWindow>(title: "PlayServ");
+            wnd.titleContent = new GUIContent(BuildWindowTitle(PlayServConfigProvider.FindExisting()?.SdkVersion));
+            wnd.minSize = new Vector2(MinWindowWidth, 760f);
+            if (wnd.position.width > DefaultWindowWidth)
+                wnd.position = new Rect(wnd.position.x, wnd.position.y, DefaultWindowWidth, Math.Max(wnd.position.height, 760f));
             wnd.Show();
             wnd.Focus();
         }
@@ -115,12 +132,16 @@ namespace Playserv.Editor
 
             _showAvailableSchemaInfo = false;
 
-                _wsEndpoint = EditorPrefs.GetString(
+            if (position.width > DefaultWindowWidth)
+                position = new Rect(position.x, position.y, DefaultWindowWidth, Math.Max(position.height, 760f));
+
+            _wsEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
                 PlayServPackageDefaultsProvider.ResolveBackendServerAddress(null)
             );
 
             EnsureConfig();
+            UpdateWindowTitle();
         }
 
         private void OnDisable()
@@ -151,50 +172,203 @@ namespace Playserv.Editor
             _pAllowMultipleConnections = _so.FindProperty("allowMultipleConnections");
             _pDeployAuthToken = _so.FindProperty("deployAuthToken");
             _pDeployTimeoutSeconds = _so.FindProperty("timeoutSeconds");
+
+            UpdateWindowTitle();
+        }
+
+        private void UpdateWindowTitle()
+        {
+            titleContent = new GUIContent(BuildWindowTitle(_config != null ? _config.SdkVersion : null));
+        }
+
+        private static string BuildWindowTitle(string sdkVersion)
+        {
+            var version = string.IsNullOrWhiteSpace(sdkVersion) ? FallbackSdkVersion : sdkVersion.Trim();
+            return $"{WindowTitlePrefix} {version}";
         }
 
         private void OnGUI()
         {
-            GUILayout.Space(8);
+            PlayServWindowTheme.Ensure();
+            DrawWindowBackdrop();
 
-            EditorGUILayout.HelpBox(
-                "Central settings for PlayServ SDK and code generation.",
-                MessageType.Info);
+            var previousLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = Mathf.Clamp(position.width * 0.23f, 120f, 170f);
 
-            GUILayout.Space(6);
-
-            DrawCodegenFoldout();
-            GUILayout.Space(6);
-            DrawEventsFoldout();
-            GUILayout.Space(6);
-            DrawModelFoldout();
-            GUILayout.Space(6);
-            if (ShowWebSocketConnectionMenu)
+            using (new GUILayout.AreaScope(new Rect(0f, 0f, position.width, position.height)))
             {
-                DrawConnectionFoldout();
-                GUILayout.Space(6);
+                _mainScrollPos = EditorGUILayout.BeginScrollView(_mainScrollPos, GUIStyle.none, GUI.skin.verticalScrollbar);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Space(24f);
+                    using (new EditorGUILayout.VerticalScope())
+                    {
+                        GUILayout.Space(18f);
+                        DrawHeroSection();
+                        GUILayout.Space(14f);
+                        DrawOverviewStrip();
+                        GUILayout.Space(18f);
+
+                        DrawConfigFoldout();
+                        GUILayout.Space(12f);
+                        DrawDeploymentFoldout();
+                        GUILayout.Space(12f);
+                        DrawModelFoldout();
+                        GUILayout.Space(12f);
+                        DrawEventsFoldout();
+                        GUILayout.Space(12f);
+                        DrawCodegenFoldout();
+
+                        if (ShowWebSocketConnectionMenu)
+                        {
+                            GUILayout.Space(12f);
+                            DrawConnectionFoldout();
+                        }
+
+                        GUILayout.Space(16f);
+                        DrawFooter();
+                        GUILayout.Space(18f);
+                    }
+                    GUILayout.Space(24f);
+                }
+
+                EditorGUILayout.EndScrollView();
             }
-            DrawDeploymentFoldout();
-            GUILayout.Space(6);
 
-            DrawConfigFoldout();
-
-            GUILayout.FlexibleSpace();
-            DrawFooter();
-            GUILayout.Space(6);
+            EditorGUIUtility.labelWidth = previousLabelWidth;
             
             if (_deployRunning)
                 Repaint();
         }
 
+        private void DrawWindowBackdrop()
+        {
+            var fullRect = new Rect(0f, 0f, position.width, position.height);
+            EditorGUI.DrawRect(fullRect, PlayServWindowTheme.Background);
+            EditorGUI.DrawRect(new Rect(0f, 0f, position.width, 1f), PlayServWindowTheme.GridLine);
+        }
+
+        private void DrawHeroSection()
+        {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.HeroCardStyle))
+            {
+                GUILayout.Label("PlayServ editor controls", PlayServWindowTheme.HeroTitleStyle);
+                GUILayout.Space(6f);
+                GUILayout.Label("Configure runtime, sync models, deploy code, and generate APIs from one place.", PlayServWindowTheme.HeroAccentStyle);
+            }
+        }
+
+        private void DrawOverviewStrip()
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawOverviewCard("Game ID", string.IsNullOrWhiteSpace(_config?.GameId) ? "Not configured" : _config.GameId, "Runtime identity");
+                    GUILayout.Space(10f);
+                    DrawOverviewCard(
+                        "Backend",
+                        string.IsNullOrWhiteSpace(_config?.BackendServerAddress) ? "Not set" : _config.BackendServerAddress,
+                        "Primary transport");
+                }
+
+                GUILayout.Space(10f);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawOverviewCard("Schema", EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "—"), "Current model hash");
+                    GUILayout.Space(10f);
+                    DrawOverviewCard("Deploy", _deployRunning ? "Deploying…" : _versionSyncRunning ? "Syncing…" : "Ready", "Release control");
+                }
+            }
+        }
+
+        private void DrawOverviewCard(string label, string value, string caption)
+        {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.MetricCardStyle, GUILayout.MinHeight(82f)))
+            {
+                GUILayout.Label(label, PlayServWindowTheme.MetricLabelStyle);
+                GUILayout.Space(2f);
+                GUILayout.Label(value, PlayServWindowTheme.MetricValueStyle);
+                GUILayout.Space(6f);
+                GUILayout.Label(caption, PlayServWindowTheme.MetricCaptionStyle);
+            }
+        }
+
+        private bool BeginSectionCard(ref bool expanded, string badge, string title, string subtitle)
+        {
+            EditorGUILayout.BeginVertical(PlayServWindowTheme.CardStyle);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label(badge, PlayServWindowTheme.SectionPillStyle, GUILayout.Height(22f));
+                GUILayout.FlexibleSpace();
+
+                if (DrawActionButton(expanded ? "Collapse" : "Expand", ButtonTone.Ghost, GUILayout.Width(92f), GUILayout.Height(24f)))
+                    expanded = !expanded;
+            }
+
+            GUILayout.Space(6f);
+
+            if (GUILayout.Button(title, PlayServWindowTheme.SectionTitleButtonStyle, GUILayout.Height(28f)))
+                expanded = !expanded;
+
+            GUILayout.Space(2f);
+            GUILayout.Label(subtitle, PlayServWindowTheme.SectionSubtitleStyle);
+
+            if (expanded)
+            {
+                GUILayout.Space(12f);
+                EditorGUILayout.BeginVertical(PlayServWindowTheme.CardBodyStyle);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void EndSectionCard(bool expanded)
+        {
+            if (expanded)
+                EditorGUILayout.EndVertical();
+
+            EditorGUILayout.EndVertical();
+        }
+
+        private bool DrawActionButton(string label, ButtonTone tone, params GUILayoutOption[] options)
+        {
+            return GUILayout.Button(label, PlayServWindowTheme.GetButtonStyle(tone), options);
+        }
+
+        private static void DrawNotice(string text, MessageType type)
+        {
+            var style = type == MessageType.Warning
+                ? PlayServWindowTheme.NoticeWarningStyle
+                : PlayServWindowTheme.NoticeInfoStyle;
+
+            GUILayout.Label(text, style);
+        }
+
+        private void FocusConfigAsset()
+        {
+            EnsureConfig();
+            if (_config == null)
+                return;
+
+            Selection.activeObject = _config;
+            EditorGUIUtility.PingObject(_config);
+        }
+
         private void DrawCodegenFoldout()
         {
-            _foldCodegen = EditorGUILayout.BeginFoldoutHeaderGroup(_foldCodegen, "Code Generation");
+            var expanded = BeginSectionCard(
+                ref _foldCodegen,
+                "Automation",
+                "Code Generation",
+                "Generate DTOs on demand and keep the generated layer clean when you need a reset.");
 
-            if (_foldCodegen)
+            if (expanded)
             {
-                EditorGUI.indentLevel++;
-
                 bool autoGen = EditorPrefs.GetBool(Const.PrefKeyAutoCodegen, true);
                 bool newAutoGen = EditorGUILayout.ToggleLeft("Enable automatic DTO generation", autoGen);
 
@@ -203,54 +377,59 @@ namespace Playserv.Editor
 
                 GUILayout.Space(6);
 
-                if (GUILayout.Button("Generate DTOs Now"))
-                    SharedCodeGenerator.GenerateMenu();
-
-                if (GUILayout.Button("Remove Generated DTOs"))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (EditorUtility.DisplayDialog(
-                            "Remove DTOs",
-                            "This will delete all generated DTO files.\nAre you sure?",
-                            "Remove",
-                            "Cancel"))
+                    if (DrawActionButton("Generate DTOs Now", ButtonTone.Primary, GUILayout.Width(168f), GUILayout.Height(32f)))
+                        SharedCodeGenerator.GenerateMenu();
+
+                    GUILayout.Space(8f);
+
+                    if (DrawActionButton("Remove Generated DTOs", ButtonTone.Danger, GUILayout.Width(184f), GUILayout.Height(32f)))
                     {
-                        SharedCodeGenerator.DestroyDTOs();
+                        if (EditorUtility.DisplayDialog(
+                                "Remove DTOs",
+                                "This will delete all generated DTO files.\nAre you sure?",
+                                "Remove",
+                                "Cancel"))
+                        {
+                            SharedCodeGenerator.DestroyDTOs();
+                        }
                     }
                 }
-
-                EditorGUI.indentLevel--;
             }
 
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldCodegen, _foldCodegen);
         }
 
         private void DrawEventsFoldout()
         {
-            _foldEvents = EditorGUILayout.BeginFoldoutHeaderGroup(_foldEvents, "Events");
+            var expanded = BeginSectionCard(
+                ref _foldEvents,
+                "Realtime",
+                "Events",
+                "Generate the typed events API and keep event payload contracts close to the runtime.");
 
-            if (_foldEvents)
+            if (expanded)
             {
-                EditorGUI.indentLevel++;
-
-                if (GUILayout.Button("Generate Events API"))
+                if (DrawActionButton("Generate Events API", ButtonTone.Primary, GUILayout.Width(168f), GUILayout.Height(32f)))
                     EventsCodeGenerator.Generate();
-
-                EditorGUI.indentLevel--;
             }
 
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldEvents, _foldEvents);
         }
 
         private void DrawModelFoldout()
         {
-            _foldModel = EditorGUILayout.BeginFoldoutHeaderGroup(_foldModel, "Model");
+            var expanded = BeginSectionCard(
+                ref _foldModel,
+                "Schema",
+                "Model Sync",
+                "Check the latest schema, compare timestamps, and regenerate editor-side models from the current source of truth.");
 
-            if (_foldModel)
+            if (expanded)
             {
-                EditorGUI.indentLevel++;
-
                 GUILayout.Space(6);
 
                 string currentVersion = EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "");
@@ -325,32 +504,32 @@ namespace Playserv.Editor
                 if (hasCurrent || hasLatest)
                 {
                     if (statusMessage != null && statusType.HasValue)
-                        EditorGUILayout.HelpBox(statusMessage, statusType.Value);
+                        DrawNotice(statusMessage, statusType.Value);
 
-                    EditorGUILayout.LabelField("Schema details", EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField("Schema details", PlayServWindowTheme.MiniHeadingStyle);
 
-                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.BeginVertical(PlayServWindowTheme.LogContainerStyle);
 
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(" ", GUILayout.Width(14));
-                    EditorGUILayout.LabelField("Current schema", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.LabelField("Current schema", PlayServWindowTheme.SectionLabelStyle);
                     if (_showAvailableSchemaInfo)
-                        EditorGUILayout.LabelField("Latest available schema", EditorStyles.miniBoldLabel);
+                        EditorGUILayout.LabelField("Latest available schema", PlayServWindowTheme.SectionLabelStyle);
                     EditorGUILayout.EndHorizontal();
 
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField("V", GUILayout.Width(14));
                     EditorGUILayout.SelectableLabel(
                         string.IsNullOrEmpty(currentVersion) ? "—" : currentVersion,
-                        EditorStyles.textField,
-                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                        PlayServWindowTheme.InputStyle,
+                        GUILayout.Height(StyledFieldHeight));
 
                     if (_showAvailableSchemaInfo)
                     {
                         EditorGUILayout.SelectableLabel(
                             string.IsNullOrEmpty(latestVersion) ? "—" : latestVersion,
-                            EditorStyles.textField,
-                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                            PlayServWindowTheme.InputStyle,
+                            GUILayout.Height(StyledFieldHeight));
                     }
 
                     EditorGUILayout.EndHorizontal();
@@ -359,15 +538,15 @@ namespace Playserv.Editor
                     EditorGUILayout.LabelField("T", GUILayout.Width(14));
                     EditorGUILayout.SelectableLabel(
                         string.IsNullOrEmpty(currentTimestampRaw) ? "—" : FormatTimestamp(currentTimestampRaw),
-                        EditorStyles.textField,
-                        GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                        PlayServWindowTheme.InputStyle,
+                        GUILayout.Height(StyledFieldHeight));
 
                     if (_showAvailableSchemaInfo)
                     {
                         EditorGUILayout.SelectableLabel(
                             string.IsNullOrEmpty(latestTimestampRaw) ? "—" : FormatTimestamp(latestTimestampRaw),
-                            EditorStyles.textField,
-                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                            PlayServWindowTheme.InputStyle,
+                            GUILayout.Height(StyledFieldHeight));
                     }
 
                     EditorGUILayout.EndHorizontal();
@@ -378,14 +557,14 @@ namespace Playserv.Editor
 
                         EditorGUILayout.BeginHorizontal();
 
-                        if (GUILayout.Button("Hide", GUILayout.Width(120)))
+                        if (DrawActionButton("Hide", ButtonTone.Ghost, GUILayout.Width(120f), GUILayout.Height(28f)))
                             _showAvailableSchemaInfo = false;
 
                         GUILayout.FlexibleSpace();
 
                         using (new EditorGUI.DisabledScope(!differs))
                         {
-                            if (GUILayout.Button("Apply New Schema", GUILayout.Width(180)))
+                            if (DrawActionButton("Apply New Schema", ButtonTone.Primary, GUILayout.Width(180f), GUILayout.Height(28f)))
                             {
                                 if (EditorUtility.DisplayDialog(
                                         "Apply new schema",
@@ -410,40 +589,45 @@ namespace Playserv.Editor
                     GUILayout.Space(6);
                 }
 
-                if (GUILayout.Button("Check Updates"))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    _showAvailableSchemaInfo = true;
-                    SchemaLoader.LoadSchema(_pGameAccessToken.stringValue);
-                    SchemaLoader.CheckNewSchema();
+                    if (DrawActionButton("Check Updates", ButtonTone.Secondary, GUILayout.Width(138f), GUILayout.Height(32f)))
+                    {
+                        _showAvailableSchemaInfo = true;
+                        SchemaLoader.LoadSchema(_pGameAccessToken.stringValue);
+                        SchemaLoader.CheckNewSchema();
+                    }
+
+                    GUILayout.Space(8f);
+
+                    if (DrawActionButton("Re-generate Models", ButtonTone.Primary, GUILayout.Width(176f), GUILayout.Height(32f)))
+                        SchemaCodeGenerator.GenerateModels(false);
                 }
-
-                if (GUILayout.Button("Re-generate Models from current schema"))
-                    SchemaCodeGenerator.GenerateModels(false);
-
-                EditorGUI.indentLevel--;
             }
 
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldModel, _foldModel);
         }
 
         private void DrawConnectionFoldout()
         {
-            _foldConnection = EditorGUILayout.BeginFoldoutHeaderGroup(_foldConnection, "WebSocket Connection");
+            var expanded = BeginSectionCard(
+                ref _foldConnection,
+                "Transport",
+                "WebSocket Connection",
+                "Low-level socket smoke test for editor diagnostics and message tracing.");
 
-            if (_foldConnection)
+            if (expanded)
             {
-                EditorGUI.indentLevel++;
-
-                EditorGUILayout.HelpBox("Test WebSocket connection.", MessageType.Info);
+                DrawNotice("Test WebSocket connection.", MessageType.Info);
 
                 GUILayout.Space(6);
 
-                EditorGUILayout.LabelField("Connection Settings", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Connection Settings", PlayServWindowTheme.MiniHeadingStyle);
 
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField("Endpoint", GUILayout.Width(80));
-                string newEndpoint = EditorGUILayout.TextField(_wsEndpoint);
+                string newEndpoint = EditorGUILayout.TextField(_wsEndpoint, PlayServWindowTheme.InputStyle);
                 if (newEndpoint != _wsEndpoint)
                 {
                     _wsEndpoint = newEndpoint;
@@ -460,13 +644,13 @@ namespace Playserv.Editor
 
                 using (new EditorGUI.DisabledScope(isConnected || isConnecting))
                 {
-                    if (GUILayout.Button(isConnecting ? "Connecting..." : "Connect", GUILayout.Height(30)))
+                    if (DrawActionButton(isConnecting ? "Connecting..." : "Connect", ButtonTone.Primary, GUILayout.Height(30f)))
                         _ = ConnectWebSocket();
                 }
 
                 using (new EditorGUI.DisabledScope(!isConnected))
                 {
-                    if (GUILayout.Button("Disconnect", GUILayout.Height(30)))
+                    if (DrawActionButton("Disconnect", ButtonTone.Secondary, GUILayout.Height(30f)))
                         DisconnectWebSocket();
                 }
 
@@ -474,55 +658,56 @@ namespace Playserv.Editor
 
                 GUILayout.Space(6);
 
-                EditorGUILayout.LabelField("Status", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Status", PlayServWindowTheme.MiniHeadingStyle);
                 string statusText = isConnected ? "Connected" : isConnecting ? "Connecting..." : "Disconnected";
                 var statusColor = isConnected ? Color.green : isConnecting ? Color.yellow : Color.gray;
 
                 var prevColor = GUI.color;
                 GUI.color = statusColor;
-                EditorGUILayout.LabelField("● " + statusText, EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("● " + statusText, PlayServWindowTheme.StatusValueStyle);
                 GUI.color = prevColor;
 
                 GUILayout.Space(6);
 
                 using (new EditorGUI.DisabledScope(!isConnected))
                 {
-                    EditorGUILayout.LabelField("Send Test Message", EditorStyles.boldLabel);
-                    _testMessage = EditorGUILayout.TextArea(_testMessage, GUILayout.Height(40));
+                    EditorGUILayout.LabelField("Send Test Message", PlayServWindowTheme.MiniHeadingStyle);
+                    _testMessage = EditorGUILayout.TextArea(_testMessage, PlayServWindowTheme.TextAreaStyle, GUILayout.Height(64f));
 
-                    if (GUILayout.Button("Send Message"))
+                    if (DrawActionButton("Send Message", ButtonTone.Primary, GUILayout.Width(132f), GUILayout.Height(28f)))
                         _ = SendTestMessage();
                 }
 
                 GUILayout.Space(6);
 
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Connection Log", EditorStyles.boldLabel);
-                if (GUILayout.Button("Clear", GUILayout.Width(60)))
+                EditorGUILayout.LabelField("Connection Log", PlayServWindowTheme.MiniHeadingStyle);
+                if (DrawActionButton("Clear", ButtonTone.Ghost, GUILayout.Width(74f), GUILayout.Height(24f)))
                 {
                     _wsTransport?.ClearLogs();
                     Repaint();
                 }
                 EditorGUILayout.EndHorizontal();
 
+                EditorGUILayout.BeginVertical(PlayServWindowTheme.LogContainerStyle);
                 _connectionScrollPos = EditorGUILayout.BeginScrollView(_connectionScrollPos, GUILayout.Height(200));
 
                 if (_wsTransport != null && _wsTransport.LogMessages.Count > 0)
                 {
                     foreach (var log in _wsTransport.LogMessages)
-                        EditorGUILayout.SelectableLabel(log, EditorStyles.wordWrappedLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                        EditorGUILayout.SelectableLabel(log, PlayServWindowTheme.LogLineStyle, GUILayout.Height(EditorGUIUtility.singleLineHeight));
                 }
                 else
                 {
-                    EditorGUILayout.LabelField("No logs yet...", EditorStyles.centeredGreyMiniLabel);
+                    EditorGUILayout.LabelField("No logs yet...", PlayServWindowTheme.EmptyStateStyle);
                 }
 
                 EditorGUILayout.EndScrollView();
+                EditorGUILayout.EndVertical();
 
-                EditorGUI.indentLevel--;
             }
 
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldConnection, _foldConnection);
         }
 
@@ -572,13 +757,15 @@ namespace Playserv.Editor
         
         private void DrawDeploymentFoldout()
         {
-            _foldDeployment = EditorGUILayout.BeginFoldoutHeaderGroup(_foldDeployment, "Deployment");
+            var expanded = BeginSectionCard(
+                ref _foldDeployment,
+                "Release",
+                "Deployment",
+                "Preview RPC code closure, sync deployed version, and ship the ZIP package to the active deployment endpoint.");
 
-            if (_foldDeployment)
+            if (expanded)
             {
-                EditorGUI.indentLevel++;
-
-                EditorGUILayout.HelpBox(
+                DrawNotice(
                     "Create a ZIP from selected files and upload it to your Deployment API endpoint.",
                     MessageType.Info);
 
@@ -612,7 +799,7 @@ namespace Playserv.Editor
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("Pattern", GUILayout.Width(EditorGUIUtility.labelWidth));
-                    _deployPattern = EditorGUILayout.TextField(_deployPattern);
+                    _deployPattern = EditorGUILayout.TextField(_deployPattern, PlayServWindowTheme.InputStyle);
                 }
 
                 _deployKeepRelativePaths = EditorGUILayout.ToggleLeft(
@@ -625,72 +812,88 @@ namespace Playserv.Editor
                 {
                     using (new EditorGUILayout.HorizontalScope())
                     {
-                        if (GUILayout.Button("Preview Files", GUILayout.Width(120)))
+                        if (DrawActionButton("Preview Files", ButtonTone.Secondary, GUILayout.Width(120f), GUILayout.Height(30f)))
                         {
                             _deployFilesPreview = BuildDeployFileList(out var err);
                             if (!string.IsNullOrEmpty(err))
-                                Debug.LogError($"[PlayServ] {err}");
+                            {
+                                _deployStatus = err;
+                                _deployShowFileList = false;
+                                _deployFilesPreview.Clear();
+                            }
                             else
+                            {
+                                _deployStatus = "Preview ready.";
                                 _deployShowFileList = true;
+                            }
                         }
 
-                        if (GUILayout.Button("Clear Preview", GUILayout.Width(120)))
+                        GUILayout.Space(8f);
+
+                        if (DrawActionButton("Clear Preview", ButtonTone.Ghost, GUILayout.Width(120f), GUILayout.Height(30f)))
                         {
                             _deployFilesPreview.Clear();
                             _deployShowFileList = false;
                         }
+                    }
 
-                        GUILayout.FlexibleSpace();
-
-                        if (GUILayout.Button("Sync Version", GUILayout.Width(120)))
+                    GUILayout.Space(8f);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (DrawActionButton("Sync Version", ButtonTone.Secondary, GUILayout.Width(120f), GUILayout.Height(30f)))
                             _ = StartVersionSyncAsync();
 
-                        if (GUILayout.Button("Deploy Now", GUILayout.Width(140)))
+                        GUILayout.Space(8f);
+
+                        if (DrawActionButton("Deploy Now", ButtonTone.Primary, GUILayout.Width(140f), GUILayout.Height(30f)))
                             _ = StartDeployAsync();
                     }
                 }
 
                 using (new EditorGUI.DisabledScope(!_deployRunning))
                 {
-                    if (GUILayout.Button("Cancel", GUILayout.Width(120)))
+                    if (DrawActionButton("Cancel", ButtonTone.Danger, GUILayout.Width(120f), GUILayout.Height(28f)))
                         _deployCts?.Cancel();
                 }
 
                 if (_deployShowFileList && _deployFilesPreview.Count > 0)
                 {
                     GUILayout.Space(6);
-                    EditorGUILayout.LabelField($"Files ({_deployFilesPreview.Count})", EditorStyles.miniBoldLabel);
+                    EditorGUILayout.LabelField($"Files ({_deployFilesPreview.Count})", PlayServWindowTheme.MiniHeadingStyle);
 
-                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.LogContainerStyle))
                     {
                         _deployFilesScroll = EditorGUILayout.BeginScrollView(_deployFilesScroll, GUILayout.Height(140));
                         foreach (var f in _deployFilesPreview.Take(300))
-                            EditorGUILayout.LabelField(f, EditorStyles.miniLabel);
+                            EditorGUILayout.LabelField(f, PlayServWindowTheme.LogLineStyle);
                         if (_deployFilesPreview.Count > 300)
-                            EditorGUILayout.LabelField($"...and {_deployFilesPreview.Count - 300} more", EditorStyles.miniLabel);
+                            EditorGUILayout.LabelField($"...and {_deployFilesPreview.Count - 300} more", PlayServWindowTheme.EmptyStateStyle);
                         EditorGUILayout.EndScrollView();
                     }
                 }
 
-                if (_deployRunning)
+                if (_deployRunning || !string.IsNullOrWhiteSpace(_deployStatus))
                 {
                     GUILayout.Space(6);
-                    EditorGUILayout.LabelField("Status", EditorStyles.miniBoldLabel);
-                    EditorGUILayout.HelpBox(string.IsNullOrEmpty(_deployStatus) ? "Working..." : _deployStatus, MessageType.None);
-                    EditorGUILayout.Slider("Progress", _deployProgress, 0f, 1f);
+                    EditorGUILayout.LabelField("Status", PlayServWindowTheme.MiniHeadingStyle);
+                    var deployMessageType = !_deployRunning && _deployStatus.StartsWith("Failed", StringComparison.OrdinalIgnoreCase)
+                        ? MessageType.Warning
+                        : MessageType.Info;
+                    DrawNotice(string.IsNullOrEmpty(_deployStatus) ? "Working..." : _deployStatus, deployMessageType);
+
+                    if (_deployRunning)
+                        EditorGUILayout.Slider("Progress", _deployProgress, 0f, 1f);
                 }
 
                 if (_versionSyncRunning || !string.IsNullOrWhiteSpace(_versionSyncStatus))
                 {
                     GUILayout.Space(6);
-                    EditorGUILayout.LabelField("Version Sync", EditorStyles.miniBoldLabel);
-                    EditorGUILayout.HelpBox(_versionSyncStatus, _versionSyncRunning ? MessageType.Info : MessageType.None);
+                    EditorGUILayout.LabelField("Version Sync", PlayServWindowTheme.MiniHeadingStyle);
+                    DrawNotice(_versionSyncStatus, _versionSyncRunning ? MessageType.Info : MessageType.Warning);
                 }
-
-                EditorGUI.indentLevel--;
             }
 
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldDeployment, _foldDeployment);
         }
 
@@ -1350,18 +1553,20 @@ namespace Playserv.Editor
 
         private void DrawConfigFoldout()
         {
-            _foldConfig = EditorGUILayout.BeginFoldoutHeaderGroup(_foldConfig, "PlayServ Config");
+            var expanded = BeginSectionCard(
+                ref _foldConfig,
+                "Control Room",
+                "PlayServ Config",
+                "Manage runtime identity, fixed endpoints, SDK version, and the project-side config asset from one place.");
 
-            if (_foldConfig)
+            if (expanded)
             {
-                EditorGUI.indentLevel++;
-
                 if (_config == null || _so == null)
                 {
-                    if (GUILayout.Button("Create / Locate Config"))
+                    if (DrawActionButton("Create / Locate Config", ButtonTone.Primary, GUILayout.Width(176f), GUILayout.Height(32f)))
                         EnsureConfig();
 
-                    EditorGUILayout.HelpBox("Config asset not found.", MessageType.Warning);
+                    DrawNotice("Config asset not found.", MessageType.Warning);
                 }
                 else
                 {
@@ -1378,7 +1583,7 @@ namespace Playserv.Editor
 
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.ObjectField("Config Asset", _config, typeof(PlayServConfig), false);
-                    if (GUILayout.Button("Ping", GUILayout.Width(60)))
+                    if (DrawActionButton("Ping", ButtonTone.Secondary, GUILayout.Width(72f), GUILayout.Height(24f)))
                         EditorGUIUtility.PingObject(_config);
                     EditorGUILayout.EndHorizontal();
 
@@ -1399,18 +1604,16 @@ namespace Playserv.Editor
                         EditorGUILayout.PrefixLabel("SDK Version");
                         EditorGUILayout.SelectableLabel(
                             _pSdkVersion.stringValue,
-                            EditorStyles.textField,
-                            GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                            PlayServWindowTheme.InputStyle,
+                            GUILayout.Height(StyledFieldHeight));
                     }
 
                     if (_so.ApplyModifiedProperties())
                         EditorUtility.SetDirty(_config);
                 }
-
-                EditorGUI.indentLevel--;
             }
 
-            EditorGUILayout.EndFoldoutHeaderGroup();
+            EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldConfig, _foldConfig);
         }
 
@@ -1469,29 +1672,318 @@ namespace Playserv.Editor
                 EditorGUILayout.PrefixLabel(label);
                 EditorGUILayout.SelectableLabel(
                     value ?? string.Empty,
-                    EditorStyles.textField,
-                    GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    PlayServWindowTheme.InputStyle,
+                    GUILayout.Height(StyledFieldHeight));
             }
         }
 
         private void DrawFooter()
         {
-            EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.FooterCardStyle))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    bool showOnStartup = EditorPrefs.GetBool(Const.PrefKeyShowOnStartup, true);
+                    bool newShowOnStartup = EditorGUILayout.ToggleLeft("Show this window on Unity startup", showOnStartup);
 
-            EditorGUILayout.BeginHorizontal();
+                    if (newShowOnStartup != showOnStartup)
+                        EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, newShowOnStartup);
 
-            bool showOnStartup = EditorPrefs.GetBool(Const.PrefKeyShowOnStartup, true);
-            bool newShowOnStartup = EditorGUILayout.ToggleLeft("Show this window on Unity startup", showOnStartup);
+                    GUILayout.FlexibleSpace();
 
-            if (newShowOnStartup != showOnStartup)
-                EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, newShowOnStartup);
+                    if (DrawActionButton("Ping Config", ButtonTone.Secondary, GUILayout.Width(116f), GUILayout.Height(28f)))
+                        FocusConfigAsset();
 
-            GUILayout.FlexibleSpace();
+                    GUILayout.Space(8f);
 
-            if (GUILayout.Button("Open Docs", GUILayout.Width(100)))
-                Application.OpenURL(DocsUrl);
+                    if (DrawActionButton("Open Docs", ButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(28f)))
+                        Application.OpenURL(DocsUrl);
+                }
+            }
+        }
 
-            EditorGUILayout.EndHorizontal();
+        private static class PlayServWindowTheme
+        {
+            public static readonly Color Background = Parse("#0E1117");
+            public static readonly Color GridLine = new Color(1f, 1f, 1f, 0.08f);
+
+            public static GUIStyle TopBarStyle { get; private set; }
+            public static GUIStyle TopBarTitleStyle { get; private set; }
+            public static GUIStyle TopBarNavStyle { get; private set; }
+            public static GUIStyle HeroCardStyle { get; private set; }
+            public static GUIStyle HeroTitleStyle { get; private set; }
+            public static GUIStyle HeroAccentStyle { get; private set; }
+            public static GUIStyle HeroBodyStyle { get; private set; }
+            public static GUIStyle PillStyle { get; private set; }
+            public static GUIStyle MetricCardStyle { get; private set; }
+            public static GUIStyle MetricLabelStyle { get; private set; }
+            public static GUIStyle MetricValueStyle { get; private set; }
+            public static GUIStyle MetricCaptionStyle { get; private set; }
+            public static GUIStyle CardStyle { get; private set; }
+            public static GUIStyle CardBodyStyle { get; private set; }
+            public static GUIStyle SectionPillStyle { get; private set; }
+            public static GUIStyle SectionTitleButtonStyle { get; private set; }
+            public static GUIStyle SectionSubtitleStyle { get; private set; }
+            public static GUIStyle MiniHeadingStyle { get; private set; }
+            public static GUIStyle SectionLabelStyle { get; private set; }
+            public static GUIStyle StatusValueStyle { get; private set; }
+            public static GUIStyle InputStyle { get; private set; }
+            public static GUIStyle TextAreaStyle { get; private set; }
+            public static GUIStyle NoticeInfoStyle { get; private set; }
+            public static GUIStyle NoticeWarningStyle { get; private set; }
+            public static GUIStyle LogContainerStyle { get; private set; }
+            public static GUIStyle LogLineStyle { get; private set; }
+            public static GUIStyle EmptyStateStyle { get; private set; }
+            public static GUIStyle FooterCardStyle { get; private set; }
+            public static GUIStyle FooterTitleStyle { get; private set; }
+            public static GUIStyle FooterBodyStyle { get; private set; }
+
+            private static GUIStyle _primaryButtonStyle;
+            private static GUIStyle _secondaryButtonStyle;
+            private static GUIStyle _ghostButtonStyle;
+            private static GUIStyle _dangerButtonStyle;
+            private static Texture2D _transparentTexture;
+
+            public static void Ensure()
+            {
+                if (TopBarStyle != null)
+                    return;
+
+                TopBarStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(16, 16, 10, 10), new RectOffset(0, 0, 0, 0));
+                HeroCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(18, 18, 18, 18), new RectOffset(0, 0, 0, 0));
+                MetricCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(14, 14, 12, 12), new RectOffset(0, 0, 0, 0));
+                CardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(18, 18, 14, 14), new RectOffset(0, 0, 0, 0));
+                CardBodyStyle = CreateBoxStyle("#0F1319", "#1E232B", new RectOffset(14, 14, 14, 14), new RectOffset(0, 0, 0, 0));
+                FooterCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(18, 18, 16, 16), new RectOffset(0, 0, 0, 0));
+                LogContainerStyle = CreateBoxStyle("#0F1319", "#1E232B", new RectOffset(12, 12, 10, 10), new RectOffset(0, 0, 0, 0));
+                NoticeInfoStyle = CreateBoxStyle("#141B26", "#293446", new RectOffset(12, 12, 10, 10), new RectOffset(0, 0, 0, 0));
+                NoticeWarningStyle = CreateBoxStyle("#241C17", "#4A392A", new RectOffset(12, 12, 10, 10), new RectOffset(0, 0, 0, 0));
+
+                PillStyle = CreateChipStyle("#171B22", "#2A303A", "#C3CBD8", 11, FontStyle.Bold, new RectOffset(10, 10, 5, 5));
+                SectionPillStyle = CreateChipStyle("#171B22", "#2A303A", "#8CB2FF", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
+
+                TopBarTitleStyle = CreateLabelStyle(16, FontStyle.Bold, "#F3F5F8");
+                TopBarNavStyle = CreateLabelStyle(12, FontStyle.Normal, "#8892A0");
+
+                HeroTitleStyle = CreateWrappedLabelStyle(30, FontStyle.Bold, "#F3F5F8");
+                HeroAccentStyle = CreateWrappedLabelStyle(18, FontStyle.Bold, "#A8D3FF");
+                HeroBodyStyle = CreateWrappedLabelStyle(13, FontStyle.Normal, "#AAB2BF");
+
+                MetricLabelStyle = CreateLabelStyle(11, FontStyle.Bold, "#8892A0");
+                MetricValueStyle = CreateWrappedLabelStyle(14, FontStyle.Bold, "#F3F5F8");
+                MetricCaptionStyle = CreateWrappedLabelStyle(11, FontStyle.Normal, "#7D8693");
+
+                SectionTitleButtonStyle = new GUIStyle(EditorStyles.label)
+                {
+                    fontSize = 18,
+                    fontStyle = FontStyle.Bold,
+                    wordWrap = true,
+                    stretchWidth = true,
+                    alignment = TextAnchor.MiddleLeft,
+                    padding = new RectOffset(0, 0, 0, 0),
+                    margin = new RectOffset(0, 0, 0, 0),
+                    normal = { textColor = Parse("#F6F7FF"), background = TransparentTexture },
+                    hover = { textColor = Parse("#8BC8FF"), background = TransparentTexture }
+                };
+
+                SectionSubtitleStyle = CreateWrappedLabelStyle(12, FontStyle.Normal, "#8D97A5");
+                MiniHeadingStyle = CreateLabelStyle(11, FontStyle.Bold, "#AAB3BF");
+                SectionLabelStyle = CreateLabelStyle(11, FontStyle.Bold, "#C3CBD8");
+                StatusValueStyle = CreateLabelStyle(12, FontStyle.Bold, "#F3F5F8");
+                LogLineStyle = CreateWrappedLabelStyle(11, FontStyle.Normal, "#B3BBC7");
+                EmptyStateStyle = new GUIStyle(EditorStyles.centeredGreyMiniLabel)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 11,
+                    normal = { textColor = Parse("#7F88A6") }
+                };
+
+                FooterTitleStyle = CreateLabelStyle(14, FontStyle.Bold, "#F3F5F8");
+                FooterBodyStyle = CreateWrappedLabelStyle(12, FontStyle.Normal, "#97A0AD");
+                InputStyle = CreateInputStyle("#0F1319", "#262C36", "#E9EEFF");
+                TextAreaStyle = CreateTextAreaStyle("#0F1319", "#262C36", "#E9EEFF");
+
+                _primaryButtonStyle = CreateButtonStyle("#6E56CF", "#7B63DB", "#F8F7FF", 12, FontStyle.Bold);
+                _secondaryButtonStyle = CreateButtonStyle("#1A1F27", "#202632", "#F0F3FF", 12, FontStyle.Normal);
+                _ghostButtonStyle = CreateButtonStyle("#12161D", "#191E26", "#AAB4C0", 12, FontStyle.Normal);
+                _dangerButtonStyle = CreateButtonStyle("#362126", "#41282E", "#FFD7E6", 12, FontStyle.Bold);
+            }
+
+            public static GUIStyle GetButtonStyle(ButtonTone tone)
+            {
+                Ensure();
+                switch (tone)
+                {
+                    case ButtonTone.Primary:
+                        return _primaryButtonStyle;
+                    case ButtonTone.Ghost:
+                        return _ghostButtonStyle;
+                    case ButtonTone.Danger:
+                        return _dangerButtonStyle;
+                    default:
+                        return _secondaryButtonStyle;
+                }
+            }
+
+            private static Texture2D TransparentTexture
+            {
+                get
+                {
+                    if (_transparentTexture != null)
+                        return _transparentTexture;
+
+                    _transparentTexture = new Texture2D(1, 1);
+                    _transparentTexture.SetPixel(0, 0, new Color(0f, 0f, 0f, 0f));
+                    _transparentTexture.Apply();
+                    _transparentTexture.hideFlags = HideFlags.HideAndDontSave;
+                    return _transparentTexture;
+                }
+            }
+
+            private static GUIStyle CreateBoxStyle(string fillHex, string borderHex, RectOffset padding, RectOffset margin)
+            {
+                var texture = CreateBorderedTexture(Parse(fillHex), Parse(borderHex));
+                return new GUIStyle(GUI.skin.box)
+                {
+                    normal = { background = texture, textColor = Parse("#F5F7FF") },
+                    border = new RectOffset(3, 3, 3, 3),
+                    padding = padding,
+                    margin = margin
+                };
+            }
+
+            private static GUIStyle CreateChipStyle(string fillHex, string borderHex, string textHex, int fontSize, FontStyle fontStyle, RectOffset padding)
+            {
+                return new GUIStyle(EditorStyles.miniLabel)
+                {
+                    fontSize = fontSize,
+                    fontStyle = fontStyle,
+                    alignment = TextAnchor.MiddleCenter,
+                    padding = padding,
+                    margin = new RectOffset(0, 0, 0, 0),
+                    normal =
+                    {
+                        background = CreateBorderedTexture(Parse(fillHex), Parse(borderHex)),
+                        textColor = Parse(textHex)
+                    },
+                    border = new RectOffset(3, 3, 3, 3)
+                };
+            }
+
+            private static GUIStyle CreateButtonStyle(string fillHex, string hoverHex, string textHex, int fontSize, FontStyle fontStyle)
+            {
+                return new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = fontSize,
+                    fontStyle = fontStyle,
+                    alignment = TextAnchor.MiddleCenter,
+                    border = new RectOffset(3, 3, 3, 3),
+                    padding = new RectOffset(14, 14, 8, 8),
+                    margin = new RectOffset(0, 0, 0, 0),
+                    normal =
+                    {
+                        background = CreateBorderedTexture(Parse(fillHex), Shift(Parse(fillHex), 0.18f)),
+                        textColor = Parse(textHex)
+                    },
+                    hover =
+                    {
+                        background = CreateBorderedTexture(Parse(hoverHex), Shift(Parse(hoverHex), 0.12f)),
+                        textColor = Parse("#FFFFFF")
+                    },
+                    active =
+                    {
+                        background = CreateBorderedTexture(Shift(Parse(fillHex), -0.08f), Shift(Parse(fillHex), 0.08f)),
+                        textColor = Parse(textHex)
+                    }
+                };
+            }
+
+            private static GUIStyle CreateInputStyle(string fillHex, string borderHex, string textHex)
+            {
+                return new GUIStyle(EditorStyles.textField)
+                {
+                    fontSize = 12,
+                    border = new RectOffset(3, 3, 3, 3),
+                    padding = new RectOffset(10, 10, 6, 6),
+                    margin = new RectOffset(0, 0, 0, 0),
+                    normal =
+                    {
+                        background = CreateBorderedTexture(Parse(fillHex), Parse(borderHex)),
+                        textColor = Parse(textHex)
+                    },
+                    focused =
+                    {
+                        background = CreateBorderedTexture(Parse(fillHex), Shift(Parse(borderHex), 0.12f)),
+                        textColor = Parse(textHex)
+                    }
+                };
+            }
+
+            private static GUIStyle CreateTextAreaStyle(string fillHex, string borderHex, string textHex)
+            {
+                var style = CreateInputStyle(fillHex, borderHex, textHex);
+                style.wordWrap = true;
+                style.alignment = TextAnchor.UpperLeft;
+                style.stretchHeight = true;
+                return style;
+            }
+
+            private static GUIStyle CreateLabelStyle(int fontSize, FontStyle fontStyle, string textHex)
+            {
+                return new GUIStyle(EditorStyles.label)
+                {
+                    fontSize = fontSize,
+                    fontStyle = fontStyle,
+                    normal = { textColor = Parse(textHex) }
+                };
+            }
+
+            private static GUIStyle CreateWrappedLabelStyle(int fontSize, FontStyle fontStyle, string textHex)
+            {
+                return new GUIStyle(EditorStyles.label)
+                {
+                    fontSize = fontSize,
+                    fontStyle = fontStyle,
+                    wordWrap = true,
+                    normal = { textColor = Parse(textHex) }
+                };
+            }
+
+            private static Texture2D CreateBorderedTexture(Color fill, Color border)
+            {
+                var tex = new Texture2D(8, 8);
+                var pixels = new Color[64];
+                for (int y = 0; y < 8; y++)
+                {
+                    for (int x = 0; x < 8; x++)
+                    {
+                        var index = y * 8 + x;
+                        var isBorder = x <= 1 || y <= 1 || x >= 6 || y >= 6;
+                        pixels[index] = isBorder ? border : fill;
+                    }
+                }
+
+                tex.SetPixels(pixels);
+                tex.Apply();
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.hideFlags = HideFlags.HideAndDontSave;
+                return tex;
+            }
+
+            private static Color Parse(string hex)
+            {
+                ColorUtility.TryParseHtmlString(hex, out var color);
+                return color;
+            }
+
+            private static Color Shift(Color color, float delta)
+            {
+                return new Color(
+                    Mathf.Clamp01(color.r + delta),
+                    Mathf.Clamp01(color.g + delta),
+                    Mathf.Clamp01(color.b + delta),
+                    color.a);
+            }
         }
     }
 }
