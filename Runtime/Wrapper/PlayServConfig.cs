@@ -87,7 +87,7 @@ namespace Playserv.Wrapper
         public int NetworkTransformSyncIntervalMs => networkTransformSyncIntervalMs;
 
         /// <summary>
-        /// Backend websocket endpoint.
+        /// Backend transport endpoint.
         /// </summary>
         public string BackendServerAddress => backendServerAddress;
 

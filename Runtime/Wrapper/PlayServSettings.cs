@@ -6,7 +6,7 @@ namespace Playserv.Wrapper
     public sealed class PlayServSettings
     {
         /// <summary>
-        /// Default backend websocket endpoint.
+        /// Default backend transport endpoint.
         /// </summary>
         public const string DefaultBackendServerAddress = "";
 
@@ -66,7 +66,7 @@ namespace Playserv.Wrapper
         public int NetworkTransformSyncIntervalMs { get; set; } = 100;
 
         /// <summary>
-        /// Backend websocket endpoint.
+        /// Backend transport endpoint. Supports websocket endpoints and desktop UDP endpoints via <c>udp://host:port</c>.
         /// </summary>
         public string BackendServerAddress { get; set; } = DefaultBackendServerAddress;
 

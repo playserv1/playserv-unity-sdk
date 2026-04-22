@@ -3,7 +3,7 @@ using System;
 namespace Playserv.Proxy.Common
 {
     /// <summary>
-    /// Initial handshake request sent after websocket connect.
+    /// Initial handshake request sent after transport connect.
     /// </summary>
     [Serializable]
     public sealed class HandshakeRequest
