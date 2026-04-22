@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Playserv.Http.Interfaces;
+using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -32,7 +33,7 @@ namespace Playserv.Http.Modules.Unity
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
 
             var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildPath(LatestVersionPathTemplate, gameId));
-            LogTrace($"[PlayServ] Requesting latest game version. url={url}");
+            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting latest game version. url={url}");
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
@@ -48,7 +49,7 @@ namespace Playserv.Http.Modules.Unity
             if (string.IsNullOrWhiteSpace(version))
                 throw new InvalidOperationException("Latest version was not found in response.");
 
-            LogTrace($"[PlayServ] Latest game version response parsed. version={version}");
+            PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version response parsed. version={version}");
             return version;
         }
 
@@ -123,7 +124,7 @@ namespace Playserv.Http.Modules.Unity
                 if (ct.IsCancellationRequested)
                 {
                     TryAbort(req);
-                    LogTraceWarning($"[PlayServ] Runtime API request cancelled before completion. url={req.url}");
+                    PlayServLog.TraceWarning(PlayServLogCategory.Http, $"Runtime API request cancelled before completion. url={req.url}");
                     ct.ThrowIfCancellationRequested();
                 }
 
@@ -134,8 +135,9 @@ namespace Playserv.Http.Modules.Unity
 #endif
             }
 
-            LogTrace(
-                $"[PlayServ] Runtime API request completed. code={req.responseCode}, error={req.error ?? "<none>"}, url={req.url}");
+            PlayServLog.Trace(
+                PlayServLogCategory.Http,
+                $"Runtime API request completed. code={req.responseCode}, error={req.error ?? "<none>"}, url={req.url}");
 
 #if UNITY_2020_2_OR_NEWER
             if (req.result != UnityWebRequest.Result.Success)
@@ -160,18 +162,6 @@ namespace Playserv.Http.Modules.Unity
             {
                 // ignored
             }
-        }
-
-        [System.Diagnostics.Conditional("PlayServ_Logs")]
-        private static void LogTrace(string message)
-        {
-            Debug.Log(message);
-        }
-
-        [System.Diagnostics.Conditional("PlayServ_Logs")]
-        private static void LogTraceWarning(string message)
-        {
-            Debug.LogWarning(message);
         }
 
         private static string NormalizeEndpoint(string endpoint)

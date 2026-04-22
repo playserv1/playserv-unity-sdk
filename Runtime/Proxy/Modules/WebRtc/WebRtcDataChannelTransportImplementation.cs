@@ -62,7 +62,7 @@ namespace Playserv.Proxy.Implementation
             _endpoint = endpoint;
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _signalingClient = signalingClient;
-            _logger = logger ?? new ConsoleLogger();
+            _logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
             _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
             _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
 

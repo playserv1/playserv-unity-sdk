@@ -43,7 +43,7 @@ namespace Playserv.Proxy.Implementation
                 throw new ArgumentException($"{transportName} endpoint must include an explicit port.", nameof(uri));
 
             TransportName = transportName;
-            Logger = logger ?? new ConsoleLogger();
+            Logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
             SyncContext = SynchronizationContext.Current ?? new SynchronizationContext();
             _channel = CreateChannel();
         }

@@ -18,7 +18,7 @@ namespace Playserv.DataSubscription
         private readonly IDisposable _subscription;
         private readonly string _query;
         private readonly Dictionary<string, object> _variables;
-        private readonly ILogger _logger = new ConsoleLogger();
+        private readonly ILogger _logger = PlayServLog.ForCategory(PlayServLogCategory.Data);
         private bool _isDisposed;
 
         public T Value { get; private set; } = new();

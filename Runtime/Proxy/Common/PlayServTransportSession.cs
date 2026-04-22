@@ -12,6 +12,7 @@ namespace Playserv.Proxy.Common
     {
         private readonly ITransport _transport;
         private readonly ILogger _logger;
+        private readonly ILogger _rpcLogger;
         private readonly HandshakeService _handshakeService;
         private readonly KeepAliveManager _keepAliveManager;
         private readonly ReconnectionManager _reconnectionManager;
@@ -44,6 +45,7 @@ namespace Playserv.Proxy.Common
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _rpcLogger = PlayServLog.ForCategory(PlayServLogCategory.Rpc);
             _mainThreadContext = mainThreadContext;
             _notifyTransportError = notifyTransportError ?? (_ => { });
             _notifyKeepAlivePingSent = notifyKeepAlivePingSent ?? (() => { });
@@ -197,8 +199,8 @@ namespace Playserv.Proxy.Common
                 : $"{response.Request.ServiceName}.{response.Request.MethodName}";
             var resultInfo = string.IsNullOrWhiteSpace(response.Result) ? "<empty>" : response.Result;
 
-            _logger.Log(
-                $"[PlayServ][RPC] InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
+            _rpcLogger.Log(
+                $"InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
             _notifyRpcInvokeResponse(response);
         }
 

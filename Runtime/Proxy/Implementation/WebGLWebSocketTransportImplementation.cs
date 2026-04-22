@@ -33,7 +33,7 @@ namespace Playserv.Proxy.Implementation
         public WebGLWebSocketTransportImplementation(string uri, ILogger logger = null)
         {
             _uri = new Uri(uri);
-            _logger = logger ?? new ConsoleLogger();
+            _logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
             _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
             _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
         }

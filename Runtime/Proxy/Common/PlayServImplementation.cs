@@ -29,12 +29,12 @@ namespace Playserv.Proxy.Common
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
 
         public PlayServImplementation(string endpoint)
-            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), new ConsoleLogger()) { }
+            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport)) { }
 
         internal PlayServImplementation(
             string endpoint,
             Func<string, ITransportImplementation> transportImplementationFactory)
-            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), new ConsoleLogger(), transportImplementationFactory) { }
+            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport), transportImplementationFactory) { }
 
         private PlayServImplementation(
             string endpoint,
@@ -63,8 +63,8 @@ namespace Playserv.Proxy.Common
             var implementation = transportImplementationFactory(endpoint);
 
             _transport = new Transport(implementation, serializer, requestIdGenerator, logger);
-            _eventsAdapter = new PlayServEventsAdapter(_transport, _logger);
-            _dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(this, _logger);
+            _eventsAdapter = new PlayServEventsAdapter(_transport, PlayServLog.ForCategory(PlayServLogCategory.Events));
+            _dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(this, PlayServLog.ForCategory(PlayServLogCategory.Data));
             _transportSession = new PlayServTransportSession(
                 _transport,
                 _logger,

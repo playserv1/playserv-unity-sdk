@@ -20,7 +20,7 @@ namespace Playserv.Proxy.Common
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("Transport endpoint cannot be null or empty.", nameof(context));
 
-            var logger = context.Logger ?? new ConsoleLogger();
+            var logger = context.Logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
             var scheme = GetEndpointScheme(endpoint);
             if (string.IsNullOrWhiteSpace(scheme))
                 throw new InvalidOperationException($"Transport endpoint '{endpoint}' is not a valid absolute URI.");
