@@ -1,4 +1,5 @@
 using System;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Wrapper
 {
@@ -140,6 +141,30 @@ namespace Playserv.Wrapper
         public PlayServSettings Clone()
         {
             return new PlayServSettings
+            {
+                GameAccessToken = GameAccessToken,
+                GameId = GameId,
+                UserId = UserId,
+                GameVersion = GameVersion,
+                SdkVersion = SdkVersion,
+                AllowMultipleConnections = AllowMultipleConnections,
+                KeepAlivePingIntervalMs = KeepAlivePingIntervalMs,
+                KeepAlivePongTimeoutMs = KeepAlivePongTimeoutMs,
+                NetworkTransformSyncIntervalMs = NetworkTransformSyncIntervalMs,
+                BackendServerAddress = BackendServerAddress,
+                WebRtcSignalingServerAddress = WebRtcSignalingServerAddress,
+                WebRtcDataChannelLabel = WebRtcDataChannelLabel,
+                WebRtcIceServers = WebRtcIceServers == null ? Array.Empty<string>() : (string[])WebRtcIceServers.Clone(),
+                DeployApiServerAddress = DeployApiServerAddress,
+                SchemaApiServerAddress = SchemaApiServerAddress,
+                DeployAuthToken = DeployAuthToken,
+                TimeoutSeconds = TimeoutSeconds
+            };
+        }
+
+        public PlayServRuntimeSettings ToRuntimeSettings()
+        {
+            return new PlayServRuntimeSettings
             {
                 GameAccessToken = GameAccessToken,
                 GameId = GameId,

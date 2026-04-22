@@ -8,8 +8,8 @@ using Playserv.DataSubscription.Responses;
 using Playserv.Http.Common;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
-using Playserv.Proxy.WebRtc;
 using Playserv.RPC;
+using Playserv.Runtime.Abstractions;
 using Playserv.Server;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
@@ -28,7 +28,7 @@ namespace Playserv.Wrapper
         private PlayServSettings _settings;
         private string _instanceEndpoint;
         private string _instanceTransportKey;
-        private Func<PlayServSettings, IWebRtcSignalingClient> _webRtcSignalingClientFactory;
+        private Func<PlayServRuntimeSettings, IWebRtcSignalingClient> _webRtcSignalingClientFactory;
         private int _shutdownIgnoreWarningLogged;
         private readonly PlayServApiLocalExecutionFacade _localExecution;
         private readonly PlayServApiRpcFacade _rpcFacade;
@@ -111,7 +111,7 @@ namespace Playserv.Wrapper
 
         public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
 
-        public void SetWebRtcSignalingClientFactory(Func<PlayServSettings, IWebRtcSignalingClient> signalingClientFactory)
+        public void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory)
         {
             _webRtcSignalingClientFactory = signalingClientFactory;
 
@@ -341,7 +341,7 @@ namespace Playserv.Wrapper
             if (!HasWebRtcScheme(settings?.Endpoint))
                 return null;
 
-            var transportSettings = settings.Clone();
+            var transportSettings = settings.ToRuntimeSettings();
             return endpoint => TransportImplementationResolver.Create(
                 new TransportModuleContext(
                     endpoint,
@@ -387,7 +387,8 @@ namespace Playserv.Wrapper
 
             try
             {
-                var httpClient = PlayServRuntimeHttpClientResolver.Create(new PlayServHttpModuleContext(settings));
+                var httpClient = PlayServRuntimeHttpClientResolver.Create(
+                    new PlayServHttpModuleContext(settings.ToRuntimeSettings()));
                 var latestVersion = await httpClient.GetLatestVersionAsync(gameId, ct);
                 LogTrace($"[PlayServ] Latest game version resolved from deployment API: {latestVersion}");
                 return latestVersion;

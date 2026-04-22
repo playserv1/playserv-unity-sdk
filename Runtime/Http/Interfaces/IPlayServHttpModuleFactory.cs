@@ -1,4 +1,4 @@
-using Playserv.Http.Common;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Http.Interfaces
 {
