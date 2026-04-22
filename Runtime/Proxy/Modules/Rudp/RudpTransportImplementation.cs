@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Logging;
 
 namespace Playserv.Proxy.Implementation
@@ -14,7 +14,7 @@ namespace Playserv.Proxy.Implementation
     /// Reliable UDP transport for backend endpoints exposed via <c>rudp://host:port</c>.
     /// Uses a simple stop-and-wait protocol with sequence numbers, ACKs and retransmits.
     /// </summary>
-    public sealed class RudpTransportImplementation : ITransportImplementation
+    internal sealed class RudpTransportImplementation : DatagramTransportBase
     {
         private const string RudpScheme = "rudp";
         private const byte ProtocolVersion = 1;
@@ -22,131 +22,26 @@ namespace Playserv.Proxy.Implementation
         private const int AckTimeoutMs = 350;
         private const int MaxSendAttempts = 8;
 
-        private readonly Uri _uri;
-        private readonly ILogger _logger;
-        private readonly CancellationTokenSource _disposeCts = new CancellationTokenSource();
-        private readonly object _gate = new object();
-        private readonly object _connectGate = new object();
         private readonly object _receiveGate = new object();
         private readonly object _sendStateGate = new object();
-        private readonly List<IObserver<byte[]>> _observers = new List<IObserver<byte[]>>();
         private readonly Dictionary<uint, byte[]> _receiveBuffer = new Dictionary<uint, byte[]>();
-        private readonly SynchronizationContext _syncContext;
-        private ByteArrayChannel _channel;
 
-        private UdpClient _client;
-        private Task _receiveLoop;
-        private bool _connected;
-        private bool _connecting;
         private int _nextSendSequence;
         private uint _nextExpectedReceiveSequence = 1;
         private uint _pendingAckSequence;
         private TaskCompletionSource<bool> _pendingAckTcs;
 
-        public RudpTransportImplementation(string uri, ILogger logger = null)
+        internal RudpTransportImplementation(string uri, ILogger logger = null)
+            : base(uri, RudpScheme, "RUDP", logger)
         {
-            if (string.IsNullOrWhiteSpace(uri))
-                throw new ArgumentException("RUDP endpoint cannot be null or empty.", nameof(uri));
-
-            _uri = new Uri(uri);
-            if (!string.Equals(_uri.Scheme, RudpScheme, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException(
-                    $"RUDP transport requires '{RudpScheme}://' endpoint. Actual scheme: '{_uri.Scheme}'.",
-                    nameof(uri));
-            }
-
-            if (_uri.Port <= 0)
-                throw new ArgumentException("RUDP endpoint must include an explicit port.", nameof(uri));
-
-            _logger = logger ?? new ConsoleLogger();
-            _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
-            _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
         }
 
-        public Task<bool> Connect()
-        {
-            lock (_connectGate)
-            {
-                if (_connecting)
-                {
-                    _logger.LogWarning("RUDP connect already in progress.");
-                    return Task.FromResult(false);
-                }
-
-                if (_connected)
-                {
-                    if (_channel.IsCompleted)
-                    {
-                        _logger.LogWarning("RUDP transport is marked connected but receive channel is completed. Recreating client/channel.");
-                        CloseClientUnsafe();
-                        _connected = false;
-                        ResetChannel();
-                    }
-                    else
-                    {
-                        _logger.LogWarning("RUDP transport is already connected.");
-                        return Task.FromResult(true);
-                    }
-                }
-                else
-                {
-                    CloseClientUnsafe();
-                    if (_channel.IsCompleted)
-                        ResetChannel();
-                }
-
-                _connecting = true;
-            }
-
-            try
-            {
-                var client = new UdpClient();
-                client.Connect(_uri.Host, _uri.Port);
-
-                lock (_connectGate)
-                {
-                    _client = client;
-                    _connected = true;
-                }
-
-                ResetProtocolState();
-                _receiveLoop = Task.Run(() => ReceiveLoop(client));
-                _logger.Log($"RUDP transport ready: {_uri}");
-                return Task.FromResult(true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Failed to initialize RUDP transport: {ex.Message}");
-                CloseClientUnsafe();
-                _connected = false;
-                return Task.FromResult(false);
-            }
-            finally
-            {
-                lock (_connectGate)
-                {
-                    _connecting = false;
-                }
-            }
-        }
-
-        public async Task Send(byte[] data)
+        public override async Task Send(byte[] data)
         {
             if (data == null)
                 throw new ArgumentNullException(nameof(data));
 
-            UdpClient client;
-            lock (_connectGate)
-            {
-                client = _client;
-                if (!_connected || client == null)
-                {
-                    _logger.LogError("Attempted to send data but RUDP transport is not connected.");
-                    throw new InvalidOperationException("RUDP transport is not connected.");
-                }
-            }
-
+            var client = GetConnectedClient();
             var sequence = unchecked((uint)Interlocked.Increment(ref _nextSendSequence));
             var packet = BuildPacket(PacketType.Data, sequence, data);
             var ackTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -169,22 +64,22 @@ namespace Playserv.Proxy.Implementation
                 {
                     await client.SendAsync(packet, packet.Length);
 
-                    var acked = await WaitForAckAsync(ackTcs.Task, AckTimeoutMs, _disposeCts.Token);
+                    var acked = await WaitForAckAsync(ackTcs.Task, AckTimeoutMs, DisposeToken);
                     if (acked)
                         return;
 
                     if (attempt < MaxSendAttempts)
                     {
-                        _logger.LogWarning(
+                        Logger.LogWarning(
                             $"RUDP ACK timeout for seq={sequence}. Retrying {attempt + 1}/{MaxSendAttempts}.");
                     }
                 }
 
-                MarkDisconnectedAfterSendFailure();
+                MarkDisconnectedAndCloseClient();
                 throw new TimeoutException(
                     $"RUDP ACK was not received for seq={sequence} after {MaxSendAttempts} attempts.");
             }
-            catch (OperationCanceledException) when (_disposeCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (DisposeToken.IsCancellationRequested)
             {
                 throw new ObjectDisposedException(nameof(RudpTransportImplementation));
             }
@@ -194,96 +89,46 @@ namespace Playserv.Proxy.Implementation
             }
         }
 
-        public IObservable<byte[]> OnReceive() => _channel;
-
-        public void ResetConnection()
+        protected override void OnConnected(UdpClient client)
         {
-            lock (_connectGate)
-            {
-                _connecting = false;
-                _connected = false;
-                CloseClientUnsafe();
-                ResetProtocolState();
-                ResetChannel();
-            }
-
-            _logger.Log("[RUDP] Transport connection state reset.");
+            ResetProtocolState();
         }
 
-        public void Dispose()
+        protected override void OnResetConnection()
         {
-            _disposeCts.Cancel();
-            CloseClientUnsafe();
+            ResetProtocolState();
+        }
+
+        protected override void OnDispose()
+        {
             CancelPendingAck();
-
-            try
-            {
-                _receiveLoop?.Wait(1000);
-            }
-            catch
-            {
-                // ignored
-            }
-
-            _disposeCts.Dispose();
         }
 
-        private async Task ReceiveLoop(UdpClient client)
+        protected override async Task ProcessReceivedDatagramAsync(
+            UdpClient client,
+            byte[] buffer,
+            ObservableByteChannel channel)
         {
-            ByteArrayChannel channel;
-            lock (_gate)
+            if (buffer == null || buffer.Length < HeaderSize)
             {
-                channel = _channel;
+                Logger.LogWarning("Received malformed RUDP datagram.");
+                return;
             }
 
-            try
+            if (!TryParsePacket(buffer, out var packetType, out var sequence, out var payload))
             {
-                while (!_disposeCts.IsCancellationRequested)
-                {
-                    var result = await client.ReceiveAsync();
-                    if (result.Buffer == null || result.Buffer.Length < HeaderSize)
-                    {
-                        _logger.LogWarning("Received malformed RUDP datagram.");
-                        continue;
-                    }
-
-                    if (!TryParsePacket(result.Buffer, out var packetType, out var sequence, out var payload))
-                    {
-                        _logger.LogWarning("Received unsupported RUDP packet.");
-                        continue;
-                    }
-
-                    if (packetType == PacketType.Ack)
-                    {
-                        HandleAck(sequence);
-                        continue;
-                    }
-
-                    await SendAckAsync(client, sequence);
-                    HandleIncomingData(sequence, payload, channel);
-                }
+                Logger.LogWarning("Received unsupported RUDP packet.");
+                return;
             }
-            catch (ObjectDisposedException)
+
+            if (packetType == PacketType.Ack)
             {
-                if (_disposeCts.IsCancellationRequested)
-                    channel.Complete();
+                HandleAck(sequence);
+                return;
             }
-            catch (SocketException ex)
-            {
-                if (_disposeCts.IsCancellationRequested)
-                {
-                    channel.Complete();
-                    return;
-                }
 
-                _logger.LogError($"Error in RUDP receive loop: {ex.Message}");
-                channel.Error(ex);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error in RUDP receive loop: {ex.Message}");
-                channel.Error(ex);
-            }
+            await SendAckAsync(client, sequence);
+            HandleIncomingData(sequence, payload, channel);
         }
 
         private void HandleAck(uint sequence)
@@ -299,7 +144,7 @@ namespace Playserv.Proxy.Implementation
             ackTcs?.TrySetResult(true);
         }
 
-        private void HandleIncomingData(uint sequence, byte[] payload, ByteArrayChannel channel)
+        private void HandleIncomingData(uint sequence, byte[] payload, ObservableByteChannel channel)
         {
             lock (_receiveGate)
             {
@@ -335,7 +180,7 @@ namespace Playserv.Proxy.Implementation
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Failed to send RUDP ACK for seq={sequence}: {ex.Message}");
+                Logger.LogWarning($"Failed to send RUDP ACK for seq={sequence}: {ex.Message}");
             }
         }
 
@@ -377,23 +222,11 @@ namespace Playserv.Proxy.Implementation
             }
         }
 
-        private void MarkDisconnectedAfterSendFailure()
-        {
-            lock (_connectGate)
-            {
-                _connected = false;
-                CloseClientUnsafe();
-            }
-        }
-
         private static async Task<bool> WaitForAckAsync(Task<bool> ackTask, int timeoutMs, CancellationToken ct)
         {
-            var completed = await Task.WhenAny(ackTask, Task.Delay(timeoutMs, ct));
-            if (completed != ackTask)
-            {
-                ct.ThrowIfCancellationRequested();
+            var completed = await AsyncTimeoutHelper.WaitForCompletionOrTimeoutAsync(ackTask, timeoutMs, ct);
+            if (!completed)
                 return false;
-            }
 
             return await ackTask;
         }
@@ -438,167 +271,10 @@ namespace Playserv.Proxy.Implementation
             return payload;
         }
 
-        private void ResetChannel()
-        {
-            lock (_gate)
-            {
-                _observers.Clear();
-                _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
-            }
-        }
-
-        private void CloseClientUnsafe()
-        {
-            try
-            {
-                _client?.Close();
-            }
-            catch
-            {
-                // ignored
-            }
-
-            try
-            {
-                _client?.Dispose();
-            }
-            catch
-            {
-                // ignored
-            }
-
-            _client = null;
-        }
-
         private enum PacketType : byte
         {
             Data = 1,
             Ack = 2
-        }
-
-        private sealed class ByteArrayChannel : IObservable<byte[]>
-        {
-            private readonly List<IObserver<byte[]>> _observers;
-            private readonly object _gate;
-            private readonly SynchronizationContext _syncContext;
-            private bool _completed;
-
-            public ByteArrayChannel(List<IObserver<byte[]>> observers, object gate, SynchronizationContext syncContext)
-            {
-                _observers = observers;
-                _gate = gate;
-                _syncContext = syncContext ?? new SynchronizationContext();
-            }
-
-            public IDisposable Subscribe(IObserver<byte[]> observer)
-            {
-                if (observer == null)
-                    throw new ArgumentNullException(nameof(observer));
-
-                lock (_gate)
-                {
-                    if (_completed)
-                    {
-                        observer.OnCompleted();
-                        return new Unsubscriber(_observers, observer, _gate, false);
-                    }
-
-                    _observers.Add(observer);
-                    return new Unsubscriber(_observers, observer, _gate, true);
-                }
-            }
-
-            public void Next(byte[] value)
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    snapshot = _observers.ToArray();
-                }
-
-                foreach (var observer in snapshot)
-                    _syncContext.Post(_ => observer.OnNext(value), null);
-            }
-
-            public void Error(Exception error)
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    _completed = true;
-                    snapshot = _observers.ToArray();
-                    _observers.Clear();
-                }
-
-                foreach (var observer in snapshot)
-                    _syncContext.Post(_ => observer.OnError(error), null);
-            }
-
-            public void Complete()
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    _completed = true;
-                    snapshot = _observers.ToArray();
-                    _observers.Clear();
-                }
-
-                foreach (var observer in snapshot)
-                    _syncContext.Post(_ => observer.OnCompleted(), null);
-            }
-
-            public bool IsCompleted
-            {
-                get
-                {
-                    lock (_gate)
-                    {
-                        return _completed;
-                    }
-                }
-            }
-
-            private sealed class Unsubscriber : IDisposable
-            {
-                private readonly List<IObserver<byte[]>> _observers;
-                private readonly IObserver<byte[]> _observer;
-                private readonly object _gate;
-                private bool _active;
-
-                public Unsubscriber(List<IObserver<byte[]>> observers, IObserver<byte[]> observer, object gate, bool active)
-                {
-                    _observers = observers;
-                    _observer = observer;
-                    _gate = gate;
-                    _active = active;
-                }
-
-                public void Dispose()
-                {
-                    if (!_active)
-                        return;
-
-                    _active = false;
-
-                    lock (_gate)
-                    {
-                        _observers.Remove(_observer);
-                    }
-                }
-            }
         }
     }
 #endif

@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 
@@ -16,7 +17,7 @@ namespace Playserv.Proxy.Implementation
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private readonly object _gate = new object();
         private readonly List<IObserver<byte[]>> _observers = new List<IObserver<byte[]>>();
-        private ByteArrayChannel _channel;
+        private ObservableByteChannel _channel;
         private readonly SynchronizationContext _syncContext;
         private readonly ILogger _logger;
         private readonly object _connectGate = new object();
@@ -31,7 +32,7 @@ namespace Playserv.Proxy.Implementation
             _uri = new Uri(uri);
             _logger = logger ?? new ConsoleLogger();
             _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
-            _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
+            _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
         }
 
         public async Task<bool> Connect()
@@ -185,7 +186,7 @@ namespace Playserv.Proxy.Implementation
         {
             var buffer = new byte[4096];
             using var ms = new MemoryStream();
-            ByteArrayChannel channel;
+            ObservableByteChannel channel;
 
             lock (_gate)
             {
@@ -255,7 +256,7 @@ namespace Playserv.Proxy.Implementation
             lock (_gate)
             {
                 _observers.Clear();
-                _channel = new ByteArrayChannel(_observers, _gate, _syncContext);
+                _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
             }
         }
 
@@ -271,137 +272,6 @@ namespace Playserv.Proxy.Implementation
             _socket.Dispose();
             _connectCTS?.Dispose();
             _cts.Dispose();
-        }
-
-        private sealed class ByteArrayChannel : IObservable<byte[]>
-        {
-            private readonly List<IObserver<byte[]>> _observers;
-            private readonly object _gate;
-            private readonly SynchronizationContext _syncContext;
-            private bool _completed;
-
-            public ByteArrayChannel(List<IObserver<byte[]>> observers, object gate, SynchronizationContext syncContext)
-            {
-                _observers = observers;
-                _gate = gate;
-                _syncContext = syncContext ?? new SynchronizationContext();
-            }
-
-            public IDisposable Subscribe(IObserver<byte[]> observer)
-            {
-                if (observer == null)
-                    throw new ArgumentNullException(nameof(observer));
-
-                lock (_gate)
-                {
-                    if (_completed)
-                    {
-                        observer.OnCompleted();
-                        return new Unsubscriber(_observers, observer, _gate, active: false);
-                    }
-
-                    _observers.Add(observer);
-                    return new Unsubscriber(_observers, observer, _gate, active: true);
-                }
-            }
-
-            public void Next(byte[] value)
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    snapshot = _observers.ToArray();
-                }
-
-                foreach (var o in snapshot)
-                {
-                    _syncContext.Post(_ => o.OnNext(value), null);
-                }
-            }
-
-            public void Error(Exception error)
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    _completed = true;
-                    snapshot = _observers.ToArray();
-                    _observers.Clear();
-                }
-
-                foreach (var o in snapshot)
-                {
-                    _syncContext.Post(_ => o.OnError(error), null);
-                }
-            }
-
-            public void Complete()
-            {
-                IObserver<byte[]>[] snapshot;
-
-                lock (_gate)
-                {
-                    if (_completed)
-                        return;
-
-                    _completed = true;
-                    snapshot = _observers.ToArray();
-                    _observers.Clear();
-                }
-
-                foreach (var o in snapshot)
-                {
-                    _syncContext.Post(_ => o.OnCompleted(), null);
-                }
-            }
-
-            public bool IsCompleted
-            {
-                get
-                {
-                    lock (_gate)
-                    {
-                        return _completed;
-                    }
-                }
-            }
-
-            private sealed class Unsubscriber : IDisposable
-            {
-                private readonly List<IObserver<byte[]>> _observers;
-                private readonly IObserver<byte[]> _observer;
-                private readonly object _gate;
-                private bool _active;
-
-                public Unsubscriber(List<IObserver<byte[]>> observers, IObserver<byte[]> observer, object gate, bool active)
-                {
-                    _observers = observers;
-                    _observer = observer;
-                    _gate = gate;
-                    _active = active;
-                }
-
-                public void Dispose()
-                {
-                    if (!_active)
-                        return;
-
-                    _active = false;
-
-                    lock (_gate)
-                    {
-                        _observers.Remove(_observer);
-                    }
-                }
-            }
         }
     }
 }

@@ -164,22 +164,6 @@ namespace Playserv.Samples
             GUILayout.Label($"SDK: {PlayServ.State} | Status: {_status}");
             GUILayout.Label($"Bound Player: {_boundPlayerId ?? "-"} | Backend: {_activeBackend} | Group Joined: {_isGroupJoined}");
             GUILayout.Label("Examples: connect | bind player-001 polling | subevent | publishglobal hello | rpc named hi | spawn TestCube");
-            GUILayout.Label("WebGL note: if browser Enter is swallowed, use Run or Connect SDK buttons.");
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Connect SDK", GUILayout.Height(28f)))
-            {
-                _ = ConnectAsync();
-            }
-            if (GUILayout.Button("Disconnect SDK", GUILayout.Height(28f)))
-            {
-                Disconnect();
-            }
-            if (GUILayout.Button("State", GUILayout.Height(28f)))
-            {
-                AddLog($"SDK state = {PlayServ.State}");
-            }
-            GUILayout.EndHorizontal();
 
             if (_focusInputNextFrame)
             {
