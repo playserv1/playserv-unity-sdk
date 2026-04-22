@@ -5,9 +5,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
+using Playserv.Http.Common;
+using Playserv.Proxy.Common;
+using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.WebRtc;
 using Playserv.RPC;
 using Playserv.Server;
-using Playserv.Proxy.Common;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -20,12 +23,15 @@ namespace Playserv.Wrapper
         private const string ConfigResourceName = "PlayServConfig";
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
 #endif
+        private const string WebRtcScheme = "webrtc";
         private PlayServImplementation _instance;
         private PlayServSettings _settings;
         private string _instanceEndpoint;
+        private string _instanceTransportKey;
         private ICommandHandler _commandHandler;
         private IEventHandler _eventHandler;
         private IRpcInvoker _rpcInvoker;
+        private Func<PlayServSettings, IWebRtcSignalingClient> _webRtcSignalingClientFactory;
         private readonly object _connectGate = new();
         private Task<bool> _connectTask;
         private int _shutdownIgnoreWarningLogged;
@@ -85,6 +91,14 @@ namespace Playserv.Wrapper
                 _connectTask = ConnectInternalAsync();
                 return _connectTask;
             }
+        }
+
+        public void SetWebRtcSignalingClientFactory(Func<PlayServSettings, IWebRtcSignalingClient> signalingClientFactory)
+        {
+            _webRtcSignalingClientFactory = signalingClientFactory;
+
+            if (_instance != null && _settings != null && HasWebRtcScheme(_settings.Endpoint))
+                Disconnect();
         }
 
         private async Task<bool> ConnectInternalAsync()
@@ -236,7 +250,7 @@ namespace Playserv.Wrapper
             InvokeMapped(serviceName, methodCall.Method.Name, payload);
         }
 
-        public void Invoke<TService>(Expression<Action<TService>> method, object? payload)
+        public void Invoke<TService>(Expression<Action<TService>> method, object payload)
         {
             if (method == null)
                 throw new ArgumentNullException(nameof(method));
@@ -320,6 +334,7 @@ namespace Playserv.Wrapper
                 _instance.Dispose();
                 _instance = null;
                 _instanceEndpoint = null;
+                _instanceTransportKey = null;
             }
         }
 
@@ -545,7 +560,7 @@ namespace Playserv.Wrapper
         private void ApplySettings(PlayServSettings settings)
         {
             EnsureConfigured(settings);
-            EnsureInstanceForEndpoint(settings.Endpoint);
+            EnsureInstanceForSettings(settings);
 
             Instance.SetConfig(
                 settings.GameAccessToken,
@@ -591,24 +606,37 @@ namespace Playserv.Wrapper
 #endif
         }
 
-        private void EnsureInstanceForEndpoint(string endpoint)
+        private void EnsureInstanceForSettings(PlayServSettings settings)
         {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            var endpoint = settings.Endpoint;
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
 
+            var transportKey = BuildTransportKey(settings);
             if (_instance == null)
             {
-                _instance = new PlayServImplementation(endpoint);
+                var transportFactory = CreateTransportImplementationFactory(settings);
+                _instance = transportFactory == null
+                    ? new PlayServImplementation(endpoint)
+                    : new PlayServImplementation(endpoint, transportFactory);
                 _instanceEndpoint = endpoint;
+                _instanceTransportKey = transportKey;
                 return;
             }
 
-            if (string.Equals(_instanceEndpoint, endpoint, StringComparison.Ordinal))
+            if (string.Equals(_instanceTransportKey, transportKey, StringComparison.Ordinal))
                 return;
 
             _instance.Dispose();
-            _instance = new PlayServImplementation(endpoint);
+            var replacementTransportFactory = CreateTransportImplementationFactory(settings);
+            _instance = replacementTransportFactory == null
+                ? new PlayServImplementation(endpoint)
+                : new PlayServImplementation(endpoint, replacementTransportFactory);
             _instanceEndpoint = endpoint;
+            _instanceTransportKey = transportKey;
         }
 
         private PlayServSettings GetOrCreateSettings()
@@ -649,6 +677,44 @@ namespace Playserv.Wrapper
             return PlayServSettingsResolver.TryLoadSettingsFromResourcesOrPackageDefaults(out settings);
         }
 
+        private Func<string, ITransportImplementation> CreateTransportImplementationFactory(PlayServSettings settings)
+        {
+            if (!HasWebRtcScheme(settings?.Endpoint))
+                return null;
+
+            var transportSettings = settings.Clone();
+            return endpoint => TransportImplementationResolver.Create(
+                new TransportModuleContext(
+                    endpoint,
+                    logger: null,
+                    settings: transportSettings,
+                    webRtcSignalingClientFactory: _webRtcSignalingClientFactory));
+        }
+
+        private string BuildTransportKey(PlayServSettings settings)
+        {
+            var endpoint = settings?.Endpoint?.Trim() ?? string.Empty;
+            if (!HasWebRtcScheme(endpoint))
+                return endpoint;
+
+            var signalingAddress = settings.WebRtcSignalingServerAddress?.Trim() ?? string.Empty;
+            var channelLabel = settings.WebRtcDataChannelLabel?.Trim() ?? string.Empty;
+            var iceServers = settings.WebRtcIceServers == null
+                ? string.Empty
+                : string.Join(";", settings.WebRtcIceServers);
+            var hasFactory = _webRtcSignalingClientFactory != null ? "factory:on" : "factory:off";
+
+            return $"{endpoint}|{signalingAddress}|{channelLabel}|{iceServers}|{hasFactory}";
+        }
+
+        private static bool HasWebRtcScheme(string endpoint)
+        {
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+                return false;
+
+            return string.Equals(uri.Scheme, WebRtcScheme, StringComparison.OrdinalIgnoreCase);
+        }
+
 #if UNITY_5_3_OR_NEWER
         private static async Task<string> GetLatestVersionOrFallbackAsync(
             PlayServSettings settings,
@@ -662,7 +728,8 @@ namespace Playserv.Wrapper
 
             try
             {
-                var latestVersion = await new PlayServRuntimeApiClient(settings).GetLatestVersionAsync(gameId, ct);
+                var httpClient = PlayServRuntimeHttpClientResolver.Create(new PlayServHttpModuleContext(settings));
+                var latestVersion = await httpClient.GetLatestVersionAsync(gameId, ct);
                 LogTrace($"[PlayServ] Latest game version resolved from deployment API: {latestVersion}");
                 return latestVersion;
             }
@@ -687,17 +754,22 @@ namespace Playserv.Wrapper
             config.SetGameVersion(gameVersion);
         }
 
+        #endif
+
         [System.Diagnostics.Conditional("PlayServ_Logs")]
         private static void LogTrace(string message)
         {
+#if UNITY_5_3_OR_NEWER
             Debug.Log(message);
+#endif
         }
 
         [System.Diagnostics.Conditional("PlayServ_Logs")]
         private static void LogTraceWarning(string message)
         {
+#if UNITY_5_3_OR_NEWER
             Debug.LogWarning(message);
-        }
 #endif
+        }
     }
 }

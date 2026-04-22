@@ -3,12 +3,14 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using Playserv.Http.Interfaces;
+using Playserv.Wrapper;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace Playserv.Wrapper
+namespace Playserv.Http.Modules.Unity
 {
-    internal sealed class PlayServRuntimeApiClient
+    internal sealed class UnityWebRequestRuntimeHttpClient : IPlayServRuntimeHttpClient
     {
         private const string ApiPath = "/api";
         private const string DeploymentEndpointPath = "/deployments";
@@ -16,7 +18,7 @@ namespace Playserv.Wrapper
 
         private readonly PlayServSettings _settings;
 
-        public PlayServRuntimeApiClient(PlayServSettings settings)
+        public UnityWebRequestRuntimeHttpClient(PlayServSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }

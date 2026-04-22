@@ -1,3 +1,5 @@
+using System;
+
 namespace Playserv.Wrapper
 {
     /// <summary>
@@ -14,6 +16,16 @@ namespace Playserv.Wrapper
         /// Default deployment API server address.
         /// </summary>
         public const string DefaultDeployApiServerAddress = "";
+
+        /// <summary>
+        /// Default WebRTC signaling server address.
+        /// </summary>
+        public const string DefaultWebRtcSignalingServerAddress = "";
+
+        /// <summary>
+        /// Default WebRTC data channel label.
+        /// </summary>
+        public const string DefaultWebRtcDataChannelLabel = "playserv";
 
         /// <summary>
         /// Default schema API server address.
@@ -66,9 +78,26 @@ namespace Playserv.Wrapper
         public int NetworkTransformSyncIntervalMs { get; set; } = 100;
 
         /// <summary>
-        /// Backend transport endpoint. Supports websocket endpoints and desktop UDP endpoints via <c>udp://host:port</c>.
+        /// Backend transport endpoint. Supports websocket endpoints, desktop UDP endpoints via <c>udp://host:port</c>,
+        /// desktop reliable UDP endpoints via <c>rudp://host:port</c>, and WebRTC routing via <c>webrtc://...</c>
+        /// when signaling client factory is configured.
         /// </summary>
         public string BackendServerAddress { get; set; } = DefaultBackendServerAddress;
+
+        /// <summary>
+        /// Optional signaling server address used by WebRTC DataChannel transport.
+        /// </summary>
+        public string WebRtcSignalingServerAddress { get; set; } = DefaultWebRtcSignalingServerAddress;
+
+        /// <summary>
+        /// WebRTC data channel label to negotiate with backend peer.
+        /// </summary>
+        public string WebRtcDataChannelLabel { get; set; } = DefaultWebRtcDataChannelLabel;
+
+        /// <summary>
+        /// Optional STUN/TURN server list used by WebRTC peer connection.
+        /// </summary>
+        public string[] WebRtcIceServers { get; set; } = Array.Empty<string>();
 
         /// <summary>
         /// Deployment API server address used by editor deployment tools.
@@ -122,6 +151,9 @@ namespace Playserv.Wrapper
                 KeepAlivePongTimeoutMs = KeepAlivePongTimeoutMs,
                 NetworkTransformSyncIntervalMs = NetworkTransformSyncIntervalMs,
                 BackendServerAddress = BackendServerAddress,
+                WebRtcSignalingServerAddress = WebRtcSignalingServerAddress,
+                WebRtcDataChannelLabel = WebRtcDataChannelLabel,
+                WebRtcIceServers = WebRtcIceServers == null ? Array.Empty<string>() : (string[])WebRtcIceServers.Clone(),
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
                 DeployAuthToken = DeployAuthToken,

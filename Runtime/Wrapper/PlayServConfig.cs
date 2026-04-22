@@ -1,4 +1,5 @@
 #if UNITY_5_3_OR_NEWER
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -29,6 +30,10 @@ namespace Playserv.Wrapper
         [SerializeField] private int networkTransformSyncIntervalMs = 100;
         [FormerlySerializedAs("remoteEndpoint")]
         [SerializeField] private string backendServerAddress = DEFAULT_BACKEND_SERVER_ADDRESS;
+        [Header("WebRTC")]
+        [SerializeField] private string webRtcSignalingServerAddress = PlayServSettings.DefaultWebRtcSignalingServerAddress;
+        [SerializeField] private string webRtcDataChannelLabel = PlayServSettings.DefaultWebRtcDataChannelLabel;
+        [SerializeField] private string[] webRtcIceServers = Array.Empty<string>();
         
         [FormerlySerializedAs("deployApiEndpoint")]
         [Header("Deploy")]
@@ -88,8 +93,26 @@ namespace Playserv.Wrapper
 
         /// <summary>
         /// Backend transport endpoint.
+        /// Supports websocket endpoints, desktop UDP endpoints via <c>udp://host:port</c>,
+        /// desktop reliable UDP endpoints via <c>rudp://host:port</c>, and WebRTC routing via <c>webrtc://...</c>
+        /// when signaling client factory is configured.
         /// </summary>
         public string BackendServerAddress => backendServerAddress;
+
+        /// <summary>
+        /// Optional signaling server address used by WebRTC DataChannel transport.
+        /// </summary>
+        public string WebRtcSignalingServerAddress => webRtcSignalingServerAddress;
+
+        /// <summary>
+        /// WebRTC data channel label to negotiate with backend peer.
+        /// </summary>
+        public string WebRtcDataChannelLabel => webRtcDataChannelLabel;
+
+        /// <summary>
+        /// Optional STUN/TURN server list used by WebRTC peer connection.
+        /// </summary>
+        public string[] WebRtcIceServers => webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone();
 
         /// <summary>
         /// Backward-compatible alias for <see cref="BackendServerAddress"/>.
@@ -130,6 +153,9 @@ namespace Playserv.Wrapper
                 KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs,
                 NetworkTransformSyncIntervalMs = networkTransformSyncIntervalMs,
                 BackendServerAddress = backendServerAddress,
+                WebRtcSignalingServerAddress = webRtcSignalingServerAddress,
+                WebRtcDataChannelLabel = webRtcDataChannelLabel,
+                WebRtcIceServers = webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone(),
                 DeployApiServerAddress = deployApiServerAddress,
                 SchemaApiServerAddress = schemaApiServerAddress,
                 DeployAuthToken = deployAuthToken,
@@ -156,6 +182,9 @@ namespace Playserv.Wrapper
             changed |= AssignIfDifferent(ref keepAlivePongTimeoutMs, settings.KeepAlivePongTimeoutMs);
             changed |= AssignIfDifferent(ref networkTransformSyncIntervalMs, settings.NetworkTransformSyncIntervalMs);
             changed |= AssignIfDifferent(ref backendServerAddress, settings.BackendServerAddress);
+            changed |= AssignIfDifferent(ref webRtcSignalingServerAddress, settings.WebRtcSignalingServerAddress);
+            changed |= AssignIfDifferent(ref webRtcDataChannelLabel, settings.WebRtcDataChannelLabel);
+            changed |= AssignArrayIfDifferent(ref webRtcIceServers, settings.WebRtcIceServers);
             changed |= AssignIfDifferent(ref deployApiServerAddress, settings.DeployApiServerAddress);
             changed |= AssignIfDifferent(ref schemaApiServerAddress, settings.SchemaApiServerAddress);
             changed |= AssignIfDifferent(ref deployAuthToken, settings.DeployAuthToken);
@@ -223,6 +252,31 @@ namespace Playserv.Wrapper
                 return false;
 
             field = value;
+            return true;
+        }
+
+        private static bool AssignArrayIfDifferent(ref string[] field, string[] value)
+        {
+            var normalizedField = field ?? Array.Empty<string>();
+            var normalizedValue = value ?? Array.Empty<string>();
+
+            if (normalizedField.Length == normalizedValue.Length)
+            {
+                var isEqual = true;
+                for (var i = 0; i < normalizedField.Length; i++)
+                {
+                    if (!string.Equals(normalizedField[i], normalizedValue[i], StringComparison.Ordinal))
+                    {
+                        isEqual = false;
+                        break;
+                    }
+                }
+
+                if (isEqual)
+                    return false;
+            }
+
+            field = normalizedValue.Length == 0 ? Array.Empty<string>() : (string[])normalizedValue.Clone();
             return true;
         }
     }
