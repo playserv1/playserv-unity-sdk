@@ -14,6 +14,8 @@ namespace Playserv.Proxy.Common
 {
     public sealed partial class PlayServImplementation : IDisposable
     {
+        private const string UdpScheme = "udp";
+
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly PlayServEventsAdapter _eventsAdapter;
@@ -66,9 +68,9 @@ namespace Playserv.Proxy.Common
             if (transportImplementationFactory == null)
             {
 #if UNITY_WEBGL && !UNITY_EDITOR
-                transportImplementationFactory = ep => new WebGLWebSocketTransportImplementation(ep, logger);
+                transportImplementationFactory = ep => CreateDefaultWebGlTransportImplementation(ep, logger);
 #else
-                transportImplementationFactory = ep => new WebSocketTransportImplementation(ep, logger);
+                transportImplementationFactory = ep => CreateDefaultTransportImplementation(ep, logger);
 #endif
             }
 
@@ -204,7 +206,7 @@ namespace Playserv.Proxy.Common
             }
 
             State = PlayServState.Handshaking;
-            _logger.Log("WebSocket connected. Performing handshake...");
+            _logger.Log("Transport connected. Performing handshake...");
 
             var handshakeResult = await _handshakeService.PerformHandshakeAsync(_gameAccessToken, _gameId, _userId, _gameVersion, _sdkVersion);
             if (!handshakeResult.Success)
@@ -336,6 +338,35 @@ namespace Playserv.Proxy.Common
             where TDto : class, new()
         {
             return _dataSubscriptionAdapter.SelectEntity(playerId, map, mode);
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        private static ITransportImplementation CreateDefaultWebGlTransportImplementation(string endpoint, ILogger logger)
+        {
+            if (HasUdpScheme(endpoint))
+            {
+                throw new PlatformNotSupportedException(
+                    "UDP transport is not supported in Unity WebGL. Use ws:// or wss:// endpoint.");
+            }
+
+            return new WebGLWebSocketTransportImplementation(endpoint, logger);
+        }
+#else
+        private static ITransportImplementation CreateDefaultTransportImplementation(string endpoint, ILogger logger)
+        {
+            if (HasUdpScheme(endpoint))
+                return new UdpTransportImplementation(endpoint, logger);
+
+            return new WebSocketTransportImplementation(endpoint, logger);
+        }
+#endif
+
+        private static bool HasUdpScheme(string endpoint)
+        {
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+                return false;
+
+            return string.Equals(uri.Scheme, UdpScheme, StringComparison.OrdinalIgnoreCase);
         }
 
         public Task<DataGetResponse> GetDataByKeyAsync(
