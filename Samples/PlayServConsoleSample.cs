@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.Proxy.Common;
@@ -262,7 +263,7 @@ namespace Playserv.Samples
         }
         private static List<string> GetCommandSuggestions(string input)
         {
-            var query = (input ?? string.Empty).Trim();
+            var query = NormalizeConsoleInput(input);
             if (string.IsNullOrEmpty(query))
                 return AvailableCommands.ToList();
 
@@ -277,7 +278,7 @@ namespace Playserv.Samples
 
         private string GetCommandUsageHint(string input, IReadOnlyList<string> suggestions)
         {
-            var trimmed = (input ?? string.Empty).Trim();
+            var trimmed = NormalizeConsoleInput(input);
             if (string.IsNullOrEmpty(trimmed))
                 return string.Empty;
 
@@ -297,7 +298,7 @@ namespace Playserv.Samples
 
         private void TryAutocompleteCommand()
         {
-            var trimmedStart = _input ?? string.Empty;
+            var trimmedStart = NormalizeConsoleInput(_input);
             var parts = Tokenize(trimmedStart);
             if (parts.Count > 1)
                 return;
@@ -364,7 +365,7 @@ namespace Playserv.Samples
 
         private void SubmitInput()
         {
-            var line = _input?.Trim();
+            var line = NormalizeConsoleInput(_input);
             if (string.IsNullOrWhiteSpace(line))
             {
                 _focusInputNextFrame = true;
@@ -384,11 +385,12 @@ namespace Playserv.Samples
 
         private async Task ExecuteCommandAsync(string line)
         {
+            line = NormalizeConsoleInput(line);
             var parts = Tokenize(line);
             if (parts.Count == 0)
                 return;
 
-            var cmd = parts[0].ToLowerInvariant();
+            var cmd = NormalizeConsoleToken(parts[0]).ToLowerInvariant();
 
             try
             {
@@ -514,7 +516,7 @@ namespace Playserv.Samples
                         break;
 
                     default:
-                        AddLog($"Unknown command: {cmd}. Type 'help'.");
+                        AddLog($"Unknown command: '{cmd}'. Type 'help'. Raw length={cmd.Length}");
                         break;
                 }
             }
@@ -857,6 +859,39 @@ namespace Playserv.Samples
             }
         }
 
+        private static string NormalizeConsoleInput(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return string.Empty;
+
+            var normalized = input.Normalize(NormalizationForm.FormKC);
+            var builder = new StringBuilder(normalized.Length);
+
+            foreach (var ch in normalized)
+            {
+                if (ch == '\r' || ch == '\n' || ch == '\t')
+                {
+                    builder.Append(' ');
+                    continue;
+                }
+
+                if (ch == '\u200B' || ch == '\u200C' || ch == '\u200D' || ch == '\uFEFF' || ch == '\u2060')
+                    continue;
+
+                if (char.IsControl(ch))
+                    continue;
+
+                builder.Append(ch);
+            }
+
+            return builder.ToString().Trim();
+        }
+
+        private static string NormalizeConsoleToken(string token)
+        {
+            return NormalizeConsoleInput(token);
+        }
+
         private void AddLog(string line)
         {
             if (string.IsNullOrWhiteSpace(line))
@@ -871,6 +906,7 @@ namespace Playserv.Samples
         private static List<string> Tokenize(string input)
         {
             var result = new List<string>();
+            input = NormalizeConsoleInput(input);
             if (string.IsNullOrWhiteSpace(input))
                 return result;
 
