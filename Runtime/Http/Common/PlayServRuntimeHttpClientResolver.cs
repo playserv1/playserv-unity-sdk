@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using Playserv.Http.Interfaces;
 
 namespace Playserv.Http.Common
@@ -36,42 +34,9 @@ namespace Playserv.Http.Common
                 if (_factories != null)
                     return _factories;
 
-                _factories = DiscoverFactories();
+                _factories = PlayServHttpModuleRegistry.GetFactories();
                 return _factories;
             }
-        }
-
-        private static IPlayServHttpModuleFactory[] DiscoverFactories()
-        {
-            var result = new List<IPlayServHttpModuleFactory>();
-            var assembly = typeof(PlayServRuntimeHttpClientResolver).Assembly;
-            Type[] types;
-
-            try
-            {
-                types = assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types ?? Array.Empty<Type>();
-            }
-
-            foreach (var type in types)
-            {
-                if (type == null || type.IsAbstract || type.IsInterface)
-                    continue;
-
-                if (!typeof(IPlayServHttpModuleFactory).IsAssignableFrom(type))
-                    continue;
-
-                if (type.GetConstructor(Type.EmptyTypes) == null)
-                    continue;
-
-                if (Activator.CreateInstance(type) is IPlayServHttpModuleFactory factory)
-                    result.Add(factory);
-            }
-
-            return result.ToArray();
         }
     }
 }
