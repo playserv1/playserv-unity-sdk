@@ -1,7 +1,5 @@
 using System;
-using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
-using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Common
@@ -20,7 +18,6 @@ namespace Playserv.Proxy.Common
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("Transport endpoint cannot be null or empty.", nameof(context));
 
-            var logger = context.Logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
             var scheme = GetEndpointScheme(endpoint);
             if (string.IsNullOrWhiteSpace(scheme))
                 throw new InvalidOperationException($"Transport endpoint '{endpoint}' is not a valid absolute URI.");
@@ -29,18 +26,9 @@ namespace Playserv.Proxy.Common
             if (moduleFactory != null)
                 return moduleFactory.Create(context);
 
-            if (IsWebSocketCompatibleScheme(scheme))
-            {
-#if UNITY_WEBGL && !UNITY_EDITOR
-                return new WebGLWebSocketTransportImplementation(endpoint, logger);
-#else
-                return new WebSocketTransportImplementation(endpoint, logger);
-#endif
-            }
-
             throw new NotSupportedException(
                 $"No transport module is registered for scheme '{scheme}'. " +
-                "Restore the corresponding transport module folder or use ws:// / wss:// endpoint.");
+                "Restore the corresponding transport module folder.");
         }
 
         public static bool HasModuleForEndpoint(string endpoint)
@@ -76,14 +64,6 @@ namespace Playserv.Proxy.Common
                 _factories = TransportModuleRegistry.GetFactories();
                 return _factories;
             }
-        }
-
-        private static bool IsWebSocketCompatibleScheme(string scheme)
-        {
-            return string.Equals(scheme, "ws", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(scheme, "wss", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(scheme, "http", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(scheme, "https", StringComparison.OrdinalIgnoreCase);
         }
 
         internal static string GetEndpointScheme(string endpoint)

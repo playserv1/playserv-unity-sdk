@@ -10,6 +10,7 @@ namespace Playserv.Proxy.Common
         internal static ITransportModuleFactory[] GetFactories()
         {
             var factories = new List<ITransportModuleFactory>();
+            RegisterWebSocket(factories);
             RegisterUdp(factories);
             RegisterRudp(factories);
             RegisterWebRtc(factories);
@@ -19,6 +20,7 @@ namespace Playserv.Proxy.Common
                 .ToArray();
         }
 
+        static partial void RegisterWebSocket(List<ITransportModuleFactory> factories);
         static partial void RegisterUdp(List<ITransportModuleFactory> factories);
         static partial void RegisterRudp(List<ITransportModuleFactory> factories);
         static partial void RegisterWebRtc(List<ITransportModuleFactory> factories);
