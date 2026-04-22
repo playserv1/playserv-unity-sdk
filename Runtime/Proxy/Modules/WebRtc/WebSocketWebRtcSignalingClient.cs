@@ -58,7 +58,7 @@ namespace Playserv.Proxy.WebRtc
         public WebSocketWebRtcSignalingClient(PlayServRuntimeSettings settings, ILogger logger = null)
         {
             _settings = settings?.Clone() ?? throw new ArgumentNullException(nameof(settings));
-            _logger = logger ?? new ConsoleLogger();
+            _logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
 
             if (string.IsNullOrWhiteSpace(_settings.WebRtcSignalingServerAddress))
             {

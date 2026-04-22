@@ -2,12 +2,15 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Playserv.Proxy.Logging;
+using ISdkLogger = Playserv.Proxy.Logging.ILogger;
 using UnityEngine;
 
 namespace Playserv.Spawn
 {
     internal sealed class SpawnManager : IDisposable
     {
+        private static readonly ISdkLogger Logger = PlayServLog.ForCategory(PlayServLogCategory.Spawn);
         private readonly Dictionary<string, GameObject> _spawnedObjects = new();
         private readonly Dictionary<string, TaskCompletionSource<GameObject>> _pendingSpawns = new();
         private Action<SpawnEvent> _publishAction;
@@ -25,13 +28,13 @@ namespace Playserv.Spawn
             var prefab = Resources.Load<GameObject>(assetName);
             if (prefab == null)
             {
-                Debug.LogError($"[SpawnManager] Prefab not found in Resources: {assetName}");
+                Logger.LogError($"Prefab not found in Resources: {assetName}");
                 return Task.FromResult<GameObject>(null);
             }
 
             if (prefab.GetComponent<NetworkObject>() == null)
             {
-                Debug.LogError($"[SpawnManager] Prefab '{assetName}' must have NetworkObject component");
+                Logger.LogError($"Prefab '{assetName}' must have NetworkObject component");
                 return Task.FromResult<GameObject>(null);
             }
 
@@ -52,7 +55,7 @@ namespace Playserv.Spawn
             var prefab = Resources.Load<GameObject>(spawnEvent.AssetName);
             if (prefab == null)
             {
-                Debug.LogError($"[SpawnManager] Prefab not found in Resources: {spawnEvent.AssetName}");
+                Logger.LogError($"Prefab not found in Resources: {spawnEvent.AssetName}");
                 CompletePendingSpawn(spawnEvent.SpawnId, null);
                 return;
             }
@@ -62,7 +65,7 @@ namespace Playserv.Spawn
             var networkObject = instance.GetComponent<NetworkObject>();
             if (networkObject == null)
             {
-                Debug.LogError($"[SpawnManager] Prefab '{spawnEvent.AssetName}' missing NetworkObject component");
+                Logger.LogError($"Prefab '{spawnEvent.AssetName}' missing NetworkObject component");
                 UnityEngine.Object.Destroy(instance);
                 CompletePendingSpawn(spawnEvent.SpawnId, null);
                 return;

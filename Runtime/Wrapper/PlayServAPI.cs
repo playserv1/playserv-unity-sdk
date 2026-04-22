@@ -8,6 +8,7 @@ using Playserv.DataSubscription.Responses;
 using Playserv.Http.Common;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.Logging;
 using Playserv.RPC;
 using Playserv.Runtime.Abstractions;
 using Playserv.Server;
@@ -55,7 +56,7 @@ namespace Playserv.Wrapper
                 subscribeToInstanceEvents: SubscribeToInstanceEvents,
                 resolveLatestVersion: GetLatestVersionOrFallbackAsync,
                 syncLoadedConfigGameVersion: SyncLoadedConfigGameVersion,
-                logTrace: ForwardLogTrace,
+                logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
                 versionRefreshTimeoutSeconds: ConnectVersionRefreshTimeoutSeconds);
             _connectionOrchestrator = new PlayServApiConnectionOrchestrator(
                 getState: () => State,
@@ -65,7 +66,7 @@ namespace Playserv.Wrapper
                 getCurrentInstance: () => _instance,
                 disconnect: Disconnect,
                 resetShutdownState: ResetShutdownState,
-                logTrace: ForwardLogTrace,
+                logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
                 shouldIgnoreMissingInstance: ShouldIgnoreMissingInstance,
                 logShutdownIgnoreWarning: LogShutdownIgnoreWarning);
             _rpcFacade = new PlayServApiRpcFacade(
@@ -285,7 +286,9 @@ namespace Playserv.Wrapper
                 return;
 
 #if UNITY_5_3_OR_NEWER
-            Debug.LogWarning($"[PlayServ] Ignoring {operationName} because Unity is shutting down or exiting play mode.");
+            PlayServLog.Warning(
+                PlayServLogCategory.General,
+                $"Ignoring {operationName} because Unity is shutting down or exiting play mode.");
 #endif
         }
 
@@ -390,13 +393,14 @@ namespace Playserv.Wrapper
                 var httpClient = PlayServRuntimeHttpClientResolver.Create(
                     new PlayServHttpModuleContext(settings.ToRuntimeSettings()));
                 var latestVersion = await httpClient.GetLatestVersionAsync(gameId, ct);
-                LogTrace($"[PlayServ] Latest game version resolved from deployment API: {latestVersion}");
+                PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version resolved from deployment API: {latestVersion}");
                 return latestVersion;
             }
             catch (Exception ex) when (!string.IsNullOrWhiteSpace(fallbackVersion))
             {
-                LogTraceWarning(
-                    $"[PlayServ] Failed to fetch latest game version for gameId={gameId}. " +
+                PlayServLog.TraceWarning(
+                    PlayServLogCategory.Http,
+                    $"Failed to fetch latest game version for gameId={gameId}. " +
                     $"Falling back to configured GameVersion={fallbackVersion}. Error: {ex.Message}");
                 return fallbackVersion;
             }
@@ -438,24 +442,6 @@ namespace Playserv.Wrapper
             return _connectionOrchestrator.TryGetInstanceForFireAndForget(operationName, out var instance)
                 ? instance
                 : null;
-        }
-
-        private static void ForwardLogTrace(string message) => LogTrace(message);
-
-        [System.Diagnostics.Conditional("PlayServ_Logs")]
-        private static void LogTrace(string message)
-        {
-#if UNITY_5_3_OR_NEWER
-            Debug.Log(message);
-#endif
-        }
-
-        [System.Diagnostics.Conditional("PlayServ_Logs")]
-        private static void LogTraceWarning(string message)
-        {
-#if UNITY_5_3_OR_NEWER
-            Debug.LogWarning(message);
-#endif
         }
     }
 }
