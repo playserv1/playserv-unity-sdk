@@ -9,7 +9,7 @@ namespace Playserv.Events
         private readonly Dictionary<string, string> _eventTypeToSubscriptionId = new Dictionary<string, string>();
         private readonly Dictionary<string, string> _subscriptionIdToEventType = new Dictionary<string, string>();
         private readonly HashSet<string> _pendingEventTypes = new HashSet<string>();
-        private readonly Dictionary<Type, List<object>> _typeObservers = new Dictionary<Type, List<object>>();
+        private readonly Dictionary<Type, List<IObserverRegistration>> _typeObservers = new Dictionary<Type, List<IObserverRegistration>>();
         private readonly object _lock = new object();
 
         public void AddSubscription(string eventType, string subscriptionId)
@@ -134,10 +134,11 @@ namespace Playserv.Events
                 var type = typeof(T);
                 if (!_typeObservers.TryGetValue(type, out var observers))
                 {
-                    observers = new List<object>();
+                    observers = new List<IObserverRegistration>();
                     _typeObservers[type] = observers;
                 }
-                observers.Add(observer);
+
+                observers.Add(new ObserverRegistration<T>(observer));
             }
         }
 
@@ -148,7 +149,7 @@ namespace Playserv.Events
                 var type = typeof(T);
                 if (_typeObservers.TryGetValue(type, out var observers))
                 {
-                    observers.Remove(observer);
+                    observers.RemoveAll(x => x.Matches(observer));
                     if (observers.Count == 0)
                     {
                         _typeObservers.Remove(type);
@@ -167,18 +168,53 @@ namespace Playserv.Events
 
         public void NotifyEvent<T>(T eventData)
         {
-            List<IObserver<T>> observers;
+            NotifyEvent(typeof(T), eventData);
+        }
+
+        public void NotifyEvent(Type eventType, object eventData)
+        {
+            if (eventType == null)
+                throw new ArgumentNullException(nameof(eventType));
+
+            List<IObserverRegistration> observers;
             lock (_lock)
             {
-                if (!_typeObservers.TryGetValue(typeof(T), out var observerList))
+                if (!_typeObservers.TryGetValue(eventType, out var observerList))
                     return;
 
-                observers = observerList.Cast<IObserver<T>>().ToList();
+                observers = observerList.ToList();
             }
 
             foreach (var observer in observers)
             {
                 observer.OnNext(eventData);
+            }
+        }
+
+        private interface IObserverRegistration
+        {
+            bool Matches(object observer);
+
+            void OnNext(object eventData);
+        }
+
+        private sealed class ObserverRegistration<T> : IObserverRegistration
+        {
+            private readonly IObserver<T> _observer;
+
+            public ObserverRegistration(IObserver<T> observer)
+            {
+                _observer = observer ?? throw new ArgumentNullException(nameof(observer));
+            }
+
+            public bool Matches(object observer)
+            {
+                return ReferenceEquals(_observer, observer);
+            }
+
+            public void OnNext(object eventData)
+            {
+                _observer.OnNext((T)eventData);
             }
         }
     }

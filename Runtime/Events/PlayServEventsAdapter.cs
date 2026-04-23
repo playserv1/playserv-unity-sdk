@@ -216,17 +216,7 @@ namespace Playserv.Events
                     return;
                 }
 
-                var notifyMethod = typeof(EventSubscriptionManager)
-                    .GetMethod(nameof(EventSubscriptionManager.NotifyEvent));
-
-                if (notifyMethod == null)
-                {
-                    _logger.LogError("NotifyEvent method not found on EventSubscriptionManager.");
-                    return;
-                }
-
-                var genericNotify = notifyMethod.MakeGenericMethod(eventType);
-                genericNotify.Invoke(_subscriptionManager, new object[] { eventInstance });
+                _subscriptionManager.NotifyEvent(eventType, eventInstance);
             }
             catch (JsonCodecException ex)
             {
