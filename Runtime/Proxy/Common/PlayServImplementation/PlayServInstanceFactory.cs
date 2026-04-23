@@ -44,13 +44,14 @@ namespace Playserv.Proxy.Common
 
             if (transportImplementationFactory == null)
                 transportImplementationFactory = CreateDefaultTransportImplementationFactory(logger);
+            var jsonCodec = new NewtonsoftJsonCodec();
 
             var implementation = transportImplementationFactory(endpoint);
             if (implementation == null)
                 throw new InvalidOperationException("Transport implementation factory returned null.");
 
             var transport = new Transport(implementation, serializer, requestIdGenerator, logger);
-            var eventsAdapter = new PlayServEventsAdapter(transport, PlayServLog.ForCategory(PlayServLogCategory.Events));
+            var eventsAdapter = new PlayServEventsAdapter(transport, jsonCodec, PlayServLog.ForCategory(PlayServLogCategory.Events));
             var dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(owner, PlayServLog.ForCategory(PlayServLogCategory.Data));
             var transportSession = new PlayServTransportSession(
                 transport,

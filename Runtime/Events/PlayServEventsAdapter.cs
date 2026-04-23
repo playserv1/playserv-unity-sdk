@@ -2,18 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
 using Playserv.Proxy;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Serialization;
 
 namespace Playserv.Events
 {
     internal sealed class PlayServEventsAdapter : IEventsAdapter
     {
         private readonly ITransport _transport;
+        private readonly IJsonCodec _jsonCodec;
         private readonly ILogger _logger;
         private readonly EventSubscriptionManager _subscriptionManager;
         private readonly EventTypeRegistry _eventTypeRegistry = new EventTypeRegistry();
@@ -21,27 +22,12 @@ namespace Playserv.Events
         private readonly object _infrastructureEventLock = new object();
         private readonly SemaphoreSlim _groupCommandGate = new SemaphoreSlim(1, 1);
         private static readonly TimeSpan GroupCommandTimeout = TimeSpan.FromSeconds(10);
+        private static readonly JsonCodecOptions EventJsonOptions = CreateEventJsonOptions();
 
-        private static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
-        {
-            // Tweak if needed
-            NullValueHandling = NullValueHandling.Include,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            DateParseHandling = DateParseHandling.DateTime,
-            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
-        };
-
-        static PlayServEventsAdapter()
-        {
-#if UNITY_5_3_OR_NEWER
-            JsonSettings.Converters.Add(new Vector3JsonConverter());
-            JsonSettings.Converters.Add(new QuaternionJsonConverter());
-#endif
-        }
-
-        public PlayServEventsAdapter(ITransport transport, ILogger logger)
+        public PlayServEventsAdapter(ITransport transport, IJsonCodec jsonCodec, ILogger logger)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _subscriptionManager = new EventSubscriptionManager();
 
@@ -70,7 +56,7 @@ namespace Playserv.Events
                 throw new ArgumentNullException(nameof(@event));
 
             _eventTypeRegistry.Register(@event.GetType());
-            var payload = JsonConvert.SerializeObject(@event, JsonSettings);
+            var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
             var eventType = @event.GetType().Name;
 
             var message = new EventMessage(eventType, payload);
@@ -86,7 +72,7 @@ namespace Playserv.Events
                 throw new ArgumentNullException(nameof(@event));
 
             _eventTypeRegistry.Register(@event.GetType());
-            var payload = JsonConvert.SerializeObject(@event, JsonSettings);
+            var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
             var eventType = @event.GetType().Name;
 
             var message = new GroupEventMessage(groupName, eventType, payload);
@@ -102,7 +88,7 @@ namespace Playserv.Events
                 throw new ArgumentNullException(nameof(@event));
 
             _eventTypeRegistry.Register(@event.GetType());
-            var payload = JsonConvert.SerializeObject(@event, JsonSettings);
+            var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
             var eventType = @event.GetType().Name;
 
             var message = new UserEventMessage(userId, eventType, payload);
@@ -220,7 +206,7 @@ namespace Playserv.Events
 
             try
             {
-                var eventInstance = JsonConvert.DeserializeObject(message.Payload, eventType, JsonSettings);
+                var eventInstance = _jsonCodec.Deserialize(message.Payload, eventType, EventJsonOptions);
                 if (eventInstance == null)
                 {
                     _logger.LogError($"Failed to deserialize event payload for type: {eventType.Name}");
@@ -239,7 +225,7 @@ namespace Playserv.Events
                 var genericNotify = notifyMethod.MakeGenericMethod(eventType);
                 genericNotify.Invoke(_subscriptionManager, new object[] { eventInstance });
             }
-            catch (JsonException ex)
+            catch (JsonCodecException ex)
             {
                 _logger.LogError($"JSON deserialize error for EventMessage type={eventType.Name}: {ex.Message}");
             }
@@ -254,6 +240,22 @@ namespace Playserv.Events
             return _eventTypeRegistry.TryResolve(typeName, out var eventType)
                 ? eventType
                 : null;
+        }
+
+        private static JsonCodecOptions CreateEventJsonOptions()
+        {
+            var converters = new List<object>();
+#if UNITY_5_3_OR_NEWER
+            converters.Add(new Vector3JsonConverter());
+            converters.Add(new QuaternionJsonConverter());
+#endif
+            return new JsonCodecOptions
+            {
+                IncludeNullValues = true,
+                IgnoreMissingMembers = true,
+                ParseDates = true,
+                CustomConverters = converters
+            };
         }
 
         private static bool IsInfrastructureEventType(string eventTypeName)

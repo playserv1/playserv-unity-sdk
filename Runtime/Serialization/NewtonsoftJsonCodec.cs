@@ -300,12 +300,23 @@ namespace Playserv.Serialization
             if (options == null)
                 options = new JsonCodecOptions();
 
-            return new JsonSerializerSettings
+            var settings = new JsonSerializerSettings
             {
                 DateParseHandling = options.ParseDates ? DateParseHandling.DateTime : DateParseHandling.None,
                 NullValueHandling = options.IncludeNullValues ? NullValueHandling.Include : NullValueHandling.Ignore,
                 MissingMemberHandling = options.IgnoreMissingMembers ? MissingMemberHandling.Ignore : MissingMemberHandling.Error
             };
+
+            if (options.CustomConverters != null)
+            {
+                foreach (var converter in options.CustomConverters)
+                {
+                    if (converter is JsonConverter jsonConverter)
+                        settings.Converters.Add(jsonConverter);
+                }
+            }
+
+            return settings;
         }
 
         private static object ConvertTokenToPlain(JToken token)
