@@ -1,7 +1,7 @@
 using System;
-using Newtonsoft.Json.Linq;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
+using Playserv.Serialization;
 
 namespace Playserv.DataSubscription
 {
@@ -71,29 +71,28 @@ namespace Playserv.DataSubscription
                    message.IndexOf("Timed out waiting for DataSubscriptionResponse", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        public static JToken ExtractSubscriptionPayload(JToken data, string rootFieldName)
+        public static object ExtractSubscriptionPayload(object data, string rootFieldName, IJsonCodec jsonCodec)
         {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
             if (data == null)
                 return null;
 
-            if (data is not JObject obj)
+            object firstPropertyValue;
+            if (!jsonCodec.TryGetFirstPropertyValue(data, out firstPropertyValue))
                 return data;
 
             if (!string.IsNullOrWhiteSpace(rootFieldName))
             {
-                if (obj.TryGetValue(rootFieldName, StringComparison.Ordinal, out var exact))
+                if (jsonCodec.TryGetProperty(data, rootFieldName, ignoreCase: false, out var exact))
                     return exact;
 
-                if (obj.TryGetValue(rootFieldName, StringComparison.OrdinalIgnoreCase, out var insensitive))
+                if (jsonCodec.TryGetProperty(data, rootFieldName, ignoreCase: true, out var insensitive))
                     return insensitive;
             }
 
-            foreach (var property in obj.Properties())
-            {
-                return property.Value;
-            }
-
-            return data;
+            return firstPropertyValue;
         }
     }
 }

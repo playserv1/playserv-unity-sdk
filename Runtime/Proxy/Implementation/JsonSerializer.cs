@@ -1,17 +1,30 @@
 using System;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Playserv.DataSubscription.Responses;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
 using Playserv.RPC;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.Implementation
 {
     public sealed class JsonSerializer : IMessageSerializer
     {
+        private readonly IJsonCodec _jsonCodec;
+        private readonly ICommandPayloadMapper _commandPayloadMapper;
+
+        public JsonSerializer()
+            : this(new NewtonsoftJsonCodec(), new NewtonsoftCommandPayloadMapper())
+        {
+        }
+
+        public JsonSerializer(IJsonCodec jsonCodec, ICommandPayloadMapper commandPayloadMapper)
+        {
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
+            _commandPayloadMapper = commandPayloadMapper ?? throw new ArgumentNullException(nameof(commandPayloadMapper));
+        }
+
         public MessageEnvelope Serialize<T>(T command, string moduleName = null)
         {
             if (command == null)
@@ -20,11 +33,8 @@ namespace Playserv.Proxy.Implementation
             if (command is EventMessage eventMessage &&
                 string.Equals(eventMessage.EventType, "KeepAlive", StringComparison.OrdinalIgnoreCase))
             {
-                // KeepAlive must satisfy both server handlers:
-                // - transport keepalive handler expects "Event"
-                // - events module expects "EventType"
-                var keepAlivePayload = BuildKeepAlivePayload(eventMessage);
-                return new MessageEnvelope("EventMessage", keepAlivePayload.ToString(Formatting.None));
+                var keepAlivePayload = _commandPayloadMapper.BuildKeepAlivePayloadJson(eventMessage.EventType, eventMessage.Payload);
+                return new MessageEnvelope("EventMessage", keepAlivePayload);
             }
 
             var commandType = command.GetType();
@@ -45,7 +55,7 @@ namespace Playserv.Proxy.Implementation
                 }
             }
 
-            var payloadJson = JsonConvert.SerializeObject(command);
+            var payloadJson = _jsonCodec.Serialize(command);
 
             return new MessageEnvelope(typeName, payloadJson);
         }
@@ -71,15 +81,15 @@ namespace Playserv.Proxy.Implementation
             if (type == null)
                 throw new InvalidOperationException($"Unknown command type: {envelope.Command}");
 
-            var normalizedPayload = NormalizePayloadForType(envelope.Payload, type);
+            var normalizedPayload = _commandPayloadMapper.NormalizePayloadForType(envelope.Payload, type);
             object cmd;
             try
             {
-                cmd = JsonConvert.DeserializeObject(normalizedPayload, type);
+                cmd = _jsonCodec.Deserialize(normalizedPayload, type);
             }
-            catch (JsonException)
+            catch (JsonCodecException)
             {
-                if (TryDeserializeAsCommandError(envelope.Payload, out var fallback))
+                if (_commandPayloadMapper.TryDeserializeAsCommandError(envelope.Payload, out var fallback))
                     return fallback;
 
                 throw;
@@ -211,175 +221,6 @@ namespace Playserv.Proxy.Implementation
 
             type = null;
             return false;
-        }
-
-        /// <summary>
-        /// Normalizes incoming payload for backward/forward compatible deserialization.
-        /// </summary>
-        /// <remarks>
-        /// Handles two known transport variants:
-        /// 1) "Event" field instead of "EventType"
-        /// 2) Object/array payload token for commands where "Payload" member is string
-        /// </remarks>
-        private static string NormalizePayloadForType(string payloadJson, Type type)
-        {
-            if (string.IsNullOrWhiteSpace(payloadJson))
-                return payloadJson;
-
-            JObject payloadObject;
-            try
-            {
-                payloadObject = JObject.Parse(payloadJson);
-            }
-            catch (JsonException)
-            {
-                // Not an object payload (or not JSON) - use as-is.
-                return payloadJson;
-            }
-
-            if (!payloadObject.ContainsKey("EventType") &&
-                payloadObject.TryGetValue("Event", StringComparison.OrdinalIgnoreCase, out var eventToken) &&
-                HasStringMember(type, "EventType"))
-            {
-                payloadObject["EventType"] = eventToken.Type == JTokenType.String
-                    ? eventToken
-                    : eventToken.ToString(Formatting.None);
-            }
-
-            if (payloadObject.TryGetValue("Payload", StringComparison.OrdinalIgnoreCase, out var commandPayload) &&
-                commandPayload.Type != JTokenType.String &&
-                commandPayload.Type != JTokenType.Null &&
-                HasStringMember(type, "Payload"))
-            {
-                payloadObject["Payload"] = commandPayload.ToString(Formatting.None);
-            }
-
-            if (payloadObject.TryGetValue("error", StringComparison.OrdinalIgnoreCase, out var errorPayload) &&
-                errorPayload.Type != JTokenType.String &&
-                errorPayload.Type != JTokenType.Null &&
-                HasStringMember(type, "error"))
-            {
-                payloadObject["error"] = errorPayload.Type == JTokenType.Object &&
-                                         errorPayload["message"]?.Type == JTokenType.String
-                    ? errorPayload["message"]!.ToString()
-                    : errorPayload.ToString(Formatting.None);
-            }
-
-            if (HasStringMember(type, "error") &&
-                (!payloadObject.TryGetValue("error", StringComparison.OrdinalIgnoreCase, out var existingError) ||
-                 existingError.Type == JTokenType.Null ||
-                 (existingError.Type == JTokenType.String && string.IsNullOrWhiteSpace(existingError.ToString()))) &&
-                payloadObject.TryGetValue("Code", StringComparison.OrdinalIgnoreCase, out var codePayload) &&
-                codePayload.Type != JTokenType.Null)
-            {
-                payloadObject["error"] = codePayload.Type == JTokenType.String
-                    ? codePayload.ToString()
-                    : codePayload.ToString(Formatting.None);
-            }
-
-            if (HasStringMember(type, "timestamp") &&
-                (!payloadObject.TryGetValue("timestamp", StringComparison.OrdinalIgnoreCase, out var existingTimestamp) ||
-                 existingTimestamp.Type == JTokenType.Null ||
-                 (existingTimestamp.Type == JTokenType.String && string.IsNullOrWhiteSpace(existingTimestamp.ToString()))) &&
-                payloadObject.TryGetValue("TimestampUtc", StringComparison.OrdinalIgnoreCase, out var timestampPayload) &&
-                timestampPayload.Type != JTokenType.Null)
-            {
-                payloadObject["timestamp"] = timestampPayload.Type == JTokenType.String
-                    ? timestampPayload.ToString()
-                    : timestampPayload.ToString(Formatting.None);
-            }
-
-            return payloadObject.ToString(Formatting.None);
-        }
-
-        private static bool TryDeserializeAsCommandError(string payloadJson, out CommandErrorResponse response)
-        {
-            response = null;
-
-            if (string.IsNullOrWhiteSpace(payloadJson))
-                return false;
-
-            JObject payloadObject;
-            try
-            {
-                payloadObject = JObject.Parse(payloadJson);
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-
-            if (!payloadObject.TryGetValue("error", StringComparison.OrdinalIgnoreCase, out var errorToken) &&
-                !payloadObject.TryGetValue("message", StringComparison.OrdinalIgnoreCase, out _))
-            {
-                return false;
-            }
-
-            var error = string.Empty;
-            if (errorToken != null && errorToken.Type != JTokenType.Null)
-            {
-                if (errorToken.Type == JTokenType.String)
-                {
-                    error = errorToken.ToString();
-                }
-                else if (errorToken.Type == JTokenType.Object &&
-                         errorToken["message"]?.Type == JTokenType.String)
-                {
-                    error = errorToken["message"]!.ToString();
-                }
-                else
-                {
-                    error = errorToken.ToString(Formatting.None);
-                }
-            }
-
-            response = new CommandErrorResponse
-            {
-                error = error,
-                message = payloadObject["message"]?.ToString() ?? string.Empty,
-                timestamp = payloadObject["timestamp"]?.ToString() ?? string.Empty
-            };
-            return true;
-        }
-
-        private static bool HasStringMember(Type type, string memberName)
-        {
-            var field = type.GetField(memberName);
-            if (field != null && field.FieldType == typeof(string))
-                return true;
-
-            var property = type.GetProperty(memberName);
-            return property != null && property.PropertyType == typeof(string);
-        }
-
-        private static JObject BuildKeepAlivePayload(EventMessage eventMessage)
-        {
-            var payloadToken = ParsePayloadToken(eventMessage.Payload) ?? new JObject();
-            var eventType = string.IsNullOrWhiteSpace(eventMessage.EventType)
-                ? "KeepAlive"
-                : eventMessage.EventType;
-
-            return new JObject
-            {
-                ["EventType"] = eventType,
-                ["Event"] = "KeepAlive",
-                ["Payload"] = payloadToken
-            };
-        }
-
-        private static JToken ParsePayloadToken(string payloadJson)
-        {
-            if (string.IsNullOrWhiteSpace(payloadJson))
-                return new JObject();
-
-            try
-            {
-                return JToken.Parse(payloadJson);
-            }
-            catch (JsonException)
-            {
-                return new JObject();
-            }
         }
 
         private string ToPascalCase(string input)

@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.JsonPatch;
 using Playserv.Proxy.Logging;
+using Playserv.Serialization;
 
 namespace Playserv.DataSubscription
 {
@@ -18,6 +18,7 @@ namespace Playserv.DataSubscription
         private readonly IDisposable _subscription;
         private readonly string _query;
         private readonly Dictionary<string, object> _variables;
+        private readonly IJsonCodec _jsonCodec;
         private readonly ILogger _logger = PlayServLog.ForCategory(PlayServLogCategory.Data);
         private bool _isDisposed;
 
@@ -44,6 +45,7 @@ namespace Playserv.DataSubscription
             _query = query ?? throw new ArgumentNullException(nameof(query));
             _variables = variables ?? throw new ArgumentNullException(nameof(variables));
             _mapFunc = mapFunc;
+            _jsonCodec = _adapter.GetJsonCodec();
 
             _subscription = _adapter.OnSubscriptionUpdate(_subscriptionId, OnServerUpdate);
         }
@@ -70,6 +72,7 @@ namespace Playserv.DataSubscription
             _query = query ?? throw new ArgumentNullException(nameof(query));
             _variables = variables ?? throw new ArgumentNullException(nameof(variables));
             _mapFunc = mapFunc;
+            _jsonCodec = _adapter.GetJsonCodec();
 
             _subscription = _adapter.RegisterPollingSubscription(
                 _subscriptionId,
@@ -181,10 +184,9 @@ namespace Playserv.DataSubscription
                 return _mapFunc(raw);
 
             if (_selector != null)
-                return SharedDataMapper.Map<T>(_selector, raw);
+                return SharedDataMapper.Map<T>(_selector, raw, _jsonCodec);
 
-            var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
-            var mapped = JsonConvert.DeserializeObject<T>(json);
+            var mapped = _jsonCodec.Convert<T>(raw);
             return mapped ?? new T();
         }
 

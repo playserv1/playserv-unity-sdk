@@ -7,6 +7,7 @@ using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
 using Playserv.Events.Responses;
 using Playserv.Proxy.Common;
+using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription
@@ -16,15 +17,18 @@ namespace Playserv.DataSubscription
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
         private readonly DataSubscriptionRequestIdSource _requestIds;
+        private readonly IJsonCodec _jsonCodec;
 
         public TransportSubscriptionClient(
             PlayServImplementation transport,
             ILogger logger,
-            DataSubscriptionRequestIdSource requestIds)
+            DataSubscriptionRequestIdSource requestIds,
+            IJsonCodec jsonCodec)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _requestIds = requestIds ?? throw new ArgumentNullException(nameof(requestIds));
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
         }
 
         public async Task<long?> TryOpenTransportSubscriptionAsync(
@@ -89,7 +93,7 @@ namespace Playserv.DataSubscription
 
             byCommandSubscription = _transport.OnCommand("DataSubscriptionResponse", command =>
             {
-                if (!DataSubscriptionRequestSupport.TryMapDataSubscriptionResponse(command, out var response))
+                if (!DataSubscriptionRequestSupport.TryMapDataSubscriptionResponse(_jsonCodec, command, out var response))
                     return;
 
                 if (response.RequestId == request.RequestId)
@@ -98,7 +102,7 @@ namespace Playserv.DataSubscription
 
             byModuleCommandSubscription = _transport.OnCommand("module_dataflow.DataSubscriptionResponse", command =>
             {
-                if (!DataSubscriptionRequestSupport.TryMapDataSubscriptionResponse(command, out var response))
+                if (!DataSubscriptionRequestSupport.TryMapDataSubscriptionResponse(_jsonCodec, command, out var response))
                     return;
 
                 if (response.RequestId == request.RequestId)

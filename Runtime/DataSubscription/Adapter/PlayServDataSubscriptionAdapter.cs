@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
+using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription
@@ -21,22 +21,29 @@ namespace Playserv.DataSubscription
 
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
+        private readonly IJsonCodec _jsonCodec;
         private readonly DataSubscriptionRegistry _registry;
         private readonly TransportSubscriptionClient _transportSubscriptionClient;
         private readonly DataMutationClient _dataMutationClient;
         private readonly DataGetClient _dataGetClient;
         private readonly DataSubscriptionPollingCoordinator _pollingCoordinator;
 
-        public PlayServDataSubscriptionAdapter(PlayServImplementation proxy, ILogger logger)
+        public PlayServDataSubscriptionAdapter(PlayServImplementation proxy, ILogger logger, IJsonCodec jsonCodec = null)
         {
             _transport = proxy ?? throw new ArgumentNullException(nameof(proxy));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _registry = new DataSubscriptionRegistry(logger);
+            _jsonCodec = jsonCodec ?? new NewtonsoftJsonCodec();
+            _registry = new DataSubscriptionRegistry(logger, _jsonCodec);
             var requestIds = new DataSubscriptionRequestIdSource();
-            _transportSubscriptionClient = new TransportSubscriptionClient(proxy, logger, requestIds);
+            _transportSubscriptionClient = new TransportSubscriptionClient(proxy, logger, requestIds, _jsonCodec);
             _dataMutationClient = new DataMutationClient(proxy, requestIds);
-            _dataGetClient = new DataGetClient(proxy, logger, requestIds);
+            _dataGetClient = new DataGetClient(proxy, logger, requestIds, _jsonCodec);
             _pollingCoordinator = new DataSubscriptionPollingCoordinator(proxy, _dataGetClient, logger);
+        }
+
+        internal IJsonCodec GetJsonCodec()
+        {
+            return _jsonCodec;
         }
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
@@ -188,8 +195,7 @@ namespace Playserv.DataSubscription
                             if (raw == null)
                                 return new TDto();
 
-                            var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
-                            var entity = JsonConvert.DeserializeObject<TEntity>(json);
+                            var entity = _jsonCodec.Convert<TEntity>(raw);
                             return entity == null ? new TDto() : map(entity);
                         });
                 }
@@ -216,8 +222,7 @@ namespace Playserv.DataSubscription
                     if (raw == null)
                         return new TDto();
 
-                    var json = raw is string str ? str : JsonConvert.SerializeObject(raw);
-                    var entity = JsonConvert.DeserializeObject<TEntity>(json);
+                    var entity = _jsonCodec.Convert<TEntity>(raw);
                     return entity == null ? new TDto() : map(entity);
                 });
         }
