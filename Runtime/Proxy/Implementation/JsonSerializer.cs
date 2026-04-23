@@ -22,6 +22,8 @@ namespace Playserv.Proxy.Implementation
             _commandPayloadMapper = commandPayloadMapper ?? throw new ArgumentNullException(nameof(commandPayloadMapper));
         }
 
+        internal IJsonCodec JsonCodec => _jsonCodec;
+
         public MessageEnvelope Serialize<T>(T command, string moduleName = null)
         {
             if (command == null)

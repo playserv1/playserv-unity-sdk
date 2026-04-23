@@ -18,6 +18,14 @@ namespace Playserv.Wrapper
 #if UNITY_EDITOR
         private const string ClientBridgeTypeName = "Playserv.ClientEditor.PlayServProjectSettingsBridge";
         private const string TryResolveSettingsMethodName = "TryResolveSettings";
+        private static readonly string[] ClientBridgeTypeCandidates =
+        {
+            ClientBridgeTypeName + ", Playserv.ClientEditor",
+            ClientBridgeTypeName + ", Assembly-CSharp-Editor",
+            ClientBridgeTypeName + ", Assembly-CSharp",
+            ClientBridgeTypeName
+        };
+        private static readonly Lazy<Type> ClientBridgeType = new Lazy<Type>(ResolveClientBridgeType);
 
         public static PlayServSettings ResolveEditorSettings(PlayServConfig config)
         {
@@ -71,9 +79,14 @@ namespace Playserv.Wrapper
 
         private static Type FindClientBridgeType()
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            return ClientBridgeType.Value;
+        }
+
+        private static Type ResolveClientBridgeType()
+        {
+            foreach (var candidate in ClientBridgeTypeCandidates)
             {
-                var type = assembly.GetType(ClientBridgeTypeName, throwOnError: false);
+                var type = Type.GetType(candidate, throwOnError: false);
                 if (type != null)
                     return type;
             }

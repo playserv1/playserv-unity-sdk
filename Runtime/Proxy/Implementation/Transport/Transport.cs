@@ -1,5 +1,6 @@
 using System;
 using Playserv.Proxy.Interfaces;
+using Playserv.Serialization;
 using ISdkLogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.Proxy.Implementation
@@ -28,8 +29,9 @@ namespace Playserv.Proxy.Implementation
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
 
+            var envelopeCodec = new MessageEnvelopeCodec(ResolveEnvelopeJsonCodec(serializer));
             _channelRegistry = new TransportChannelRegistry();
-            _receiver = new TransportReceiver(serializer, logger, _channelRegistry);
+            _receiver = new TransportReceiver(serializer, envelopeCodec, logger, _channelRegistry);
             _connectionLifecycle = new TransportConnectionLifecycle(
                 implementation,
                 logger,
@@ -39,6 +41,7 @@ namespace Playserv.Proxy.Implementation
             _sender = new TransportSender(
                 implementation,
                 serializer,
+                envelopeCodec,
                 logger,
                 () => _isDisposed);
         }
@@ -95,6 +98,14 @@ namespace Playserv.Proxy.Implementation
         private void RaiseConnectionLost()
         {
             ConnectionLost?.Invoke(this, EventArgs.Empty);
+        }
+
+        private static IJsonCodec ResolveEnvelopeJsonCodec(IMessageSerializer serializer)
+        {
+            if (serializer is JsonSerializer jsonSerializer)
+                return jsonSerializer.JsonCodec;
+
+            return new NewtonsoftJsonCodec();
         }
     }
 }
