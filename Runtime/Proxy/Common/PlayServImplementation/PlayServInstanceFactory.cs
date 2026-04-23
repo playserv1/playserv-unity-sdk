@@ -7,6 +7,7 @@ using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.RPC;
 using Playserv.Runtime.Abstractions;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
 {
@@ -71,7 +72,8 @@ namespace Playserv.Proxy.Common
 
         private static Func<string, ITransportImplementation> CreateDefaultTransportImplementationFactory(ILogger logger)
         {
-            return endpoint => TransportImplementationResolver.Create(new TransportModuleContext(endpoint, logger));
+            return endpoint => TransportImplementationResolver.Create(
+                new TransportModuleContext(endpoint, logger, jsonCodec: new NewtonsoftJsonCodec()));
         }
     }
 }

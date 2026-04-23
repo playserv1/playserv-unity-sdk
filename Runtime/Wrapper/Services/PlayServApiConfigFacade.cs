@@ -6,6 +6,7 @@ using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
+using Playserv.Serialization;
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -160,7 +161,8 @@ namespace Playserv.Wrapper
                     endpoint,
                     logger: null,
                     settings: transportSettings,
-                    webRtcSignalingClientFactory: _webRtcSignalingClientFactory));
+                    webRtcSignalingClientFactory: _webRtcSignalingClientFactory,
+                    jsonCodec: new NewtonsoftJsonCodec()));
         }
 
         private string BuildTransportKey(PlayServSettings settings)
