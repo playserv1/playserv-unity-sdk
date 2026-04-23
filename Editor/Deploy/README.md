@@ -11,8 +11,14 @@ This document describes the Unity Editor tooling under `Assets/playserv-unity-sd
 Main files:
 
 - `Editor/PlayServWindow.cs`
+- `Editor/PlayServWindowTheme.cs`
+- `Editor/PlayServClientProjectConfigBridge.cs`
 - `Editor/Deploy/DeploymentApiClient.cs`
 - `Editor/Deploy/DeploymentService.cs`
+- `Editor/Deploy/DeploymentClosureFilter.cs`
+- `Editor/Deploy/DeploymentZipBuilder.cs`
+- `Editor/Deploy/DeploymentUploadAction.cs`
+- `Editor/Deploy/VersionSyncAction.cs`
 - `Editor/Deploy/Analysis/RpcCodeAnalyzer.cs`
 
 ## Deployment Flow
@@ -24,11 +30,11 @@ Main files:
 
 Runtime flow:
 
-1. `BuildDeployFileList(...)` collects `*.cs` files.
+1. `DeploymentClosureFilter.CollectDeployFiles(...)` collects `*.cs` files.
 2. Files are analyzed by `FunctionAnalyzerService` (Roslyn-based analyzer).
 3. Analyzer returns `FilesToCompile` (RPC classes + dependency closure).
-4. Client creates ZIP archive.
-5. ZIP is uploaded with `X-Game-Id` header.
+4. `DeploymentZipBuilder` creates ZIP archive.
+5. `DeploymentUploadAction` uploads ZIP with `X-Game-Id` header.
 
 Upload endpoint behavior:
 
@@ -72,10 +78,10 @@ Goal:
 
 Steps:
 
-1. Reuse analyzer-selected file list (`BuildDeployFileList`).
+1. Reuse analyzer-selected file list from `DeploymentClosureFilter`.
 2. Call `GET /api/schemas/{gameId}/latest`.
-3. Create in-memory ZIP from local analyzed files.
-4. Compute SHA-256 hash of ZIP bytes.
+3. `DeploymentZipBuilder` creates in-memory ZIP from local analyzed files.
+4. `DeploymentZipBuilder` computes SHA-256 hash of ZIP bytes.
 5. Call `GET /api/games/{gameId}/rpc-code/hash`.
 6. Compare local hash with remote hash.
 7. On match:
@@ -84,6 +90,10 @@ Steps:
 8. On mismatch:
   - call `GET /api/games/{gameId}/code-archive`
   - save archive to temp folder (`.../playserv-sync`)
+
+Execution entry:
+
+- `VersionSyncAction.ExecuteAsync(...)`
 
 Important:
 
