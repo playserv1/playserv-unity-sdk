@@ -1,5 +1,4 @@
 using System;
-using Newtonsoft.Json.Linq;
 
 namespace Playserv.DataSubscription.Responses
 {
@@ -39,7 +38,7 @@ namespace Playserv.DataSubscription.Responses
         /// <summary>
         /// Returned data object from server.
         /// </summary>
-        public JToken Data { get; set; }
+        public object Data { get; set; }
     }
 
     /// <summary>

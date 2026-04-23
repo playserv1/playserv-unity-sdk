@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Playserv.DataSubscription.Exceptions;
+using Playserv.Serialization;
 
 namespace Playserv.DataSubscription.JsonPatch
 {
@@ -12,6 +10,8 @@ namespace Playserv.DataSubscription.JsonPatch
     /// </summary>
     public static class JsonPatchApplier
     {
+        private static readonly IJsonCodec JsonCodec = new NewtonsoftJsonCodec();
+
         /// <summary>
         /// Applies parsed patch operations to target object.
         /// </summary>
@@ -21,14 +21,14 @@ namespace Playserv.DataSubscription.JsonPatch
         /// <returns>Patched object instance.</returns>
         public static T ApplyPatch<T>(T target, IEnumerable<PatchOperation> operations) where T : class
         {
-            var json = JObject.FromObject(target);
+            var root = RequireObjectDocument(JsonCodec.ToPlainValue(target));
 
-            foreach (var operation in operations)
+            foreach (var operation in NormalizeOperations(operations))
             {
-                ApplyOperation(json, operation);
+                ApplyOperation(root, operation);
             }
 
-            return json.ToObject<T>();
+            return JsonCodec.Convert<T>(root);
         }
 
         /// <summary>
@@ -47,18 +47,51 @@ namespace Playserv.DataSubscription.JsonPatch
         private static IEnumerable<PatchOperation> ParseOperations(object patchData)
         {
             if (patchData is IEnumerable<PatchOperation> ops)
-                return ops;
+                return NormalizeOperations(ops);
 
-            var json = patchData is string str ? str : JsonConvert.SerializeObject(patchData);
-            return JsonConvert.DeserializeObject<List<PatchOperation>>(json);
+            if (patchData is string json)
+                return NormalizeOperations(JsonCodec.Deserialize<List<PatchOperation>>(json));
+
+            return NormalizeOperations(JsonCodec.Convert<List<PatchOperation>>(patchData));
         }
 
-        private static void ApplyOperation(JObject target, PatchOperation operation)
+        private static IEnumerable<PatchOperation> NormalizeOperations(IEnumerable<PatchOperation> operations)
+        {
+            if (operations == null)
+                return Array.Empty<PatchOperation>();
+
+            var normalized = new List<PatchOperation>();
+            foreach (var operation in operations)
+            {
+                if (operation == null)
+                    continue;
+
+                normalized.Add(new PatchOperation
+                {
+                    Op = operation.Op,
+                    Path = operation.Path,
+                    From = operation.From,
+                    Value = JsonCodec.ToPlainValue(operation.Value)
+                });
+            }
+
+            return normalized;
+        }
+
+        private static IDictionary<string, object> RequireObjectDocument(object value)
+        {
+            if (value is IDictionary<string, object> document)
+                return document;
+
+            throw new UpdateDataCorruptionException("Patch target must be a JSON object.");
+        }
+
+        private static void ApplyOperation(IDictionary<string, object> target, PatchOperation operation)
         {
             var path = NormalizePath(operation.Path);
             var segments = ParsePath(path);
 
-            switch (operation.Op?.ToLowerInvariant())
+            switch (operation.Op == null ? string.Empty : operation.Op.ToLowerInvariant())
             {
                 case "add":
                     ApplyAdd(target, segments, operation.Value);
@@ -99,10 +132,10 @@ namespace Playserv.DataSubscription.JsonPatch
             return path.Split('/');
         }
 
-        private static JToken NavigateToParent(JObject root, string[] segments, out string lastSegment)
+        private static object NavigateToParent(IDictionary<string, object> root, string[] segments, out string lastSegment)
         {
-            lastSegment = segments.LastOrDefault();
-            JToken current = root;
+            lastSegment = segments.Length == 0 ? string.Empty : segments[segments.Length - 1];
+            object current = root;
 
             for (int i = 0; i < segments.Length - 1; i++)
             {
@@ -112,144 +145,175 @@ namespace Playserv.DataSubscription.JsonPatch
             return current;
         }
 
-        private static JToken NavigateSegment(JToken current, string segment)
+        private static object NavigateSegment(object current, string segment)
         {
-            if (current is JObject obj)
+            if (current is IDictionary<string, object> obj)
             {
                 if (!obj.TryGetValue(segment, out var value))
                     throw new UpdateDataCorruptionException($"Path not found: {segment}");
+
                 return value;
             }
 
-            if (current is JArray arr)
+            if (current is IList<object> arr)
             {
-                if (!int.TryParse(segment, out var index) || index < 0 || index >= arr.Count)
-                    throw new UpdateDataCorruptionException($"Invalid array index: {segment}");
+                var index = ParseExistingIndex(segment, arr.Count);
                 return arr[index];
             }
 
             throw new UpdateDataCorruptionException($"Cannot navigate path segment: {segment}");
         }
 
-        private static void ApplyAdd(JObject root, string[] segments, object value)
+        private static void ApplyAdd(IDictionary<string, object> root, string[] segments, object value)
         {
             if (segments.Length == 0)
                 throw new UpdateDataCorruptionException("Cannot add to root");
 
             var parent = NavigateToParent(root, segments, out var lastSegment);
-            var jValue = value is JToken jt ? jt : JToken.FromObject(value ?? JValue.CreateNull());
+            var clonedValue = JsonCodec.Clone(value);
 
-            if (parent is JObject obj)
+            if (parent is IDictionary<string, object> obj)
             {
-                obj[lastSegment] = jValue;
+                obj[lastSegment] = clonedValue;
+                return;
             }
-            else if (parent is JArray arr)
+
+            if (parent is IList<object> arr)
             {
                 if (lastSegment == "-")
                 {
-                    arr.Add(jValue);
+                    arr.Add(clonedValue);
+                    return;
                 }
-                else if (int.TryParse(lastSegment, out var index))
-                {
-                    arr.Insert(index, jValue);
-                }
-                else
-                {
-                    throw new UpdateDataCorruptionException($"Invalid array index: {lastSegment}");
-                }
+
+                arr.Insert(ParseInsertIndex(lastSegment, arr.Count), clonedValue);
+                return;
             }
+
+            throw new UpdateDataCorruptionException($"Cannot add value at path segment: {lastSegment}");
         }
 
-        private static void ApplyRemove(JObject root, string[] segments)
+        private static void ApplyRemove(IDictionary<string, object> root, string[] segments)
         {
             if (segments.Length == 0)
                 throw new UpdateDataCorruptionException("Cannot remove root");
 
             var parent = NavigateToParent(root, segments, out var lastSegment);
 
-            if (parent is JObject obj)
+            if (parent is IDictionary<string, object> obj)
             {
-                obj.Remove(lastSegment);
+                if (!obj.Remove(lastSegment))
+                    throw new UpdateDataCorruptionException($"Property not found for remove: {lastSegment}");
+                return;
             }
-            else if (parent is JArray arr && int.TryParse(lastSegment, out var index))
+
+            if (parent is IList<object> arr)
             {
-                arr.RemoveAt(index);
+                arr.RemoveAt(ParseExistingIndex(lastSegment, arr.Count));
+                return;
             }
+
+            throw new UpdateDataCorruptionException($"Cannot remove value at path segment: {lastSegment}");
         }
 
-        private static void ApplyReplace(JObject root, string[] segments, object value)
+        private static void ApplyReplace(IDictionary<string, object> root, string[] segments, object value)
         {
             if (segments.Length == 0)
                 throw new UpdateDataCorruptionException("Cannot replace root");
 
             var parent = NavigateToParent(root, segments, out var lastSegment);
-            var jValue = value is JToken jt ? jt : JToken.FromObject(value ?? JValue.CreateNull());
+            var clonedValue = JsonCodec.Clone(value);
 
-            if (parent is JObject obj)
+            if (parent is IDictionary<string, object> obj)
             {
                 if (!obj.ContainsKey(lastSegment))
                     throw new UpdateDataCorruptionException($"Property not found for replace: {lastSegment}");
-                obj[lastSegment] = jValue;
+
+                obj[lastSegment] = clonedValue;
+                return;
             }
-            else if (parent is JArray arr && int.TryParse(lastSegment, out var index))
+
+            if (parent is IList<object> arr)
             {
-                if (index < 0 || index >= arr.Count)
-                    throw new UpdateDataCorruptionException($"Array index out of bounds: {index}");
-                arr[index] = jValue;
+                var index = ParseExistingIndex(lastSegment, arr.Count);
+                arr[index] = clonedValue;
+                return;
             }
+
+            throw new UpdateDataCorruptionException($"Cannot replace value at path segment: {lastSegment}");
         }
 
-        private static void ApplyMove(JObject root, string[] toSegments, string from)
+        private static void ApplyMove(IDictionary<string, object> root, string[] toSegments, string from)
         {
             var fromSegments = ParsePath(NormalizePath(from));
             var parent = NavigateToParent(root, fromSegments, out var lastSegment);
-
-            JToken value;
-            if (parent is JObject obj)
-            {
-                value = obj[lastSegment];
-                obj.Remove(lastSegment);
-            }
-            else if (parent is JArray arr && int.TryParse(lastSegment, out var index))
-            {
-                value = arr[index];
-                arr.RemoveAt(index);
-            }
-            else
-            {
-                throw new UpdateDataCorruptionException($"Cannot move from path: {from}");
-            }
-
+            var value = ExtractAndRemoveValue(parent, lastSegment);
             ApplyAdd(root, toSegments, value);
         }
 
-        private static void ApplyCopy(JObject root, string[] toSegments, string from)
+        private static void ApplyCopy(IDictionary<string, object> root, string[] toSegments, string from)
         {
             var fromSegments = ParsePath(NormalizePath(from));
-            var current = (JToken)root;
+            object current = root;
 
-            foreach (var segment in fromSegments)
+            for (int i = 0; i < fromSegments.Length; i++)
             {
-                current = NavigateSegment(current, segment);
+                current = NavigateSegment(current, fromSegments[i]);
             }
 
-            ApplyAdd(root, toSegments, current.DeepClone());
+            ApplyAdd(root, toSegments, JsonCodec.Clone(current));
         }
 
-        private static void ApplyTest(JObject root, string[] segments, object expectedValue)
+        private static void ApplyTest(IDictionary<string, object> root, string[] segments, object expectedValue)
         {
-            var current = (JToken)root;
-
-            foreach (var segment in segments)
+            object current = root;
+            for (int i = 0; i < segments.Length; i++)
             {
-                current = NavigateSegment(current, segment);
+                current = NavigateSegment(current, segments[i]);
             }
 
-            var expected = expectedValue is JToken jt ? jt : JToken.FromObject(expectedValue ?? JValue.CreateNull());
-            if (!JToken.DeepEquals(current, expected))
-            {
+            var actualJson = JsonCodec.ToCanonicalJson(current);
+            var expectedJson = JsonCodec.ToCanonicalJson(JsonCodec.ToPlainValue(expectedValue));
+            if (!string.Equals(actualJson, expectedJson, StringComparison.Ordinal))
                 throw new UpdateDataCorruptionException("Test operation failed - value mismatch");
+        }
+
+        private static object ExtractAndRemoveValue(object parent, string lastSegment)
+        {
+            if (parent is IDictionary<string, object> obj)
+            {
+                if (!obj.TryGetValue(lastSegment, out var value))
+                    throw new UpdateDataCorruptionException($"Property not found for move: {lastSegment}");
+
+                obj.Remove(lastSegment);
+                return value;
             }
+
+            if (parent is IList<object> arr)
+            {
+                var index = ParseExistingIndex(lastSegment, arr.Count);
+                var value = arr[index];
+                arr.RemoveAt(index);
+                return value;
+            }
+
+            throw new UpdateDataCorruptionException($"Cannot move from path segment: {lastSegment}");
+        }
+
+        private static int ParseExistingIndex(string segment, int count)
+        {
+            if (!int.TryParse(segment, out var index) || index < 0 || index >= count)
+                throw new UpdateDataCorruptionException($"Invalid array index: {segment}");
+
+            return index;
+        }
+
+        private static int ParseInsertIndex(string segment, int count)
+        {
+            if (!int.TryParse(segment, out var index) || index < 0 || index > count)
+                throw new UpdateDataCorruptionException($"Invalid array index: {segment}");
+
+            return index;
         }
     }
 }

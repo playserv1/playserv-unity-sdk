@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -91,8 +92,11 @@ namespace Playserv.Serialization
             if (value is string text)
                 return text;
 
+            if (value is IDictionary<string, object> || value is IList<object>)
+                return ToPlainValue(value, options);
+
             if (value is JToken token)
-                return token.DeepClone();
+                return ConvertTokenToPlain(token);
 
             var json = Serialize(value, options);
             try
@@ -102,6 +106,64 @@ namespace Playserv.Serialization
             catch (JsonException)
             {
                 return json;
+            }
+        }
+
+        public object ToPlainValue(object value, JsonCodecOptions options = null)
+        {
+            if (value == null)
+                return null;
+
+            if (value is string text)
+            {
+                try
+                {
+                    return ParseToPlainValue(JsonConvert.SerializeObject(text), options);
+                }
+                catch (JsonCodecException)
+                {
+                    return text;
+                }
+            }
+
+            if (value is JToken token)
+                return ConvertTokenToPlain(token);
+
+            if (value is IDictionary<string, object> dictionary)
+                return CloneDictionary(dictionary);
+
+            if (value is IList<object> list)
+                return CloneList(list);
+
+            if (value is IDictionary nonGenericDictionary)
+                return CloneDictionary(ToStringObjectDictionary(nonGenericDictionary));
+
+            if (value is IList nonGenericList && value is not byte[])
+                return CloneList(ToObjectList(nonGenericList));
+
+            try
+            {
+                var json = Serialize(value, options);
+                return ParseToPlainValue(json, options);
+            }
+            catch (JsonCodecException)
+            {
+                return value;
+            }
+        }
+
+        public object ParseToPlainValue(string json, JsonCodecOptions options = null)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            try
+            {
+                return ConvertTokenToPlain(JToken.Parse(json));
+            }
+            catch (JsonException ex)
+            {
+                throw new JsonCodecException("Failed to parse JSON document.", ex);
             }
         }
 
@@ -244,6 +306,122 @@ namespace Playserv.Serialization
                 NullValueHandling = options.IncludeNullValues ? NullValueHandling.Include : NullValueHandling.Ignore,
                 MissingMemberHandling = options.IgnoreMissingMembers ? MissingMemberHandling.Ignore : MissingMemberHandling.Error
             };
+        }
+
+        private static object ConvertTokenToPlain(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+                return null;
+
+            if (token is JObject obj)
+            {
+                var result = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var property in obj.Properties())
+                {
+                    result[property.Name] = ConvertTokenToPlain(property.Value);
+                }
+
+                return result;
+            }
+
+            if (token is JArray array)
+            {
+                var result = new List<object>(array.Count);
+                foreach (var item in array)
+                {
+                    result.Add(ConvertTokenToPlain(item));
+                }
+
+                return result;
+            }
+
+            if (token is JValue value)
+                return value.Value;
+
+            return token.ToString(Formatting.None);
+        }
+
+        private static Dictionary<string, object> CloneDictionary(IDictionary<string, object> dictionary)
+        {
+            var result = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (dictionary == null)
+                return result;
+
+            foreach (var pair in dictionary)
+            {
+                result[pair.Key] = ClonePlainValue(pair.Value);
+            }
+
+            return result;
+        }
+
+        private static List<object> CloneList(IEnumerable<object> values)
+        {
+            var result = new List<object>();
+            if (values == null)
+                return result;
+
+            foreach (var value in values)
+            {
+                result.Add(ClonePlainValue(value));
+            }
+
+            return result;
+        }
+
+        private static object ClonePlainValue(object value)
+        {
+            if (value == null)
+                return null;
+
+            if (value is IDictionary<string, object> dictionary)
+                return CloneDictionary(dictionary);
+
+            if (value is IList<object> list)
+                return CloneList(list);
+
+            if (value is IDictionary nonGenericDictionary)
+                return CloneDictionary(ToStringObjectDictionary(nonGenericDictionary));
+
+            if (value is IList nonGenericList && value is not byte[])
+                return CloneList(ToObjectList(nonGenericList));
+
+            if (value is JToken token)
+                return ConvertTokenToPlain(token);
+
+            return value;
+        }
+
+        private static Dictionary<string, object> ToStringObjectDictionary(IDictionary dictionary)
+        {
+            var result = new Dictionary<string, object>(StringComparer.Ordinal);
+            if (dictionary == null)
+                return result;
+
+            foreach (DictionaryEntry entry in dictionary)
+            {
+                var key = entry.Key?.ToString();
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
+
+                result[key] = entry.Value;
+            }
+
+            return result;
+        }
+
+        private static List<object> ToObjectList(IList list)
+        {
+            var result = new List<object>();
+            if (list == null)
+                return result;
+
+            foreach (var item in list)
+            {
+                result.Add(item);
+            }
+
+            return result;
         }
     }
 }

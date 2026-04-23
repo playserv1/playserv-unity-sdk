@@ -30,6 +30,7 @@ namespace Playserv.DataSubscription
 
             if (command is DataGetResponse dataGetResponse)
             {
+                NormalizeDataGetResponse(jsonCodec, dataGetResponse);
                 response = dataGetResponse;
                 return true;
             }
@@ -40,6 +41,7 @@ namespace Playserv.DataSubscription
                 if (mapped == null)
                     return false;
 
+                NormalizeDataGetResponse(jsonCodec, mapped);
                 response = mapped;
                 return true;
             }
@@ -184,6 +186,17 @@ namespace Playserv.DataSubscription
                 Query = query,
                 Variables = CloneVariables(variables)
             };
+        }
+
+        private static void NormalizeDataGetResponse(IJsonCodec jsonCodec, DataGetResponse response)
+        {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
+            if (response?.Result == null || response.Result.Data == null)
+                return;
+
+            response.Result.Data = jsonCodec.ToPlainValue(response.Result.Data);
         }
     }
 }
