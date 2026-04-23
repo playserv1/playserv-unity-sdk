@@ -11,16 +11,16 @@ namespace Playserv.DataSubscription
     internal sealed class DataSubscriptionPollingCoordinator
     {
         private readonly PlayServImplementation _transport;
-        private readonly DataSubscriptionRequestClient _requestClient;
+        private readonly DataGetClient _dataGetClient;
         private readonly ILogger _logger;
 
         public DataSubscriptionPollingCoordinator(
             PlayServImplementation transport,
-            DataSubscriptionRequestClient requestClient,
+            DataGetClient dataGetClient,
             ILogger logger)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
-            _requestClient = requestClient ?? throw new ArgumentNullException(nameof(requestClient));
+            _dataGetClient = dataGetClient ?? throw new ArgumentNullException(nameof(dataGetClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -75,7 +75,7 @@ namespace Playserv.DataSubscription
 
             try
             {
-                var response = await _requestClient.GetDataByKeyAsync(
+                var response = await _dataGetClient.GetDataByKeyAsync(
                     entry.Key,
                     entry.Query,
                     entry.Variables,
@@ -176,7 +176,7 @@ namespace Playserv.DataSubscription
 #if PlayServ_Logs
                         SafeLog($"[DataGet] -> poll request send. key={key}, timeout={requestTimeoutMs}ms");
 #endif
-                        var response = await _requestClient.GetDataByKeyAsync(
+                        var response = await _dataGetClient.GetDataByKeyAsync(
                             key,
                             query,
                             variables,
