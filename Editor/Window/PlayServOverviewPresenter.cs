@@ -1,0 +1,75 @@
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEngine;
+
+namespace Playserv.Editor
+{
+    internal sealed class PlayServOverviewPresenter
+    {
+        public void DrawHeader(PlayServWindowContext context)
+        {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.HeroCardStyle))
+            {
+                GUILayout.Label("PlayServ editor controls", PlayServWindowTheme.HeroTitleStyle);
+                GUILayout.Space(6f);
+                GUILayout.Label("Configure runtime, sync models, deploy code, and generate APIs from one place.", PlayServWindowTheme.HeroAccentStyle);
+            }
+
+            GUILayout.Space(14f);
+
+            using (new EditorGUILayout.VerticalScope())
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    PlayServWindowChrome.DrawOverviewCard(
+                        "Game ID",
+                        string.IsNullOrWhiteSpace(context.Config != null ? context.Config.GameId : null) ? "Not configured" : context.Config.GameId,
+                        "Runtime identity");
+                    GUILayout.Space(10f);
+                    PlayServWindowChrome.DrawOverviewCard(
+                        "Backend",
+                        string.IsNullOrWhiteSpace(context.Config != null ? context.Config.BackendServerAddress : null) ? "Not set" : context.Config.BackendServerAddress,
+                        "Primary transport");
+                }
+
+                GUILayout.Space(10f);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    PlayServWindowChrome.DrawOverviewCard("Schema", EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "—"), "Current model hash");
+                    GUILayout.Space(10f);
+                    PlayServWindowChrome.DrawOverviewCard(
+                        "Deploy",
+                        context.State.DeployRunning ? "Deploying…" : context.State.VersionSyncRunning ? "Syncing…" : "Ready",
+                        "Release control");
+                }
+            }
+        }
+
+        public void DrawFooter(PlayServWindowContext context)
+        {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.FooterCardStyle))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    bool showOnStartup = EditorPrefs.GetBool(Const.PrefKeyShowOnStartup, true);
+                    bool newShowOnStartup = EditorGUILayout.ToggleLeft("Show this window on Unity startup", showOnStartup);
+
+                    if (newShowOnStartup != showOnStartup)
+                        EditorPrefs.SetBool(Const.PrefKeyShowOnStartup, newShowOnStartup);
+
+                    GUILayout.FlexibleSpace();
+
+                    if (PlayServWindowChrome.DrawActionButton("Ping Config", PlayServWindowButtonTone.Secondary, GUILayout.Width(116f), GUILayout.Height(30f)))
+                        context.FocusConfigAsset();
+
+                    GUILayout.Space(8f);
+
+                    if (PlayServWindowChrome.DrawActionButton("Open Docs", PlayServWindowButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(30f)))
+                        Application.OpenURL(context.DocsUrl);
+                }
+            }
+        }
+    }
+}
+#endif
