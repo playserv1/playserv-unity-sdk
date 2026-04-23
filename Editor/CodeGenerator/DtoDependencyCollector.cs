@@ -5,45 +5,63 @@ using System.Linq;
 
 namespace Playserv.CodeGenerator.Editor
 {
+    internal sealed class DependencyCollectionResult
+    {
+        public HashSet<string> Dependencies { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public List<string> Diagnostics { get; } = new List<string>();
+    }
+
     internal static class DtoDependencyCollector
     {
-        public static HashSet<string> CollectDependencies(IEnumerable<SharedTextFinder.Binding> bindings, TypeIndex typeIndex)
+        public static DependencyCollectionResult CollectDependencies(IEnumerable<SharedTextFinder.Binding> bindings, TypeIndex typeIndex)
         {
-            var dependencies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new DependencyCollectionResult();
             if (bindings == null)
-                return dependencies;
+                return result;
 
             foreach (var binding in bindings)
             {
                 if (binding == null)
                     continue;
 
+                var bindingSource = BuildBindingSource(binding);
                 var rootTypeNameRaw = TypeNameUtil.ExtractTypeofName(binding.RootTypeExpr);
-                var rootTypeNameQualified = string.IsNullOrWhiteSpace(rootTypeNameRaw)
-                    ? string.Empty
-                    : TypeNameUtil.QualifyTypeIfNeeded(rootTypeNameRaw, typeIndex);
-                var rootTypeLookup = StripGlobalPrefix(rootTypeNameQualified);
-                var rootType = string.IsNullOrWhiteSpace(rootTypeLookup) ? null : typeIndex.Find(rootTypeLookup);
+                var rootTypeLookup = NormalizeTypeName(rootTypeNameRaw) ?? StripGlobalPrefix(rootTypeNameRaw);
+                var rootType = ResolveRootType(typeIndex, rootTypeLookup, result, bindingSource);
 
-                RegisterTypeDependency(rootTypeLookup, typeIndex, dependencies);
+                RegisterTypeDependency(rootTypeNameRaw, typeIndex, result, bindingSource, "root type");
 
                 if (string.IsNullOrWhiteSpace(binding.Selection))
                     continue;
 
+                if (rootType == null)
+                {
+                    if (!string.IsNullOrWhiteSpace(rootTypeLookup))
+                    {
+                        result.Diagnostics.Add(
+                            "Dependency graph may be incomplete for '" + bindingSource +
+                            "' because root type '" + rootTypeLookup + "' could not be resolved precisely.");
+                    }
+
+                    continue;
+                }
+
                 var selection = SelectionParser.Parse(binding.Selection);
-                CollectSelectionDependencies(selection, rootType, typeIndex, dependencies);
+                CollectSelectionDependencies(selection, rootType, typeIndex, result, bindingSource, string.Empty);
             }
 
-            return dependencies;
+            return result;
         }
 
         private static void CollectSelectionDependencies(
             IEnumerable<SelectionParser.SelectionNode> selection,
             TypeInfoModel? rootType,
             TypeIndex typeIndex,
-            ISet<string> dependencies)
+            DependencyCollectionResult result,
+            string bindingSource,
+            string parentPath)
         {
-            if (selection == null)
+            if (selection == null || rootType == null)
                 return;
 
             foreach (var node in selection)
@@ -51,21 +69,38 @@ namespace Playserv.CodeGenerator.Editor
                 if (node == null)
                     continue;
 
+                var currentPath = string.IsNullOrWhiteSpace(parentPath)
+                    ? node.Name
+                    : parentPath + "." + node.Name;
+
                 var memberTypeName = TryResolveMemberType(rootType, node.Name, out _);
-                RegisterTypeDependency(memberTypeName, typeIndex, dependencies);
+                if (string.IsNullOrWhiteSpace(memberTypeName))
+                {
+                    result.Diagnostics.Add(
+                        "Could not resolve member '" + currentPath + "' on '" + rootType.FullName +
+                        "' while collecting dependencies for '" + bindingSource + "'.");
+                    continue;
+                }
+
+                RegisterTypeDependency(memberTypeName, typeIndex, result, bindingSource, "member '" + currentPath + "'");
 
                 if (node.Children.Count == 0)
                     continue;
 
-                var nestedRoot = ResolveNestedRoot(typeIndex, memberTypeName);
+                var nestedRoot = ResolveNestedRoot(typeIndex, memberTypeName, result, bindingSource, currentPath);
                 if (nestedRoot != null)
-                    dependencies.Add(nestedRoot.FullName);
+                    result.Dependencies.Add(nestedRoot.FullName);
 
-                CollectSelectionDependencies(node.Children, nestedRoot, typeIndex, dependencies);
+                CollectSelectionDependencies(node.Children, nestedRoot, typeIndex, result, bindingSource, currentPath);
             }
         }
 
-        private static void RegisterTypeDependency(string? typeName, TypeIndex typeIndex, ISet<string> dependencies)
+        private static void RegisterTypeDependency(
+            string? typeName,
+            TypeIndex typeIndex,
+            DependencyCollectionResult result,
+            string bindingSource,
+            string context)
         {
             if (string.IsNullOrWhiteSpace(typeName))
                 return;
@@ -75,16 +110,38 @@ namespace Playserv.CodeGenerator.Editor
                 if (string.IsNullOrWhiteSpace(token) || IsFrameworkType(token))
                     continue;
 
-                var fullName = typeIndex.TryGetFullName(token);
-                if (!string.IsNullOrWhiteSpace(fullName))
+                var resolution = typeIndex.ResolveReference(token);
+                if (resolution.IsResolved)
                 {
-                    dependencies.Add(fullName);
+                    if (!string.IsNullOrWhiteSpace(resolution.FullName))
+                        result.Dependencies.Add(resolution.FullName);
+                    continue;
+                }
+
+                if (resolution.IsAmbiguous)
+                {
+                    foreach (var candidate in resolution.Candidates)
+                        result.Dependencies.Add(candidate);
+
+                    result.Diagnostics.Add(
+                        "Ambiguous type reference '" + token + "' in " + context + " for '" + bindingSource +
+                        "'. Candidates: " + string.Join(", ", resolution.Candidates.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) + ".");
                     continue;
                 }
 
                 var stripped = StripGlobalPrefix(token);
                 if (!string.IsNullOrWhiteSpace(stripped) && stripped.IndexOf('.', StringComparison.Ordinal) >= 0)
-                    dependencies.Add(stripped);
+                {
+                    result.Dependencies.Add(stripped);
+                    result.Diagnostics.Add(
+                        "Unverified qualified type reference '" + stripped + "' in " + context + " for '" + bindingSource +
+                        "'. It was kept as a best-effort dependency.");
+                    continue;
+                }
+
+                result.Diagnostics.Add(
+                    "Unresolved type reference '" + token + "' in " + context + " for '" + bindingSource +
+                    "'. Dependency graph may be incomplete.");
             }
         }
 
@@ -171,6 +228,20 @@ namespace Playserv.CodeGenerator.Editor
                 case "string":
                 case "object":
                 case "void":
+                case "List":
+                case "IList":
+                case "IReadOnlyList":
+                case "IEnumerable":
+                case "ICollection":
+                case "Dictionary":
+                case "IDictionary":
+                case "IReadOnlyDictionary":
+                case "HashSet":
+                case "ISet":
+                case "Queue":
+                case "Stack":
+                case "KeyValuePair":
+                case "Nullable":
                 case "System.Boolean":
                 case "System.Byte":
                 case "System.SByte":
@@ -187,32 +258,90 @@ namespace Playserv.CodeGenerator.Editor
                 case "System.String":
                 case "System.Object":
                 case "System.Void":
-                case "List":
-                case "IList":
-                case "IReadOnlyList":
-                case "IEnumerable":
-                case "ICollection":
+                case "System.Nullable":
                 case "System.Collections.Generic.List":
                 case "System.Collections.Generic.IList":
                 case "System.Collections.Generic.IReadOnlyList":
                 case "System.Collections.Generic.IEnumerable":
                 case "System.Collections.Generic.ICollection":
+                case "System.Collections.Generic.Dictionary":
+                case "System.Collections.Generic.IDictionary":
+                case "System.Collections.Generic.IReadOnlyDictionary":
+                case "System.Collections.Generic.HashSet":
+                case "System.Collections.Generic.ISet":
+                case "System.Collections.Generic.Queue":
+                case "System.Collections.Generic.Stack":
+                case "System.Collections.Generic.KeyValuePair":
                     return true;
                 default:
                     return false;
             }
         }
 
-        private static TypeInfoModel? ResolveNestedRoot(TypeIndex typeIndex, string? typeName)
+        private static TypeInfoModel? ResolveRootType(
+            TypeIndex typeIndex,
+            string? typeName,
+            DependencyCollectionResult result,
+            string bindingSource)
         {
             if (string.IsNullOrWhiteSpace(typeName))
                 return null;
 
-            var t = NormalizeTypeName(typeName);
-            if (string.IsNullOrWhiteSpace(t))
+            var resolution = typeIndex.ResolveReference(typeName);
+            if (resolution.IsResolved)
+                return string.IsNullOrWhiteSpace(resolution.FullName) ? null : typeIndex.Find(resolution.FullName);
+
+            if (resolution.IsAmbiguous)
+            {
+                foreach (var candidate in resolution.Candidates)
+                    result.Dependencies.Add(candidate);
+
+                result.Diagnostics.Add(
+                    "Ambiguous root type '" + typeName + "' for '" + bindingSource +
+                    "'. Candidates: " + string.Join(", ", resolution.Candidates.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) + ".");
+            }
+
+            return null;
+        }
+
+        private static TypeInfoModel? ResolveNestedRoot(
+            TypeIndex typeIndex,
+            string? typeName,
+            DependencyCollectionResult result,
+            string bindingSource,
+            string memberPath)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
                 return null;
 
-            return typeIndex.Find(t);
+            var normalized = NormalizeTypeName(typeName);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return null;
+
+            var resolution = typeIndex.ResolveReference(normalized);
+            if (resolution.IsResolved)
+                return string.IsNullOrWhiteSpace(resolution.FullName) ? null : typeIndex.Find(resolution.FullName);
+
+            if (resolution.IsAmbiguous)
+            {
+                foreach (var candidate in resolution.Candidates)
+                    result.Dependencies.Add(candidate);
+
+                result.Diagnostics.Add(
+                    "Ambiguous nested type '" + normalized + "' for member '" + memberPath +
+                    "' in '" + bindingSource + "'. Candidates: " +
+                    string.Join(", ", resolution.Candidates.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)) + ".");
+                return null;
+            }
+
+            if (!IsFrameworkType(normalized))
+            {
+                result.Diagnostics.Add(
+                    "Could not resolve nested type '" + normalized + "' for member '" + memberPath +
+                    "' in '" + bindingSource + "'.");
+            }
+
+            return null;
         }
 
         private static string? TryResolveMemberType(TypeInfoModel? rootType, string memberName, out string resolvedMemberName)
@@ -286,7 +415,13 @@ namespace Playserv.CodeGenerator.Editor
                 ? typeName.Substring(prefix.Length)
                 : typeName;
         }
+
+        private static string BuildBindingSource(SharedTextFinder.Binding binding)
+        {
+            var owner = string.IsNullOrWhiteSpace(binding.OwnerTypeName) ? "UnknownOwner" : binding.OwnerTypeName;
+            var member = string.IsNullOrWhiteSpace(binding.MemberName) ? "UnknownMember" : binding.MemberName;
+            return owner + "." + member;
+        }
     }
 }
 #nullable restore
-

@@ -69,6 +69,8 @@ namespace Playserv.CodeGenerator.Editor
             var dict = new Dictionary<string, TypeInfoModel>(StringComparer.OrdinalIgnoreCase);
             var enums = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var enumFullNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var typeCandidatesByShortName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            var enumCandidatesByShortName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var snapshot in snapshots)
             {
@@ -86,9 +88,14 @@ namespace Playserv.CodeGenerator.Editor
                     {
                         var full = snapshot.Namespace + "." + en;
                         enums.Add(full);
+                        AddCandidate(enumCandidatesByShortName, en, full);
 
                         if (!enumFullNames.ContainsKey(en))
                             enumFullNames[en] = full;
+                    }
+                    else
+                    {
+                        AddCandidate(enumCandidatesByShortName, en, en);
                     }
                 }
 
@@ -98,12 +105,13 @@ namespace Playserv.CodeGenerator.Editor
                         continue;
 
                     var info = new TypeInfoModel(type.Name, type.FullName, type.Members);
+                    AddCandidate(typeCandidatesByShortName, type.Name, type.FullName);
                     dict[type.Name] = info;
                     dict[type.FullName] = info;
                 }
             }
 
-            return new TypeIndex(dict, enums, enumFullNames);
+            return new TypeIndex(dict, enums, enumFullNames, typeCandidatesByShortName, enumCandidatesByShortName);
         }
 
         public static string SerializeSnapshot(CachedSourceSnapshot snapshot)
@@ -200,6 +208,24 @@ namespace Playserv.CodeGenerator.Editor
                 return string.Empty;
 
             return Encoding.UTF8.GetString(Convert.FromBase64String(value));
+        }
+
+        private static void AddCandidate(
+            Dictionary<string, List<string>> map,
+            string shortName,
+            string fullName)
+        {
+            if (string.IsNullOrWhiteSpace(shortName) || string.IsNullOrWhiteSpace(fullName))
+                return;
+
+            if (!map.TryGetValue(shortName, out var candidates))
+            {
+                candidates = new List<string>();
+                map[shortName] = candidates;
+            }
+
+            if (!candidates.Contains(fullName, StringComparer.OrdinalIgnoreCase))
+                candidates.Add(fullName);
         }
     }
 }

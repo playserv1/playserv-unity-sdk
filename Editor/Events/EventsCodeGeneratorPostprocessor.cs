@@ -14,8 +14,7 @@ namespace Playserv.Events.Editor
             "/Editor/Events/",
             "/Runtime/Events/"
         };
-
-        private const string GeneratedEventsMarker = "/Runtime/Generated/Events/";
+        private static readonly string GeneratedEventsMarker = NormalizePath(EventsCodeGenerator.GeneratedEventsDirectoryPath);
 
         private static void OnPostprocessAllAssets(
             string[] importedAssets,
@@ -53,9 +52,9 @@ namespace Playserv.Events.Editor
             if (HasRelevantImportedSource(importedAssets))
                 return true;
 
-            if (HasRelevantDeletedOrMovedSource(deletedAssets) ||
-                HasRelevantDeletedOrMovedSource(movedAssets) ||
-                HasRelevantDeletedOrMovedSource(movedFromAssetPaths))
+            if (HasPotentiallyRelevantDeletedOrMovedSource(deletedAssets) ||
+                HasPotentiallyRelevantDeletedOrMovedSource(movedAssets) ||
+                HasPotentiallyRelevantDeletedOrMovedSource(movedFromAssetPaths))
             {
                 return true;
             }
@@ -97,15 +96,14 @@ namespace Playserv.Events.Editor
             return false;
         }
 
-        private static bool HasRelevantDeletedOrMovedSource(string[] assetPaths)
+        private static bool HasPotentiallyRelevantDeletedOrMovedSource(string[] assetPaths)
         {
             if (assetPaths == null || assetPaths.Length == 0)
                 return false;
 
             return assetPaths.Any(assetPath =>
                 IsCSharpSource(assetPath) &&
-                !IsGeneratedEventsAsset(assetPath) &&
-                MatchesEventPath(assetPath));
+                !IsGeneratedEventsAsset(assetPath));
         }
 
         private static bool IsCSharpSource(string assetPath)
@@ -117,7 +115,7 @@ namespace Playserv.Events.Editor
         private static bool IsGeneratedEventsAsset(string assetPath)
         {
             return !string.IsNullOrWhiteSpace(assetPath) &&
-                   assetPath.Replace('\\', '/').IndexOf(GeneratedEventsMarker, StringComparison.OrdinalIgnoreCase) >= 0;
+                   NormalizePath(assetPath).IndexOf(GeneratedEventsMarker, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool MatchesEventPath(string assetPath)
@@ -125,9 +123,16 @@ namespace Playserv.Events.Editor
             if (string.IsNullOrWhiteSpace(assetPath))
                 return false;
 
-            var normalized = assetPath.Replace('\\', '/');
+            var normalized = NormalizePath(assetPath);
             return EventRelevantPathMarkers.Any(marker =>
                 normalized.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static string NormalizePath(string assetPath)
+        {
+            return string.IsNullOrWhiteSpace(assetPath)
+                ? string.Empty
+                : assetPath.Replace('\\', '/');
         }
     }
 }
