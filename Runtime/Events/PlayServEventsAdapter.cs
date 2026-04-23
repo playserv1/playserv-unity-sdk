@@ -309,9 +309,6 @@ namespace Playserv.Events
                     () => completion.TrySetException(
                         new InvalidOperationException($"Transport completed while waiting for {typeof(TResponse).Name}.")));
 
-                using var errorSubscription = _transport.OnReceive<ErrorResponse>().Subscribe(
-                    error => completion.TrySetResult(GroupCommandResult.FromError(error)));
-
                 using var cancellationRegistration =
                     timeoutCts.Token.Register(() => completion.TrySetCanceled(timeoutCts.Token));
 
@@ -319,13 +316,6 @@ namespace Playserv.Events
                 _logger.Log($"Sent group {operationName} request: groupName={groupName}");
 
                 var result = await completion.Task;
-                if (result.Error != null)
-                {
-                    throw new InvalidOperationException(
-                        $"Group {operationName} failed for '{groupName}'. " +
-                        $"Code={result.Error.ErrorCode}, Message={result.Error.Message}");
-                }
-
                 if (result.Success)
                     _logger.Log($"Group {operationName} successful: groupName={groupName}");
                 else
@@ -336,7 +326,8 @@ namespace Playserv.Events
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 throw new TimeoutException(
-                    $"Timed out waiting for {typeof(TResponse).Name} for group '{groupName}'.");
+                    $"Timed out waiting for {typeof(TResponse).Name} for group '{groupName}'. " +
+                    "Uncorrelated events-module errors are logged separately and are not treated as a response to this command.");
             }
             finally
             {
@@ -347,22 +338,15 @@ namespace Playserv.Events
         private sealed class GroupCommandResult
         {
             public bool Success { get; }
-            public ErrorResponse Error { get; }
 
-            private GroupCommandResult(bool success, ErrorResponse error)
+            private GroupCommandResult(bool success)
             {
                 Success = success;
-                Error = error;
             }
 
             public static GroupCommandResult FromResponse(bool success)
             {
-                return new GroupCommandResult(success, null);
-            }
-
-            public static GroupCommandResult FromError(ErrorResponse error)
-            {
-                return new GroupCommandResult(false, error);
+                return new GroupCommandResult(success);
             }
         }
     }
