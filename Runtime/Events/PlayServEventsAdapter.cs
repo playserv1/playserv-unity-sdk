@@ -38,7 +38,7 @@ namespace Playserv.Events
         {
             var eventClrType = typeof(T);
             _eventTypeRegistry.Register(eventClrType);
-            var eventType = eventClrType.Name;
+            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
             return new EventObservable<T>(_transport, _subscriptionManager, eventType, _logger);
         }
 
@@ -55,9 +55,10 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            _eventTypeRegistry.Register(@event.GetType());
+            var eventClrType = @event.GetType();
+            _eventTypeRegistry.Register(eventClrType);
             var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
-            var eventType = @event.GetType().Name;
+            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new EventMessage(eventType, payload);
             _ = _transport.Send(message);
@@ -71,9 +72,10 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            _eventTypeRegistry.Register(@event.GetType());
+            var eventClrType = @event.GetType();
+            _eventTypeRegistry.Register(eventClrType);
             var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
-            var eventType = @event.GetType().Name;
+            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new GroupEventMessage(groupName, eventType, payload);
             _ = _transport.Send(message);
@@ -87,9 +89,10 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
-            _eventTypeRegistry.Register(@event.GetType());
+            var eventClrType = @event.GetType();
+            _eventTypeRegistry.Register(eventClrType);
             var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
-            var eventType = @event.GetType().Name;
+            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new UserEventMessage(userId, eventType, payload);
             _ = _transport.Send(message);
