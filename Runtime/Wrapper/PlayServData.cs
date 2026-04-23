@@ -12,7 +12,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServData
     {
-        private static IPlayServApi Api => PlayServApiHost.Api;
+        private static IPlayServDataApi Api => PlayServApiHost.Data;
 
         public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
             string playerId,

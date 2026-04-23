@@ -12,7 +12,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServRpc
     {
-        private static IPlayServApi Api => PlayServApiHost.Api;
+        private static IPlayServRpcApi Api => PlayServApiHost.Rpc;
 
         public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {

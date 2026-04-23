@@ -9,7 +9,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServSpawn
     {
-        private static IPlayServApi Api => PlayServApiHost.Api;
+        private static IPlayServSpawnApi Api => PlayServApiHost.Spawn;
 
         public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
             Api.Spawn(assetName, position, rotation);
