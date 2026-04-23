@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
+using Playserv.Serialization;
 using Playserv.Wrapper;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -105,8 +105,7 @@ namespace Playserv.Deploy.Editor
             if (string.IsNullOrWhiteSpace(body))
                 throw new InvalidOperationException("Remote hash response body is empty.");
 
-            var obj = JObject.Parse(body);
-            var hash = GetJsonValueIgnoreCase(obj, "hash");
+            var hash = JsonResponseReader.GetStringValueIgnoreCase(body, "hash");
 
             if (string.IsNullOrWhiteSpace(hash))
                 throw new InvalidOperationException("Remote hash was not found in response.");
@@ -129,8 +128,7 @@ namespace Playserv.Deploy.Editor
             if (string.IsNullOrWhiteSpace(body))
                 throw new InvalidOperationException("Latest version response body is empty.");
 
-            var obj = JObject.Parse(body);
-            var version = GetJsonValueIgnoreCase(obj, "version");
+            var version = JsonResponseReader.GetStringValueIgnoreCase(body, "version");
 
             if (string.IsNullOrWhiteSpace(version))
                 throw new InvalidOperationException("Latest version was not found in response.");
@@ -202,20 +200,15 @@ namespace Playserv.Deploy.Editor
 
             try
             {
-                var token = JToken.Parse(responseBody);
-                var obj = token as JObject;
-                if (obj == null)
+                var document = JsonResponseReader.ParseDocument(responseBody);
+                if (document == null)
                     return new[] { responseBody };
 
-                var messages = obj["errors"] is JArray errors
-                    ? errors
-                        .Select(x => x?.ToString())
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Select(x => x.Trim())
-                        .ToList()
-                    : new System.Collections.Generic.List<string>();
+                var messages = JsonResponseReader
+                    .GetStringArrayValueIgnoreCase(document, "errors")
+                    .ToList();
 
-                var topMessage = obj["message"]?.ToString();
+                var topMessage = JsonResponseReader.GetStringValueIgnoreCase(document, "message");
                 if (!string.IsNullOrWhiteSpace(topMessage))
                     messages.Insert(0, topMessage.Trim());
 
@@ -275,16 +268,6 @@ namespace Playserv.Deploy.Editor
         private static string BuildPath(string template, string gameId)
         {
             return string.Format(template, gameId);
-        }
-
-        private static string GetJsonValueIgnoreCase(JObject obj, string key)
-        {
-            if (obj == null || string.IsNullOrWhiteSpace(key))
-                return string.Empty;
-
-            return obj.TryGetValue(key, StringComparison.OrdinalIgnoreCase, out var token)
-                ? token?.ToString()?.Trim()
-                : string.Empty;
         }
 
         private async Task<DeploymentUploadResponse> RetryAsMultipartIfNeededAsync(

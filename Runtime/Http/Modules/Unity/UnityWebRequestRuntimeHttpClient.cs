@@ -2,10 +2,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 using Playserv.Http.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
+using Playserv.Serialization;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -43,8 +43,7 @@ namespace Playserv.Http.Modules.Unity
             if (string.IsNullOrWhiteSpace(body))
                 throw new InvalidOperationException("Latest version response body is empty.");
 
-            var obj = JObject.Parse(body);
-            var version = GetJsonValueIgnoreCase(obj, "version");
+            var version = JsonResponseReader.GetStringValueIgnoreCase(body, "version");
 
             if (string.IsNullOrWhiteSpace(version))
                 throw new InvalidOperationException("Latest version was not found in response.");
@@ -91,16 +90,6 @@ namespace Playserv.Http.Modules.Unity
         private static string BuildPath(string template, string gameId)
         {
             return string.Format(template, gameId);
-        }
-
-        private static string GetJsonValueIgnoreCase(JObject obj, string key)
-        {
-            if (obj == null || string.IsNullOrWhiteSpace(key))
-                return string.Empty;
-
-            return obj.TryGetValue(key, StringComparison.OrdinalIgnoreCase, out var token)
-                ? token?.ToString()?.Trim()
-                : string.Empty;
         }
 
         private void AddCommonHeaders(UnityWebRequest req)
