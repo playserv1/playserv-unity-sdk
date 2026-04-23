@@ -5,11 +5,14 @@ using System.Linq;
 using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 namespace Playserv.Serialization
 {
     public sealed class NewtonsoftJsonCodec : IJsonCodec
     {
+        private static readonly IContractResolver ContractResolver = new PlayServJsonNameContractResolver();
+
         public string Serialize(object value, JsonCodecOptions options = null)
         {
             try
@@ -186,7 +189,7 @@ namespace Playserv.Serialization
             var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             var property = value.GetType()
                 .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .FirstOrDefault(x => x.CanRead && string.Equals(x.Name, propertyName, comparison));
+                .FirstOrDefault(x => x.CanRead && MatchesPropertyName(x, propertyName, comparison));
 
             if (property != null)
             {
@@ -196,7 +199,7 @@ namespace Playserv.Serialization
 
             var field = value.GetType()
                 .GetFields(BindingFlags.Instance | BindingFlags.Public)
-                .FirstOrDefault(x => string.Equals(x.Name, propertyName, comparison));
+                .FirstOrDefault(x => MatchesFieldName(x, propertyName, comparison));
 
             if (field == null)
                 return false;
@@ -304,7 +307,8 @@ namespace Playserv.Serialization
             {
                 DateParseHandling = options.ParseDates ? DateParseHandling.DateTime : DateParseHandling.None,
                 NullValueHandling = options.IncludeNullValues ? NullValueHandling.Include : NullValueHandling.Ignore,
-                MissingMemberHandling = options.IgnoreMissingMembers ? MissingMemberHandling.Ignore : MissingMemberHandling.Error
+                MissingMemberHandling = options.IgnoreMissingMembers ? MissingMemberHandling.Ignore : MissingMemberHandling.Error,
+                ContractResolver = ContractResolver
             };
 
             if (options.CustomConverters != null)
@@ -433,6 +437,52 @@ namespace Playserv.Serialization
             }
 
             return result;
+        }
+
+        private static bool MatchesPropertyName(PropertyInfo property, string name, StringComparison comparison)
+        {
+            if (property == null)
+                return false;
+
+            if (string.Equals(property.Name, name, comparison))
+                return true;
+
+            var attributeName = GetCustomJsonName(property);
+            return !string.IsNullOrWhiteSpace(attributeName) &&
+                   string.Equals(attributeName, name, comparison);
+        }
+
+        private static bool MatchesFieldName(FieldInfo field, string name, StringComparison comparison)
+        {
+            if (field == null)
+                return false;
+
+            if (string.Equals(field.Name, name, comparison))
+                return true;
+
+            var attributeName = GetCustomJsonName(field);
+            return !string.IsNullOrWhiteSpace(attributeName) &&
+                   string.Equals(attributeName, name, comparison);
+        }
+
+        private static string GetCustomJsonName(MemberInfo member)
+        {
+            var attribute = member.GetCustomAttribute<PlayServJsonNameAttribute>(true);
+            return attribute?.Name;
+        }
+
+        private sealed class PlayServJsonNameContractResolver : DefaultContractResolver
+        {
+            protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+            {
+                var property = base.CreateProperty(member, memberSerialization);
+                var attributeName = GetCustomJsonName(member);
+
+                if (!string.IsNullOrWhiteSpace(attributeName))
+                    property.PropertyName = attributeName;
+
+                return property;
+            }
         }
     }
 }

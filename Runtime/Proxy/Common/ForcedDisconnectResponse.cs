@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
 {
@@ -30,7 +30,7 @@ namespace Playserv.Proxy.Common
         /// <summary>
         /// Optional server game version.
         /// </summary>
-        [JsonProperty("server_version")]
+        [PlayServJsonName("server_version")]
         public string ServerVersion { get; set; } = string.Empty;
     }
 }
