@@ -22,7 +22,9 @@ namespace Playserv.DataSubscription
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
         private readonly DataSubscriptionRegistry _registry;
-        private readonly DataSubscriptionRequestClient _requestClient;
+        private readonly TransportSubscriptionClient _transportSubscriptionClient;
+        private readonly DataMutationClient _dataMutationClient;
+        private readonly DataGetClient _dataGetClient;
         private readonly DataSubscriptionPollingCoordinator _pollingCoordinator;
 
         public PlayServDataSubscriptionAdapter(PlayServImplementation proxy, ILogger logger)
@@ -30,8 +32,11 @@ namespace Playserv.DataSubscription
             _transport = proxy ?? throw new ArgumentNullException(nameof(proxy));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _registry = new DataSubscriptionRegistry(logger);
-            _requestClient = new DataSubscriptionRequestClient(proxy, logger);
-            _pollingCoordinator = new DataSubscriptionPollingCoordinator(proxy, _requestClient, logger);
+            var requestIds = new DataSubscriptionRequestIdSource();
+            _transportSubscriptionClient = new TransportSubscriptionClient(proxy, logger, requestIds);
+            _dataMutationClient = new DataMutationClient(proxy, requestIds);
+            _dataGetClient = new DataGetClient(proxy, logger, requestIds);
+            _pollingCoordinator = new DataSubscriptionPollingCoordinator(proxy, _dataGetClient, logger);
         }
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
@@ -63,7 +68,7 @@ namespace Playserv.DataSubscription
             bool allowFallbackToPolling = true,
             CancellationToken ct = default)
         {
-            return _requestClient.TryOpenTransportSubscriptionAsync(query, variables, allowFallbackToPolling, ct);
+            return _transportSubscriptionClient.TryOpenTransportSubscriptionAsync(query, variables, allowFallbackToPolling, ct);
         }
 
         internal IDisposable RegisterPollingSubscription(
@@ -113,12 +118,12 @@ namespace Playserv.DataSubscription
 
         public void SendMutation(long subscriptionId, string query, Dictionary<string, object> variables, object patch)
         {
-            _requestClient.SendMutation(subscriptionId, query, variables, patch);
+            _dataMutationClient.SendMutation(subscriptionId, query, variables, patch);
         }
 
         public Task SendMutationAsync(long subscriptionId, string query, Dictionary<string, object> variables, object patch)
         {
-            return _requestClient.SendMutationAsync(subscriptionId, query, variables, patch);
+            return _dataMutationClient.SendMutationAsync(subscriptionId, query, variables, patch);
         }
 
         public void RequestFullState(long subscriptionId)
@@ -223,7 +228,7 @@ namespace Playserv.DataSubscription
             Dictionary<string, object> variables,
             CancellationToken ct = default)
         {
-            return _requestClient.GetDataByKeyAsync(key, query, variables, DataGetResponseTimeoutMs, ct);
+            return _dataGetClient.GetDataByKeyAsync(key, query, variables, DataGetResponseTimeoutMs, ct);
         }
 
         public IDisposable StartDataByKeyPolling(
