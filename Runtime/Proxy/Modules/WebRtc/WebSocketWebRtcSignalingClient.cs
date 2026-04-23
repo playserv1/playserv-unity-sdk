@@ -5,10 +5,10 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.WebRtc
 {
@@ -24,6 +24,7 @@ namespace Playserv.Proxy.WebRtc
         private const string HttpsScheme = "https";
 
         private readonly PlayServRuntimeSettings _settings;
+        private readonly IJsonCodec _jsonCodec;
         private readonly ILogger _logger;
         private readonly Uri _uri;
         private readonly string _sessionId = Guid.NewGuid().ToString("N");
@@ -55,9 +56,10 @@ namespace Playserv.Proxy.WebRtc
         private bool _bridgeEventsSubscribed;
 #endif
 
-        public WebSocketWebRtcSignalingClient(PlayServRuntimeSettings settings, ILogger logger = null)
+        public WebSocketWebRtcSignalingClient(PlayServRuntimeSettings settings, IJsonCodec jsonCodec, ILogger logger = null)
         {
             _settings = settings?.Clone() ?? throw new ArgumentNullException(nameof(settings));
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
             _logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
 
             if (string.IsNullOrWhiteSpace(_settings.WebRtcSignalingServerAddress))
@@ -166,7 +168,7 @@ namespace Playserv.Proxy.WebRtc
             if (string.IsNullOrWhiteSpace(message.SessionId))
                 message.SessionId = _sessionId;
 
-            var json = JsonConvert.SerializeObject(message);
+            var json = _jsonCodec.Serialize(message);
 
 #if UNITY_WEBGL && !UNITY_EDITOR
             var sendResult = RtcSig_Send(json);
@@ -462,7 +464,7 @@ namespace Playserv.Proxy.WebRtc
         {
             try
             {
-                var message = JsonConvert.DeserializeObject<WebRtcSignalMessage>(json);
+                var message = _jsonCodec.Deserialize<WebRtcSignalMessage>(json);
                 if (message == null)
                     return;
 
@@ -496,7 +498,7 @@ namespace Playserv.Proxy.WebRtc
                 TransportEndpoint = _settings.BackendServerAddress ?? string.Empty
             };
 
-            return JsonConvert.SerializeObject(hello);
+            return _jsonCodec.Serialize(hello);
         }
 
         private void FailConnect(TaskCompletionSource<bool> connectTcs, Exception ex)

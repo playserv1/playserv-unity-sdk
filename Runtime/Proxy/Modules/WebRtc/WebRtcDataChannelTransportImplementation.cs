@@ -4,11 +4,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.Implementation
 {
@@ -19,6 +19,7 @@ namespace Playserv.Proxy.Implementation
         private readonly string _endpoint;
         private readonly PlayServRuntimeSettings _settings;
         private readonly IWebRtcSignalingClient _signalingClient;
+        private readonly IJsonCodec _jsonCodec;
         private readonly ILogger _logger;
         private readonly object _gate = new object();
         private readonly object _connectGate = new object();
@@ -54,6 +55,7 @@ namespace Playserv.Proxy.Implementation
             string endpoint,
             PlayServRuntimeSettings settings,
             IWebRtcSignalingClient signalingClient,
+            IJsonCodec jsonCodec,
             ILogger logger = null)
         {
             if (string.IsNullOrWhiteSpace(endpoint))
@@ -62,6 +64,7 @@ namespace Playserv.Proxy.Implementation
             _endpoint = endpoint;
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _signalingClient = signalingClient;
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
             _logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
             _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
             _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
@@ -269,7 +272,7 @@ namespace Playserv.Proxy.Implementation
             {
                 try
                 {
-                    var json = JsonConvert.SerializeObject(message);
+                    var json = _jsonCodec.Serialize(message);
                     var accepted = Rtc_ApplySignal(json);
                     if (accepted != 1)
                     {
@@ -366,7 +369,7 @@ namespace Playserv.Proxy.Implementation
         {
             try
             {
-                var message = JsonConvert.DeserializeObject<WebRtcSignalMessage>(json);
+                var message = _jsonCodec.Deserialize<WebRtcSignalMessage>(json);
                 if (message == null)
                 {
                     _logger.LogError($"Failed to deserialize local WebRTC signaling message. payload={json}");
@@ -499,7 +502,7 @@ namespace Playserv.Proxy.Implementation
                 iceServers = _settings.WebRtcIceServers ?? Array.Empty<string>()
             };
 
-            return JsonConvert.SerializeObject(config);
+            return _jsonCodec.Serialize(config);
         }
 
         private void TryClosePeer()
