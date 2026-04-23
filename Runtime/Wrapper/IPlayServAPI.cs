@@ -26,6 +26,11 @@ namespace Playserv.Wrapper
         string SdkVersion { get; }
 
         /// <summary>
+        /// Gets current effective SDK settings object.
+        /// </summary>
+        PlayServSettings Settings { get; }
+
+        /// <summary>
         /// Gets current connection state.
         /// </summary>
         PlayServState State { get; }
