@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using Playserv.Serialization;
 
 namespace Playserv.RPC
 {
@@ -12,6 +11,17 @@ namespace Playserv.RPC
     public sealed class LocalRpcInvoker : IRpcInvoker
     {
         private readonly Dictionary<string, object> _services = new(StringComparer.Ordinal);
+        private readonly IJsonCodec _jsonCodec;
+
+        public LocalRpcInvoker()
+            : this(new NewtonsoftJsonCodec())
+        {
+        }
+
+        public LocalRpcInvoker(IJsonCodec jsonCodec)
+        {
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
+        }
 
         /// <summary>
         /// Registers service instance under its runtime type name.
@@ -114,7 +124,7 @@ namespace Playserv.RPC
                    throw new MissingMethodException(serviceType.FullName, methodName);
         }
 
-        private static object[] BuildArguments(MethodInfo method, string payloadBase64)
+        private object[] BuildArguments(MethodInfo method, string payloadBase64)
         {
             var parameters = method.GetParameters();
             if (parameters.Length == 0)
@@ -127,18 +137,18 @@ namespace Playserv.RPC
                 return BuildArgumentsFromMissingPayload(parameters, method);
             }
 
-            var payloadToken = JToken.Parse(payloadJson);
-            if (payloadToken is JObject payloadObject)
+            var payloadValue = _jsonCodec.ParseToPlainValue(payloadJson);
+            if (payloadValue is IDictionary<string, object> payloadObject)
                 return BuildArgumentsFromObject(parameters, payloadObject, method);
 
-            if (payloadToken is JArray payloadArray)
+            if (payloadValue is IList<object> payloadArray)
                 return BuildArgumentsFromArray(parameters, payloadArray, method);
 
             if (parameters.Length == 1)
             {
                 return new[]
                 {
-                    ConvertToken(payloadToken, parameters[0], method)
+                    ConvertValue(payloadValue, parameters[0], method)
                 };
             }
 
@@ -146,9 +156,9 @@ namespace Playserv.RPC
                 $"RPC payload for '{method.DeclaringType?.Name}.{method.Name}' must be a JSON object or array.");
         }
 
-        private static object[] BuildArgumentsFromObject(
+        private object[] BuildArgumentsFromObject(
             ParameterInfo[] parameters,
-            JObject payload,
+            IDictionary<string, object> payload,
             MethodInfo method)
         {
             var arguments = new object[parameters.Length];
@@ -156,9 +166,9 @@ namespace Playserv.RPC
             {
                 var parameter = parameters[i];
                 var parameterName = parameter.Name ?? $"arg{i}";
-                if (payload.TryGetValue(parameterName, StringComparison.OrdinalIgnoreCase, out var token))
+                if (_jsonCodec.TryGetProperty(payload, parameterName, ignoreCase: true, out var value))
                 {
-                    arguments[i] = ConvertToken(token, parameter, method);
+                    arguments[i] = ConvertValue(value, parameter, method);
                     continue;
                 }
 
@@ -168,9 +178,9 @@ namespace Playserv.RPC
             return arguments;
         }
 
-        private static object[] BuildArgumentsFromArray(
+        private object[] BuildArgumentsFromArray(
             ParameterInfo[] parameters,
-            JArray payload,
+            IList<object> payload,
             MethodInfo method)
         {
             if (payload.Count > parameters.Length)
@@ -185,7 +195,7 @@ namespace Playserv.RPC
             {
                 if (i < payload.Count)
                 {
-                    arguments[i] = ConvertToken(payload[i], parameters[i], method);
+                    arguments[i] = ConvertValue(payload[i], parameters[i], method);
                     continue;
                 }
 
@@ -219,9 +229,9 @@ namespace Playserv.RPC
                 $"'{method.DeclaringType?.Name}.{method.Name}'.");
         }
 
-        private static object ConvertToken(JToken token, ParameterInfo parameter, MethodInfo method)
+        private object ConvertValue(object value, ParameterInfo parameter, MethodInfo method)
         {
-            if (token.Type == JTokenType.Null)
+            if (value == null)
             {
                 if (CanAssignNull(parameter.ParameterType))
                     return null;
@@ -233,7 +243,7 @@ namespace Playserv.RPC
 
             try
             {
-                return token.ToObject(parameter.ParameterType, JsonSerializer.CreateDefault());
+                return _jsonCodec.Convert(value, parameter.ParameterType);
             }
             catch (Exception ex)
             {

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Playserv.Serialization
 {
     public sealed class JsonCodecOptions
@@ -7,5 +9,7 @@ namespace Playserv.Serialization
         public bool IncludeNullValues { get; set; } = true;
 
         public bool IgnoreMissingMembers { get; set; } = true;
+
+        public IReadOnlyList<object> CustomConverters { get; set; }
     }
 }
