@@ -308,6 +308,9 @@ namespace Playserv.Serialization
                 DateParseHandling = options.ParseDates ? DateParseHandling.DateTime : DateParseHandling.None,
                 NullValueHandling = options.IncludeNullValues ? NullValueHandling.Include : NullValueHandling.Ignore,
                 MissingMemberHandling = options.IgnoreMissingMembers ? MissingMemberHandling.Ignore : MissingMemberHandling.Error,
+                MetadataPropertyHandling = options.IgnoreMetadataProperties
+                    ? MetadataPropertyHandling.Ignore
+                    : MetadataPropertyHandling.Default,
                 ContractResolver = ContractResolver
             };
 

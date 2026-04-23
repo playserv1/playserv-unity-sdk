@@ -1,7 +1,6 @@
 using UnityEditor;
 using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -55,14 +54,7 @@ namespace Playserv.ModelGenerator.Editor
 
                 try
                 {
-                    // 1. Setup Deserialization
-                    var settings = new JsonSerializerSettings
-                    {
-                        MetadataPropertyHandling = MetadataPropertyHandling.Ignore
-                    };
-
-                    // 2. Deserialize Schema
-                    JsonSchemaRoot root = JsonConvert.DeserializeObject<JsonSchemaRoot>(content, settings)!;
+                    JsonSchemaRoot root = SchemaJsonReader.ReadRoot(content);
 
                     EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, root.JsonSchema.XTimestamp);
                     EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, root.JsonSchema.XVersion);
@@ -135,13 +127,7 @@ namespace Playserv.ModelGenerator.Editor
             }
 
             var content = File.ReadAllText(LatestSchemaFilePath);
-
-            var settings = new JsonSerializerSettings
-            {
-                MetadataPropertyHandling = MetadataPropertyHandling.Ignore
-            };
-
-            JsonSchemaRoot root = JsonConvert.DeserializeObject<JsonSchemaRoot>(content, settings)!;
+            JsonSchemaRoot root = SchemaJsonReader.ReadRoot(content);
 
             EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestTimestamp, root.JsonSchema.XTimestamp);
             EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestVersion, root.JsonSchema.XVersion);
