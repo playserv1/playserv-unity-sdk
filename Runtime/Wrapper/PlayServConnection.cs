@@ -11,7 +11,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServConnection
     {
-        private static IPlayServApi Api => PlayServApiHost.Api;
+        private static IPlayServConnectionApi Api => PlayServApiHost.Connection;
 
         public static string SdkVersion => Api.SdkVersion;
 

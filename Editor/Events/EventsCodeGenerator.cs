@@ -15,7 +15,7 @@ namespace Playserv.Events.Editor
     internal static class EventsCodeGenerator
     {
         // NOTE:
-        // If generated code can't see Playserv.Runtime assembly (IPlayServApi / events),
+        // If generated code can't see Playserv.Runtime assembly (IPlayServEventsApi / events),
         // either:
         // 1) Move output into your Runtime folder (recommended), e.g.:
         //    "Assets/Playserv/Runtime/Generated/PlayServ.EventsApiExtensions.g.cs"
@@ -43,13 +43,13 @@ namespace Playserv.Events.Editor
             sb.AppendLine("#nullable enable");
             sb.AppendLine("using System;");
             sb.AppendLine("using Playserv.Events;");
-            sb.AppendLine("using Playserv.Wrapper;"); // IPlayServApi lives here in your setup
+            sb.AppendLine("using Playserv.Wrapper;"); // IPlayServEventsApi lives here in your setup
             sb.AppendLine();
             sb.AppendLine("namespace Playserv.Wrapper");
             sb.AppendLine("{");
             sb.AppendLine("    /// <summary>");
             sb.AppendLine("    /// Generated convenience methods for events based on [Event] types.");
-            sb.AppendLine("    /// Extensions on IPlayServApi (no partial/static required).");
+            sb.AppendLine("    /// Extensions on IPlayServEventsApi.");
             sb.AppendLine("    /// </summary>");
             sb.AppendLine("    public static class PlayServEventsApiExtensions");
             sb.AppendLine("    {");
@@ -124,7 +124,7 @@ namespace Playserv.Events.Editor
         }
 
         // ----------------------------
-        // IPlayServApi extensions
+        // IPlayServEventsApi extensions
         // ----------------------------
 
         private static void AppendApiGlobalEventMethods(StringBuilder sb, Type type)
@@ -138,8 +138,8 @@ namespace Playserv.Events.Editor
             var paramName = ToCamel(field.Name);
             var fullEventTypeName = $"global::{type.FullName}";
 
-            // SendX(this IPlayServApi api, T value)
-            sb.AppendLine($"        public static void Send{methodSuffix}(this IPlayServApi api, {GetFriendlyTypeName(paramType)} {paramName})");
+            // SendX(this IPlayServEventsApi api, T value)
+            sb.AppendLine($"        public static void Send{methodSuffix}(this IPlayServEventsApi api, {GetFriendlyTypeName(paramType)} {paramName})");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine($"            var payload = new {fullEventTypeName}");
@@ -150,8 +150,8 @@ namespace Playserv.Events.Editor
             sb.AppendLine("        }");
             sb.AppendLine();
 
-            // OnX(this IPlayServApi api, Action<T> onReceive)
-            sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IPlayServApi api, Action<{GetFriendlyTypeName(paramType)}> onReceive)");
+            // OnX(this IPlayServEventsApi api, Action<T> onReceive)
+            sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IPlayServEventsApi api, Action<{GetFriendlyTypeName(paramType)}> onReceive)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine("            if (onReceive == null) throw new ArgumentNullException(nameof(onReceive));");
@@ -171,7 +171,7 @@ namespace Playserv.Events.Editor
             var paramName = ToCamel(field.Name);
             var fullEventTypeName = $"global::{type.FullName}";
 
-            sb.AppendLine($"        public static void SendGroup{methodSuffix}(this IPlayServApi api, string groupName, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void SendGroup{methodSuffix}(this IPlayServEventsApi api, string groupName, {GetFriendlyTypeName(paramType)} {paramName})");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine("            if (groupName == null) throw new ArgumentNullException(nameof(groupName));");
@@ -195,7 +195,7 @@ namespace Playserv.Events.Editor
             var paramName = ToCamel(field.Name);
             var fullEventTypeName = $"global::{type.FullName}";
 
-            sb.AppendLine($"        public static void SendUser{methodSuffix}(this IPlayServApi api, string userId, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void SendUser{methodSuffix}(this IPlayServEventsApi api, string userId, {GetFriendlyTypeName(paramType)} {paramName})");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine("            if (userId == null) throw new ArgumentNullException(nameof(userId));");

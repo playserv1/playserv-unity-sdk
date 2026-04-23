@@ -10,7 +10,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServEvents
     {
-        private static IPlayServApi Api => PlayServApiHost.Api;
+        private static IPlayServEventsApi Api => PlayServApiHost.Events;
 
         public static IObservable<T> Subscribe<T>() => Api.Subscribe<T>();
 

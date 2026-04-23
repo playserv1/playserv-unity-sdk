@@ -17,7 +17,10 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApi : IPlayServApi
+    internal sealed class PlayServApi : IPlayServApi, IPlayServConnectionApi, IPlayServRpcApi, IPlayServEventsApi, IPlayServDataApi
+#if UNITY_5_3_OR_NEWER
+        , IPlayServSpawnApi
+#endif
     {
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;

@@ -22,30 +22,36 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServ
     {
-        private static IPlayServApi Api => PlayServApiHost.Api;
+        private static IPlayServConnectionApi ConnectionApi => PlayServApiHost.Connection;
+        private static IPlayServRpcApi RpcApi => PlayServApiHost.Rpc;
+        private static IPlayServEventsApi EventsApi => PlayServApiHost.Events;
+        private static IPlayServDataApi DataApi => PlayServApiHost.Data;
+#if UNITY_5_3_OR_NEWER
+        private static IPlayServSpawnApi SpawnApi => PlayServApiHost.Spawn;
+#endif
 
         /// <summary>
         /// Gets current SDK version string reported by the client.
         /// </summary>
-        public static string SdkVersion => Api.SdkVersion;
+        public static string SdkVersion => ConnectionApi.SdkVersion;
         
         /// <summary>
         /// Get SDK settings
         /// </summary>
-        public static PlayServSettings Settings => Api.Settings;
+        public static PlayServSettings Settings => ConnectionApi.Settings;
 
         /// <summary>
         /// Gets current connection state of the SDK transport.
         /// </summary>
-        public static PlayServState State => Api.State;
+        public static PlayServState State => ConnectionApi.State;
 
         /// <summary>
         /// Raised when transport-level error happens (handshake, connection policy, protocol, etc.).
         /// </summary>
         public static event Action<TransportError> OnTransportError
         {
-            add => Api.OnTransportError += value;
-            remove => Api.OnTransportError -= value;
+            add => ConnectionApi.OnTransportError += value;
+            remove => ConnectionApi.OnTransportError -= value;
         }
 
         /// <summary>
@@ -53,8 +59,8 @@ namespace Playserv.Wrapper
         /// </summary>
         public static event Action OnKeepAlivePingSent
         {
-            add => Api.OnKeepAlivePingSent += value;
-            remove => Api.OnKeepAlivePingSent -= value;
+            add => ConnectionApi.OnKeepAlivePingSent += value;
+            remove => ConnectionApi.OnKeepAlivePingSent -= value;
         }
 
         /// <summary>
@@ -62,8 +68,8 @@ namespace Playserv.Wrapper
         /// </summary>
         public static event Action OnKeepAlivePongReceived
         {
-            add => Api.OnKeepAlivePongReceived += value;
-            remove => Api.OnKeepAlivePongReceived -= value;
+            add => ConnectionApi.OnKeepAlivePongReceived += value;
+            remove => ConnectionApi.OnKeepAlivePongReceived -= value;
         }
 
         /// <summary>
@@ -71,8 +77,8 @@ namespace Playserv.Wrapper
         /// </summary>
         public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {
-            add => Api.OnRpcInvokeResponse += value;
-            remove => Api.OnRpcInvokeResponse -= value;
+            add => RpcApi.OnRpcInvokeResponse += value;
+            remove => RpcApi.OnRpcInvokeResponse -= value;
         }
 
         /// <summary>
@@ -80,7 +86,7 @@ namespace Playserv.Wrapper
         /// </summary>
         /// <param name="settings">Runtime settings used to configure endpoint, auth and timeouts.</param>
         public static void Config(PlayServSettings settings) =>
-            Api.Config(settings);
+            ConnectionApi.Config(settings);
 
         /// <summary>
         /// Applies basic SDK connection settings.
@@ -91,14 +97,14 @@ namespace Playserv.Wrapper
         /// <param name="gameVersion">Current game client version.</param>
         /// <param name="sdkVersion">Optional SDK version override. If null, default SDK version is used.</param>
         public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
-        Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
+        ConnectionApi.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
 
         /// <summary>
         /// Connects to configured PlayServ endpoint and performs handshake.
         /// </summary>
         /// <returns>True if connection and handshake succeeded; otherwise false.</returns>
         public static Task<bool> Connect() =>
-            Api.Connect();
+            ConnectionApi.Connect();
 
         /// <summary>
         /// Registers application-provided signaling client factory for WebRTC DataChannel transport.
@@ -108,7 +114,7 @@ namespace Playserv.Wrapper
         /// Pass null to clear WebRTC signaling integration.
         /// </param>
         public static void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
-            Api.SetWebRtcSignalingClientFactory(signalingClientFactory);
+            ConnectionApi.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
         /// <summary>
         /// Requests latest deployed game version from deployment API by game identifier.
@@ -117,7 +123,7 @@ namespace Playserv.Wrapper
         /// <param name="ct">Optional cancellation token.</param>
         /// <returns>Latest deployed game version.</returns>
         public static Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
-            Api.GetLatestVersionAsync(gameId, ct);
+            ConnectionApi.GetLatestVersionAsync(gameId, ct);
 
         /// <summary>
         /// Subscribes to incoming events of type <typeparamref name="T"/>.
@@ -125,7 +131,7 @@ namespace Playserv.Wrapper
         /// <typeparam name="T">Event payload type.</typeparam>
         /// <returns>Observable stream of events.</returns>
         public static IObservable<T> Subscribe<T>() =>
-            Api.Subscribe<T>();
+            EventsApi.Subscribe<T>();
 
         /// <summary>
         /// Subscribes to incoming events of type <typeparamref name="T"/> with callback.
@@ -134,7 +140,7 @@ namespace Playserv.Wrapper
         /// <param name="onNext">Callback invoked for every received event.</param>
         /// <returns>Subscription handle that should be disposed when no longer needed.</returns>
         public static IDisposable Subscribe<T>(Action<T> onNext) =>
-            Api.Subscribe(onNext);
+            EventsApi.Subscribe(onNext);
 
         /// <summary>
         /// Sends command object using default command namespace resolution.
@@ -142,14 +148,14 @@ namespace Playserv.Wrapper
         /// <typeparam name="T">Command type.</typeparam>
         /// <param name="command">Command payload.</param>
         public static void Send<T>(T command) =>
-            Api.Send(command);
+            RpcApi.Send(command);
 
         /// <summary>
         /// Sets optional local command handler for server-side/in-process execution.
         /// </summary>
         /// <param name="commandHandler">Local command handler. Pass null to disable local handling.</param>
         public static void SetCommandHandler(ICommandHandler commandHandler) =>
-            Api.SetCommandHandler(commandHandler);
+            RpcApi.SetCommandHandler(commandHandler);
 
         /// <summary>
         /// Sends command object to explicit backend module/command path.
@@ -158,14 +164,14 @@ namespace Playserv.Wrapper
         /// <param name="command">Command payload.</param>
         /// <param name="moduleName">Target module path, for example "rpc.InvokeRpc" or "module_dataflow".</param>
         public static void Send<T>(T command, string moduleName) =>
-            Api.Send(command,  moduleName);
+            RpcApi.Send(command,  moduleName);
 
         /// <summary>
         /// Sets optional local event handler for server-side/in-process execution.
         /// </summary>
         /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
         public static void SetEventHandler(IEventHandler eventHandler) =>
-            Api.SetEventHandler(eventHandler);
+            EventsApi.SetEventHandler(eventHandler);
 
         /// <summary>
         /// Invokes server RPC method using object payload serialized to base64 JSON.
@@ -174,7 +180,7 @@ namespace Playserv.Wrapper
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payload">Payload object to serialize.</param>
         public static void Invoke(string serviceName, string methodName, object payload) =>
-            Api.Invoke(serviceName, methodName, payload);
+            RpcApi.Invoke(serviceName, methodName, payload);
 
         /// <summary>
         /// Invokes server RPC method using positional argument array without expression parsing.
@@ -183,7 +189,7 @@ namespace Playserv.Wrapper
         /// <param name="methodName">RPC method name.</param>
         /// <param name="args">Positional RPC arguments in declared method order.</param>
         public static void InvokeArgs(string serviceName, string methodName, params object[] args) =>
-            Api.InvokeArgs(serviceName, methodName, args);
+            RpcApi.InvokeArgs(serviceName, methodName, args);
 
         /// <summary>
         /// Invokes server RPC method using named argument payload without expression parsing.
@@ -192,14 +198,14 @@ namespace Playserv.Wrapper
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payload">Named RPC arguments keyed by parameter name.</param>
         public static void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
-            Api.InvokeNamed(serviceName, methodName, payload);
+            RpcApi.InvokeNamed(serviceName, methodName, payload);
 
         /// <summary>
         /// Sets optional local RPC invoker for server-side/in-process execution.
         /// </summary>
         /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
         public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
-            Api.SetRpcInvoker(rpcInvoker);
+            RpcApi.SetRpcInvoker(rpcInvoker);
 
         /// <summary>
         /// Invokes server RPC method using already prepared base64 JSON payload.
@@ -208,7 +214,7 @@ namespace Playserv.Wrapper
         /// <param name="methodName">RPC method name.</param>
         /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
         public static void Invoke(string serviceName, string methodName, string payloadBase64) =>
-            Api.Invoke(serviceName, methodName, payloadBase64);
+            RpcApi.Invoke(serviceName, methodName, payloadBase64);
 
         /// <summary>
         /// Invokes server RPC method from a method-call expression and auto-builds payload from arguments.
@@ -216,7 +222,7 @@ namespace Playserv.Wrapper
         /// <typeparam name="TService">RPC service type used to derive service name.</typeparam>
         /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll("Hello"). Service class must have [Rpc] attribute.</param>
         public static void Invoke<TService>(Expression<Action<TService>> method) =>
-            Api.Invoke(method);
+            RpcApi.Invoke(method);
 
         /// <summary>
         /// Invokes server RPC method by passing method expression of service type.
@@ -225,7 +231,7 @@ namespace Playserv.Wrapper
         /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll(default). Service class must have [Rpc] attribute.</param>
         /// <param name="payload">Payload object to serialize to base64 JSON.</param>
         public static void Invoke<TService>(Expression<Action<TService>> method, object payload) =>
-            Api.Invoke(method, payload);
+            RpcApi.Invoke(method, payload);
 
         /// <summary>
         /// Invokes server RPC method by passing method expression with pre-encoded base64 payload.
@@ -234,14 +240,14 @@ namespace Playserv.Wrapper
         /// <param name="method">Method call expression, e.g. x => x.BroadcastToAll(default). Service class must have [Rpc] attribute.</param>
         /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
         public static void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
-            Api.Invoke(method, payloadBase64);
+            RpcApi.Invoke(method, payloadBase64);
 
         /// <summary>
         /// Returns low-level transport implementation used by SDK.
         /// Intended for testing and protocol diagnostics only.
         /// </summary>
         public static Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
-            Api.GetTransportImplementation();
+            ConnectionApi.GetTransportImplementation();
 
         /// <summary>
         /// Publishes global event to all interested listeners.
@@ -249,7 +255,7 @@ namespace Playserv.Wrapper
         /// <typeparam name="T">Event payload type.</typeparam>
         /// <param name="event">Event payload.</param>
         public static void Publish<T>(T @event) =>
-            Api.Publish(@event);
+            EventsApi.Publish(@event);
 
         /// <summary>
         /// Publishes event scoped to a specific group.
@@ -258,7 +264,7 @@ namespace Playserv.Wrapper
         /// <param name="groupName">Target group name.</param>
         /// <param name="event">Event payload.</param>
         public static void PublishForGroup<T>(string groupName, T @event) =>
-            Api.PublishForGroup(groupName, @event);
+            EventsApi.PublishForGroup(groupName, @event);
 
         /// <summary>
         /// Publishes event scoped to a specific user.
@@ -267,7 +273,7 @@ namespace Playserv.Wrapper
         /// <param name="userId">Target user id.</param>
         /// <param name="event">Event payload.</param>
         public static void PublishForUser<T>(string userId, T @event) =>
-            Api.PublishForUser(userId, @event);
+            EventsApi.PublishForUser(userId, @event);
 
         /// <summary>
         /// Joins named event group for group-scoped routing.
@@ -276,7 +282,7 @@ namespace Playserv.Wrapper
         /// <param name="ct">Optional cancellation token.</param>
         /// <returns>True when group join succeeded.</returns>
         public static Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
-            Api.SubscribeGroupAsync(groupName, ct);
+            EventsApi.SubscribeGroupAsync(groupName, ct);
 
         /// <summary>
         /// Leaves named event group.
@@ -285,13 +291,13 @@ namespace Playserv.Wrapper
         /// <param name="ct">Optional cancellation token.</param>
         /// <returns>True when group leave succeeded.</returns>
         public static Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
-            Api.UnsubscribeGroupAsync(groupName, ct);
+            EventsApi.UnsubscribeGroupAsync(groupName, ct);
 
         /// <summary>
         /// Disconnects SDK transport and disposes internal runtime instance.
         /// </summary>
         public static void Disconnect() =>
-            Api.Disconnect();
+            ConnectionApi.Disconnect();
 
 #if UNITY_5_3_OR_NEWER
         /// <summary>
@@ -302,7 +308,7 @@ namespace Playserv.Wrapper
         /// <param name="rotation">World rotation.</param>
         /// <returns>Spawned GameObject or null when spawn failed.</returns>
         public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
-            Api.Spawn(assetName, position, rotation);
+            SpawnApi.Spawn(assetName, position, rotation);
 
         /// <summary>
         /// Spawns networked prefab from Resources with identity rotation.
@@ -311,7 +317,7 @@ namespace Playserv.Wrapper
         /// <param name="position">World position.</param>
         /// <returns>Spawned GameObject or null when spawn failed.</returns>
         public static Task<GameObject> Spawn(string assetName, Vector3 position) =>
-            Api.Spawn(assetName, position);
+            SpawnApi.Spawn(assetName, position);
 #endif
 
         /// <summary>
@@ -329,7 +335,7 @@ namespace Playserv.Wrapper
             DataSubscriptionMode mode = DataSubscriptionMode.Polling)
             where TEntity : class
             where TDto : class, new() =>
-            Api.SelectEntity<TEntity, TDto>(playerId, map, mode);
+            DataApi.SelectEntity<TEntity, TDto>(playerId, map, mode);
 
         /// <summary>
         /// Sends simplified key-based retrieval request once.
@@ -344,7 +350,7 @@ namespace Playserv.Wrapper
             string query,
             Dictionary<string, object> variables,
             CancellationToken ct = default) =>
-            Api.GetDataByKeyAsync(key, query, variables, ct);
+            DataApi.GetDataByKeyAsync(key, query, variables, ct);
 
         /// <summary>
         /// Starts simplified key-based polling loop.
@@ -361,6 +367,6 @@ namespace Playserv.Wrapper
             Dictionary<string, object> variables,
             Action<DataGetResponse> onData,
             Action<Exception> onError = null) =>
-            Api.StartDataByKeyPolling(key, query, variables, onData, onError);
+            DataApi.StartDataByKeyPolling(key, query, variables, onData, onError);
     }
 }
