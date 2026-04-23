@@ -4,12 +4,14 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
-namespace Playserv.Events
+namespace Playserv.Serialization
 {
-    internal sealed class Vector3JsonConverter : JsonConverter
+    internal sealed class Vector3NewtonsoftJsonConverter : JsonConverter
     {
-        public override bool CanConvert(Type objectType) =>
-            objectType == typeof(Vector3);
+        public override bool CanConvert(Type objectType)
+        {
+            return objectType == typeof(Vector3);
+        }
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
@@ -37,10 +39,12 @@ namespace Playserv.Events
         }
     }
 
-    internal sealed class QuaternionJsonConverter : JsonConverter
+    internal sealed class QuaternionNewtonsoftJsonConverter : JsonConverter
     {
-        public override bool CanConvert(Type objectType) =>
-            objectType == typeof(Quaternion);
+        public override bool CanConvert(Type objectType)
+        {
+            return objectType == typeof(Quaternion);
+        }
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {

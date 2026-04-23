@@ -22,7 +22,7 @@ namespace Playserv.Events
         private readonly object _infrastructureEventLock = new object();
         private readonly SemaphoreSlim _groupCommandGate = new SemaphoreSlim(1, 1);
         private static readonly TimeSpan GroupCommandTimeout = TimeSpan.FromSeconds(10);
-        private static readonly JsonCodecOptions EventJsonOptions = CreateEventJsonOptions();
+        private static readonly JsonCodecOptions EventJsonOptions = UnityJsonCodecOptionsFactory.CreateDefaultEventOptions();
 
         public PlayServEventsAdapter(ITransport transport, IJsonCodec jsonCodec, ILogger logger)
         {
@@ -240,22 +240,6 @@ namespace Playserv.Events
             return _eventTypeRegistry.TryResolve(typeName, out var eventType)
                 ? eventType
                 : null;
-        }
-
-        private static JsonCodecOptions CreateEventJsonOptions()
-        {
-            var converters = new List<object>();
-#if UNITY_5_3_OR_NEWER
-            converters.Add(new Vector3JsonConverter());
-            converters.Add(new QuaternionJsonConverter());
-#endif
-            return new JsonCodecOptions
-            {
-                IncludeNullValues = true,
-                IgnoreMissingMembers = true,
-                ParseDates = true,
-                CustomConverters = converters
-            };
         }
 
         private static bool IsInfrastructureEventType(string eventTypeName)
