@@ -16,11 +16,13 @@ using UnityEngine;
 namespace Playserv.Wrapper
 {
     /// <summary>
-    /// Main static facade for PlayServ SDK runtime operations.
+    /// Compatibility and convenience facade for PlayServ SDK runtime operations.
+    /// Prefer domain-specific entrypoints such as PlayServConnection, PlayServRpc,
+    /// PlayServEvents, PlayServData and PlayServSpawn for new code.
     /// </summary>
     public static class PlayServ
     {
-        private static readonly PlayServApi Api = new PlayServApi();
+        private static IPlayServApi Api => PlayServApiHost.Api;
 
         /// <summary>
         /// Gets current SDK version string reported by the client.
