@@ -104,17 +104,7 @@ namespace Playserv.Deploy.Editor.Analysis
             var result = new AnalysisResult { Success = true };
 
             if (rpcClassList.Count > 0)
-            {
-                var firstSemanticModel = compilation.GetSemanticModel(rpcClassList[0].SyntaxTree);
-                var circularValidator = new CircularDependencyValidator();
-                var circularResult = circularValidator.Validate(rpcClassList[0], firstSemanticModel);
-
-                if (!circularResult.IsValid)
-                {
-                    result.Success = false;
-                    result.Errors.AddRange(circularResult.Errors);
-                }
-            }
+                ApplyCircularDependencyValidation(compilation, result);
 
             foreach (var rpcClass in rpcClassList)
             {
@@ -163,6 +153,34 @@ namespace Playserv.Deploy.Editor.Analysis
             result.RpcServices = _scanner.ExtractRpcServices(rpcClassList);
 
             return result;
+        }
+
+        private static void ApplyCircularDependencyValidation(
+            CSharpCompilation compilation,
+            AnalysisResult result)
+        {
+            if (compilation == null)
+                throw new ArgumentNullException(nameof(compilation));
+
+            if (result == null)
+                throw new ArgumentNullException(nameof(result));
+
+            var seedTree = compilation.SyntaxTrees.FirstOrDefault();
+            if (seedTree == null)
+                return;
+
+            // CircularDependencyValidator walks the entire compilation, so the seed root/model
+            // here only provide access to that compilation context.
+            var seedRoot = seedTree.GetRoot();
+            var seedSemanticModel = compilation.GetSemanticModel(seedTree);
+            var circularValidator = new CircularDependencyValidator();
+            var circularResult = circularValidator.Validate(seedRoot, seedSemanticModel);
+
+            if (circularResult.IsValid)
+                return;
+
+            result.Success = false;
+            result.Errors.AddRange(circularResult.Errors);
         }
 
         private static List<MetadataReference> BuildMetadataReferences()
