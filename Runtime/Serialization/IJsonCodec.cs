@@ -18,6 +18,10 @@ namespace Playserv.Serialization
 
         object Clone(object value, JsonCodecOptions options = null);
 
+        object ToPlainValue(object value, JsonCodecOptions options = null);
+
+        object ParseToPlainValue(string json, JsonCodecOptions options = null);
+
         bool TryGetProperty(object value, string propertyName, bool ignoreCase, out object propertyValue);
 
         bool TryGetFirstPropertyValue(object value, out object propertyValue);
