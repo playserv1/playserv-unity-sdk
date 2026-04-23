@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using Newtonsoft.Json;
+using Playserv.Serialization;
 
 namespace Playserv.RPC
 {
@@ -9,6 +9,8 @@ namespace Playserv.RPC
     /// </summary>
     public static class RpcPayloadSerializer
     {
+        private static readonly IJsonCodec JsonCodec = new NewtonsoftJsonCodec();
+
         /// <summary>
         /// Serializes arbitrary object to JSON and encodes it as base64.
         /// </summary>
@@ -16,7 +18,7 @@ namespace Playserv.RPC
         /// <returns>Base64-encoded UTF8 JSON string.</returns>
         public static string SerializeToBase64(object payload)
         {
-            var json = JsonConvert.SerializeObject(payload);
+            var json = JsonCodec.Serialize(payload);
             var bytes = Encoding.UTF8.GetBytes(json);
             return Convert.ToBase64String(bytes);
         }
