@@ -171,6 +171,8 @@ namespace Playserv.CodeGenerator.Editor
             int parsedFiles = 0;
             int foundBindings = 0;
             int written = 0;
+            var previousDirtySnapshots = CapturePreviousSnapshots(cache, dirtyAssets, deletedAssets);
+            var generatedOutputsThisRun = new Dictionary<string, GeneratedDtoOutput>(StringComparer.OrdinalIgnoreCase);
 
             if (fullRebuild)
             {
@@ -213,9 +215,16 @@ namespace Playserv.CodeGenerator.Editor
                 .Select(TypeIndexBuilder.DeserializeSnapshot)
                 .ToArray();
             var typeIndex = TypeIndexBuilder.BuildFromSnapshots(typeSnapshots);
+            var changedTypeNames = GetChangedTypeNames(cache, previousDirtySnapshots, dirtyAssets, deletedAssets);
 
             var sharedSourceFiles = GetKnownSharedSourceFiles(cache);
-            var filesToProcess = DetermineSharedFilesToProcess(cache, sharedSourceFiles, dirtyAssets, deletedAssets, fullRebuild);
+            var filesToProcess = DetermineSharedFilesToProcess(
+                cache,
+                sharedSourceFiles,
+                dirtyAssets,
+                deletedAssets,
+                changedTypeNames,
+                fullRebuild);
 
             foreach (var assetPath in sharedSourceFiles.Except(filesToProcess, StringComparer.OrdinalIgnoreCase))
             {
@@ -243,6 +252,10 @@ namespace Playserv.CodeGenerator.Editor
                     Debug.Log($"[PlayServ] Found [Shared] text but parsed 0 bindings in: {assetPath}");
 
                 foundBindings += bindings.Count;
+                cache.FileDependencies[assetPath] = DtoDependencyCollector
+                    .CollectDependencies(bindings, typeIndex)
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
 
                 var outs = new List<string>();
 
@@ -269,6 +282,12 @@ namespace Playserv.CodeGenerator.Editor
                         typeIndex: typeIndex);
 
                     var outHash = HashUtil.Sha256Hex(content);
+                    ValidateGeneratedOutputCollision(
+                        generatedOutputsThisRun,
+                        outFile,
+                        outHash,
+                        content,
+                        $"{assetPath} -> {b.OwnerTypeName}.{b.MemberName}");
 
                     if (cache.OutputHashes.TryGetValue(outFile, out var prevOutHash) && prevOutHash == outHash)
                         continue;
@@ -400,6 +419,7 @@ namespace Playserv.CodeGenerator.Editor
             cache.FileTypeSnapshots.Remove(assetPath);
             cache.FileSharedMarkers.Remove(assetPath);
             cache.FileOutputs.Remove(assetPath);
+            cache.FileDependencies.Remove(assetPath);
         }
 
         private static HashSet<string> GetKnownSharedSourceFiles(SimpleCache cache)
@@ -426,9 +446,10 @@ namespace Playserv.CodeGenerator.Editor
             HashSet<string> sharedSourceFiles,
             HashSet<string> dirtyAssets,
             HashSet<string> deletedAssets,
+            HashSet<string> changedTypeNames,
             bool fullRebuild)
         {
-            if (fullRebuild || deletedAssets.Count > 0)
+            if (fullRebuild)
                 return new HashSet<string>(sharedSourceFiles, StringComparer.OrdinalIgnoreCase);
 
             var dirtySharedFiles = new HashSet<string>(
@@ -438,17 +459,107 @@ namespace Playserv.CodeGenerator.Editor
                      string.Equals(marker, "1", StringComparison.Ordinal))),
                 StringComparer.OrdinalIgnoreCase);
 
+            var dependentSharedFiles = GetDependentSharedFiles(cache, sharedSourceFiles, changedTypeNames);
+
             if (dirtyAssets.Count == 0)
-                return dirtySharedFiles;
+                return new HashSet<string>(
+                    dirtySharedFiles.Union(dependentSharedFiles),
+                    StringComparer.OrdinalIgnoreCase);
 
-            var onlySharedFilesChanged = dirtyAssets.All(assetPath =>
-                sharedSourceFiles.Contains(assetPath) ||
-                (cache.FileSharedMarkers.TryGetValue(assetPath, out var marker) &&
-                 string.Equals(marker, "1", StringComparison.Ordinal)));
+            return new HashSet<string>(dirtySharedFiles.Union(dependentSharedFiles), StringComparer.OrdinalIgnoreCase);
+        }
 
-            return onlySharedFilesChanged
-                ? dirtySharedFiles
-                : new HashSet<string>(sharedSourceFiles.Union(dirtySharedFiles), StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, TypeIndexBuilder.CachedSourceSnapshot> CapturePreviousSnapshots(
+            SimpleCache cache,
+            HashSet<string> dirtyAssets,
+            HashSet<string> deletedAssets)
+        {
+            var result = new Dictionary<string, TypeIndexBuilder.CachedSourceSnapshot>(StringComparer.OrdinalIgnoreCase);
+            foreach (var assetPath in dirtyAssets.Union(deletedAssets))
+            {
+                if (!cache.FileTypeSnapshots.TryGetValue(assetPath, out var raw))
+                    continue;
+
+                result[assetPath] = TypeIndexBuilder.DeserializeSnapshot(raw);
+            }
+
+            return result;
+        }
+
+        private static HashSet<string> GetChangedTypeNames(
+            SimpleCache cache,
+            Dictionary<string, TypeIndexBuilder.CachedSourceSnapshot> previousSnapshots,
+            HashSet<string> dirtyAssets,
+            HashSet<string> deletedAssets)
+        {
+            var changed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var kv in previousSnapshots)
+                AddDeclaredTypeNames(changed, kv.Value);
+
+            foreach (var assetPath in dirtyAssets)
+            {
+                if (!cache.FileTypeSnapshots.TryGetValue(assetPath, out var raw))
+                    continue;
+
+                AddDeclaredTypeNames(changed, TypeIndexBuilder.DeserializeSnapshot(raw));
+            }
+
+            foreach (var assetPath in deletedAssets)
+            {
+                if (previousSnapshots.TryGetValue(assetPath, out var snapshot))
+                    AddDeclaredTypeNames(changed, snapshot);
+            }
+
+            return changed;
+        }
+
+        private static void AddDeclaredTypeNames(HashSet<string> target, TypeIndexBuilder.CachedSourceSnapshot snapshot)
+        {
+            if (snapshot == null)
+                return;
+
+            foreach (var type in snapshot.Types)
+            {
+                if (!string.IsNullOrWhiteSpace(type?.FullName))
+                    target.Add(type.FullName);
+            }
+
+            foreach (var en in snapshot.Enums)
+            {
+                if (string.IsNullOrWhiteSpace(en))
+                    continue;
+
+                if (!string.IsNullOrWhiteSpace(snapshot.Namespace))
+                    target.Add(snapshot.Namespace + "." + en);
+                else
+                    target.Add(en);
+            }
+        }
+
+        private static HashSet<string> GetDependentSharedFiles(
+            SimpleCache cache,
+            HashSet<string> sharedSourceFiles,
+            HashSet<string> changedTypeNames)
+        {
+            if (changedTypeNames.Count == 0)
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sharedFile in sharedSourceFiles)
+            {
+                if (!cache.FileDependencies.TryGetValue(sharedFile, out var dependencies) ||
+                    dependencies == null ||
+                    dependencies.Count == 0)
+                {
+                    continue;
+                }
+
+                if (dependencies.Any(changedTypeNames.Contains))
+                    result.Add(sharedFile);
+            }
+
+            return result;
         }
 
         private static void EnsureIsExternalInit(string outputDir, SimpleCache cache, HashSet<string> keepOutputs)
@@ -547,6 +658,48 @@ namespace System.Runtime.CompilerServices
             }
 
             return deleted;
+        }
+
+        private static void ValidateGeneratedOutputCollision(
+            Dictionary<string, GeneratedDtoOutput> generatedOutputs,
+            string outFile,
+            string outHash,
+            string content,
+            string sourceBinding)
+        {
+            if (!generatedOutputs.TryGetValue(outFile, out var existing))
+            {
+                generatedOutputs[outFile] = new GeneratedDtoOutput(outHash, content, sourceBinding);
+                return;
+            }
+
+            if (string.Equals(existing.Hash, outHash, StringComparison.Ordinal) &&
+                string.Equals(existing.Content, content, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Shared DTO generation collision detected for '{outFile}'. " +
+                $"Existing source: {existing.SourceBinding}. " +
+                $"Conflicting source: {sourceBinding}. " +
+                "Use distinct GeneratedName/DTO type names or make the generated content identical.");
+        }
+
+        private sealed class GeneratedDtoOutput
+        {
+            public GeneratedDtoOutput(string hash, string content, string sourceBinding)
+            {
+                Hash = hash ?? string.Empty;
+                Content = content ?? string.Empty;
+                SourceBinding = sourceBinding ?? string.Empty;
+            }
+
+            public string Hash { get; }
+
+            public string Content { get; }
+
+            public string SourceBinding { get; }
         }
     }
 }

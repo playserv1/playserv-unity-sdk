@@ -13,6 +13,7 @@ namespace Playserv.CodeGenerator.Editor
         public Dictionary<string, string> OutputHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> FileTypeSnapshots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> FileSharedMarkers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, List<string>> FileDependencies = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         public static SimpleCache Load(string path)
         {
@@ -26,7 +27,8 @@ namespace Playserv.CodeGenerator.Editor
                     line == "[FileOutputs]" ||
                     line == "[OutputHashes]" ||
                     line == "[FileTypeSnapshots]" ||
-                    line == "[FileSharedMarkers]")
+                    line == "[FileSharedMarkers]" ||
+                    line == "[FileDependencies]")
                 {
                     section = line;
                     continue;
@@ -55,6 +57,14 @@ namespace Playserv.CodeGenerator.Editor
                     var k = line.Substring(0, idx);
                     var v = line.Substring(idx + 1);
                     c.FileOutputs[k] = v.Length == 0 ? new List<string>() : v.Split(';').ToList();
+                }
+                else if (section == "[FileDependencies]")
+                {
+                    var idx = line.IndexOf('|');
+                    if (idx <= 0) continue;
+                    var k = line.Substring(0, idx);
+                    var v = line.Substring(idx + 1);
+                    c.FileDependencies[k] = v.Length == 0 ? new List<string>() : v.Split(';').ToList();
                 }
             }
 
@@ -88,6 +98,10 @@ namespace Playserv.CodeGenerator.Editor
             sb.AppendLine("[FileSharedMarkers]");
             foreach (var kv in c.FileSharedMarkers)
                 sb.AppendLine(kv.Key + "=" + kv.Value);
+
+            sb.AppendLine("[FileDependencies]");
+            foreach (var kv in c.FileDependencies)
+                sb.AppendLine(kv.Key + "|" + string.Join(";", kv.Value));
 
             File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
         }
