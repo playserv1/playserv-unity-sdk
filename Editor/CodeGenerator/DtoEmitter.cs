@@ -17,12 +17,26 @@ namespace Playserv.CodeGenerator.Editor
             TypeIndex typeIndex)
         {
             var rootTypeNameRaw = TypeNameUtil.ExtractTypeofName(rootTypeExpr);
+            var rootTypeResolution = string.IsNullOrWhiteSpace(rootTypeNameRaw)
+                ? null
+                : typeIndex.ResolveReference(rootTypeNameRaw);
+
+            if (rootTypeResolution != null && rootTypeResolution.IsAmbiguous)
+            {
+                throw new InvalidOperationException(
+                    $"Shared DTO root type '{rootTypeNameRaw}' for '{source}' is ambiguous. " +
+                    $"Candidates: {string.Join(", ", rootTypeResolution.Candidates)}. " +
+                    "Use a fully qualified type in typeof(...).");
+            }
 
             // IMPORTANT: Keep root type resolution consistent with the generated mapper signature.
             // If rootTypeExpr is `typeof(Player)` and multiple `Player` exist, we must resolve to the same one everywhere.
-            var rootTypeNameQualified = string.IsNullOrWhiteSpace(rootTypeNameRaw)
-                ? ""
-                : TypeNameUtil.QualifyTypeIfNeeded(rootTypeNameRaw, typeIndex);
+            var rootTypeNameQualified =
+                rootTypeResolution != null && rootTypeResolution.IsResolved && !string.IsNullOrWhiteSpace(rootTypeResolution.FullName)
+                    ? "global::" + rootTypeResolution.FullName
+                    : string.IsNullOrWhiteSpace(rootTypeNameRaw)
+                        ? ""
+                        : TypeNameUtil.QualifyTypeIfNeeded(rootTypeNameRaw, typeIndex);
 
             // TypeIndex typically stores names without the `global::` prefix.
             var rootTypeLookup = StripGlobalPrefix(rootTypeNameQualified);
