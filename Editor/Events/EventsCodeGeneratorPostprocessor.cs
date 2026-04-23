@@ -9,6 +9,13 @@ namespace Playserv.Events.Editor
     internal sealed class EventsCodeGeneratorPostprocessor : AssetPostprocessor
     {
         private static bool _isGenerating;
+        private static readonly string[] EventRelevantPathMarkers =
+        {
+            "/Editor/Events/",
+            "/Runtime/Events/"
+        };
+
+        private const string GeneratedEventsMarker = "/Runtime/Generated/Events/";
 
         private static void OnPostprocessAllAssets(
             string[] importedAssets,
@@ -19,13 +26,7 @@ namespace Playserv.Events.Editor
             if (_isGenerating)
                 return;
 
-            if (importedAssets == null || importedAssets.Length == 0)
-                return;
-
-            var hasScriptChanges = importedAssets.Any(a =>
-                a.EndsWith(".cs", StringComparison.OrdinalIgnoreCase));
-
-            if (!hasScriptChanges)
+            if (!ShouldGenerate(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths))
                 return;
 
             _isGenerating = true;
@@ -41,6 +42,92 @@ namespace Playserv.Events.Editor
             {
                 _isGenerating = false;
             }
+        }
+
+        private static bool ShouldGenerate(
+            string[] importedAssets,
+            string[] deletedAssets,
+            string[] movedAssets,
+            string[] movedFromAssetPaths)
+        {
+            if (HasRelevantImportedSource(importedAssets))
+                return true;
+
+            if (HasRelevantDeletedOrMovedSource(deletedAssets) ||
+                HasRelevantDeletedOrMovedSource(movedAssets) ||
+                HasRelevantDeletedOrMovedSource(movedFromAssetPaths))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasRelevantImportedSource(string[] assetPaths)
+        {
+            if (assetPaths == null || assetPaths.Length == 0)
+                return false;
+
+            foreach (var assetPath in assetPaths)
+            {
+                if (!IsCSharpSource(assetPath) || IsGeneratedEventsAsset(assetPath))
+                    continue;
+
+                if (MatchesEventPath(assetPath))
+                    return true;
+
+                if (!System.IO.File.Exists(assetPath))
+                    continue;
+
+                try
+                {
+                    var text = System.IO.File.ReadAllText(assetPath);
+                    if (text.IndexOf("[Event", StringComparison.Ordinal) >= 0 ||
+                        text.IndexOf("EventAttribute", StringComparison.Ordinal) >= 0)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasRelevantDeletedOrMovedSource(string[] assetPaths)
+        {
+            if (assetPaths == null || assetPaths.Length == 0)
+                return false;
+
+            return assetPaths.Any(assetPath =>
+                IsCSharpSource(assetPath) &&
+                !IsGeneratedEventsAsset(assetPath) &&
+                MatchesEventPath(assetPath));
+        }
+
+        private static bool IsCSharpSource(string assetPath)
+        {
+            return !string.IsNullOrWhiteSpace(assetPath) &&
+                   assetPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsGeneratedEventsAsset(string assetPath)
+        {
+            return !string.IsNullOrWhiteSpace(assetPath) &&
+                   assetPath.Replace('\\', '/').IndexOf(GeneratedEventsMarker, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool MatchesEventPath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return false;
+
+            var normalized = assetPath.Replace('\\', '/');
+            return EventRelevantPathMarkers.Any(marker =>
+                normalized.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0);
         }
     }
 }

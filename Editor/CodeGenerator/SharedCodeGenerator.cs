@@ -22,6 +22,8 @@ namespace Playserv.CodeGenerator.Editor
 
         private const string PendingKey = "SharedCodeGenerator.Pending";
         private const string RunningKey = "SharedCodeGenerator.Running";
+        private const string DirtyAssetsKey = "SharedCodeGenerator.DirtyAssets";
+        private const string DeletedAssetsKey = "SharedCodeGenerator.DeletedAssets";
 
         private const string AutoGenPrefKey = "PlayServ.Codegen.AutoGenerate";
 
@@ -50,6 +52,19 @@ namespace Playserv.CodeGenerator.Editor
         public static void GenerateMenu()
         {
             RunNow("menu");
+        }
+
+        internal static void TrackAssetChanges(IEnumerable<string> dirtyAssets, IEnumerable<string> deletedAssets, string reason)
+        {
+            if (!IsAutoGenerationEnabled())
+                return;
+
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                return;
+
+            MergeTrackedAssets(DirtyAssetsKey, dirtyAssets);
+            MergeTrackedAssets(DeletedAssetsKey, deletedAssets);
+            Schedule(reason);
         }
 
         public static void DestroyDTOs()
@@ -90,11 +105,16 @@ namespace Playserv.CodeGenerator.Editor
 
             var reason = SessionState.GetString(PendingKey, "scheduled");
             SessionState.EraseString(PendingKey);
+            var dirtyAssets = ConsumeTrackedAssets(DirtyAssetsKey);
+            var deletedAssets = ConsumeTrackedAssets(DeletedAssetsKey);
+
+            if (!ShouldRun(reason, dirtyAssets, deletedAssets))
+                return;
 
             SessionState.SetBool(RunningKey, true);
             try
             {
-                GenerateAll(reason);
+                GenerateAll(reason, dirtyAssets, deletedAssets, ShouldForceFullRebuild(reason));
             }
             catch (Exception e)
             {
@@ -114,7 +134,7 @@ namespace Playserv.CodeGenerator.Editor
             SessionState.SetBool(RunningKey, true);
             try
             {
-                GenerateAll(reason);
+                GenerateAll(reason, new HashSet<string>(StringComparer.OrdinalIgnoreCase), new HashSet<string>(StringComparer.OrdinalIgnoreCase), true);
             }
             catch (Exception e)
             {
@@ -131,7 +151,11 @@ namespace Playserv.CodeGenerator.Editor
             return EditorPrefs.GetBool(AutoGenPrefKey, true);
         }
 
-        private static void GenerateAll(string reason)
+        private static void GenerateAll(
+            string reason,
+            HashSet<string> dirtyAssets,
+            HashSet<string> deletedAssets,
+            bool fullRebuild)
         {
             Directory.CreateDirectory(OutputDir);
             Directory.CreateDirectory(Path.GetDirectoryName(CacheFile) ?? CacheFolder);
@@ -144,42 +168,79 @@ namespace Playserv.CodeGenerator.Editor
             // Ensure IsExternalInit exists for Unity 2021.3 (init setters)
             EnsureIsExternalInit(OutputDir, cache, keepOutputs);
 
-            var csFilesAbs = Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories)
-                .Select(p => p.Replace("\\", "/"))
-                .Where(p => !p.Contains("/Shared/Generated/DTOs/", StringComparison.OrdinalIgnoreCase))
-                .Where(p => !p.EndsWith("/Editor/SharedCodeGenerator.cs", StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-
-            // Build a naive type index from all sources (needed to resolve DTO field types).
-            var typeIndex = TypeIndexBuilder.BuildFromAllCsFiles(csFilesAbs);
-
             int parsedFiles = 0;
             int foundBindings = 0;
             int written = 0;
 
-            foreach (var abs in csFilesAbs)
+            if (fullRebuild)
             {
-                var rel = "Assets" + abs.Substring(Application.dataPath.Length).Replace("\\", "/");
-                var text = File.ReadAllText(abs);
-                parsedFiles++;
+                var currentSourceFiles = new HashSet<string>(
+                    EnumerateRelevantSourceAssetPaths(),
+                    StringComparer.OrdinalIgnoreCase);
 
-                var fileHash = HashUtil.Sha256Hex(text);
-
-                // If unchanged, keep previously known outputs for stale cleanup.
-                if (cache.FileHashes.TryGetValue(rel, out var old) && old == fileHash)
+                foreach (var cachedPath in cache.FileHashes.Keys.ToArray())
                 {
-                    if (cache.FileOutputs.TryGetValue(rel, out var outsOld))
+                    if (!currentSourceFiles.Contains(cachedPath))
+                        RemoveSourceFile(cache, cachedPath);
+                }
+
+                foreach (var assetPath in currentSourceFiles)
+                {
+                    if (!TryReadAssetText(assetPath, out var text))
+                        continue;
+
+                    UpdateSourceSnapshotCache(cache, assetPath, text);
+                }
+            }
+            else
+            {
+                foreach (var deletedAsset in deletedAssets)
+                    RemoveSourceFile(cache, deletedAsset);
+
+                foreach (var dirtyAsset in dirtyAssets)
+                {
+                    if (!TryReadAssetText(dirtyAsset, out var text))
                     {
-                        foreach (var o in outsOld)
-                            keepOutputs.Add(o);
+                        RemoveSourceFile(cache, dirtyAsset);
+                        continue;
                     }
+
+                    UpdateSourceSnapshotCache(cache, dirtyAsset, text);
+                }
+            }
+
+            var typeSnapshots = cache.FileTypeSnapshots.Values
+                .Select(TypeIndexBuilder.DeserializeSnapshot)
+                .ToArray();
+            var typeIndex = TypeIndexBuilder.BuildFromSnapshots(typeSnapshots);
+
+            var sharedSourceFiles = GetKnownSharedSourceFiles(cache);
+            var filesToProcess = DetermineSharedFilesToProcess(cache, sharedSourceFiles, dirtyAssets, deletedAssets, fullRebuild);
+
+            foreach (var assetPath in sharedSourceFiles.Except(filesToProcess, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!cache.FileOutputs.TryGetValue(assetPath, out var cachedOutputs))
+                    continue;
+
+                foreach (var output in cachedOutputs)
+                    keepOutputs.Add(output);
+            }
+
+            foreach (var assetPath in filesToProcess)
+            {
+                if (!TryReadAssetText(assetPath, out var text))
+                {
+                    RemoveSourceFile(cache, assetPath);
                     continue;
                 }
+
+                parsedFiles++;
+                UpdateSourceSnapshotCache(cache, assetPath, text);
 
                 var bindings = SharedTextFinder.FindBindings(text);
 
                 if (bindings.Count == 0 && text.Contains("[Shared", StringComparison.Ordinal))
-                    Debug.Log($"[PlayServ] Found [Shared] text but parsed 0 bindings in: {rel}");
+                    Debug.Log($"[PlayServ] Found [Shared] text but parsed 0 bindings in: {assetPath}");
 
                 foundBindings += bindings.Count;
 
@@ -187,9 +248,6 @@ namespace Playserv.CodeGenerator.Editor
 
                 foreach (var b in bindings)
                 {
-                    // 1) If member has explicit declared DTO type (field/property type) -> use it
-                    // 2) Else use GeneratedName
-                    // 3) Else fallback to Owner_Member
                     var declaredDto = ShortTypeName(b.DeclaredDtoTypeName);
 
                     var dtoName =
@@ -220,8 +278,8 @@ namespace Playserv.CodeGenerator.Editor
                     written++;
                 }
 
-                cache.FileHashes[rel] = fileHash;
-                cache.FileOutputs[rel] = outs;
+                cache.FileOutputs[assetPath] = outs;
+                cache.FileSharedMarkers[assetPath] = text.Contains("[Shared", StringComparison.Ordinal) ? "1" : "0";
             }
 
             written += DeleteStaleOutputs(cache, keepOutputs);
@@ -232,6 +290,165 @@ namespace Playserv.CodeGenerator.Editor
                 AssetDatabase.Refresh();
 
             Debug.Log($"[PlayServ] {reason}: wrote={written}, parsed={parsedFiles}, bindings={foundBindings}");
+        }
+
+        private static bool ShouldRun(string reason, HashSet<string> dirtyAssets, HashSet<string> deletedAssets)
+        {
+            if (ShouldForceFullRebuild(reason))
+                return true;
+
+            return dirtyAssets.Count > 0 || deletedAssets.Count > 0;
+        }
+
+        private static bool ShouldForceFullRebuild(string reason)
+        {
+            return string.Equals(reason, "menu", StringComparison.OrdinalIgnoreCase) ||
+                   !File.Exists(CacheFile) ||
+                   !Directory.Exists(OutputDir);
+        }
+
+        private static void MergeTrackedAssets(string key, IEnumerable<string> assets)
+        {
+            if (assets == null)
+                return;
+
+            var current = LoadTrackedAssets(key);
+            foreach (var asset in assets)
+            {
+                var normalized = NormalizeAssetPath(asset);
+                if (IsRelevantSourceAsset(normalized))
+                    current.Add(normalized);
+            }
+
+            SaveTrackedAssets(key, current);
+        }
+
+        private static HashSet<string> ConsumeTrackedAssets(string key)
+        {
+            var result = LoadTrackedAssets(key);
+            SessionState.EraseString(key);
+            return result;
+        }
+
+        private static HashSet<string> LoadTrackedAssets(string key)
+        {
+            var raw = SessionState.GetString(key, string.Empty);
+            return new HashSet<string>(
+                raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(NormalizeAssetPath)
+                    .Where(IsRelevantSourceAsset),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void SaveTrackedAssets(string key, HashSet<string> assets)
+        {
+            SessionState.SetString(key, string.Join("\n", assets.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        private static IEnumerable<string> EnumerateRelevantSourceAssetPaths()
+        {
+            return Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories)
+                .Select(ToAssetPath)
+                .Where(IsRelevantSourceAsset)
+                .ToArray();
+        }
+
+        private static bool IsRelevantSourceAsset(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+                return false;
+
+            var normalized = NormalizeAssetPath(assetPath);
+            if (!normalized.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return normalized.IndexOf("/Shared/Generated/DTOs/", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        private static string NormalizeAssetPath(string assetPath)
+        {
+            return (assetPath ?? string.Empty).Replace("\\", "/").Trim();
+        }
+
+        private static string ToAssetPath(string absolutePath)
+        {
+            return "Assets" + absolutePath.Substring(Application.dataPath.Length).Replace("\\", "/");
+        }
+
+        private static bool TryReadAssetText(string assetPath, out string text)
+        {
+            text = string.Empty;
+            var fullPath = Path.GetFullPath(assetPath);
+            if (!File.Exists(fullPath))
+                return false;
+
+            text = File.ReadAllText(fullPath);
+            return true;
+        }
+
+        private static void UpdateSourceSnapshotCache(SimpleCache cache, string assetPath, string text)
+        {
+            cache.FileHashes[assetPath] = HashUtil.Sha256Hex(text);
+            cache.FileTypeSnapshots[assetPath] =
+                TypeIndexBuilder.SerializeSnapshot(TypeIndexBuilder.ParseSnapshot(text));
+            cache.FileSharedMarkers[assetPath] = text.Contains("[Shared", StringComparison.Ordinal) ? "1" : "0";
+        }
+
+        private static void RemoveSourceFile(SimpleCache cache, string assetPath)
+        {
+            cache.FileHashes.Remove(assetPath);
+            cache.FileTypeSnapshots.Remove(assetPath);
+            cache.FileSharedMarkers.Remove(assetPath);
+            cache.FileOutputs.Remove(assetPath);
+        }
+
+        private static HashSet<string> GetKnownSharedSourceFiles(SimpleCache cache)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var kv in cache.FileSharedMarkers)
+            {
+                if (string.Equals(kv.Value, "1", StringComparison.Ordinal))
+                    result.Add(kv.Key);
+            }
+
+            foreach (var kv in cache.FileOutputs)
+            {
+                if (kv.Value != null && kv.Value.Count > 0)
+                    result.Add(kv.Key);
+            }
+
+            return result;
+        }
+
+        private static HashSet<string> DetermineSharedFilesToProcess(
+            SimpleCache cache,
+            HashSet<string> sharedSourceFiles,
+            HashSet<string> dirtyAssets,
+            HashSet<string> deletedAssets,
+            bool fullRebuild)
+        {
+            if (fullRebuild || deletedAssets.Count > 0)
+                return new HashSet<string>(sharedSourceFiles, StringComparer.OrdinalIgnoreCase);
+
+            var dirtySharedFiles = new HashSet<string>(
+                dirtyAssets.Where(assetPath =>
+                    sharedSourceFiles.Contains(assetPath) ||
+                    (cache.FileSharedMarkers.TryGetValue(assetPath, out var marker) &&
+                     string.Equals(marker, "1", StringComparison.Ordinal))),
+                StringComparer.OrdinalIgnoreCase);
+
+            if (dirtyAssets.Count == 0)
+                return dirtySharedFiles;
+
+            var onlySharedFilesChanged = dirtyAssets.All(assetPath =>
+                sharedSourceFiles.Contains(assetPath) ||
+                (cache.FileSharedMarkers.TryGetValue(assetPath, out var marker) &&
+                 string.Equals(marker, "1", StringComparison.Ordinal)));
+
+            return onlySharedFilesChanged
+                ? dirtySharedFiles
+                : new HashSet<string>(sharedSourceFiles.Union(dirtySharedFiles), StringComparer.OrdinalIgnoreCase);
         }
 
         private static void EnsureIsExternalInit(string outputDir, SimpleCache cache, HashSet<string> keepOutputs)

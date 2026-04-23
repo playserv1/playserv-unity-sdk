@@ -17,7 +17,7 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApi : IPlayServApi, IPlayServConnectionApi, IPlayServRpcApi, IPlayServEventsApi, IPlayServDataApi
+    internal sealed class PlayServApi : IPlayServConnectionApi, IPlayServRpcApi, IPlayServEventsApi, IPlayServDataApi
 #if UNITY_5_3_OR_NEWER
         , IPlayServSpawnApi
 #endif

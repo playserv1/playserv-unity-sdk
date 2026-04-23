@@ -11,6 +11,8 @@ namespace Playserv.CodeGenerator.Editor
         public Dictionary<string, string> FileHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, List<string>> FileOutputs = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> OutputHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> FileTypeSnapshots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> FileSharedMarkers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public static SimpleCache Load(string path)
         {
@@ -20,7 +22,11 @@ namespace Playserv.CodeGenerator.Editor
             string section = "";
             foreach (var line in File.ReadAllLines(path))
             {
-                if (line == "[FileHashes]" || line == "[FileOutputs]" || line == "[OutputHashes]")
+                if (line == "[FileHashes]" ||
+                    line == "[FileOutputs]" ||
+                    line == "[OutputHashes]" ||
+                    line == "[FileTypeSnapshots]" ||
+                    line == "[FileSharedMarkers]")
                 {
                     section = line;
                     continue;
@@ -28,14 +34,19 @@ namespace Playserv.CodeGenerator.Editor
 
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
-                if (section == "[FileHashes]" || section == "[OutputHashes]")
+                if (section == "[FileHashes]" ||
+                    section == "[OutputHashes]" ||
+                    section == "[FileTypeSnapshots]" ||
+                    section == "[FileSharedMarkers]")
                 {
                     var idx = line.IndexOf('=');
                     if (idx <= 0) continue;
                     var k = line.Substring(0, idx);
                     var v = line.Substring(idx + 1);
                     if (section == "[FileHashes]") c.FileHashes[k] = v;
-                    else c.OutputHashes[k] = v;
+                    else if (section == "[OutputHashes]") c.OutputHashes[k] = v;
+                    else if (section == "[FileTypeSnapshots]") c.FileTypeSnapshots[k] = v;
+                    else c.FileSharedMarkers[k] = v;
                 }
                 else if (section == "[FileOutputs]")
                 {
@@ -68,6 +79,14 @@ namespace Playserv.CodeGenerator.Editor
 
             sb.AppendLine("[OutputHashes]");
             foreach (var kv in c.OutputHashes)
+                sb.AppendLine(kv.Key + "=" + kv.Value);
+
+            sb.AppendLine("[FileTypeSnapshots]");
+            foreach (var kv in c.FileTypeSnapshots)
+                sb.AppendLine(kv.Key + "=" + kv.Value);
+
+            sb.AppendLine("[FileSharedMarkers]");
+            foreach (var kv in c.FileSharedMarkers)
                 sb.AppendLine(kv.Key + "=" + kv.Value);
 
             File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
