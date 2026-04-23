@@ -1,33 +1,33 @@
 using System;
 using System.Linq.Expressions;
-using Newtonsoft.Json;
+using Playserv.Serialization;
 
 namespace Playserv.DataSubscription
 {
     internal static class SharedDataMapper
     {
-        private static readonly JsonSerializerSettings Settings = new()
+        private static readonly JsonCodecOptions CodecOptions = new JsonCodecOptions
         {
-            // Adjust if you need custom converters / enum handling
-            DateParseHandling = DateParseHandling.DateTime,
-            NullValueHandling = NullValueHandling.Include,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
+            ParseDates = true,
+            IncludeNullValues = true,
+            IgnoreMissingMembers = true
         };
 
-        public static TResult Map<TResult>(LambdaExpression selector, object raw)
+        public static TResult Map<TResult>(LambdaExpression selector, object raw, IJsonCodec jsonCodec)
         {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
             if (raw == null)
                 return default;
 
-            // If raw is already a string, treat it as JSON; otherwise serialize it
-            var jsonString = raw as string ?? JsonConvert.SerializeObject(raw, Settings);
+            var jsonString = raw as string ?? jsonCodec.Serialize(raw, CodecOptions);
 
-            // No selector => deserialize directly to TResult
             if (selector == null)
-                return JsonConvert.DeserializeObject<TResult>(jsonString, Settings);
+                return jsonCodec.Deserialize<TResult>(jsonString, CodecOptions);
 
             var sourceType = selector.Parameters[0].Type;
-            var source = JsonConvert.DeserializeObject(jsonString, sourceType, Settings);
+            var source = jsonCodec.Deserialize(jsonString, sourceType, CodecOptions);
 
             if (source == null)
                 return default;
@@ -38,11 +38,9 @@ namespace Playserv.DataSubscription
             if (result == null)
                 return default;
 
-            // If result is already TResult (or compatible), return directly
             if (result is TResult typed)
                 return typed;
 
-            // Otherwise, try convert (covers value types like int/float) 
             return (TResult)Convert.ChangeType(result, typeof(TResult));
         }
     }

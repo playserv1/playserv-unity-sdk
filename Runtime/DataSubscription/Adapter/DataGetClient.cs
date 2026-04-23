@@ -6,6 +6,7 @@ using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
 using Playserv.Events.Responses;
 using Playserv.Proxy.Common;
+using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription
@@ -15,15 +16,18 @@ namespace Playserv.DataSubscription
         private readonly PlayServImplementation _transport;
         private readonly ILogger _logger;
         private readonly DataSubscriptionRequestIdSource _requestIds;
+        private readonly IJsonCodec _jsonCodec;
 
         public DataGetClient(
             PlayServImplementation transport,
             ILogger logger,
-            DataSubscriptionRequestIdSource requestIds)
+            DataSubscriptionRequestIdSource requestIds,
+            IJsonCodec jsonCodec)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _requestIds = requestIds ?? throw new ArgumentNullException(nameof(requestIds));
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
         }
 
         public async Task<DataGetResponse> GetDataByKeyAsync(
@@ -63,7 +67,7 @@ namespace Playserv.DataSubscription
 
             responseByCommandSubscription = _transport.OnCommand("DataGetResponse", command =>
             {
-                if (!DataSubscriptionRequestSupport.TryMapDataGetResponse(command, out var response))
+                if (!DataSubscriptionRequestSupport.TryMapDataGetResponse(_jsonCodec, command, out var response))
                     return;
 
 #if PlayServ_Logs
@@ -81,7 +85,7 @@ namespace Playserv.DataSubscription
 
             responseByModuleCommandSubscription = _transport.OnCommand("module_dataflow.DataGetResponse", command =>
             {
-                if (!DataSubscriptionRequestSupport.TryMapDataGetResponse(command, out var response))
+                if (!DataSubscriptionRequestSupport.TryMapDataGetResponse(_jsonCodec, command, out var response))
                     return;
 
 #if PlayServ_Logs

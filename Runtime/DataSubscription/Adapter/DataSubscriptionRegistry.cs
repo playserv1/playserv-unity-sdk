@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Newtonsoft.Json;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
+using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription
@@ -11,13 +11,15 @@ namespace Playserv.DataSubscription
     internal sealed class DataSubscriptionRegistry
     {
         private readonly ILogger _logger;
+        private readonly IJsonCodec _jsonCodec;
         private readonly object _gate = new object();
         private readonly Dictionary<long, DataSubscriptionPollingEntry> _entries = new Dictionary<long, DataSubscriptionPollingEntry>();
         private long _subscriptionIdCounter;
 
-        public DataSubscriptionRegistry(ILogger logger)
+        public DataSubscriptionRegistry(ILogger logger, IJsonCodec jsonCodec)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
         }
 
         public long NextSubscriptionId()
@@ -141,8 +143,8 @@ namespace Playserv.DataSubscription
             if (!TryGetEntry(subscriptionId, out var entry))
                 return;
 
-            var payloadToken = DataSubscriptionErrorMapper.ExtractSubscriptionPayload(response.Result?.Data, entry.RootFieldName);
-            var payloadFingerprint = payloadToken == null ? string.Empty : payloadToken.ToString(Formatting.None);
+            var payloadToken = DataSubscriptionErrorMapper.ExtractSubscriptionPayload(response.Result?.Data, entry.RootFieldName, _jsonCodec);
+            var payloadFingerprint = payloadToken == null ? string.Empty : _jsonCodec.ToCanonicalJson(payloadToken);
 
             var shouldNotify = false;
             Action<object> onChanged = null;
@@ -158,7 +160,7 @@ namespace Playserv.DataSubscription
                         current.LastSnapshotJson = payloadFingerprint;
                         shouldNotify = true;
                         onChanged = current.OnChanged;
-                        callbackPayload = payloadToken?.DeepClone();
+                        callbackPayload = _jsonCodec.Clone(payloadToken);
                     }
                 }
             }

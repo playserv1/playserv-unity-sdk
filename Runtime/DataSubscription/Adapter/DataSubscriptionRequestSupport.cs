@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
+using Playserv.Serialization;
 
 namespace Playserv.DataSubscription
 {
@@ -19,8 +19,11 @@ namespace Playserv.DataSubscription
             return new Dictionary<string, object>(variables);
         }
 
-        public static bool TryMapDataGetResponse(object command, out DataGetResponse response)
+        public static bool TryMapDataGetResponse(IJsonCodec jsonCodec, object command, out DataGetResponse response)
         {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
             response = null;
             if (command == null)
                 return false;
@@ -33,8 +36,7 @@ namespace Playserv.DataSubscription
 
             try
             {
-                var json = JsonConvert.SerializeObject(command);
-                var mapped = JsonConvert.DeserializeObject<DataGetResponse>(json);
+                var mapped = jsonCodec.Convert<DataGetResponse>(command);
                 if (mapped == null)
                     return false;
 
@@ -47,8 +49,11 @@ namespace Playserv.DataSubscription
             }
         }
 
-        public static bool TryMapDataSubscriptionResponse(object command, out DataSubscriptionResponse response)
+        public static bool TryMapDataSubscriptionResponse(IJsonCodec jsonCodec, object command, out DataSubscriptionResponse response)
         {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
             response = null;
             if (command == null)
                 return false;
@@ -61,8 +66,7 @@ namespace Playserv.DataSubscription
 
             try
             {
-                var json = JsonConvert.SerializeObject(command);
-                var mapped = JsonConvert.DeserializeObject<DataSubscriptionResponse>(json);
+                var mapped = jsonCodec.Convert<DataSubscriptionResponse>(command);
                 if (mapped == null)
                     return false;
 
