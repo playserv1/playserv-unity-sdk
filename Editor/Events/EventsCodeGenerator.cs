@@ -15,6 +15,7 @@ namespace Playserv.Events.Editor
 {
     internal static class EventsCodeGenerator
     {
+        internal const string GeneratedEventsDirectoryPath = "Assets/Shared/Generated/Events/";
         private const string ApiExtensionsOutputPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string AdapterExtensionsOutputPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
 

@@ -252,10 +252,22 @@ namespace Playserv.CodeGenerator.Editor
                     Debug.Log($"[PlayServ] Found [Shared] text but parsed 0 bindings in: {assetPath}");
 
                 foundBindings += bindings.Count;
-                cache.FileDependencies[assetPath] = DtoDependencyCollector
-                    .CollectDependencies(bindings, typeIndex)
+                var dependencyResult = DtoDependencyCollector.CollectDependencies(bindings, typeIndex);
+                cache.FileDependencies[assetPath] = dependencyResult.Dependencies
                     .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                     .ToList();
+
+                if (dependencyResult.Diagnostics.Count > 0)
+                {
+                    var diagnostics = dependencyResult.Diagnostics
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(x => x, StringComparer.Ordinal)
+                        .ToArray();
+
+                    Debug.LogWarning(
+                        $"[PlayServ] Shared DTO dependency diagnostics in {assetPath}:{Environment.NewLine}- " +
+                        string.Join(Environment.NewLine + "- ", diagnostics));
+                }
 
                 var outs = new List<string>();
 
