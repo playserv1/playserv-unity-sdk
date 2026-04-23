@@ -10,6 +10,8 @@ namespace Playserv.Serialization
 
         public bool IgnoreMissingMembers { get; set; } = true;
 
+        public bool IgnoreMetadataProperties { get; set; }
+
         public IReadOnlyList<object> CustomConverters { get; set; }
     }
 }
