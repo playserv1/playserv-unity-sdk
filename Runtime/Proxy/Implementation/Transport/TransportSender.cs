@@ -1,0 +1,104 @@
+using System;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Playserv.Proxy.Interfaces;
+using ISdkLogger = Playserv.Proxy.Logging.ILogger;
+
+namespace Playserv.Proxy.Implementation
+{
+    internal sealed class TransportSender
+    {
+        private readonly ITransportImplementation _implementation;
+        private readonly IMessageSerializer _serializer;
+        private readonly ISdkLogger _logger;
+        private readonly Func<bool> _isDisposed;
+        private readonly System.Threading.SemaphoreSlim _sendGate = new System.Threading.SemaphoreSlim(1, 1);
+
+        public TransportSender(
+            ITransportImplementation implementation,
+            IMessageSerializer serializer,
+            ISdkLogger logger,
+            Func<bool> isDisposed)
+        {
+            _implementation = implementation ?? throw new ArgumentNullException(nameof(implementation));
+            _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _isDisposed = isDisposed ?? throw new ArgumentNullException(nameof(isDisposed));
+        }
+
+        public async Task Send<T>(T command, string moduleName = null)
+        {
+            if (command == null)
+                throw new ArgumentNullException(nameof(command));
+
+            if (_isDisposed())
+            {
+                _logger.LogWarning(
+                    $"[Transport] Send skipped because transport is already disposed. Command={typeof(T).Name}");
+                return;
+            }
+
+            try
+            {
+                await _sendGate.WaitAsync();
+                try
+                {
+                    if (_isDisposed())
+                    {
+                        _logger.LogWarning(
+                            $"[Transport] Send skipped after wait because transport is disposed. Command={typeof(T).Name}");
+                        return;
+                    }
+
+                    var envelope = _serializer.Serialize(command, moduleName);
+                    var commandJson = JsonConvert.SerializeObject(envelope.Command);
+                    var payloadJson = string.IsNullOrWhiteSpace(envelope.Payload)
+                        ? "null"
+                        : envelope.Payload;
+                    var json = $"{{\"Command\":{commandJson},\"Payload\":{payloadJson}}}";
+                    var data = Encoding.UTF8.GetBytes(json);
+
+                    await _implementation.Send(data);
+                    LogTransportJson($"Message sent: {typeof(T).Name} with payload: {json}", json);
+                }
+                finally
+                {
+                    _sendGate.Release();
+                }
+            }
+            catch (ObjectDisposedException) when (_isDisposed())
+            {
+                _logger.LogWarning(
+                    $"[Transport] Late send ignored during teardown. Command={typeof(T).Name}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to send message {typeof(T).Name}: {ex.Message}");
+                throw;
+            }
+        }
+
+        private void LogTransportJson(string message, string json)
+        {
+#if PlayServ_Logs
+            _logger.Log(message);
+#else
+            if (IsHeartbeatTransportFrame(json))
+                return;
+
+            _logger.Log(message);
+#endif
+        }
+
+        private static bool IsHeartbeatTransportFrame(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            return json.IndexOf("\"KeepAlive\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   json.IndexOf("\"Ping\"", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   json.IndexOf("\"Pong\"", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
+}
