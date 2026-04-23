@@ -66,7 +66,7 @@ namespace Playserv.Events
                 }
 
                 var candidates = _typeObservers.Keys
-                    .Select(t => t.Name)
+                    .Select(EventTypeRegistry.GetCanonicalName)
                     .Distinct(StringComparer.Ordinal)
                     .Where(topic =>
                         !_eventTypeToSubscriptionId.ContainsKey(topic) &&
