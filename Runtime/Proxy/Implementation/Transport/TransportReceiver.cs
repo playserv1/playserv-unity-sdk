@@ -8,15 +8,18 @@ namespace Playserv.Proxy.Implementation
     internal sealed class TransportReceiver
     {
         private readonly IMessageSerializer _serializer;
+        private readonly MessageEnvelopeCodec _envelopeCodec;
         private readonly ISdkLogger _logger;
         private readonly TransportChannelRegistry _channelRegistry;
 
         public TransportReceiver(
             IMessageSerializer serializer,
+            MessageEnvelopeCodec envelopeCodec,
             ISdkLogger logger,
             TransportChannelRegistry channelRegistry)
         {
             _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            _envelopeCodec = envelopeCodec ?? throw new ArgumentNullException(nameof(envelopeCodec));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _channelRegistry = channelRegistry ?? throw new ArgumentNullException(nameof(channelRegistry));
         }
@@ -37,7 +40,7 @@ namespace Playserv.Proxy.Implementation
             {
                 json = Encoding.UTF8.GetString(data);
                 LogTransportJson($"Received JSON: {json}", json);
-                envelope = MessageEnvelopeParser.Parse(json);
+                envelope = _envelopeCodec.Parse(json);
             }
             catch (Exception ex)
             {

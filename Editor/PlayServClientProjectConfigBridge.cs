@@ -8,6 +8,14 @@ namespace Playserv.Editor
     {
         private const string BridgeTypeName = "Playserv.ClientEditor.PlayServProjectSettingsBridge";
         private const string DrawProjectConfigUiMethodName = "DrawProjectConfigUi";
+        private static readonly string[] BridgeTypeCandidates =
+        {
+            BridgeTypeName + ", Playserv.ClientEditor",
+            BridgeTypeName + ", Assembly-CSharp-Editor",
+            BridgeTypeName + ", Assembly-CSharp",
+            BridgeTypeName
+        };
+        private static readonly Lazy<Type> BridgeType = new Lazy<Type>(ResolveBridgeType);
 
         public static bool TryDraw(out bool changed)
         {
@@ -48,9 +56,14 @@ namespace Playserv.Editor
 
         private static Type FindBridgeType()
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            return BridgeType.Value;
+        }
+
+        private static Type ResolveBridgeType()
+        {
+            foreach (var candidate in BridgeTypeCandidates)
             {
-                var type = assembly.GetType(BridgeTypeName, throwOnError: false);
+                var type = Type.GetType(candidate, throwOnError: false);
                 if (type != null)
                     return type;
             }
