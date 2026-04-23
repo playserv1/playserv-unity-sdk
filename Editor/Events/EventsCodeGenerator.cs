@@ -14,13 +14,6 @@ namespace Playserv.Events.Editor
 {
     internal static class EventsCodeGenerator
     {
-        // NOTE:
-        // If generated code can't see Playserv.Runtime assembly (IPlayServEventsApi / events),
-        // either:
-        // 1) Move output into your Runtime folder (recommended), e.g.:
-        //    "Assets/Playserv/Runtime/Generated/PlayServ.EventsApiExtensions.g.cs"
-        // or
-        // 2) Add an asmdef for Assets/PlayservGenerated and reference Playserv.Runtime.asmdef.
         private const string ApiExtensionsOutputPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string AdapterExtensionsOutputPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
 
@@ -341,6 +334,13 @@ namespace Playserv.Events.Editor
             var directory = Path.GetDirectoryName(fullPath);
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
+
+            if (File.Exists(fullPath))
+            {
+                var existing = File.ReadAllText(fullPath);
+                if (string.Equals(existing, content, StringComparison.Ordinal))
+                    return;
+            }
 
             WriteAllText(fullPath, content, Encoding.UTF8);
         }
