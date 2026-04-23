@@ -16,9 +16,9 @@ namespace Playserv.Events
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly EventSubscriptionManager _subscriptionManager;
-        private readonly Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
+        private readonly EventTypeRegistry _eventTypeRegistry = new EventTypeRegistry();
         private readonly HashSet<string> _suppressedInfrastructureEventTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly object _typeCacheLock = new object();
+        private readonly object _infrastructureEventLock = new object();
         private readonly SemaphoreSlim _groupCommandGate = new SemaphoreSlim(1, 1);
         private static readonly TimeSpan GroupCommandTimeout = TimeSpan.FromSeconds(10);
 
@@ -50,7 +50,9 @@ namespace Playserv.Events
 
         public IObservable<T> Subscribe<T>()
         {
-            var eventType = typeof(T).Name;
+            var eventClrType = typeof(T);
+            _eventTypeRegistry.Register(eventClrType);
+            var eventType = eventClrType.Name;
             return new EventObservable<T>(_transport, _subscriptionManager, eventType, _logger);
         }
 
@@ -67,6 +69,7 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
+            _eventTypeRegistry.Register(@event.GetType());
             var payload = JsonConvert.SerializeObject(@event, JsonSettings);
             var eventType = @event.GetType().Name;
 
@@ -82,6 +85,7 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
+            _eventTypeRegistry.Register(@event.GetType());
             var payload = JsonConvert.SerializeObject(@event, JsonSettings);
             var eventType = @event.GetType().Name;
 
@@ -97,6 +101,7 @@ namespace Playserv.Events
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
 
+            _eventTypeRegistry.Register(@event.GetType());
             var payload = JsonConvert.SerializeObject(@event, JsonSettings);
             var eventType = @event.GetType().Name;
 
@@ -198,7 +203,7 @@ namespace Playserv.Events
                 if (IsInfrastructureEventType(message.EventType))
                 {
                     var shouldLogOnce = false;
-                    lock (_typeCacheLock)
+                    lock (_infrastructureEventLock)
                     {
                         shouldLogOnce = _suppressedInfrastructureEventTypes.Add(message.EventType);
                     }
@@ -246,45 +251,9 @@ namespace Playserv.Events
 
         private Type FindTypeByName(string typeName)
         {
-            lock (_typeCacheLock)
-            {
-                if (_typeCache.TryGetValue(typeName, out var cachedType))
-                    return cachedType;
-            }
-
-            Type foundType = null;
-
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                // Fast path: full name match
-                var type = assembly.GetType(typeName);
-                if (type != null)
-                {
-                    foundType = type;
-                    break;
-                }
-
-                // Fallback: by simple name
-                foreach (var t in assembly.GetTypes())
-                {
-                    if (t.Name == typeName)
-                    {
-                        foundType = t;
-                        break;
-                    }
-                }
-
-                if (foundType != null)
-                    break;
-            }
-
-            lock (_typeCacheLock)
-            {
-                if (!_typeCache.ContainsKey(typeName))
-                    _typeCache[typeName] = foundType;
-            }
-
-            return foundType;
+            return _eventTypeRegistry.TryResolve(typeName, out var eventType)
+                ? eventType
+                : null;
         }
 
         private static bool IsInfrastructureEventType(string eventTypeName)
