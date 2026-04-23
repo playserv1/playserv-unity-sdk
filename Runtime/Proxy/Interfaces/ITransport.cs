@@ -9,6 +9,11 @@ namespace Playserv.Proxy.Interfaces
     public interface ITransport : IDisposable
     {
         /// <summary>
+        /// Raised when underlying transport connection is lost or raw stream completes unexpectedly.
+        /// </summary>
+        event EventHandler ConnectionLost;
+
+        /// <summary>
         /// Opens underlying transport connection.
         /// </summary>
         /// <returns>True when connection is established.</returns>

@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.RPC;
@@ -66,9 +65,7 @@ namespace Playserv.Proxy.Common
             _keepAliveManager.OnTimeout += HandleKeepAliveTimeout;
             _keepAliveManager.OnPingSent += () => _notifyKeepAlivePingSent();
             _keepAliveManager.PongReceived += () => _notifyKeepAlivePongReceived();
-
-            if (_transport is Transport transportImpl)
-                transportImpl.ConnectionLost += OnConnectionLost;
+            _transport.ConnectionLost += OnConnectionLost;
         }
 
         public void Configure(
@@ -216,9 +213,7 @@ namespace Playserv.Proxy.Common
             _reconnectionManager.Dispose();
 
             State = PlayServState.Offline;
-
-            if (_transport is Transport transportImpl)
-                transportImpl.ConnectionLost -= OnConnectionLost;
+            _transport.ConnectionLost -= OnConnectionLost;
         }
 
         private async Task<bool> ReconnectSessionAsync()
