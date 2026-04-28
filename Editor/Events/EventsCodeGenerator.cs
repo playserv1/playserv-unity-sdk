@@ -127,31 +127,46 @@ namespace Playserv.Events.Editor
         private static void AppendApiGlobalEventMethods(StringBuilder sb, Type type, string methodSuffix)
         {
             var field = GetSinglePublicInstanceField(type);
-            if (field == null)
+            var eventTypeName = GetCSharpTypeName(type);
+
+            if (field != null)
+            {
+                var paramType = field.FieldType;
+                var paramName = ToCamel(field.Name);
+
+                sb.AppendLine($"        public static void Send{methodSuffix}(this IPlayServEventsApi api, {GetCSharpTypeName(paramType)} {paramName})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
+                sb.AppendLine($"            var payload = new {eventTypeName}");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                {field.Name} = {paramName}");
+                sb.AppendLine("            };");
+                sb.AppendLine("            api.Publish(payload);");
+                sb.AppendLine("        }");
+                sb.AppendLine();
+
+                sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IPlayServEventsApi api, Action<{GetCSharpTypeName(paramType)}> onReceive)");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
+                sb.AppendLine("            if (onReceive == null) throw new ArgumentNullException(nameof(onReceive));");
+                sb.AppendLine($"            return api.Subscribe<{eventTypeName}>(e => onReceive(e.{field.Name}));");
+                sb.AppendLine("        }");
+                sb.AppendLine();
                 return;
+            }
 
-            var paramType = field.FieldType;
-            var paramName = ToCamel(field.Name);
-            var fullEventTypeName = $"global::{type.FullName}";
-
-            // SendX(this IPlayServEventsApi api, T value)
-            sb.AppendLine($"        public static void Send{methodSuffix}(this IPlayServEventsApi api, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void Send{methodSuffix}(this IPlayServEventsApi api, {eventTypeName} payload)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
-            sb.AppendLine($"            var payload = new {fullEventTypeName}");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                {field.Name} = {paramName}");
-            sb.AppendLine("            };");
             sb.AppendLine("            api.Publish(payload);");
             sb.AppendLine("        }");
             sb.AppendLine();
 
-            // OnX(this IPlayServEventsApi api, Action<T> onReceive)
-            sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IPlayServEventsApi api, Action<{GetFriendlyTypeName(paramType)}> onReceive)");
+            sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IPlayServEventsApi api, Action<{eventTypeName}> onReceive)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine("            if (onReceive == null) throw new ArgumentNullException(nameof(onReceive));");
-            sb.AppendLine($"            return api.Subscribe<{fullEventTypeName}>(e => onReceive(e.{field.Name}));");
+            sb.AppendLine($"            return api.Subscribe<{eventTypeName}>(onReceive);");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -159,21 +174,31 @@ namespace Playserv.Events.Editor
         private static void AppendApiGroupEventMethods(StringBuilder sb, Type type, string methodSuffix)
         {
             var field = GetSinglePublicInstanceField(type);
-            if (field == null)
+            var eventTypeName = GetCSharpTypeName(type);
+
+            if (field != null)
+            {
+                var paramType = field.FieldType;
+                var paramName = ToCamel(field.Name);
+
+                sb.AppendLine($"        public static void SendGroup{methodSuffix}(this IPlayServEventsApi api, string groupName, {GetCSharpTypeName(paramType)} {paramName})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
+                sb.AppendLine("            if (groupName == null) throw new ArgumentNullException(nameof(groupName));");
+                sb.AppendLine($"            var payload = new {eventTypeName}");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                {field.Name} = {paramName}");
+                sb.AppendLine("            };");
+                sb.AppendLine("            api.PublishForGroup(groupName, payload);");
+                sb.AppendLine("        }");
+                sb.AppendLine();
                 return;
+            }
 
-            var paramType = field.FieldType;
-            var paramName = ToCamel(field.Name);
-            var fullEventTypeName = $"global::{type.FullName}";
-
-            sb.AppendLine($"        public static void SendGroup{methodSuffix}(this IPlayServEventsApi api, string groupName, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void SendGroup{methodSuffix}(this IPlayServEventsApi api, string groupName, {eventTypeName} payload)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine("            if (groupName == null) throw new ArgumentNullException(nameof(groupName));");
-            sb.AppendLine($"            var payload = new {fullEventTypeName}");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                {field.Name} = {paramName}");
-            sb.AppendLine("            };");
             sb.AppendLine("            api.PublishForGroup(groupName, payload);");
             sb.AppendLine("        }");
             sb.AppendLine();
@@ -182,21 +207,31 @@ namespace Playserv.Events.Editor
         private static void AppendApiUserEventMethods(StringBuilder sb, Type type, string methodSuffix)
         {
             var field = GetSinglePublicInstanceField(type);
-            if (field == null)
+            var eventTypeName = GetCSharpTypeName(type);
+
+            if (field != null)
+            {
+                var paramType = field.FieldType;
+                var paramName = ToCamel(field.Name);
+
+                sb.AppendLine($"        public static void SendUser{methodSuffix}(this IPlayServEventsApi api, string userId, {GetCSharpTypeName(paramType)} {paramName})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
+                sb.AppendLine("            if (userId == null) throw new ArgumentNullException(nameof(userId));");
+                sb.AppendLine($"            var payload = new {eventTypeName}");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                {field.Name} = {paramName}");
+                sb.AppendLine("            };");
+                sb.AppendLine("            api.PublishForUser(userId, payload);");
+                sb.AppendLine("        }");
+                sb.AppendLine();
                 return;
+            }
 
-            var paramType = field.FieldType;
-            var paramName = ToCamel(field.Name);
-            var fullEventTypeName = $"global::{type.FullName}";
-
-            sb.AppendLine($"        public static void SendUser{methodSuffix}(this IPlayServEventsApi api, string userId, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void SendUser{methodSuffix}(this IPlayServEventsApi api, string userId, {eventTypeName} payload)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (api == null) throw new ArgumentNullException(nameof(api));");
             sb.AppendLine("            if (userId == null) throw new ArgumentNullException(nameof(userId));");
-            sb.AppendLine($"            var payload = new {fullEventTypeName}");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                {field.Name} = {paramName}");
-            sb.AppendLine("            };");
             sb.AppendLine("            api.PublishForUser(userId, payload);");
             sb.AppendLine("        }");
             sb.AppendLine();
@@ -209,30 +244,48 @@ namespace Playserv.Events.Editor
         private static void AppendAdapterGlobalEventMethods(StringBuilder sb, Type type, string methodSuffix)
         {
             var field = GetSinglePublicInstanceField(type);
-            if (field == null)
+            var eventTypeName = GetCSharpTypeName(type);
+
+            if (field != null)
+            {
+                var paramType = field.FieldType;
+                var paramName = ToCamel(field.Name);
+
+                sb.AppendLine($"        public static void Publish{methodSuffix}(this IEventsAdapter adapter, {GetCSharpTypeName(paramType)} {paramName})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
+                sb.AppendLine($"            var payload = new {eventTypeName}");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                {field.Name} = {paramName}");
+                sb.AppendLine("            };");
+                sb.AppendLine("            adapter.Publish(payload);");
+                sb.AppendLine("        }");
+                sb.AppendLine();
+
+                sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IEventsAdapter adapter, Action<{GetCSharpTypeName(paramType)}> onReceive)");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
+                sb.AppendLine("            if (onReceive == null) throw new ArgumentNullException(nameof(onReceive));");
+                sb.AppendLine($"            return adapter.Subscribe<{eventTypeName}>()");
+                sb.AppendLine($"                .Subscribe(e => onReceive(e.{field.Name}));");
+                sb.AppendLine("        }");
+                sb.AppendLine();
                 return;
+            }
 
-            var paramType = field.FieldType;
-            var paramName = ToCamel(field.Name);
-            var fullEventTypeName = $"global::{type.FullName}";
-
-            sb.AppendLine($"        public static void Publish{methodSuffix}(this IEventsAdapter adapter, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void Publish{methodSuffix}(this IEventsAdapter adapter, {eventTypeName} payload)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
-            sb.AppendLine($"            var payload = new {fullEventTypeName}");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                {field.Name} = {paramName}");
-            sb.AppendLine("            };");
             sb.AppendLine("            adapter.Publish(payload);");
             sb.AppendLine("        }");
             sb.AppendLine();
 
-            sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IEventsAdapter adapter, Action<{GetFriendlyTypeName(paramType)}> onReceive)");
+            sb.AppendLine($"        public static IDisposable On{methodSuffix}(this IEventsAdapter adapter, Action<{eventTypeName}> onReceive)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
             sb.AppendLine("            if (onReceive == null) throw new ArgumentNullException(nameof(onReceive));");
-            sb.AppendLine($"            return adapter.Subscribe<{fullEventTypeName}>()");
-            sb.AppendLine($"                .Subscribe(e => onReceive(e.{field.Name}));");
+            sb.AppendLine($"            return adapter.Subscribe<{eventTypeName}>()");
+            sb.AppendLine("                .Subscribe(onReceive);");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -240,20 +293,29 @@ namespace Playserv.Events.Editor
         private static void AppendAdapterGroupEventMethods(StringBuilder sb, Type type, string methodSuffix)
         {
             var field = GetSinglePublicInstanceField(type);
-            if (field == null)
+            var eventTypeName = GetCSharpTypeName(type);
+
+            if (field != null)
+            {
+                var paramType = field.FieldType;
+                var paramName = ToCamel(field.Name);
+
+                sb.AppendLine($"        public static void PublishGroup{methodSuffix}(this IEventsAdapter adapter, string groupName, {GetCSharpTypeName(paramType)} {paramName})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
+                sb.AppendLine($"            var payload = new {eventTypeName}");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                {field.Name} = {paramName}");
+                sb.AppendLine("            };");
+                sb.AppendLine("            adapter.PublishForGroup(groupName, payload);");
+                sb.AppendLine("        }");
+                sb.AppendLine();
                 return;
+            }
 
-            var paramType = field.FieldType;
-            var paramName = ToCamel(field.Name);
-            var fullEventTypeName = $"global::{type.FullName}";
-
-            sb.AppendLine($"        public static void PublishGroup{methodSuffix}(this IEventsAdapter adapter, string groupName, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void PublishGroup{methodSuffix}(this IEventsAdapter adapter, string groupName, {eventTypeName} payload)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
-            sb.AppendLine($"            var payload = new {fullEventTypeName}");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                {field.Name} = {paramName}");
-            sb.AppendLine("            };");
             sb.AppendLine("            adapter.PublishForGroup(groupName, payload);");
             sb.AppendLine("        }");
             sb.AppendLine();
@@ -262,20 +324,29 @@ namespace Playserv.Events.Editor
         private static void AppendAdapterUserEventMethods(StringBuilder sb, Type type, string methodSuffix)
         {
             var field = GetSinglePublicInstanceField(type);
-            if (field == null)
+            var eventTypeName = GetCSharpTypeName(type);
+
+            if (field != null)
+            {
+                var paramType = field.FieldType;
+                var paramName = ToCamel(field.Name);
+
+                sb.AppendLine($"        public static void PublishUser{methodSuffix}(this IEventsAdapter adapter, string userId, {GetCSharpTypeName(paramType)} {paramName})");
+                sb.AppendLine("        {");
+                sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
+                sb.AppendLine($"            var payload = new {eventTypeName}");
+                sb.AppendLine("            {");
+                sb.AppendLine($"                {field.Name} = {paramName}");
+                sb.AppendLine("            };");
+                sb.AppendLine("            adapter.PublishForUser(userId, payload);");
+                sb.AppendLine("        }");
+                sb.AppendLine();
                 return;
+            }
 
-            var paramType = field.FieldType;
-            var paramName = ToCamel(field.Name);
-            var fullEventTypeName = $"global::{type.FullName}";
-
-            sb.AppendLine($"        public static void PublishUser{methodSuffix}(this IEventsAdapter adapter, string userId, {GetFriendlyTypeName(paramType)} {paramName})");
+            sb.AppendLine($"        public static void PublishUser{methodSuffix}(this IEventsAdapter adapter, string userId, {eventTypeName} payload)");
             sb.AppendLine("        {");
             sb.AppendLine("            if (adapter == null) throw new ArgumentNullException(nameof(adapter));");
-            sb.AppendLine($"            var payload = new {fullEventTypeName}");
-            sb.AppendLine("            {");
-            sb.AppendLine($"                {field.Name} = {paramName}");
-            sb.AppendLine("            };");
             sb.AppendLine("            adapter.PublishForUser(userId, payload);");
             sb.AppendLine("        }");
             sb.AppendLine();
@@ -444,21 +515,71 @@ namespace Playserv.Events.Editor
             return char.ToLowerInvariant(s[0]) + s.Substring(1);
         }
 
-        private static string GetFriendlyTypeName(Type type)
+        private static string GetCSharpTypeName(Type type)
         {
-            if (!type.IsGenericType)
-                return $"global::{type.FullName}";
+            if (type.IsByRef)
+                return GetCSharpElementTypeName(type);
 
-            var typeDefName = type.GetGenericTypeDefinition().FullName;
-            var tickIndex = typeDefName.IndexOf('`');
-            if (tickIndex > 0)
-                typeDefName = typeDefName.Substring(0, tickIndex);
+            if (type.IsPointer)
+                return $"{GetCSharpElementTypeName(type)}*";
+
+            if (type.IsArray)
+            {
+                var rankSuffix = type.GetArrayRank() == 1
+                    ? string.Empty
+                    : new string(',', type.GetArrayRank() - 1);
+                return $"{GetCSharpElementTypeName(type)}[{rankSuffix}]";
+            }
+
+            if (type.IsGenericParameter)
+                return type.Name;
+
+            if (!type.IsGenericType)
+                return GetCSharpNonGenericTypeName(type);
+
+            var typeDefName = StripGenericArity(GetCSharpNonGenericTypeName(type.GetGenericTypeDefinition()));
 
             var genericArgs = type.GetGenericArguments()
-                .Select(GetFriendlyTypeName)
+                .Select(GetCSharpTypeName)
                 .ToArray();
 
-            return $"global::{typeDefName}<{string.Join(", ", genericArgs)}>";
+            return $"{typeDefName}<{string.Join(", ", genericArgs)}>";
+        }
+
+        private static string GetCSharpElementTypeName(Type type)
+        {
+            var elementType = type.GetElementType();
+            return elementType == null
+                ? "global::System.Object"
+                : GetCSharpTypeName(elementType);
+        }
+
+        private static string GetCSharpNonGenericTypeName(Type type)
+        {
+            var declaringTypes = GetDeclaringTypes(type).ToArray();
+            var rootType = declaringTypes.Length > 0 ? declaringTypes[0] : type;
+
+            var typeParts = declaringTypes
+                .Select(declaringType => StripGenericArity(declaringType.Name))
+                .Concat(new[] { StripGenericArity(type.Name) })
+                .Where(part => !string.IsNullOrWhiteSpace(part));
+
+            var localTypeName = string.Join(".", typeParts);
+            if (string.IsNullOrWhiteSpace(rootType.Namespace))
+                return $"global::{localTypeName}";
+
+            return $"global::{rootType.Namespace}.{localTypeName}";
+        }
+
+        private static string StripGenericArity(string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+                return string.Empty;
+
+            var tickIndex = typeName.IndexOf('`');
+            return tickIndex >= 0
+                ? typeName.Substring(0, tickIndex)
+                : typeName;
         }
 
         private static void WriteFile(string assetPath, string content)
