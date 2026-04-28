@@ -15,6 +15,9 @@ MonoBehaviour:
   gameAccessToken: 
   gameId: 
   backendServerAddress: wss://proxy.playserv.io/ws
+  webRtcSignalingServerAddress: 
+  webRtcDataChannelLabel: playserv
+  webRtcIceServers: []
   deployApiServerAddress: https://deployment.playserv.io
   schemaApiServerAddress: https://backoffice.playserv.io/
   allowMultipleConnections: 1
