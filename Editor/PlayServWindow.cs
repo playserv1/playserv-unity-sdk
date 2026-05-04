@@ -13,8 +13,9 @@ namespace Playserv.Editor
         private const string FallbackSdkVersion = "0.1.0";
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://docs.playserv.io/";
-        private const float DefaultWindowWidth = 720f;
-        private const float MinWindowWidth = 640f;
+        private const float FixedWindowWidth = 720f;
+        private const float MinWindowHeight = 760f;
+        private const float MaxWindowHeight = 10000f;
         private const float StyledFieldHeight = 26f;
         private const bool ShowWebSocketConnectionMenu = false;
 
@@ -28,6 +29,7 @@ namespace Playserv.Editor
         private readonly PlayServEventsSectionPresenter _eventsSectionPresenter = new PlayServEventsSectionPresenter();
         private readonly PlayServCodegenSectionPresenter _codegenSectionPresenter = new PlayServCodegenSectionPresenter();
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
+        private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
 
         private VersionSyncAction _versionSyncAction;
         private DeploymentUploadAction _deploymentUploadAction;
@@ -60,9 +62,7 @@ namespace Playserv.Editor
 
             var window = GetWindow<PlayServWindow>(title: WindowTitlePrefix);
             window.titleContent = new GUIContent(BuildWindowTitle(PlayServConfigProvider.FindExisting()?.SdkVersion));
-            window.minSize = new Vector2(MinWindowWidth, 760f);
-            if (window.position.width > DefaultWindowWidth)
-                window.position = new Rect(window.position.x, window.position.y, DefaultWindowWidth, Mathf.Max(window.position.height, 760f));
+            window.ConfigureWindowSize();
             window.Show();
             window.Focus();
         }
@@ -77,11 +77,12 @@ namespace Playserv.Editor
             _state.FoldConfig = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
             _state.FoldConnection = EditorPrefs.GetBool(Const.PrefFoldConnection, false);
             _state.FoldDeployment = EditorPrefs.GetBool(Const.PrefFoldDeployment, false);
+            _state.ShowModuleSettingsLayer = false;
+            _state.ModuleSettings.Load();
 
             _state.ShowAvailableSchemaInfo = false;
 
-            if (position.width > DefaultWindowWidth)
-                position = new Rect(position.x, position.y, DefaultWindowWidth, Mathf.Max(position.height, 760f));
+            ConfigureWindowSize();
 
             _state.WebSocketEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
@@ -99,6 +100,7 @@ namespace Playserv.Editor
 
         private void OnGUI()
         {
+            EnforceFixedWidth();
             PlayServWindowTheme.Ensure();
             DrawWindowBackdrop();
 
@@ -117,27 +119,11 @@ namespace Playserv.Editor
                     using (new EditorGUILayout.VerticalScope())
                     {
                         GUILayout.Space(18f);
-                        _overviewPresenter.DrawHeader(context);
-                        GUILayout.Space(18f);
+                        if (_state.ShowModuleSettingsLayer)
+                            DrawModuleSettingsLayer(context);
+                        else
+                            DrawMainLayer(context);
 
-                        _configSectionPresenter.Draw(context);
-                        GUILayout.Space(12f);
-                        _deploymentSectionPresenter.Draw(context);
-                        GUILayout.Space(12f);
-                        _modelSectionPresenter.Draw(context);
-                        GUILayout.Space(12f);
-                        _eventsSectionPresenter.Draw(context);
-                        GUILayout.Space(12f);
-                        _codegenSectionPresenter.Draw(context);
-
-                        if (ShowWebSocketConnectionMenu)
-                        {
-                            GUILayout.Space(12f);
-                            _connectionSectionPresenter.Draw(context);
-                        }
-
-                        GUILayout.Space(16f);
-                        _overviewPresenter.DrawFooter(context);
                         GUILayout.Space(18f);
                     }
                     GUILayout.Space(24f);
@@ -150,6 +136,52 @@ namespace Playserv.Editor
 
             if (_state.DeployRunning)
                 Repaint();
+        }
+
+        private void DrawMainLayer(PlayServWindowContext context)
+        {
+            _overviewPresenter.DrawHeader(context);
+            GUILayout.Space(18f);
+
+            _configSectionPresenter.Draw(context);
+
+            if (_state.ModuleSettings.Deployment || _state.DeployRunning || _state.VersionSyncRunning)
+            {
+                GUILayout.Space(12f);
+                _deploymentSectionPresenter.Draw(context);
+            }
+
+            if (_state.ModuleSettings.ModelSync)
+            {
+                GUILayout.Space(12f);
+                _modelSectionPresenter.Draw(context);
+            }
+
+            if (_state.ModuleSettings.Events)
+            {
+                GUILayout.Space(12f);
+                _eventsSectionPresenter.Draw(context);
+            }
+
+            if (_state.ModuleSettings.Codegen)
+            {
+                GUILayout.Space(12f);
+                _codegenSectionPresenter.Draw(context);
+            }
+
+            if (ShowWebSocketConnectionMenu)
+            {
+                GUILayout.Space(12f);
+                _connectionSectionPresenter.Draw(context);
+            }
+
+            GUILayout.Space(16f);
+            _overviewPresenter.DrawFooter(context);
+        }
+
+        private void DrawModuleSettingsLayer(PlayServWindowContext context)
+        {
+            _moduleSettingsPresenter.Draw(context);
         }
 
         private void EnsureControllers()
@@ -204,6 +236,25 @@ namespace Playserv.Editor
             var fullRect = new Rect(0f, 0f, position.width, position.height);
             EditorGUI.DrawRect(fullRect, PlayServWindowTheme.Background);
             EditorGUI.DrawRect(new Rect(0f, 0f, position.width, 1f), PlayServWindowTheme.GridLine);
+        }
+
+        private void ConfigureWindowSize()
+        {
+            minSize = new Vector2(FixedWindowWidth, MinWindowHeight);
+            maxSize = new Vector2(FixedWindowWidth, MaxWindowHeight);
+            EnforceFixedWidth();
+        }
+
+        private void EnforceFixedWidth()
+        {
+            if (Mathf.Approximately(position.width, FixedWindowWidth))
+                return;
+
+            position = new Rect(
+                position.x,
+                position.y,
+                FixedWindowWidth,
+                Mathf.Max(position.height, MinWindowHeight));
         }
 
         private void FocusConfigAsset()

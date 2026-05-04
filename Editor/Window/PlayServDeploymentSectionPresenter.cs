@@ -65,7 +65,7 @@ namespace Playserv.Editor
                 {
                     using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning))
                     {
-                        if (PlayServWindowChrome.DrawActionButton("Preview Files", PlayServWindowButtonTone.Secondary, GUILayout.Width(120f), GUILayout.Height(30f)))
+                        if (PlayServWindowChrome.DrawActionButton("Preview Files", PlayServWindowButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(30f)))
                         {
                             state.DeployFilesPreview = context.DeploymentController.BuildDeployFileList(out var err);
                             if (!string.IsNullOrEmpty(err))
@@ -81,30 +81,30 @@ namespace Playserv.Editor
                             }
                         }
 
-                        GUILayout.Space(8f);
+                        GUILayout.Space(6f);
 
-                        if (PlayServWindowChrome.DrawActionButton("Clear Preview", PlayServWindowButtonTone.Ghost, GUILayout.Width(120f), GUILayout.Height(30f)))
+                        if (PlayServWindowChrome.DrawActionButton("Clear Preview", PlayServWindowButtonTone.Ghost, GUILayout.Width(112f), GUILayout.Height(30f)))
                         {
                             state.DeployFilesPreview.Clear();
                             state.DeployShowFileList = false;
                         }
 
-                        GUILayout.Space(8f);
+                        GUILayout.Space(6f);
 
-                        if (PlayServWindowChrome.DrawActionButton("Sync Version", PlayServWindowButtonTone.Secondary, GUILayout.Width(120f), GUILayout.Height(30f)))
+                        if (PlayServWindowChrome.DrawActionButton("Sync Version", PlayServWindowButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(30f)))
                             _ = context.DeploymentController.StartVersionSyncAsync(context);
 
-                        GUILayout.Space(8f);
+                        GUILayout.Space(6f);
 
-                        if (PlayServWindowChrome.DrawActionButton("Deploy Now", PlayServWindowButtonTone.Primary, GUILayout.Width(140f), GUILayout.Height(30f)))
+                        if (PlayServWindowChrome.DrawActionButton("Deploy Now", PlayServWindowButtonTone.Primary, GUILayout.Width(128f), GUILayout.Height(30f)))
                             _ = context.DeploymentController.StartDeployAsync(context);
                     }
 
-                    GUILayout.Space(8f);
+                    GUILayout.Space(6f);
 
                     using (new EditorGUI.DisabledScope(!state.DeployRunning))
                     {
-                        if (PlayServWindowChrome.DrawActionButton("Cancel", PlayServWindowButtonTone.Danger, GUILayout.Width(120f), GUILayout.Height(30f)))
+                        if (PlayServWindowChrome.DrawActionButton("Cancel", PlayServWindowButtonTone.Danger, GUILayout.Width(112f), GUILayout.Height(30f)))
                             context.DeploymentController.CancelDeploy();
                     }
                 }

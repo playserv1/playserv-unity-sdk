@@ -11,6 +11,7 @@ using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditor.Compilation;
 using UnityEngine;
+using Playserv.Editor;
 
 namespace Playserv.CodeGenerator.Editor
 {
@@ -148,7 +149,8 @@ namespace Playserv.CodeGenerator.Editor
 
         private static bool IsAutoGenerationEnabled()
         {
-            return EditorPrefs.GetBool(AutoGenPrefKey, true);
+            return EditorPrefs.GetBool(AutoGenPrefKey, true) &&
+                   EditorPrefs.GetBool(Const.PrefModuleCodegen, true);
         }
 
         private static void GenerateAll(

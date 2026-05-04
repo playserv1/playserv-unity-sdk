@@ -10,12 +10,24 @@ namespace Playserv.Editor
         {
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.HeroCardStyle))
             {
-                GUILayout.Label("PlayServ editor controls", PlayServWindowTheme.HeroTitleStyle);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("PlayServ editor controls", PlayServWindowTheme.HeroTitleStyle);
+                    GUILayout.FlexibleSpace();
+
+                    if (PlayServWindowChrome.DrawIconButton(FindSettingsIcon(), "⚙", "Module settings", PlayServWindowButtonTone.Ghost, 18f, GUILayout.Width(34f), GUILayout.Height(30f)))
+                    {
+                        context.State.ShowModuleSettingsLayer = true;
+                        context.State.MainScrollPos = Vector2.zero;
+                        context.Repaint();
+                    }
+                }
+
                 GUILayout.Space(6f);
                 GUILayout.Label("Configure runtime, sync models, deploy code, and generate APIs from one place.", PlayServWindowTheme.HeroAccentStyle);
             }
 
-            GUILayout.Space(14f);
+            GUILayout.Space(8f);
 
             using (new EditorGUILayout.VerticalScope())
             {
@@ -25,25 +37,31 @@ namespace Playserv.Editor
                         "Game ID",
                         string.IsNullOrWhiteSpace(context.Config != null ? context.Config.GameId : null) ? "Not configured" : context.Config.GameId,
                         "Runtime identity");
-                    GUILayout.Space(10f);
+                    GUILayout.Space(8f);
                     PlayServWindowChrome.DrawOverviewCard(
                         "Backend",
                         string.IsNullOrWhiteSpace(context.Config != null ? context.Config.BackendServerAddress : null) ? "Not set" : context.Config.BackendServerAddress,
                         "Primary transport");
                 }
 
-                GUILayout.Space(10f);
+                GUILayout.Space(8f);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     PlayServWindowChrome.DrawOverviewCard("Schema", EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "—"), "Current model hash");
-                    GUILayout.Space(10f);
+                    GUILayout.Space(8f);
                     PlayServWindowChrome.DrawOverviewCard(
                         "Deploy",
                         context.State.DeployRunning ? "Deploying…" : context.State.VersionSyncRunning ? "Syncing…" : "Ready",
                         "Release control");
                 }
             }
+        }
+
+        private static Texture FindSettingsIcon()
+        {
+            var icon = EditorGUIUtility.IconContent("SettingsIcon") ?? EditorGUIUtility.IconContent("_Popup");
+            return icon != null ? icon.image : null;
         }
 
         public void DrawFooter(PlayServWindowContext context)

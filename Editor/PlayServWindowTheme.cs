@@ -55,9 +55,9 @@ namespace Playserv.Editor
                 return;
 
             HeroCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(18, 18, 18, 18), new RectOffset(0, 0, 0, 0));
-            MetricCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(14, 14, 12, 12), new RectOffset(0, 0, 0, 0));
+            MetricCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(10, 10, 8, 8), new RectOffset(0, 0, 0, 0));
             CardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(18, 18, 14, 14), new RectOffset(0, 0, 0, 0));
-            CardBodyStyle = CreateBoxStyle("#0F1319", "#1E232B", new RectOffset(14, 14, 14, 14), new RectOffset(0, 0, 0, 0));
+            CardBodyStyle = CreateBoxStyle("#0F1319", "#1E232B", new RectOffset(10, 10, 10, 10), new RectOffset(0, 0, 0, 0));
             FooterCardStyle = CreateBoxStyle("#12161D", "#262C36", new RectOffset(18, 18, 16, 16), new RectOffset(0, 0, 0, 0));
             LogContainerStyle = CreateBoxStyle("#0F1319", "#1E232B", new RectOffset(12, 12, 10, 10), new RectOffset(0, 0, 0, 0));
             NoticeInfoStyle = CreateBoxStyle("#141B26", "#293446", new RectOffset(12, 12, 10, 10), new RectOffset(0, 0, 0, 0));
@@ -70,9 +70,9 @@ namespace Playserv.Editor
             HeroAccentStyle = CreateWrappedLabelStyle(18, FontStyle.Bold, "#A8D3FF");
             HeroBodyStyle = CreateWrappedLabelStyle(13, FontStyle.Normal, "#AAB2BF");
 
-            MetricLabelStyle = CreateLabelStyle(11, FontStyle.Bold, "#8892A0");
-            MetricValueStyle = CreateWrappedLabelStyle(14, FontStyle.Bold, "#F3F5F8");
-            MetricCaptionStyle = CreateWrappedLabelStyle(11, FontStyle.Normal, "#7D8693");
+            MetricLabelStyle = CreateLabelStyle(10, FontStyle.Bold, "#8892A0");
+            MetricValueStyle = CreateWrappedLabelStyle(13, FontStyle.Bold, "#F3F5F8");
+            MetricCaptionStyle = CreateWrappedLabelStyle(10, FontStyle.Normal, "#7D8693");
 
             SectionTitleButtonStyle = new GUIStyle(EditorStyles.label)
             {
