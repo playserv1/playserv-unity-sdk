@@ -27,9 +27,11 @@ namespace Playserv.Editor
         public bool FoldConfig;
         public bool FoldConnection;
         public bool FoldDeployment;
+        public bool ShowModuleSettingsLayer;
 
         public bool ShowAvailableSchemaInfo;
         public Vector2 MainScrollPos;
+        public readonly PlayServEditorModuleSettings ModuleSettings = new PlayServEditorModuleSettings();
 
         public EditorWebSocketTransport WebSocketTransport;
         public Vector2 ConnectionScrollPos;

@@ -25,6 +25,9 @@ namespace Playserv.Events.Editor
             if (_isGenerating)
                 return;
 
+            if (!IsEventsModuleEnabled())
+                return;
+
             if (!ShouldGenerate(importedAssets, deletedAssets, movedAssets, movedFromAssetPaths))
                 return;
 
@@ -133,6 +136,11 @@ namespace Playserv.Events.Editor
             return string.IsNullOrWhiteSpace(assetPath)
                 ? string.Empty
                 : assetPath.Replace('\\', '/');
+        }
+
+        private static bool IsEventsModuleEnabled()
+        {
+            return EditorPrefs.GetBool(Playserv.Editor.Const.PrefModuleEvents, true);
         }
     }
 }
