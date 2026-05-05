@@ -19,7 +19,6 @@ namespace Playserv.Events.Editor
         private const string ApiExtensionsOutputPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string AdapterExtensionsOutputPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
 
-        [MenuItem("Tools/PlayServ/Generate Events API")]
         public static void Generate()
         {
             var eventTypes = TypeCache.GetTypesWithAttribute<EventAttribute>();

@@ -2,7 +2,9 @@
 using System;
 using UnityEditor;
 using UnityEngine;
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
 using Playserv.Deploy.Editor;
+#endif
 using Playserv.Wrapper;
 
 namespace Playserv.Editor
@@ -20,22 +22,32 @@ namespace Playserv.Editor
         private const bool ShowWebSocketConnectionMenu = false;
 
         private readonly PlayServWindowState _state = new PlayServWindowState();
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
         private readonly DeploymentClosureFilter _deploymentClosureFilter = new DeploymentClosureFilter();
         private readonly DeploymentZipBuilder _deploymentZipBuilder = new DeploymentZipBuilder();
+#endif
         private readonly PlayServOverviewPresenter _overviewPresenter = new PlayServOverviewPresenter();
         private readonly PlayServConfigSectionPresenter _configSectionPresenter = new PlayServConfigSectionPresenter();
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
         private readonly PlayServDeploymentSectionPresenter _deploymentSectionPresenter = new PlayServDeploymentSectionPresenter();
+#endif
+#if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
         private readonly PlayServModelSectionPresenter _modelSectionPresenter = new PlayServModelSectionPresenter();
+#endif
 #if !PLAYSERV_DISABLE_EVENTS
         private readonly PlayServEventsSectionPresenter _eventsSectionPresenter = new PlayServEventsSectionPresenter();
 #endif
+#if !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
         private readonly PlayServCodegenSectionPresenter _codegenSectionPresenter = new PlayServCodegenSectionPresenter();
+#endif
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
 
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
         private VersionSyncAction _versionSyncAction;
         private DeploymentUploadAction _deploymentUploadAction;
         private PlayServDeploymentController _deploymentController;
+#endif
         private PlayServConnectionController _connectionController;
 
         [MenuItem(MenuPath)]
@@ -71,6 +83,7 @@ namespace Playserv.Editor
 
         private void OnEnable()
         {
+            PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
             EnsureControllers();
 
             _state.FoldCodegen = EditorPrefs.GetBool(Const.PrefFoldCodegen, true);
@@ -97,7 +110,9 @@ namespace Playserv.Editor
         private void OnDisable()
         {
             _connectionController?.Dispose();
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
             _deploymentController?.Dispose();
+#endif
         }
 
         private void OnGUI()
@@ -147,31 +162,38 @@ namespace Playserv.Editor
 
             _configSectionPresenter.Draw(context);
 
-            if (_state.ModuleSettings.Deployment || _state.DeployRunning || _state.VersionSyncRunning)
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
+            if (PlayServEditorModuleAvailability.EditorDeployment &&
+                (_state.ModuleSettings.Deployment || _state.DeployRunning || _state.VersionSyncRunning))
             {
                 GUILayout.Space(12f);
                 _deploymentSectionPresenter.Draw(context);
             }
+#endif
 
-            if (_state.ModuleSettings.ModelSync)
+#if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
+            if (PlayServEditorModuleAvailability.EditorModelSync && _state.ModuleSettings.ModelSync)
             {
                 GUILayout.Space(12f);
                 _modelSectionPresenter.Draw(context);
             }
+#endif
 
 #if !PLAYSERV_DISABLE_EVENTS
-            if (_state.ModuleSettings.RuntimeEvents)
+            if (PlayServEditorModuleAvailability.EditorEvents && _state.ModuleSettings.RuntimeEvents)
             {
                 GUILayout.Space(12f);
                 _eventsSectionPresenter.Draw(context);
             }
 #endif
 
-            if (_state.ModuleSettings.Codegen)
+#if !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
+            if (PlayServEditorModuleAvailability.EditorCodegen && _state.ModuleSettings.Codegen)
             {
                 GUILayout.Space(12f);
                 _codegenSectionPresenter.Draw(context);
             }
+#endif
 
             if (ShowWebSocketConnectionMenu)
             {
@@ -190,6 +212,7 @@ namespace Playserv.Editor
 
         private void EnsureControllers()
         {
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
             if (_versionSyncAction == null)
                 _versionSyncAction = new VersionSyncAction(_deploymentZipBuilder);
 
@@ -203,6 +226,7 @@ namespace Playserv.Editor
                     _deploymentUploadAction,
                     _versionSyncAction,
                     Repaint);
+#endif
 
             if (_connectionController == null)
                 _connectionController = new PlayServConnectionController(_state, Repaint);
@@ -276,7 +300,9 @@ namespace Playserv.Editor
             return new PlayServWindowContext(
                 this,
                 _state,
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
                 _deploymentController,
+#endif
                 _connectionController,
                 DocsUrl,
                 StyledFieldHeight,

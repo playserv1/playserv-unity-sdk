@@ -55,8 +55,12 @@ namespace Playserv.Editor
                     EditorGUILayout.PropertyField(context.GameVersionProperty);
                     EditorGUILayout.PropertyField(context.AllowMultipleConnectionsProperty);
                     PlayServWindowChrome.DrawReadOnlyTextField("Backend Server Address", context.Config.BackendServerAddress, context.StyledFieldHeight);
-                    PlayServWindowChrome.DrawReadOnlyTextField("Deploy API Server", context.Config.DeployApiServerAddress, context.StyledFieldHeight);
-                    PlayServWindowChrome.DrawReadOnlyTextField("Schema API Server", context.Config.SchemaApiServerAddress, context.StyledFieldHeight);
+
+                    if (PlayServEditorModuleAvailability.EditorDeployment)
+                        PlayServWindowChrome.DrawReadOnlyTextField("Deploy API Server", context.Config.DeployApiServerAddress, context.StyledFieldHeight);
+
+                    if (PlayServEditorModuleAvailability.EditorModelSync)
+                        PlayServWindowChrome.DrawReadOnlyTextField("Schema API Server", context.Config.SchemaApiServerAddress, context.StyledFieldHeight);
 
                     using (new EditorGUILayout.HorizontalScope())
                     {

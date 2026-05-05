@@ -27,20 +27,32 @@ namespace Playserv.Editor
 
         public void Load()
         {
-            Deployment = EditorPrefs.GetBool(Const.PrefModuleDeployment, DefaultOptionalModuleState);
-            ModelSync = EditorPrefs.GetBool(Const.PrefModuleModelSync, DefaultOptionalModuleState);
-            Codegen = EditorPrefs.GetBool(Const.PrefModuleCodegen, DefaultOptionalModuleState);
+            Deployment = PlayServEditorModuleAvailability.EditorDeployment &&
+                         EditorPrefs.GetBool(Const.PrefModuleDeployment, DefaultOptionalModuleState);
+            ModelSync = PlayServEditorModuleAvailability.EditorModelSync &&
+                        EditorPrefs.GetBool(Const.PrefModuleModelSync, DefaultOptionalModuleState);
+            Codegen = PlayServEditorModuleAvailability.EditorCodegen &&
+                      EditorPrefs.GetBool(Const.PrefModuleCodegen, DefaultOptionalModuleState);
             LoadRuntimeModuleDefines();
         }
 
-        public bool SetDeployment(bool enabled) => Set(Const.PrefModuleDeployment, Deployment, enabled, value => Deployment = value);
+        public bool SetDeployment(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorDeployment &&
+            Set(Const.PrefModuleDeployment, Deployment, enabled, value => Deployment = value);
 
-        public bool SetModelSync(bool enabled) => Set(Const.PrefModuleModelSync, ModelSync, enabled, value => ModelSync = value);
+        public bool SetModelSync(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorModelSync &&
+            Set(Const.PrefModuleModelSync, ModelSync, enabled, value => ModelSync = value);
 
-        public bool SetCodegen(bool enabled) => Set(Const.PrefModuleCodegen, Codegen, enabled, value => Codegen = value);
+        public bool SetCodegen(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorCodegen &&
+            Set(Const.PrefModuleCodegen, Codegen, enabled, value => Codegen = value);
 
         public bool SetRuntimeEvents(bool enabled)
         {
+            if (!PlayServEditorModuleAvailability.RuntimeEvents)
+                return false;
+
             if (!enabled && !CanDisableRuntimeEvents)
                 return false;
 
@@ -51,6 +63,9 @@ namespace Playserv.Editor
 
         public bool SetRuntimeData(bool enabled)
         {
+            if (!PlayServEditorModuleAvailability.RuntimeData)
+                return false;
+
             if (enabled && !RuntimeEvents)
                 return false;
 
@@ -61,6 +76,9 @@ namespace Playserv.Editor
 
         public bool SetRuntimeRpc(bool enabled)
         {
+            if (!PlayServEditorModuleAvailability.RuntimeClientRpc)
+                return false;
+
             var state = CreateRuntimeState();
             state.Rpc = enabled;
             return ApplyRuntimeState(state);
@@ -68,6 +86,9 @@ namespace Playserv.Editor
 
         public bool SetRuntimeServerRpc(bool enabled)
         {
+            if (!PlayServEditorModuleAvailability.RuntimeServerRpc)
+                return false;
+
             var state = CreateRuntimeState();
             state.ServerRpc = enabled;
             return ApplyRuntimeState(state);
@@ -75,6 +96,9 @@ namespace Playserv.Editor
 
         public bool SetRuntimeSpawn(bool enabled)
         {
+            if (!PlayServEditorModuleAvailability.RuntimeSpawn)
+                return false;
+
             if (enabled && !RuntimeEvents)
                 return false;
 
@@ -85,6 +109,9 @@ namespace Playserv.Editor
 
         public bool SetRuntimePulse(bool enabled)
         {
+            if (!PlayServEditorModuleAvailability.RuntimePulse)
+                return false;
+
             var state = CreateRuntimeState();
             state.Pulse = enabled;
             return ApplyRuntimeState(state);
@@ -92,6 +119,9 @@ namespace Playserv.Editor
 
         public bool CanChangeRuntimeModule(string moduleName)
         {
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+                return false;
+
             switch (moduleName)
             {
                 case RuntimeModuleEvents:
@@ -124,6 +154,9 @@ namespace Playserv.Editor
 
         public bool IsRuntimeModuleEnabled(string moduleName)
         {
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+                return false;
+
             switch (moduleName)
             {
                 case RuntimeModuleEvents:
@@ -147,17 +180,23 @@ namespace Playserv.Editor
 
         public void ResetToDefaults()
         {
-            SetDeployment(DefaultOptionalModuleState);
-            SetModelSync(DefaultOptionalModuleState);
-            SetCodegen(DefaultOptionalModuleState);
+            if (PlayServEditorModuleAvailability.EditorDeployment)
+                SetDeployment(DefaultOptionalModuleState);
+
+            if (PlayServEditorModuleAvailability.EditorModelSync)
+                SetModelSync(DefaultOptionalModuleState);
+
+            if (PlayServEditorModuleAvailability.EditorCodegen)
+                SetCodegen(DefaultOptionalModuleState);
+
             ApplyRuntimeState(new PlayServRuntimeModuleState
             {
-                Events = DefaultOptionalModuleState,
-                Data = DefaultOptionalModuleState,
-                Rpc = DefaultOptionalModuleState,
-                ServerRpc = DefaultOptionalModuleState,
-                Spawn = DefaultOptionalModuleState,
-                Pulse = DefaultOptionalModuleState
+                Events = PlayServEditorModuleAvailability.RuntimeEvents && DefaultOptionalModuleState,
+                Data = PlayServEditorModuleAvailability.RuntimeData && DefaultOptionalModuleState,
+                Rpc = PlayServEditorModuleAvailability.RuntimeClientRpc && DefaultOptionalModuleState,
+                ServerRpc = PlayServEditorModuleAvailability.RuntimeServerRpc && DefaultOptionalModuleState,
+                Spawn = PlayServEditorModuleAvailability.RuntimeSpawn && DefaultOptionalModuleState,
+                Pulse = PlayServEditorModuleAvailability.RuntimePulse && DefaultOptionalModuleState
             });
         }
 
@@ -190,6 +229,7 @@ namespace Playserv.Editor
         private void LoadRuntimeModuleDefines()
         {
             var state = PlayServRuntimeModuleDefines.Load();
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;
             RuntimeRpc = state.Rpc;
@@ -213,6 +253,7 @@ namespace Playserv.Editor
 
         private bool ApplyRuntimeState(PlayServRuntimeModuleState state)
         {
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
 
             var changed = RuntimeEvents != state.Events ||

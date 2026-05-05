@@ -38,99 +38,61 @@ namespace Playserv.Editor
 
                 var settings = context.State.ModuleSettings;
                 var changed = false;
+                var hasRuntimeModules = false;
 
-                changed |= DrawRuntimeModule(
-                    settings,
-                    PlayServEditorModuleSettings.RuntimeModuleEvents,
-                    "Typed publish/subscribe runtime and typed event API generation controls. Cannot be disabled while dependent modules are enabled.",
-                    settings.RuntimeEvents,
-                    settings.SetRuntimeEvents,
-                    dependencies: null,
-                    dependents: new[]
-                    {
-                        PlayServEditorModuleSettings.RuntimeModuleData,
-                        PlayServEditorModuleSettings.RuntimeModuleSpawn
-                    });
-
-                GUILayout.Space(6f);
-                changed |= DrawRuntimeModule(
-                    settings,
-                    PlayServEditorModuleSettings.RuntimeModuleData,
-                    "Shared entity query, mutation, polling, and transport subscription APIs. Depends on Events.",
-                    settings.RuntimeData,
-                    settings.SetRuntimeData,
-                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleEvents },
-                    dependents: null);
-
-                GUILayout.Space(6f);
-                changed |= DrawRuntimeModule(
-                    settings,
-                    PlayServEditorModuleSettings.RuntimeModuleRpc,
-                    "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs.",
-                    settings.RuntimeRpc,
-                    settings.SetRuntimeRpc,
-                    dependencies: null,
-                    dependents: null);
-
-                GUILayout.Space(6f);
-                changed |= DrawRuntimeModule(
-                    settings,
-                    PlayServEditorModuleSettings.RuntimeModuleServerRpc,
-                    "Server-side in-process RPC invoker, service registry, and PlayServServerRpc API.",
-                    settings.RuntimeServerRpc,
-                    settings.SetRuntimeServerRpc,
-                    dependencies: null,
-                    dependents: null);
-
-                GUILayout.Space(6f);
-                changed |= DrawRuntimeModule(
-                    settings,
-                    PlayServEditorModuleSettings.RuntimeModuleSpawn,
-                    "NetworkObject/NetworkTransform helpers and Resources-based spawn facade. Depends on Events.",
-                    settings.RuntimeSpawn,
-                    settings.SetRuntimeSpawn,
-                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleEvents },
-                    dependents: null);
-
-                GUILayout.Space(6f);
-                changed |= DrawRuntimeModule(
-                    settings,
-                    PlayServEditorModuleSettings.RuntimeModulePulse,
-                    "Realtime config placeholder module and future feature flag surface.",
-                    settings.RuntimePulse,
-                    settings.SetRuntimePulse,
-                    dependencies: null,
-                    dependents: null);
-
-                GUILayout.Space(12f);
-                GUILayout.Label("Editor tools", PlayServWindowTheme.MiniHeadingStyle);
-                GUILayout.Space(8f);
-
-                using (new EditorGUI.DisabledScope(context.State.DeployRunning || context.State.VersionSyncRunning))
+                foreach (var module in PlayServEditorModuleAvailability.AvailableRuntimeModules)
                 {
-                    changed |= DrawToggleModule(
-                        "Deployment",
-                        "Release ZIP preview, version sync, and deploy controls.",
-                        settings.Deployment,
-                        settings.SetDeployment);
+                    if (hasRuntimeModules)
+                        GUILayout.Space(6f);
+
+                    changed |= DrawRuntimeModule(settings, module);
+                    hasRuntimeModules = true;
                 }
 
-                if (context.State.DeployRunning || context.State.VersionSyncRunning)
-                    PlayServWindowChrome.DrawNotice("Deployment module cannot be hidden while deployment/version sync is running.", MessageType.Info);
+                if (!hasRuntimeModules)
+                    PlayServWindowChrome.DrawNotice("No optional runtime modules are installed in this SDK package.", MessageType.Info);
 
-                GUILayout.Space(6f);
-                changed |= DrawToggleModule(
-                    "Model Sync",
-                    "Schema update checks and generated model refresh controls.",
-                    settings.ModelSync,
-                    settings.SetModelSync);
+                if (PlayServEditorModuleAvailability.HasAnyEditorTool)
+                {
+                    GUILayout.Space(12f);
+                    GUILayout.Label("Editor tools", PlayServWindowTheme.MiniHeadingStyle);
+                    GUILayout.Space(8f);
 
-                GUILayout.Space(6f);
-                changed |= DrawToggleModule(
-                    "DTO Codegen",
-                    "Shared DTO generation and cleanup controls.",
-                    settings.Codegen,
-                    settings.SetCodegen);
+                    if (PlayServEditorModuleAvailability.EditorDeployment)
+                    {
+                        using (new EditorGUI.DisabledScope(context.State.DeployRunning || context.State.VersionSyncRunning))
+                        {
+                            changed |= DrawToggleModule(
+                                "Deployment",
+                                "Release ZIP preview, version sync, and deploy controls.",
+                                settings.Deployment,
+                                settings.SetDeployment);
+                        }
+
+                        if (context.State.DeployRunning || context.State.VersionSyncRunning)
+                            PlayServWindowChrome.DrawNotice("Deployment module cannot be hidden while deployment/version sync is running.", MessageType.Info);
+                    }
+
+                    if (PlayServEditorModuleAvailability.EditorModelSync)
+                    {
+                        GUILayout.Space(6f);
+                        changed |= DrawToggleModule(
+                            "Model Sync",
+                            "Schema update checks and generated model refresh controls.",
+                            settings.ModelSync,
+                            settings.SetModelSync);
+                    }
+
+                    if (PlayServEditorModuleAvailability.EditorCodegen)
+                    {
+                        GUILayout.Space(6f);
+                        changed |= DrawToggleModule(
+                            "DTO Codegen",
+                            "Shared DTO generation and cleanup controls.",
+                            settings.Codegen,
+                            settings.SetCodegen);
+                    }
+                }
 
                 GUILayout.Space(12f);
                 using (new EditorGUILayout.HorizontalScope())
@@ -176,13 +138,11 @@ namespace Playserv.Editor
 
         private static bool DrawRuntimeModule(
             PlayServEditorModuleSettings settings,
-            string title,
-            string description,
-            bool enabled,
-            System.Func<bool, bool> apply,
-            string[] dependencies,
-            string[] dependents)
+            PlayServEditorModuleAvailability.PlayServRuntimeModuleDefinition module)
         {
+            var title = module.Name;
+            var enabled = module.IsEnabled(settings);
+
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
             {
                 var canChange = settings.CanChangeRuntimeModule(title);
@@ -195,9 +155,9 @@ namespace Playserv.Editor
                 }
 
                 GUILayout.Space(2f);
-                GUILayout.Label(description, PlayServWindowTheme.SectionSubtitleStyle);
-                DrawModuleTags(settings, "Requires", dependencies);
-                DrawModuleTags(settings, "Required by", dependents);
+                GUILayout.Label(module.Description, PlayServWindowTheme.SectionSubtitleStyle);
+                DrawModuleTags(settings, "Requires", module.Dependencies);
+                DrawModuleTags(settings, "Required by", module.Dependents);
 
                 if (!string.IsNullOrEmpty(blockReason))
                 {
@@ -206,7 +166,7 @@ namespace Playserv.Editor
                 }
 
                 if (canChange && nextEnabled != enabled)
-                    return apply(nextEnabled);
+                    return module.SetEnabled(settings, nextEnabled);
             }
 
             return false;
@@ -217,6 +177,9 @@ namespace Playserv.Editor
             if (moduleNames == null || moduleNames.Length == 0)
                 return;
 
+            if (!HasAvailableModuleTag(moduleNames))
+                return;
+
             GUILayout.Space(6f);
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -225,6 +188,9 @@ namespace Playserv.Editor
                 for (var i = 0; i < moduleNames.Length; i++)
                 {
                     var moduleName = moduleNames[i];
+                    if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+                        continue;
+
                     var moduleEnabled = settings.IsRuntimeModuleEnabled(moduleName);
                     var style = ResolveModuleTagStyle(moduleEnabled, label);
                     GUILayout.Label(
@@ -237,6 +203,17 @@ namespace Playserv.Editor
 
                 GUILayout.FlexibleSpace();
             }
+        }
+
+        private static bool HasAvailableModuleTag(string[] moduleNames)
+        {
+            for (var i = 0; i < moduleNames.Length; i++)
+            {
+                if (PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleNames[i]))
+                    return true;
+            }
+
+            return false;
         }
 
         private static GUIStyle ResolveModuleTagStyle(bool moduleEnabled, string tagGroupLabel)

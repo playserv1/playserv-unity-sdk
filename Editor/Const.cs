@@ -23,6 +23,9 @@ namespace Playserv.Editor
         internal const string DefineDisableServerRpc = "PLAYSERV_DISABLE_SERVER_RPC";
         internal const string DefineDisableSpawn = "PLAYSERV_DISABLE_SPAWN";
         internal const string DefineDisablePulse = "PLAYSERV_DISABLE_PULSE";
+        internal const string DefineDisableEditorDeployment = "PLAYSERV_DISABLE_EDITOR_DEPLOYMENT";
+        internal const string DefineDisableEditorModelSync = "PLAYSERV_DISABLE_EDITOR_MODEL_SYNC";
+        internal const string DefineDisableEditorCodegen = "PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN";
         
         internal const string PrefKeyJsonSchemaTimestamp = "PlayServ.JsonSchema.Timestamp";
         internal const string PrefKeyJsonSchemaVersion   = "PlayServ.JsonSchema.Version.";

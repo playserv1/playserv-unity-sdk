@@ -12,7 +12,7 @@ namespace Playserv.Events.Editor
         private static readonly string[] EventRelevantPathMarkers =
         {
             "/Editor/Events/",
-            "/Runtime/Events/"
+            "/Runtime/Modules/Events/"
         };
         private static readonly string GeneratedEventsMarker = NormalizePath(EventsCodeGenerator.GeneratedEventsDirectoryPath);
 
