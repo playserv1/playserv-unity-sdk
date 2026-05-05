@@ -10,6 +10,7 @@ namespace Playserv.Editor
         public const string RuntimeModuleEvents = "Events";
         public const string RuntimeModuleData = "Data Subscription";
         public const string RuntimeModuleRpc = "RPC";
+        public const string RuntimeModuleLocalRpc = "Local RPC";
         public const string RuntimeModuleSpawn = "Spawn";
         public const string RuntimeModulePulse = "Pulse";
 
@@ -20,6 +21,7 @@ namespace Playserv.Editor
         public bool RuntimeEvents { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeData { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeRpc { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeLocalRpc { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeSpawn { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimePulse { get; private set; } = DefaultOptionalModuleState;
 
@@ -62,8 +64,21 @@ namespace Playserv.Editor
 
         public bool SetRuntimeRpc(bool enabled)
         {
+            if (!enabled && RuntimeLocalRpc)
+                return false;
+
             var state = CreateRuntimeState();
             state.Rpc = enabled;
+            return ApplyRuntimeState(state);
+        }
+
+        public bool SetRuntimeLocalRpc(bool enabled)
+        {
+            if (enabled && !RuntimeRpc)
+                return false;
+
+            var state = CreateRuntimeState();
+            state.LocalRpc = enabled;
             return ApplyRuntimeState(state);
         }
 
@@ -92,6 +107,10 @@ namespace Playserv.Editor
                     return !RuntimeEvents || CanDisableRuntimeEvents;
                 case RuntimeModuleData:
                     return RuntimeData || RuntimeEvents;
+                case RuntimeModuleRpc:
+                    return !RuntimeRpc || !RuntimeLocalRpc;
+                case RuntimeModuleLocalRpc:
+                    return RuntimeLocalRpc || RuntimeRpc;
                 case RuntimeModuleSpawn:
                     return RuntimeSpawn || RuntimeEvents;
                 default:
@@ -109,6 +128,10 @@ namespace Playserv.Editor
                         : string.Empty;
                 case RuntimeModuleData:
                     return !RuntimeData && !RuntimeEvents ? "Enable Events first." : string.Empty;
+                case RuntimeModuleRpc:
+                    return RuntimeRpc && RuntimeLocalRpc ? $"Disable dependent module first: {RuntimeModuleLocalRpc}." : string.Empty;
+                case RuntimeModuleLocalRpc:
+                    return !RuntimeLocalRpc && !RuntimeRpc ? "Enable RPC first." : string.Empty;
                 case RuntimeModuleSpawn:
                     return !RuntimeSpawn && !RuntimeEvents ? "Enable Events first." : string.Empty;
                 default:
@@ -126,6 +149,8 @@ namespace Playserv.Editor
                     return RuntimeData;
                 case RuntimeModuleRpc:
                     return RuntimeRpc;
+                case RuntimeModuleLocalRpc:
+                    return RuntimeLocalRpc;
                 case RuntimeModuleSpawn:
                     return RuntimeSpawn;
                 case RuntimeModulePulse:
@@ -146,6 +171,7 @@ namespace Playserv.Editor
                 Events = DefaultOptionalModuleState,
                 Data = DefaultOptionalModuleState,
                 Rpc = DefaultOptionalModuleState,
+                LocalRpc = DefaultOptionalModuleState,
                 Spawn = DefaultOptionalModuleState,
                 Pulse = DefaultOptionalModuleState
             });
@@ -183,6 +209,7 @@ namespace Playserv.Editor
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;
             RuntimeRpc = state.Rpc;
+            RuntimeLocalRpc = state.LocalRpc;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
         }
@@ -194,6 +221,7 @@ namespace Playserv.Editor
                 Events = RuntimeEvents,
                 Data = RuntimeData,
                 Rpc = RuntimeRpc,
+                LocalRpc = RuntimeLocalRpc,
                 Spawn = RuntimeSpawn,
                 Pulse = RuntimePulse
             };
@@ -206,12 +234,14 @@ namespace Playserv.Editor
             var changed = RuntimeEvents != state.Events ||
                           RuntimeData != state.Data ||
                           RuntimeRpc != state.Rpc ||
+                          RuntimeLocalRpc != state.LocalRpc ||
                           RuntimeSpawn != state.Spawn ||
                           RuntimePulse != state.Pulse;
 
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;
             RuntimeRpc = state.Rpc;
+            RuntimeLocalRpc = state.LocalRpc;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
 

@@ -11,8 +11,10 @@ Internally, PlayServ sends `RpcInvokeRequest` through module:
 
 - `rpc.InvokeRpc`
 
+Local in-process RPC lives in the optional `Local RPC` module under `Runtime/RPC/Local`.
 If local RPC invoker is configured (`PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
 If invoker is configured but service is not registered, SDK falls back to transport (or throws if transport is not connected).
+When `PLAYSERV_DISABLE_LOCAL_RPC` is defined, `LocalRpcInvoker`, `IRpcInvoker`, and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while remote RPC stays enabled.
 
 ## Payload format
 

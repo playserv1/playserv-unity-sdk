@@ -1,4 +1,4 @@
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

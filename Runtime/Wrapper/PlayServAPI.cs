@@ -168,8 +168,10 @@ namespace Playserv.Wrapper
         public void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
             _rpcFacade.InvokeNamed(serviceName, methodName, payload);
 
+#if !PLAYSERV_DISABLE_LOCAL_RPC
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
             _localExecution.SetRpcInvoker(rpcInvoker);
+#endif
 
         public void Invoke(string serviceName, string methodName, string payloadBase64) =>
             _rpcFacade.Invoke(serviceName, methodName, payloadBase64);

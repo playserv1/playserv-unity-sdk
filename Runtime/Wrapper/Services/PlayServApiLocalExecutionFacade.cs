@@ -1,6 +1,6 @@
 using System;
 using Playserv.Proxy.Common;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
 using Playserv.RPC;
 #endif
 using Playserv.Server;
@@ -13,7 +13,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_EVENTS
         private IEventHandler _eventHandler;
 #endif
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
         private IRpcInvoker _rpcInvoker;
 #endif
 
@@ -21,7 +21,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_EVENTS
         public void SetEventHandler(IEventHandler eventHandler) => _eventHandler = eventHandler;
 #endif
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) => _rpcInvoker = rpcInvoker;
 #endif
 
@@ -144,6 +144,9 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_RPC
         public bool TryInvokeRpc(string serviceName, string methodName, string payloadBase64, bool hasTransport)
         {
+#if PLAYSERV_DISABLE_LOCAL_RPC
+            return false;
+#else
             if (_rpcInvoker == null)
                 return false;
 
@@ -158,6 +161,7 @@ namespace Playserv.Wrapper
             }
 
             return false;
+#endif
         }
 #endif
     }

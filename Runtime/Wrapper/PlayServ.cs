@@ -220,12 +220,14 @@ namespace Playserv.Wrapper
         public static void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
             RpcApi.InvokeNamed(serviceName, methodName, payload);
 
+#if !PLAYSERV_DISABLE_LOCAL_RPC
         /// <summary>
         /// Sets optional local RPC invoker for server-side/in-process execution.
         /// </summary>
         /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
         public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
             RpcApi.SetRpcInvoker(rpcInvoker);
+#endif
 
         /// <summary>
         /// Invokes server RPC method using already prepared base64 JSON payload.
