@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.Events
@@ -29,3 +30,5 @@ namespace Playserv.Events
         public DateTime Timestamp { get; set; }
     }
 }
+
+#endif

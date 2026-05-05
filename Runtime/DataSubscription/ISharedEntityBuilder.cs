@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -66,3 +67,5 @@ namespace Playserv.DataSubscription
         Task<ISharedEntity<T>> BindAsync();
     }
 }
+
+#endif

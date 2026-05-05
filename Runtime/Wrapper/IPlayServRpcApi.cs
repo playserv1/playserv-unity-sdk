@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_RPC
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -34,3 +35,5 @@ namespace Playserv.Wrapper
         void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64);
     }
 }
+
+#endif

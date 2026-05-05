@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.Server
@@ -51,3 +52,5 @@ namespace Playserv.Server
         bool TrySubscribe<T>(out IObservable<T> observable);
     }
 }
+
+#endif

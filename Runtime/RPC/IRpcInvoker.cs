@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_RPC
 namespace Playserv.RPC
 {
     /// <summary>
@@ -15,3 +16,5 @@ namespace Playserv.RPC
         bool TryInvoke(string serviceName, string methodName, string payloadBase64);
     }
 }
+
+#endif

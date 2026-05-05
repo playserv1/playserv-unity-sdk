@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_RPC
 using System;
 
 namespace Playserv.RPC
@@ -14,3 +15,5 @@ namespace Playserv.RPC
         public string Payload { get; set; } = string.Empty;
     }
 }
+
+#endif

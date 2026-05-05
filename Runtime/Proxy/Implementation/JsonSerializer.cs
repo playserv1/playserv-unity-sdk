@@ -1,5 +1,7 @@
 using System;
+#if !PLAYSERV_DISABLE_EVENTS
 using Playserv.Events.Requests;
+#endif
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Serialization;
@@ -29,12 +31,14 @@ namespace Playserv.Proxy.Implementation
             if (command == null)
                 throw new ArgumentNullException(nameof(command));
 
+#if !PLAYSERV_DISABLE_EVENTS
             if (command is EventMessage eventMessage &&
                 string.Equals(eventMessage.EventType, "KeepAlive", StringComparison.OrdinalIgnoreCase))
             {
                 var keepAlivePayload = _commandPayloadMapper.BuildKeepAlivePayloadJson(eventMessage.EventType, eventMessage.Payload);
                 return new MessageEnvelope("EventMessage", keepAlivePayload);
             }
+#endif
 
             var commandType = command.GetType();
             var typeName = commandType.Name;
@@ -47,11 +51,13 @@ namespace Playserv.Proxy.Implementation
             {
                 var commandNamespace = commandType.Namespace;
                 
+#if !PLAYSERV_DISABLE_EVENTS
                 if (!string.IsNullOrEmpty(commandNamespace) &&
                     commandNamespace.StartsWith("Playserv.Events", StringComparison.Ordinal))
                 {
                     typeName = $"module_events.{typeName}";
                 }
+#endif
             }
 
             var payloadJson = _jsonCodec.Serialize(command);

@@ -2,12 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
+#endif
+using Playserv.Modules;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
+#endif
 
 namespace Playserv.Proxy.Common
 {
@@ -17,13 +22,18 @@ namespace Playserv.Proxy.Common
         private readonly PlayServFeatureFacade _featureFacade;
         private readonly PlayServTransportSession _transportSession;
         private readonly PlayServCommandRouter _commandRouter;
+        private readonly PlayServModuleHost _moduleHost;
 
         public PlayServState State => _transportSession.State;
+
+        public IPlayServModuleServiceProvider ModuleServices => _moduleHost.Services;
 
         public event Action<TransportError> OnTransportError;
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
+#if !PLAYSERV_DISABLE_RPC
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
+#endif
 
         public PlayServImplementation(string endpoint)
             : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport)) { }
@@ -50,15 +60,19 @@ namespace Playserv.Proxy.Common
                 SynchronizationContext.Current,
                 error => OnTransportError?.Invoke(error),
                 () => OnKeepAlivePingSent?.Invoke(),
-                () => OnKeepAlivePongReceived?.Invoke(),
-                response => OnRpcInvokeResponse?.Invoke(response),
-                InitializeSpawnManager);
+                () => OnKeepAlivePongReceived?.Invoke()
+#if !PLAYSERV_DISABLE_RPC
+                ,
+                response => OnRpcInvokeResponse?.Invoke(response));
+#else
+                );
+#endif
 
             _logger = components.Logger;
+            _moduleHost = components.ModuleHost;
             _featureFacade = new PlayServFeatureFacade(
                 components.Transport,
-                components.EventsAdapter,
-                components.DataSubscriptionAdapter);
+                components.ModuleHost.Services);
             _transportSession = components.TransportSession;
             _commandRouter = new PlayServCommandRouter(_featureFacade, _transportSession, _logger);
         }
@@ -96,6 +110,7 @@ namespace Playserv.Proxy.Common
 
         public IDisposable OnCommand(string commandName, Action<object> onNext) => _featureFacade.OnCommand(commandName, onNext);
 
+#if !PLAYSERV_DISABLE_EVENTS
         public IObservable<T> Subscribe<T>() => _featureFacade.Subscribe<T>();
 
         public IDisposable Subscribe<T>(Action<T> onNext) => _featureFacade.Subscribe(onNext);
@@ -109,6 +124,7 @@ namespace Playserv.Proxy.Common
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default) => _featureFacade.SubscribeGroupAsync(groupName, ct);
 
         public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) => _featureFacade.UnsubscribeGroupAsync(groupName, ct);
+#endif
 
         public ITransportImplementation GetTransportImplementation() => _featureFacade.GetTransportImplementation();
 
@@ -116,6 +132,11 @@ namespace Playserv.Proxy.Common
 
         internal ILogger GetLogger() => _logger;
 
+        public bool HasModule(string moduleId) => _moduleHost.HasModule(moduleId);
+
+        internal IPlayServModuleServiceProvider GetModuleServices() => ModuleServices;
+
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         internal PlayServDataSubscriptionAdapter GetDataSubscriptionAdapter() => _featureFacade.GetDataSubscriptionAdapter();
 
         public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
@@ -146,11 +167,12 @@ namespace Playserv.Proxy.Common
         {
             return _featureFacade.StartDataByKeyPolling(key, query, variables, onData, onError);
         }
+#endif
 
         public void Dispose()
         {
             _commandRouter.Dispose();
-            DisposeSpawnManager();
+            _moduleHost.Dispose();
             _transportSession.Dispose();
             _featureFacade.Dispose();
         }

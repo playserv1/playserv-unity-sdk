@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 namespace Playserv.Events.Responses
 {
     /// <summary>
@@ -12,3 +13,5 @@ namespace Playserv.Events.Responses
         public bool success;
     }
 }
+
+#endif

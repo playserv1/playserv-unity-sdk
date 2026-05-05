@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,3 +32,5 @@ namespace Playserv.Wrapper
         public static void SetEventHandler(IEventHandler eventHandler) => Api.SetEventHandler(eventHandler);
     }
 }
+
+#endif

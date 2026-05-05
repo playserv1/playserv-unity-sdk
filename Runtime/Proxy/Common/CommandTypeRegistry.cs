@@ -40,9 +40,15 @@ namespace Playserv.Proxy.Common
         {
             var builder = new CommandTypeRegistryBuilder();
             ProxyCommandTypeRegistration.Register(builder);
+#if !PLAYSERV_DISABLE_EVENTS
             EventCommandTypeRegistration.Register(builder);
+#endif
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
             DataSubscriptionCommandTypeRegistration.Register(builder);
+#endif
+#if !PLAYSERV_DISABLE_RPC
             RpcCommandTypeRegistration.Register(builder);
+#endif
             return builder.Build();
         }
 

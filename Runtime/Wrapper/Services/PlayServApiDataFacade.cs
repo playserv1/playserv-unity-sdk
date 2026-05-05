@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -5,7 +6,7 @@ using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using UnityEngine;
 #endif
 
@@ -49,7 +50,7 @@ namespace Playserv.Wrapper
             return _getRequiredInstance().StartDataByKeyPolling(key, query, variables, onData, onError);
         }
 
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
         public Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation)
         {
             return _getRequiredInstance().Spawn(assetName, position, rotation);
@@ -62,3 +63,5 @@ namespace Playserv.Wrapper
 #endif
     }
 }
+
+#endif

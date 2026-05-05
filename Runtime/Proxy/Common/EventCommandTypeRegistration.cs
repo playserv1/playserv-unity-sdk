@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 using Playserv.Events;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
@@ -24,3 +25,5 @@ namespace Playserv.Proxy.Common
         }
     }
 }
+
+#endif

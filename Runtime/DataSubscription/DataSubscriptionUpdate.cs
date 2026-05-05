@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.DataSubscription
@@ -61,3 +62,5 @@ namespace Playserv.DataSubscription
             string.Equals(UpdateType, "Patch", StringComparison.OrdinalIgnoreCase);
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
@@ -19,3 +20,5 @@ namespace Playserv.Proxy.Common
         }
     }
 }
+
+#endif

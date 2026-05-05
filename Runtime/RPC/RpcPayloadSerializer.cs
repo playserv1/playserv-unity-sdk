@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_RPC
 using System;
 using System.Text;
 using Playserv.Serialization;
@@ -51,3 +52,5 @@ namespace Playserv.RPC
         }
     }
 }
+
+#endif

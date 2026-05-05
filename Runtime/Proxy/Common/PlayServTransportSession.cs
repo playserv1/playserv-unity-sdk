@@ -3,7 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
+#endif
 
 namespace Playserv.Proxy.Common
 {
@@ -11,7 +13,9 @@ namespace Playserv.Proxy.Common
     {
         private readonly ITransport _transport;
         private readonly ILogger _logger;
+#if !PLAYSERV_DISABLE_RPC
         private readonly ILogger _rpcLogger;
+#endif
         private readonly HandshakeService _handshakeService;
         private readonly KeepAliveManager _keepAliveManager;
         private readonly ReconnectionManager _reconnectionManager;
@@ -19,7 +23,9 @@ namespace Playserv.Proxy.Common
         private readonly Action<TransportError> _notifyTransportError;
         private readonly Action _notifyKeepAlivePingSent;
         private readonly Action _notifyKeepAlivePongReceived;
+#if !PLAYSERV_DISABLE_RPC
         private readonly Action<InvokeRpcResponse> _notifyRpcInvokeResponse;
+#endif
         private readonly Action _onConnected;
 
         private string _gameAccessToken;
@@ -39,17 +45,23 @@ namespace Playserv.Proxy.Common
             Action<TransportError> notifyTransportError,
             Action notifyKeepAlivePingSent,
             Action notifyKeepAlivePongReceived,
+#if !PLAYSERV_DISABLE_RPC
             Action<InvokeRpcResponse> notifyRpcInvokeResponse,
+#endif
             Action onConnected)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+#if !PLAYSERV_DISABLE_RPC
             _rpcLogger = PlayServLog.ForCategory(PlayServLogCategory.Rpc);
+#endif
             _mainThreadContext = mainThreadContext;
             _notifyTransportError = notifyTransportError ?? (_ => { });
             _notifyKeepAlivePingSent = notifyKeepAlivePingSent ?? (() => { });
             _notifyKeepAlivePongReceived = notifyKeepAlivePongReceived ?? (() => { });
+#if !PLAYSERV_DISABLE_RPC
             _notifyRpcInvokeResponse = notifyRpcInvokeResponse ?? (_ => { });
+#endif
             _onConnected = onConnected ?? (() => { });
 
             _handshakeService = new HandshakeService(_transport, _logger);
@@ -186,6 +198,7 @@ namespace Playserv.Proxy.Common
             _logger.Log($"Received client settings response. AllowMultipleConnections = {_allowMultipleConnections}");
         }
 
+#if !PLAYSERV_DISABLE_RPC
         public void HandleInvokeRpcResponse(InvokeRpcResponse response)
         {
             if (response == null)
@@ -200,6 +213,7 @@ namespace Playserv.Proxy.Common
                 $"InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
             _notifyRpcInvokeResponse(response);
         }
+#endif
 
         public void Dispose()
         {

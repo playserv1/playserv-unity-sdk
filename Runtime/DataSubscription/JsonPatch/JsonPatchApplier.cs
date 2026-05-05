@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using Playserv.DataSubscription.Exceptions;
@@ -317,3 +318,5 @@ namespace Playserv.DataSubscription.JsonPatch
         }
     }
 }
+
+#endif

@@ -1,11 +1,12 @@
 using System;
 using System.Threading;
-using Playserv.DataSubscription;
-using Playserv.Events;
+using Playserv.Modules;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
+#endif
 using Playserv.Runtime.Abstractions;
 using Playserv.Serialization;
 
@@ -23,9 +24,13 @@ namespace Playserv.Proxy.Common
             SynchronizationContext mainThreadContext,
             Action<TransportError> notifyTransportError,
             Action notifyKeepAlivePingSent,
-            Action notifyKeepAlivePongReceived,
-            Action<InvokeRpcResponse> notifyRpcInvokeResponse,
-            Action onConnected)
+            Action notifyKeepAlivePongReceived
+#if !PLAYSERV_DISABLE_RPC
+            ,
+            Action<InvokeRpcResponse> notifyRpcInvokeResponse)
+#else
+            )
+#endif
         {
             if (owner == null)
                 throw new ArgumentNullException(nameof(owner));
@@ -51,8 +56,13 @@ namespace Playserv.Proxy.Common
                 throw new InvalidOperationException("Transport implementation factory returned null.");
 
             var transport = new Transport(implementation, serializer, requestIdGenerator, logger);
-            var eventsAdapter = new PlayServEventsAdapter(transport, jsonCodec, PlayServLog.ForCategory(PlayServLogCategory.Events));
-            var dataSubscriptionAdapter = new PlayServDataSubscriptionAdapter(owner, PlayServLog.ForCategory(PlayServLogCategory.Data));
+            var moduleHost = CreateModuleHost(
+                owner,
+                transport,
+                serializer,
+                requestIdGenerator,
+                logger,
+                jsonCodec);
             var transportSession = new PlayServTransportSession(
                 transport,
                 logger,
@@ -60,14 +70,15 @@ namespace Playserv.Proxy.Common
                 notifyTransportError,
                 notifyKeepAlivePingSent,
                 notifyKeepAlivePongReceived,
+#if !PLAYSERV_DISABLE_RPC
                 notifyRpcInvokeResponse,
-                onConnected);
+#endif
+                moduleHost.NotifyConnected);
 
             return new PlayServImplementationComponents(
                 transport,
                 logger,
-                eventsAdapter,
-                dataSubscriptionAdapter,
+                moduleHost,
                 transportSession);
         }
 
@@ -75,6 +86,29 @@ namespace Playserv.Proxy.Common
         {
             return endpoint => TransportImplementationResolver.Create(
                 new TransportModuleContext(endpoint, logger, jsonCodec: new NewtonsoftJsonCodec()));
+        }
+
+        private static PlayServModuleHost CreateModuleHost(
+            PlayServImplementation owner,
+            ITransport transport,
+            IMessageSerializer serializer,
+            IRequestIdGenerator requestIdGenerator,
+            ILogger logger,
+            IJsonCodec jsonCodec)
+        {
+            var moduleHost = new PlayServModuleHost();
+            var services = moduleHost.ServiceRegistry;
+            services.Register(owner);
+            services.Register(transport);
+            services.Register(serializer);
+            services.Register(requestIdGenerator);
+            services.Register(logger);
+            services.Register(jsonCodec);
+
+            PlayServModuleRegistry.RegisterDefaults(moduleHost);
+
+            moduleHost.Initialize(new PlayServModuleContext(services));
+            return moduleHost;
         }
     }
 }

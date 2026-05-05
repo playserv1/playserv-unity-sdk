@@ -16,6 +16,12 @@ namespace Playserv.Editor
         internal const string PrefModuleModelSync = "PlayServ.Window.Module.ModelSync";
         internal const string PrefModuleEvents = "PlayServ.Window.Module.Events";
         internal const string PrefModuleCodegen = "PlayServ.Window.Module.Codegen";
+
+        internal const string DefineDisableEvents = "PLAYSERV_DISABLE_EVENTS";
+        internal const string DefineDisableData = "PLAYSERV_DISABLE_DATA";
+        internal const string DefineDisableRpc = "PLAYSERV_DISABLE_RPC";
+        internal const string DefineDisableSpawn = "PLAYSERV_DISABLE_SPAWN";
+        internal const string DefineDisablePulse = "PLAYSERV_DISABLE_PULSE";
         
         internal const string PrefKeyJsonSchemaTimestamp = "PlayServ.JsonSchema.Timestamp";
         internal const string PrefKeyJsonSchemaVersion   = "PlayServ.JsonSchema.Version.";

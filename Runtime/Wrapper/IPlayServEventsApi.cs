@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,3 +25,5 @@ namespace Playserv.Wrapper
         Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default);
     }
 }
+
+#endif
