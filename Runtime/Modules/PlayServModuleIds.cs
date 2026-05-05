@@ -6,8 +6,10 @@ namespace Playserv.Modules
         public const string Serialization = "serialization";
         public const string Events = "events";
         public const string Data = "data";
-        public const string Rpc = "rpc";
-        public const string LocalRpc = "local-rpc";
+        public const string RpcCore = "rpc-core";
+        public const string ClientRpc = "client-rpc";
+        public const string ServerRpc = "server-rpc";
+        public const string Rpc = ClientRpc;
         public const string Spawn = "spawn";
         public const string Pulse = "pulse";
     }

@@ -1,4 +1,4 @@
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE
 using System;
 
 namespace Playserv.RPC

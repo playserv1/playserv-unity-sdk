@@ -151,7 +151,7 @@ namespace Playserv.Editor
 
             if (!EditorUtility.DisplayDialog(
                     "Sync Version",
-                    $"Compare local RPC code hash against remote for GameId '{gameId}'?",
+                    $"Compare RPC code hash against remote for GameId '{gameId}'?",
                     "Sync",
                     "Cancel"))
             {

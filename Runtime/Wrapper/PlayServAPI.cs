@@ -10,7 +10,7 @@ using Playserv.DataSubscription.Responses;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && (!PLAYSERV_DISABLE_CLIENT_RPC || !PLAYSERV_DISABLE_SERVER_RPC)
 using Playserv.RPC;
 #endif
 using Playserv.Runtime.Abstractions;
@@ -26,8 +26,11 @@ using UnityEngine;
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServConnectionApi
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         , IPlayServRpcApi
+#endif
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+        , IPlayServServerRpcApi
 #endif
 #if !PLAYSERV_DISABLE_EVENTS
         , IPlayServEventsApi
@@ -42,7 +45,7 @@ namespace Playserv.Wrapper
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;
         private readonly PlayServApiLocalExecutionFacade _localExecution;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private readonly PlayServApiRpcFacade _rpcFacade;
 #endif
 #if !PLAYSERV_DISABLE_EVENTS
@@ -65,7 +68,7 @@ namespace Playserv.Wrapper
         public event Action<TransportError> OnTransportError;
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
 #endif
 
@@ -97,7 +100,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
             _dataFacade = new PlayServApiDataFacade(() => Instance);
 #endif
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             _rpcFacade = new PlayServApiRpcFacade(
                 _localExecution,
                 () => _configFacade.CurrentInstance,
@@ -125,7 +128,7 @@ namespace Playserv.Wrapper
         public IObservable<T> Subscribe<T>() => _eventsFacade.Subscribe<T>();
 #endif
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public void Send<T>(T command)
         {
             if (_localExecution.TryHandleCommand(command, moduleName: null, _configFacade.CurrentInstance != null))
@@ -158,7 +161,7 @@ namespace Playserv.Wrapper
             _eventsFacade.SetEventHandler(eventHandler);
 #endif
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public void Invoke(string serviceName, string methodName, object payload) =>
             _rpcFacade.Invoke(serviceName, methodName, payload);
 
@@ -167,11 +170,6 @@ namespace Playserv.Wrapper
 
         public void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
             _rpcFacade.InvokeNamed(serviceName, methodName, payload);
-
-#if !PLAYSERV_DISABLE_LOCAL_RPC
-        public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
-            _localExecution.SetRpcInvoker(rpcInvoker);
-#endif
 
         public void Invoke(string serviceName, string methodName, string payloadBase64) =>
             _rpcFacade.Invoke(serviceName, methodName, payloadBase64);
@@ -184,6 +182,11 @@ namespace Playserv.Wrapper
 
         public void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
             _rpcFacade.Invoke(method, payloadBase64);
+#endif
+
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+        public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
+            _localExecution.SetRpcInvoker(rpcInvoker);
 #endif
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
@@ -282,14 +285,14 @@ namespace Playserv.Wrapper
             instance.OnTransportError -= HandleTransportError;
             instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
             instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             instance.OnRpcInvokeResponse -= HandleRpcInvokeResponse;
 #endif
 
             instance.OnTransportError += HandleTransportError;
             instance.OnKeepAlivePingSent += HandleKeepAlivePingSent;
             instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             instance.OnRpcInvokeResponse += HandleRpcInvokeResponse;
 #endif
 #if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
@@ -301,7 +304,7 @@ namespace Playserv.Wrapper
         private void HandleTransportError(TransportError error) => OnTransportError?.Invoke(error);
         private void HandleKeepAlivePingSent() => OnKeepAlivePingSent?.Invoke();
         private void HandleKeepAlivePongReceived() => OnKeepAlivePongReceived?.Invoke();
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private void HandleRpcInvokeResponse(InvokeRpcResponse response) => OnRpcInvokeResponse?.Invoke(response);
 #endif
 
@@ -332,7 +335,7 @@ namespace Playserv.Wrapper
                 : null;
         }
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private IJsonCodec ResolveJsonCodec()
         {
             var instance = _configFacade.CurrentInstance;

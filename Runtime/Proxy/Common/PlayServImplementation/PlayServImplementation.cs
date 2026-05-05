@@ -10,7 +10,7 @@ using Playserv.Modules;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using Playserv.RPC;
 #endif
 
@@ -33,7 +33,7 @@ namespace Playserv.Proxy.Common
         public event Action<TransportError> OnTransportError;
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
 #endif
 
@@ -63,7 +63,7 @@ namespace Playserv.Proxy.Common
                 error => OnTransportError?.Invoke(error),
                 () => OnKeepAlivePingSent?.Invoke(),
                 () => OnKeepAlivePongReceived?.Invoke()
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
                 ,
                 response => OnRpcInvokeResponse?.Invoke(response));
 #else
