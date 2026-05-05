@@ -8,7 +8,7 @@ using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
 #endif
 using Playserv.Proxy.Common;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && (!PLAYSERV_DISABLE_CLIENT_RPC || !PLAYSERV_DISABLE_SERVER_RPC)
 using Playserv.RPC;
 #endif
 using Playserv.Runtime.Abstractions;
@@ -23,13 +23,16 @@ namespace Playserv.Wrapper
     /// <summary>
     /// Compatibility and convenience facade for PlayServ SDK runtime operations.
     /// Prefer domain-specific entrypoints such as PlayServConnection, PlayServRpc,
-    /// PlayServEvents, PlayServData and PlayServSpawn for new code.
+    /// PlayServServerRpc, PlayServEvents, PlayServData and PlayServSpawn for new code.
     /// </summary>
     public static class PlayServ
     {
         private static IPlayServConnectionApi ConnectionApi => PlayServApiHost.Connection;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private static IPlayServRpcApi RpcApi => PlayServApiHost.Rpc;
+#endif
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+        private static IPlayServServerRpcApi ServerRpcApi => PlayServApiHost.ServerRpc;
 #endif
 #if !PLAYSERV_DISABLE_EVENTS
         private static IPlayServEventsApi EventsApi => PlayServApiHost.Events;
@@ -86,7 +89,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised when RPC module returns InvokeRpcResponse command.
         /// </summary>
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {
             add => RpcApi.OnRpcInvokeResponse += value;
@@ -157,7 +160,7 @@ namespace Playserv.Wrapper
             EventsApi.Subscribe(onNext);
 #endif
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         /// <summary>
         /// Sends command object using default command namespace resolution.
         /// </summary>
@@ -192,7 +195,7 @@ namespace Playserv.Wrapper
             EventsApi.SetEventHandler(eventHandler);
 #endif
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         /// <summary>
         /// Invokes server RPC method using object payload serialized to base64 JSON.
         /// </summary>
@@ -219,15 +222,6 @@ namespace Playserv.Wrapper
         /// <param name="payload">Named RPC arguments keyed by parameter name.</param>
         public static void InvokeNamed(string serviceName, string methodName, IDictionary<string, object> payload) =>
             RpcApi.InvokeNamed(serviceName, methodName, payload);
-
-#if !PLAYSERV_DISABLE_LOCAL_RPC
-        /// <summary>
-        /// Sets optional local RPC invoker for server-side/in-process execution.
-        /// </summary>
-        /// <param name="rpcInvoker">Local invoker implementation. Pass null to disable local invocation.</param>
-        public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
-            RpcApi.SetRpcInvoker(rpcInvoker);
-#endif
 
         /// <summary>
         /// Invokes server RPC method using already prepared base64 JSON payload.
@@ -263,6 +257,15 @@ namespace Playserv.Wrapper
         /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
         public static void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
             RpcApi.Invoke(method, payloadBase64);
+#endif
+
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+        /// <summary>
+        /// Sets optional server RPC invoker for in-process execution.
+        /// </summary>
+        /// <param name="rpcInvoker">Server invoker implementation. Pass null to disable in-process invocation.</param>
+        public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
+            ServerRpcApi.SetRpcInvoker(rpcInvoker);
 #endif
 
         /// <summary>

@@ -66,20 +66,20 @@ namespace Playserv.Editor
                 changed |= DrawRuntimeModule(
                     settings,
                     PlayServEditorModuleSettings.RuntimeModuleRpc,
-                    "Remote RPC command DTOs, generated RPC helpers, and Invoke* wrapper APIs. Cannot be disabled while Local RPC is enabled.",
+                    "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs. Enables hidden RPC Core.",
                     settings.RuntimeRpc,
                     settings.SetRuntimeRpc,
-                    dependencies: null,
-                    dependents: new[] { PlayServEditorModuleSettings.RuntimeModuleLocalRpc });
+                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleRpcCore },
+                    dependents: null);
 
                 GUILayout.Space(6f);
                 changed |= DrawRuntimeModule(
                     settings,
-                    PlayServEditorModuleSettings.RuntimeModuleLocalRpc,
-                    "In-process RPC invoker, local service registry, and PlayServ.SetRpcInvoker API. Depends on RPC.",
-                    settings.RuntimeLocalRpc,
-                    settings.SetRuntimeLocalRpc,
-                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleRpc },
+                    PlayServEditorModuleSettings.RuntimeModuleServerRpc,
+                    "Server-side in-process RPC invoker, service registry, and PlayServServerRpc API. Enables hidden RPC Core.",
+                    settings.RuntimeServerRpc,
+                    settings.SetRuntimeServerRpc,
+                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleRpcCore },
                     dependents: null);
 
                 GUILayout.Space(6f);

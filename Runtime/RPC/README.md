@@ -11,10 +11,11 @@ Internally, PlayServ sends `RpcInvokeRequest` through module:
 
 - `rpc.InvokeRpc`
 
-Local in-process RPC lives in the optional `Local RPC` module under `Runtime/RPC/Local`.
-If local RPC invoker is configured (`PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
+RPC is split into `Runtime/RPC/Core`, `Runtime/RPC/Client`, and `Runtime/RPC/Server`.
+Server-side in-process RPC lives in the optional `Server RPC` module under `Runtime/RPC/Server`.
+If server RPC invoker is configured (`PlayServServerRpc.SetRpcInvoker(...)` or `PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
 If invoker is configured but service is not registered, SDK falls back to transport (or throws if transport is not connected).
-When `PLAYSERV_DISABLE_LOCAL_RPC` is defined, `LocalRpcInvoker`, `IRpcInvoker`, and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while remote RPC stays enabled.
+When `PLAYSERV_DISABLE_SERVER_RPC` is defined, `ServerRpcInvoker`, `IRpcInvoker`, and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled.
 
 ## Payload format
 
@@ -87,10 +88,10 @@ For this variant payload is built automatically as:
 using Playserv.RPC;
 using Playserv.Wrapper;
 
-var invoker = new LocalRpcInvoker()
+var invoker = new ServerRpcInvoker()
     .RegisterService(new NotificationService(context));
 
-PlayServ.SetRpcInvoker(invoker);
+PlayServServerRpc.SetRpcInvoker(invoker);
 
 // Executes local method directly, does not send command over websocket.
 PlayServ.Invoke<NotificationService>(x => x.BroadcastToAll("Hello from server"));

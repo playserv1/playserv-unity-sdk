@@ -1,4 +1,4 @@
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,20 +9,20 @@ using Playserv.Serialization;
 
 namespace Playserv.RPC
 {
-    internal sealed class LocalRpcMethodRegistry
+    internal sealed class ServerRpcMethodRegistry
     {
-        private static readonly ConcurrentDictionary<Type, LocalRpcMethodRegistry> Cache = new();
+        private static readonly ConcurrentDictionary<Type, ServerRpcMethodRegistry> Cache = new();
 
         private readonly Type _serviceType;
-        private readonly Dictionary<string, LocalRpcMethodDescriptor> _methods;
+        private readonly Dictionary<string, ServerRpcMethodDescriptor> _methods;
 
-        private LocalRpcMethodRegistry(Type serviceType, Dictionary<string, LocalRpcMethodDescriptor> methods)
+        private ServerRpcMethodRegistry(Type serviceType, Dictionary<string, ServerRpcMethodDescriptor> methods)
         {
             _serviceType = serviceType;
             _methods = methods;
         }
 
-        public static LocalRpcMethodRegistry For(Type serviceType)
+        public static ServerRpcMethodRegistry For(Type serviceType)
         {
             if (serviceType == null)
                 throw new ArgumentNullException(nameof(serviceType));
@@ -30,7 +30,7 @@ namespace Playserv.RPC
             return Cache.GetOrAdd(serviceType, Build);
         }
 
-        public LocalRpcMethodDescriptor GetRequiredMethod(string methodName)
+        public ServerRpcMethodDescriptor GetRequiredMethod(string methodName)
         {
             if (_methods.TryGetValue(methodName, out var descriptor))
                 return descriptor;
@@ -38,11 +38,11 @@ namespace Playserv.RPC
             throw new MissingMethodException(_serviceType.FullName, methodName);
         }
 
-        private static LocalRpcMethodRegistry Build(Type serviceType)
+        private static ServerRpcMethodRegistry Build(Type serviceType)
         {
             EnsureRpcServiceAttribute(serviceType);
 
-            var methods = new Dictionary<string, LocalRpcMethodDescriptor>(StringComparer.Ordinal);
+            var methods = new Dictionary<string, ServerRpcMethodDescriptor>(StringComparer.Ordinal);
             foreach (var method in serviceType.GetMethods(BindingFlags.Instance | BindingFlags.Public))
             {
                 if (method.IsSpecialName)
@@ -52,20 +52,20 @@ namespace Playserv.RPC
                 {
                     throw new InvalidOperationException(
                         $"Service '{serviceType.FullName}' contains multiple overloads for method '{method.Name}'. " +
-                        "LocalRpcInvoker does not support method overload resolution.");
+                        "ServerRpcInvoker does not support method overload resolution.");
                 }
 
                 if (method.ContainsGenericParameters)
                 {
                     throw new InvalidOperationException(
                         $"Service '{serviceType.FullName}' contains generic RPC method '{method.Name}'. " +
-                        "LocalRpcInvoker does not support generic RPC methods.");
+                        "ServerRpcInvoker does not support generic RPC methods.");
                 }
 
-                methods[method.Name] = LocalRpcMethodDescriptor.Create(method);
+                methods[method.Name] = ServerRpcMethodDescriptor.Create(method);
             }
 
-            return new LocalRpcMethodRegistry(serviceType, methods);
+            return new ServerRpcMethodRegistry(serviceType, methods);
         }
 
         private static void EnsureRpcServiceAttribute(Type serviceType)
@@ -84,15 +84,15 @@ namespace Playserv.RPC
         }
     }
 
-    internal sealed class LocalRpcMethodDescriptor
+    internal sealed class ServerRpcMethodDescriptor
     {
         private readonly string _methodDisplayName;
-        private readonly LocalRpcParameterDescriptor[] _parameters;
+        private readonly ServerRpcParameterDescriptor[] _parameters;
         private readonly Action<object, object[]> _invoke;
 
-        private LocalRpcMethodDescriptor(
+        private ServerRpcMethodDescriptor(
             string methodDisplayName,
-            LocalRpcParameterDescriptor[] parameters,
+            ServerRpcParameterDescriptor[] parameters,
             Action<object, object[]> invoke)
         {
             _methodDisplayName = methodDisplayName;
@@ -100,14 +100,14 @@ namespace Playserv.RPC
             _invoke = invoke;
         }
 
-        public static LocalRpcMethodDescriptor Create(MethodInfo method)
+        public static ServerRpcMethodDescriptor Create(MethodInfo method)
         {
             var parameters = method.GetParameters();
-            var descriptors = new LocalRpcParameterDescriptor[parameters.Length];
+            var descriptors = new ServerRpcParameterDescriptor[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
-                descriptors[i] = LocalRpcParameterDescriptor.Create(parameters[i], i);
+                descriptors[i] = ServerRpcParameterDescriptor.Create(parameters[i], i);
 
-            return new LocalRpcMethodDescriptor(
+            return new ServerRpcMethodDescriptor(
                 $"{method.DeclaringType?.Name}.{method.Name}",
                 descriptors,
                 CompileInvoker(method));
@@ -203,7 +203,7 @@ namespace Playserv.RPC
             return arguments;
         }
 
-        private object ResolveFallbackParameterValue(LocalRpcParameterDescriptor parameter)
+        private object ResolveFallbackParameterValue(ServerRpcParameterDescriptor parameter)
         {
             if (parameter.HasDefaultValue)
                 return parameter.DefaultValue;
@@ -215,7 +215,7 @@ namespace Playserv.RPC
                 $"RPC payload does not contain required parameter '{parameter.Name}' for method '{_methodDisplayName}'.");
         }
 
-        private object ConvertValue(object value, LocalRpcParameterDescriptor parameter, IJsonCodec jsonCodec)
+        private object ConvertValue(object value, ServerRpcParameterDescriptor parameter, IJsonCodec jsonCodec)
         {
             if (value == null)
             {
@@ -300,9 +300,9 @@ namespace Playserv.RPC
         }
     }
 
-    internal readonly struct LocalRpcParameterDescriptor
+    internal readonly struct ServerRpcParameterDescriptor
     {
-        private LocalRpcParameterDescriptor(
+        private ServerRpcParameterDescriptor(
             string name,
             Type parameterType,
             bool hasDefaultValue,
@@ -322,10 +322,10 @@ namespace Playserv.RPC
         public object DefaultValue { get; }
         public bool AllowsNull { get; }
 
-        public static LocalRpcParameterDescriptor Create(ParameterInfo parameter, int index)
+        public static ServerRpcParameterDescriptor Create(ParameterInfo parameter, int index)
         {
             var parameterType = parameter.ParameterType;
-            return new LocalRpcParameterDescriptor(
+            return new ServerRpcParameterDescriptor(
                 parameter.Name ?? $"arg{index}",
                 parameterType,
                 parameter.HasDefaultValue,

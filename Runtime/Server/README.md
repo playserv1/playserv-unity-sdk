@@ -13,7 +13,7 @@ Keep server logic in a separate project/repository (for example `playserv-game-s
 3. Register local handlers via:
    - `PlayServ.SetCommandHandler(...)`
    - `PlayServ.SetEventHandler(...)`
-   - `PlayServ.SetRpcInvoker(...)`
+   - `PlayServServerRpc.SetRpcInvoker(...)`
 4. Call `PlayServ.Send/Publish/Subscribe/Invoke` from server code as usual.
 
 No changes are required in SDK runtime code for this.
@@ -60,7 +60,7 @@ public static class PlayServServerBootstrap
 {
     private static LocalCommandHandler? _commandHandler;
     private static LocalEventHandler? _eventHandler;
-    private static LocalRpcInvoker? _rpcInvoker;
+    private static ServerRpcInvoker? _rpcInvoker;
 
     public static void Start()
     {
@@ -77,19 +77,19 @@ public static class PlayServServerBootstrap
 
         _eventHandler = new LocalEventHandler();
 
-        _rpcInvoker = new LocalRpcInvoker()
+        _rpcInvoker = new ServerRpcInvoker()
             .RegisterService(new NotificationService());
 
         PlayServ.SetCommandHandler(_commandHandler);
         PlayServ.SetEventHandler(_eventHandler);
-        PlayServ.SetRpcInvoker(_rpcInvoker);
+        PlayServServerRpc.SetRpcInvoker(_rpcInvoker);
     }
 
     public static void Stop()
     {
         PlayServ.SetCommandHandler(null);
         PlayServ.SetEventHandler(null);
-        PlayServ.SetRpcInvoker(null);
+        PlayServServerRpc.SetRpcInvoker(null);
         PlayServ.Disconnect();
     }
 }
@@ -113,5 +113,5 @@ public static class PlayServServerBootstrap
 ## Constraints and notes
 
 - RPC service type must have `[Rpc]` attribute.
-- `LocalRpcInvoker` does not support ambiguous overloads with same method name.
+- `ServerRpcInvoker` does not support ambiguous overloads with same method name.
 - `LocalEventHandler` routes by payload type; group/user values are validated but not used as filters.

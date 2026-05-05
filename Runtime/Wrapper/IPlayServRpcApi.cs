@@ -1,4 +1,4 @@
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -17,10 +17,6 @@ namespace Playserv.Wrapper
         void Send<T>(T command, string moduleName);
 
         void SetCommandHandler(ICommandHandler commandHandler);
-
-#if !PLAYSERV_DISABLE_LOCAL_RPC
-        void SetRpcInvoker(IRpcInvoker rpcInvoker);
-#endif
 
         void Invoke(string serviceName, string methodName, object payload);
 

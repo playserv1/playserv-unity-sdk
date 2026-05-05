@@ -1,4 +1,4 @@
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using Playserv.RPC;
 
 namespace Playserv.Proxy.Common

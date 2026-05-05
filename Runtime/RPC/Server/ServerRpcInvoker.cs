@@ -1,4 +1,4 @@
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 using System;
 using System.Collections.Generic;
 using Playserv.Serialization;
@@ -8,17 +8,17 @@ namespace Playserv.RPC
     /// <summary>
     /// In-process RPC invoker for server/runtime usage without websocket transport.
     /// </summary>
-    public sealed class LocalRpcInvoker : IRpcInvoker
+    public sealed class ServerRpcInvoker : IRpcInvoker
     {
-        private readonly Dictionary<string, LocalRpcServiceRegistration> _services = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ServerRpcServiceRegistration> _services = new(StringComparer.Ordinal);
         private readonly IJsonCodec _jsonCodec;
 
-        public LocalRpcInvoker()
+        public ServerRpcInvoker()
             : this(new NewtonsoftJsonCodec())
         {
         }
 
-        public LocalRpcInvoker(IJsonCodec jsonCodec)
+        public ServerRpcInvoker(IJsonCodec jsonCodec)
         {
             _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
         }
@@ -29,7 +29,7 @@ namespace Playserv.RPC
         /// <typeparam name="TService">Service type.</typeparam>
         /// <param name="service">Service instance.</param>
         /// <returns>Current invoker instance for chaining.</returns>
-        public LocalRpcInvoker RegisterService<TService>(TService service)
+        public ServerRpcInvoker RegisterService<TService>(TService service)
             where TService : class
         {
             if (service == null)
@@ -44,7 +44,7 @@ namespace Playserv.RPC
         /// <param name="serviceName">RPC service name.</param>
         /// <param name="service">Service instance.</param>
         /// <returns>Current invoker instance for chaining.</returns>
-        public LocalRpcInvoker RegisterService(string serviceName, object service)
+        public ServerRpcInvoker RegisterService(string serviceName, object service)
         {
             if (string.IsNullOrWhiteSpace(serviceName))
                 throw new ArgumentException("Service name is required.", nameof(serviceName));
@@ -52,9 +52,9 @@ namespace Playserv.RPC
             if (service == null)
                 throw new ArgumentNullException(nameof(service));
 
-            _services[serviceName] = new LocalRpcServiceRegistration(
+            _services[serviceName] = new ServerRpcServiceRegistration(
                 service,
-                LocalRpcMethodRegistry.For(service.GetType()));
+                ServerRpcMethodRegistry.For(service.GetType()));
             return this;
         }
 
@@ -103,16 +103,16 @@ namespace Playserv.RPC
             return true;
         }
 
-        private readonly struct LocalRpcServiceRegistration
+        private readonly struct ServerRpcServiceRegistration
         {
-            public LocalRpcServiceRegistration(object service, LocalRpcMethodRegistry methods)
+            public ServerRpcServiceRegistration(object service, ServerRpcMethodRegistry methods)
             {
                 Service = service;
                 Methods = methods;
             }
 
             public object Service { get; }
-            public LocalRpcMethodRegistry Methods { get; }
+            public ServerRpcMethodRegistry Methods { get; }
         }
     }
 }

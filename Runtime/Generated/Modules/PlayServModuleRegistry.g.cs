@@ -9,7 +9,7 @@ using Playserv.Modules;
 #if !PLAYSERV_DISABLE_PULSE
 using Playserv.Pulse;
 #endif
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE
 using Playserv.RPC;
 #endif
 #if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
@@ -28,11 +28,14 @@ namespace Playserv.Modules
 #if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
             host.Register(new PlayServDataSubscriptionModule());
 #endif
-#if !PLAYSERV_DISABLE_RPC
-            host.Register(new PlayServRpcModule());
+#if !PLAYSERV_DISABLE_RPC_CORE
+            host.Register(new PlayServRpcCoreModule());
 #endif
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
-            host.Register(new PlayServLocalRpcModule());
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
+            host.Register(new PlayServClientRpcModule());
+#endif
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+            host.Register(new PlayServServerRpcModule());
 #endif
 #if !PLAYSERV_DISABLE_PULSE
             host.Register(new PlayServPulseModule());

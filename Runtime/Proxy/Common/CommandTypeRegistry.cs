@@ -46,7 +46,7 @@ namespace Playserv.Proxy.Common
 #if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
             DataSubscriptionCommandTypeRegistration.Register(builder);
 #endif
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             RpcCommandTypeRegistration.Register(builder);
 #endif
             return builder.Build();

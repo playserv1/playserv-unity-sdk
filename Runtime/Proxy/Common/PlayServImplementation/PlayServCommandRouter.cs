@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Playserv.Proxy.Logging;
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using Playserv.RPC;
 #endif
 
@@ -38,7 +38,7 @@ namespace Playserv.Proxy.Common
         {
             Register("error", OnCommandErrorReceived);
             Register("CommandErrorResponse", OnCommandErrorReceived);
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             Register("RpcErrorResponse", OnCommandErrorReceived);
             Register("rpc.RpcErrorResponse", OnCommandErrorReceived);
 #endif
@@ -48,7 +48,7 @@ namespace Playserv.Proxy.Common
             Register("ClientSettingsResponse", OnClientSettingsResponseReceived);
             Register("ParseErrorResponse", OnParseErrorReceived);
             Register("ValidationErrorResponse", OnValidationErrorReceived);
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             Register("InvokeRpcResponse", OnInvokeRpcResponseReceived);
             Register("rpc.InvokeRpcResponse", OnInvokeRpcResponseReceived);
             Register("rpc.InvokeRpc.InvokeRpcResponse", OnInvokeRpcResponseReceived);
@@ -126,7 +126,7 @@ namespace Playserv.Proxy.Common
             _logger.LogWarning($"Received 'error' command with unexpected payload type: {command?.GetType().Name ?? "null"}");
         }
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private void OnInvokeRpcResponseReceived(object command)
         {
             var response = command as InvokeRpcResponse;

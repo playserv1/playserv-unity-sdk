@@ -19,8 +19,9 @@ namespace Playserv.Editor
 
         internal const string DefineDisableEvents = "PLAYSERV_DISABLE_EVENTS";
         internal const string DefineDisableData = "PLAYSERV_DISABLE_DATA";
-        internal const string DefineDisableRpc = "PLAYSERV_DISABLE_RPC";
-        internal const string DefineDisableLocalRpc = "PLAYSERV_DISABLE_LOCAL_RPC";
+        internal const string DefineDisableRpcCore = "PLAYSERV_DISABLE_RPC_CORE";
+        internal const string DefineDisableClientRpc = "PLAYSERV_DISABLE_CLIENT_RPC";
+        internal const string DefineDisableServerRpc = "PLAYSERV_DISABLE_SERVER_RPC";
         internal const string DefineDisableSpawn = "PLAYSERV_DISABLE_SPAWN";
         internal const string DefineDisablePulse = "PLAYSERV_DISABLE_PULSE";
         

@@ -1,19 +1,22 @@
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE
+using System;
 using Playserv.Modules;
 
 namespace Playserv.RPC
 {
-    public sealed class PlayServLocalRpcModule : IPlayServModule, IPlayServLocalRpcModule
+    public sealed class PlayServRpcCoreModule : IPlayServModule, IPlayServRpcCoreModule
     {
         public PlayServModuleDescriptor Descriptor { get; } = new PlayServModuleDescriptor(
-            PlayServModuleIds.LocalRpc,
+            PlayServModuleIds.RpcCore,
             isCore: false,
-            PlayServModuleIds.Rpc,
             PlayServModuleIds.Serialization);
 
         public void Initialize(PlayServModuleContext context)
         {
-            context.Services.Register<IPlayServLocalRpcModule>(this);
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
+            context.Services.Register<IPlayServRpcCoreModule>(this);
             context.Services.Register(this);
         }
 

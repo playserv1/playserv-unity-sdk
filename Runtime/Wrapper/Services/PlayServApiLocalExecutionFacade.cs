@@ -1,6 +1,6 @@
 using System;
 using Playserv.Proxy.Common;
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 using Playserv.RPC;
 #endif
 using Playserv.Server;
@@ -13,7 +13,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_EVENTS
         private IEventHandler _eventHandler;
 #endif
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
         private IRpcInvoker _rpcInvoker;
 #endif
 
@@ -21,7 +21,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_EVENTS
         public void SetEventHandler(IEventHandler eventHandler) => _eventHandler = eventHandler;
 #endif
-#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) => _rpcInvoker = rpcInvoker;
 #endif
 
@@ -141,10 +141,10 @@ namespace Playserv.Wrapper
         }
 #endif
 
-#if !PLAYSERV_DISABLE_RPC
+#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public bool TryInvokeRpc(string serviceName, string methodName, string payloadBase64, bool hasTransport)
         {
-#if PLAYSERV_DISABLE_LOCAL_RPC
+#if PLAYSERV_DISABLE_SERVER_RPC
             return false;
 #else
             if (_rpcInvoker == null)
@@ -156,7 +156,7 @@ namespace Playserv.Wrapper
             if (!hasTransport)
             {
                 throw new InvalidOperationException(
-                    $"Local RPC invoker did not handle '{serviceName}.{methodName}'. " +
+                    $"Server RPC invoker did not handle '{serviceName}.{methodName}'. " +
                     "Register service in invoker or connect transport.");
             }
 
