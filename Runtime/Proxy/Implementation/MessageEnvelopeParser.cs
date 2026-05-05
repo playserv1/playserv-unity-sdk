@@ -5,12 +5,12 @@ namespace Playserv.Proxy.Implementation
 {
     internal static class MessageEnvelopeParser
     {
-        private static readonly MessageEnvelopeCodec Codec =
-            new MessageEnvelopeCodec(new NewtonsoftJsonCodec());
-
-        public static MessageEnvelope Parse(string json)
+        public static MessageEnvelope Parse(string json, IJsonCodec jsonCodec)
         {
-            return Codec.Parse(json);
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
+            return new MessageEnvelopeCodec(jsonCodec).Parse(json);
         }
     }
 }

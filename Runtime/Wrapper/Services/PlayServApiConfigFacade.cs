@@ -203,7 +203,9 @@ namespace Playserv.Wrapper
             try
             {
                 var httpClient = PlayServRuntimeHttpClientResolver.Create(
-                    new PlayServHttpModuleContext(settings.ToRuntimeSettings()));
+                    new PlayServHttpModuleContext(
+                        settings.ToRuntimeSettings(),
+                        PlayServJsonCompositionRoot.CreateDefaultJsonCodec()));
                 var latestVersion = await httpClient.GetLatestVersionAsync(gameId, ct);
                 PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version resolved from deployment API: {latestVersion}");
                 return latestVersion;

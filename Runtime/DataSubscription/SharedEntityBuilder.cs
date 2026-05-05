@@ -87,7 +87,7 @@ namespace Playserv.DataSubscription
                 throw new InvalidOperationException("Key must be specified using Key() method");
 
             var stringKey = ConvertKeyToString(_key);
-            var query = QueryBuilder.BuildQuery<T>(_entityType, _key);
+            var query = QueryBuilder.BuildQuery<T>(_entityType, _key, jsonCodec: _adapter.GetJsonCodec());
             var variables = QueryBuilder.BuildVariables(_key);
 
             if (_mode == DataSubscriptionMode.Transport)

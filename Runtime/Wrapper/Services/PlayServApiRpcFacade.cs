@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
+using Playserv.Serialization;
 
 namespace Playserv.Wrapper
 {
@@ -12,20 +13,23 @@ namespace Playserv.Wrapper
         private readonly PlayServApiLocalExecutionFacade _localExecution;
         private readonly Func<PlayServImplementation> _getCurrentInstance;
         private readonly Func<string, PlayServImplementation> _getInstanceForFireAndForget;
+        private readonly Func<IJsonCodec> _getJsonCodec;
 
         public PlayServApiRpcFacade(
             PlayServApiLocalExecutionFacade localExecution,
             Func<PlayServImplementation> getCurrentInstance,
-            Func<string, PlayServImplementation> getInstanceForFireAndForget)
+            Func<string, PlayServImplementation> getInstanceForFireAndForget,
+            Func<IJsonCodec> getJsonCodec)
         {
             _localExecution = localExecution ?? throw new ArgumentNullException(nameof(localExecution));
             _getCurrentInstance = getCurrentInstance ?? throw new ArgumentNullException(nameof(getCurrentInstance));
             _getInstanceForFireAndForget = getInstanceForFireAndForget ?? throw new ArgumentNullException(nameof(getInstanceForFireAndForget));
+            _getJsonCodec = getJsonCodec ?? throw new ArgumentNullException(nameof(getJsonCodec));
         }
 
         public void Invoke(string serviceName, string methodName, object payload)
         {
-            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _getJsonCodec());
             Invoke(serviceName, methodName, payloadBase64);
         }
 
@@ -102,7 +106,7 @@ namespace Playserv.Wrapper
 
         private void InvokeMapped(string serviceName, string methodName, RpcMappedPayload payload)
         {
-            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload);
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _getJsonCodec());
             Invoke(serviceName, methodName, payloadBase64);
         }
 

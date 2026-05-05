@@ -10,7 +10,7 @@ namespace Playserv.RPC
     /// </summary>
     public static class RpcPayloadSerializer
     {
-        private static readonly IJsonCodec JsonCodec = new NewtonsoftJsonCodec();
+        private static readonly IJsonCodec DefaultJsonCodec = new NewtonsoftJsonCodec();
 
         /// <summary>
         /// Serializes arbitrary object to JSON and encodes it as base64.
@@ -19,7 +19,12 @@ namespace Playserv.RPC
         /// <returns>Base64-encoded UTF8 JSON string.</returns>
         public static string SerializeToBase64(object payload)
         {
-            var json = JsonCodec.Serialize(payload);
+            return SerializeToBase64(payload, null);
+        }
+
+        internal static string SerializeToBase64(object payload, IJsonCodec jsonCodec)
+        {
+            var json = ResolveJsonCodec(jsonCodec).Serialize(payload);
             var bytes = Encoding.UTF8.GetBytes(json);
             return Convert.ToBase64String(bytes);
         }
@@ -31,10 +36,15 @@ namespace Playserv.RPC
         /// <returns>Base64-encoded UTF8 JSON string.</returns>
         internal static string SerializeToBase64(RpcMappedPayload payload)
         {
+            return SerializeToBase64(payload, null);
+        }
+
+        internal static string SerializeToBase64(RpcMappedPayload payload, IJsonCodec jsonCodec)
+        {
             if (payload == null)
                 throw new ArgumentNullException(nameof(payload));
 
-            return SerializeToBase64(payload.ToSerializableObject());
+            return SerializeToBase64(payload.ToSerializableObject(), jsonCodec);
         }
 
         /// <summary>
@@ -49,6 +59,11 @@ namespace Playserv.RPC
 
             var bytes = Convert.FromBase64String(payloadBase64);
             return Encoding.UTF8.GetString(bytes);
+        }
+
+        private static IJsonCodec ResolveJsonCodec(IJsonCodec jsonCodec)
+        {
+            return jsonCodec ?? DefaultJsonCodec;
         }
     }
 }

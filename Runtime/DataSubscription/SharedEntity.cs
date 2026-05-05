@@ -179,7 +179,7 @@ namespace Playserv.DataSubscription
                 return;
             }
 
-            Value = JsonPatchApplier.ApplyPatch(Value, patchData);
+            Value = JsonPatchApplier.ApplyPatch(Value, patchData, _jsonCodec);
             Changed?.Invoke(Value);
         }
 
