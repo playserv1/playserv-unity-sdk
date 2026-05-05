@@ -44,16 +44,30 @@ namespace Playserv.Editor
                         "Primary transport");
                 }
 
-                GUILayout.Space(8f);
-
-                using (new EditorGUILayout.HorizontalScope())
+                if (PlayServEditorModuleAvailability.EditorModelSync ||
+                    PlayServEditorModuleAvailability.EditorDeployment)
                 {
-                    PlayServWindowChrome.DrawOverviewCard("Schema", EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "—"), "Current model hash");
                     GUILayout.Space(8f);
-                    PlayServWindowChrome.DrawOverviewCard(
-                        "Deploy",
-                        context.State.DeployRunning ? "Deploying…" : context.State.VersionSyncRunning ? "Syncing…" : "Ready",
-                        "Release control");
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (PlayServEditorModuleAvailability.EditorModelSync)
+                            PlayServWindowChrome.DrawOverviewCard("Schema", EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, "—"), "Current model hash");
+
+                        if (PlayServEditorModuleAvailability.EditorModelSync &&
+                            PlayServEditorModuleAvailability.EditorDeployment)
+                        {
+                            GUILayout.Space(8f);
+                        }
+
+                        if (PlayServEditorModuleAvailability.EditorDeployment)
+                        {
+                            PlayServWindowChrome.DrawOverviewCard(
+                                "Deploy",
+                                context.State.DeployRunning ? "Deploying…" : context.State.VersionSyncRunning ? "Syncing…" : "Ready",
+                                "Release control");
+                        }
+                    }
                 }
             }
         }
