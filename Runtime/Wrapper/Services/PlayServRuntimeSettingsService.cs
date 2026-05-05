@@ -9,7 +9,7 @@ namespace Playserv.Wrapper
     internal sealed class PlayServRuntimeSettingsService
     {
         private readonly Func<PlayServSettings> _loadSettings;
-        private readonly Func<PlayServSettings, Func<string, ITransportImplementation>> _createTransportImplementationFactory;
+        private readonly Func<PlayServSettings, PlayServTransportImplementationFactory> _createTransportImplementationFactory;
         private readonly Func<PlayServSettings, string> _buildTransportKey;
         private readonly Action<PlayServImplementation> _subscribeToInstanceEvents;
         private readonly Func<PlayServSettings, string, CancellationToken, Task<string>> _resolveLatestVersion;
@@ -19,7 +19,7 @@ namespace Playserv.Wrapper
 
         public PlayServRuntimeSettingsService(
             Func<PlayServSettings> loadSettings,
-            Func<PlayServSettings, Func<string, ITransportImplementation>> createTransportImplementationFactory,
+            Func<PlayServSettings, PlayServTransportImplementationFactory> createTransportImplementationFactory,
             Func<PlayServSettings, string> buildTransportKey,
             Action<PlayServImplementation> subscribeToInstanceEvents,
             Func<PlayServSettings, string, CancellationToken, Task<string>> resolveLatestVersion,

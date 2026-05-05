@@ -38,19 +38,19 @@ namespace Playserv.Proxy.Common
 #endif
 
         public PlayServImplementation(string endpoint)
-            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport)) { }
+            : this(endpoint, PlayServJsonCompositionRoot.CreateDefaultSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport)) { }
 
         internal PlayServImplementation(
             string endpoint,
-            Func<string, ITransportImplementation> transportImplementationFactory)
-            : this(endpoint, new JsonSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport), transportImplementationFactory) { }
+            PlayServTransportImplementationFactory transportImplementationFactory)
+            : this(endpoint, PlayServJsonCompositionRoot.CreateDefaultSerializer(), new RequestIdGenerator(), PlayServLog.ForCategory(PlayServLogCategory.Transport), transportImplementationFactory) { }
 
         private PlayServImplementation(
             string endpoint,
             IMessageSerializer serializer,
             IRequestIdGenerator requestIdGenerator,
             ILogger logger,
-            Func<string, ITransportImplementation> transportImplementationFactory = null)
+            PlayServTransportImplementationFactory transportImplementationFactory = null)
         {
             var components = PlayServInstanceFactory.Create(
                 this,

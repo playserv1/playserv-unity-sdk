@@ -6,9 +6,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using Playserv.Serialization;
-#if UNITY_5_3_OR_NEWER
-using UnityEngine;
-#endif
 
 namespace Playserv.DataSubscription
 {
@@ -17,7 +14,7 @@ namespace Playserv.DataSubscription
         private const int MaxSelectionDepth = 6;
         private static readonly object SchemaGate = new object();
         private static readonly IJsonCodec JsonCodec = new NewtonsoftJsonCodec();
-        private static bool _schemaInitialized;
+        private static int _schemaVersionStamp = int.MinValue;
         private static readonly Dictionary<string, IDictionary<string, object>> SchemaDefinitions =
             new Dictionary<string, IDictionary<string, object>>(StringComparer.OrdinalIgnoreCase);
 
@@ -301,21 +298,21 @@ namespace Playserv.DataSubscription
 
         private static void EnsureSchemaDefinitionsLoaded()
         {
-            if (_schemaInitialized)
+            var snapshot = SchemaSelectionProvider.GetSnapshot();
+            if (_schemaVersionStamp == snapshot.VersionStamp)
                 return;
 
             lock (SchemaGate)
             {
-                if (_schemaInitialized)
+                snapshot = SchemaSelectionProvider.GetSnapshot();
+                if (_schemaVersionStamp == snapshot.VersionStamp)
                     return;
 
+                SchemaDefinitions.Clear();
                 try
                 {
-#if UNITY_5_3_OR_NEWER
-                    var schemaText = LoadSchemaTextFromResources();
-                    if (!string.IsNullOrWhiteSpace(schemaText))
-                        BuildSchemaIndex(schemaText);
-#endif
+                    if (snapshot.HasSchema)
+                        BuildSchemaIndex(snapshot.SchemaJson);
                 }
                 catch
                 {
@@ -323,25 +320,10 @@ namespace Playserv.DataSubscription
                 }
                 finally
                 {
-                    _schemaInitialized = true;
+                    _schemaVersionStamp = snapshot.VersionStamp;
                 }
             }
         }
-
-#if UNITY_5_3_OR_NEWER
-        private static string LoadSchemaTextFromResources()
-        {
-            var current = Resources.Load<TextAsset>("current-schema");
-            if (current != null && !string.IsNullOrWhiteSpace(current.text))
-                return current.text;
-
-            var latest = Resources.Load<TextAsset>("latest-schema");
-            if (latest != null && !string.IsNullOrWhiteSpace(latest.text))
-                return latest.text;
-
-            return string.Empty;
-        }
-#endif
 
         private static void BuildSchemaIndex(string rawSchemaJson)
         {

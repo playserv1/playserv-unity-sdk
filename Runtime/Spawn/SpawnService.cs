@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Playserv.Spawn
 {
-    internal sealed class SpawnManager : IDisposable
+    internal sealed class SpawnService : IDisposable
     {
         private const int SpawnCompletionTimeoutMs = 10000;
         private static readonly ISdkLogger Logger = PlayServLog.ForCategory(PlayServLogCategory.Spawn);
@@ -23,7 +23,7 @@ namespace Playserv.Spawn
         private IDisposable _despawnSubscription;
         private IDisposable _scopeJoinSubscription;
 
-        public SpawnManager()
+        public SpawnService()
         {
             _lateJoinReplayService = new LateJoinReplayService(_lifecycleStore, _eventPublisher);
         }

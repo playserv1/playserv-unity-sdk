@@ -14,35 +14,49 @@ namespace Playserv.DataSubscription
             IgnoreMissingMembers = true
         };
 
-        public static TResult Map<TResult>(LambdaExpression selector, object raw, IJsonCodec jsonCodec)
+        public static Func<object, TResult> CreateCompiledMapper<TResult>(LambdaExpression selector, IJsonCodec jsonCodec)
         {
             if (jsonCodec == null)
                 throw new ArgumentNullException(nameof(jsonCodec));
 
+            if (selector == null)
+                return raw => Deserialize<TResult>(raw, jsonCodec);
+
+            var sourceType = selector.Parameters[0].Type;
+            var projector = CompileProjector<TResult>(selector, sourceType);
+
+            return raw =>
+            {
+                if (raw == null)
+                    return default;
+
+                var jsonString = raw as string ?? jsonCodec.Serialize(raw, CodecOptions);
+                var source = jsonCodec.Deserialize(jsonString, sourceType, CodecOptions);
+
+                if (source == null)
+                    return default;
+
+                return projector(source);
+            };
+        }
+
+        private static TResult Deserialize<TResult>(object raw, IJsonCodec jsonCodec)
+        {
             if (raw == null)
                 return default;
 
             var jsonString = raw as string ?? jsonCodec.Serialize(raw, CodecOptions);
+            return jsonCodec.Deserialize<TResult>(jsonString, CodecOptions);
+        }
 
-            if (selector == null)
-                return jsonCodec.Deserialize<TResult>(jsonString, CodecOptions);
+        private static Func<object, TResult> CompileProjector<TResult>(LambdaExpression selector, Type sourceType)
+        {
+            var source = Expression.Parameter(typeof(object), "source");
+            var typedSource = Expression.Convert(source, sourceType);
+            var projected = Expression.Invoke(selector, typedSource);
+            var converted = Expression.Convert(projected, typeof(TResult));
 
-            var sourceType = selector.Parameters[0].Type;
-            var source = jsonCodec.Deserialize(jsonString, sourceType, CodecOptions);
-
-            if (source == null)
-                return default;
-
-            var compiled = selector.Compile();
-            var result = compiled.DynamicInvoke(source);
-
-            if (result == null)
-                return default;
-
-            if (result is TResult typed)
-                return typed;
-
-            return (TResult)Convert.ChangeType(result, typeof(TResult));
+            return Expression.Lambda<Func<object, TResult>>(converted, source).Compile();
         }
     }
 }

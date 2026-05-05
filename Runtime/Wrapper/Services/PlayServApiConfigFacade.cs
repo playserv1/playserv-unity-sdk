@@ -150,19 +150,19 @@ namespace Playserv.Wrapper
             return TryLoadSettingsFromUnityResources(out var settings) ? settings : null;
         }
 
-        private Func<string, ITransportImplementation> CreateTransportImplementationFactory(PlayServSettings settings)
+        private PlayServTransportImplementationFactory CreateTransportImplementationFactory(PlayServSettings settings)
         {
             if (!HasWebRtcScheme(settings?.Endpoint))
                 return null;
 
             var transportSettings = settings.ToRuntimeSettings();
-            return endpoint => TransportImplementationResolver.Create(
+            return (endpoint, jsonCodec) => TransportImplementationResolver.Create(
                 new TransportModuleContext(
                     endpoint,
                     logger: null,
                     settings: transportSettings,
                     webRtcSignalingClientFactory: _webRtcSignalingClientFactory,
-                    jsonCodec: new NewtonsoftJsonCodec()));
+                    jsonCodec: jsonCodec));
         }
 
         private string BuildTransportKey(PlayServSettings settings)
