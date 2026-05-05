@@ -11,7 +11,7 @@ namespace Playserv.Http.Modules.Unity
             if (context?.Settings == null)
                 return null;
 
-            return new UnityWebRequestRuntimeHttpClient(context.Settings);
+            return new UnityWebRequestRuntimeHttpClient(context.Settings, context.JsonCodec);
         }
     }
 }

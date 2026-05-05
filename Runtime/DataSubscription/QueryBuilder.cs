@@ -13,19 +13,23 @@ namespace Playserv.DataSubscription
     {
         private const int MaxSelectionDepth = 6;
         private static readonly object SchemaGate = new object();
-        private static readonly IJsonCodec JsonCodec = new NewtonsoftJsonCodec();
+        private static readonly IJsonCodec DefaultJsonCodec = new NewtonsoftJsonCodec();
         private static int _schemaVersionStamp = int.MinValue;
         private static readonly Dictionary<string, IDictionary<string, object>> SchemaDefinitions =
             new Dictionary<string, IDictionary<string, object>>(StringComparer.OrdinalIgnoreCase);
 
-        public static string BuildQuery<T>(string entityType, object key, Expression<Func<T, object>> selector = null)
+        public static string BuildQuery<T>(
+            string entityType,
+            object key,
+            Expression<Func<T, object>> selector = null,
+            IJsonCodec jsonCodec = null)
         {
             var sb = new StringBuilder();
             sb.Append(entityType);
             sb.Append("(id: $id)");
 
             var selection = selector == null
-                ? BuildAutoSelection(typeof(T), entityType)
+                ? BuildAutoSelection(typeof(T), entityType, jsonCodec)
                 : BuildSelectionFromExpression(selector.Body);
 
             if (string.IsNullOrWhiteSpace(selection))
@@ -38,9 +42,9 @@ namespace Playserv.DataSubscription
             return sb.ToString();
         }
 
-        private static string BuildAutoSelection(Type modelType, string entityType)
+        private static string BuildAutoSelection(Type modelType, string entityType, IJsonCodec jsonCodec)
         {
-            var schemaSelection = TryBuildSelectionFromSchema(entityType);
+            var schemaSelection = TryBuildSelectionFromSchema(entityType, jsonCodec);
             if (!string.IsNullOrWhiteSpace(schemaSelection))
                 return schemaSelection;
 
@@ -195,12 +199,12 @@ namespace Playserv.DataSubscription
                    type == typeof(TimeSpan);
         }
 
-        private static string TryBuildSelectionFromSchema(string entityType)
+        private static string TryBuildSelectionFromSchema(string entityType, IJsonCodec jsonCodec)
         {
             if (string.IsNullOrWhiteSpace(entityType))
                 return string.Empty;
 
-            EnsureSchemaDefinitionsLoaded();
+            EnsureSchemaDefinitionsLoaded(jsonCodec);
             if (SchemaDefinitions.Count == 0)
                 return string.Empty;
 
@@ -296,7 +300,7 @@ namespace Playserv.DataSubscription
             return reference.Substring(idx + 1).Trim();
         }
 
-        private static void EnsureSchemaDefinitionsLoaded()
+        private static void EnsureSchemaDefinitionsLoaded(IJsonCodec jsonCodec)
         {
             var snapshot = SchemaSelectionProvider.GetSnapshot();
             if (_schemaVersionStamp == snapshot.VersionStamp)
@@ -312,7 +316,7 @@ namespace Playserv.DataSubscription
                 try
                 {
                     if (snapshot.HasSchema)
-                        BuildSchemaIndex(snapshot.SchemaJson);
+                        BuildSchemaIndex(snapshot.SchemaJson, ResolveJsonCodec(jsonCodec));
                 }
                 catch
                 {
@@ -325,12 +329,17 @@ namespace Playserv.DataSubscription
             }
         }
 
-        private static void BuildSchemaIndex(string rawSchemaJson)
+        private static IJsonCodec ResolveJsonCodec(IJsonCodec jsonCodec)
+        {
+            return jsonCodec ?? DefaultJsonCodec;
+        }
+
+        private static void BuildSchemaIndex(string rawSchemaJson, IJsonCodec jsonCodec)
         {
             if (string.IsNullOrWhiteSpace(rawSchemaJson))
                 return;
 
-            var rootValue = JsonCodec.ParseToPlainValue(rawSchemaJson);
+            var rootValue = jsonCodec.ParseToPlainValue(rawSchemaJson);
             if (!TryAsObject(rootValue, out var root))
                 return;
 

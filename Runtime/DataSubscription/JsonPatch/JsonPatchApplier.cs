@@ -11,7 +11,7 @@ namespace Playserv.DataSubscription.JsonPatch
     /// </summary>
     public static class JsonPatchApplier
     {
-        private static readonly IJsonCodec JsonCodec = new NewtonsoftJsonCodec();
+        private static readonly IJsonCodec DefaultJsonCodec = new NewtonsoftJsonCodec();
 
         /// <summary>
         /// Applies parsed patch operations to target object.
@@ -22,14 +22,20 @@ namespace Playserv.DataSubscription.JsonPatch
         /// <returns>Patched object instance.</returns>
         public static T ApplyPatch<T>(T target, IEnumerable<PatchOperation> operations) where T : class
         {
-            var root = RequireObjectDocument(JsonCodec.ToPlainValue(target));
+            return ApplyPatch(target, operations, null);
+        }
 
-            foreach (var operation in NormalizeOperations(operations))
+        internal static T ApplyPatch<T>(T target, IEnumerable<PatchOperation> operations, IJsonCodec jsonCodec) where T : class
+        {
+            var codec = ResolveJsonCodec(jsonCodec);
+            var root = RequireObjectDocument(codec.ToPlainValue(target));
+
+            foreach (var operation in NormalizeOperations(operations, codec))
             {
-                ApplyOperation(root, operation);
+                ApplyOperation(root, operation, codec);
             }
 
-            return JsonCodec.Convert<T>(root);
+            return codec.Convert<T>(root);
         }
 
         /// <summary>
@@ -41,22 +47,33 @@ namespace Playserv.DataSubscription.JsonPatch
         /// <returns>Patched object instance.</returns>
         public static T ApplyPatch<T>(T target, object patchData) where T : class
         {
-            var operations = ParseOperations(patchData);
-            return ApplyPatch(target, operations);
+            return ApplyPatch(target, patchData, null);
         }
 
-        private static IEnumerable<PatchOperation> ParseOperations(object patchData)
+        internal static T ApplyPatch<T>(T target, object patchData, IJsonCodec jsonCodec) where T : class
+        {
+            var codec = ResolveJsonCodec(jsonCodec);
+            var operations = ParseOperations(patchData, codec);
+            return ApplyPatch(target, operations, codec);
+        }
+
+        private static IJsonCodec ResolveJsonCodec(IJsonCodec jsonCodec)
+        {
+            return jsonCodec ?? DefaultJsonCodec;
+        }
+
+        private static IEnumerable<PatchOperation> ParseOperations(object patchData, IJsonCodec jsonCodec)
         {
             if (patchData is IEnumerable<PatchOperation> ops)
-                return NormalizeOperations(ops);
+                return NormalizeOperations(ops, jsonCodec);
 
             if (patchData is string json)
-                return NormalizeOperations(JsonCodec.Deserialize<List<PatchOperation>>(json));
+                return NormalizeOperations(jsonCodec.Deserialize<List<PatchOperation>>(json), jsonCodec);
 
-            return NormalizeOperations(JsonCodec.Convert<List<PatchOperation>>(patchData));
+            return NormalizeOperations(jsonCodec.Convert<List<PatchOperation>>(patchData), jsonCodec);
         }
 
-        private static IEnumerable<PatchOperation> NormalizeOperations(IEnumerable<PatchOperation> operations)
+        private static IEnumerable<PatchOperation> NormalizeOperations(IEnumerable<PatchOperation> operations, IJsonCodec jsonCodec)
         {
             if (operations == null)
                 return Array.Empty<PatchOperation>();
@@ -72,7 +89,7 @@ namespace Playserv.DataSubscription.JsonPatch
                     Op = operation.Op,
                     Path = operation.Path,
                     From = operation.From,
-                    Value = JsonCodec.ToPlainValue(operation.Value)
+                    Value = jsonCodec.ToPlainValue(operation.Value)
                 });
             }
 
@@ -87,7 +104,7 @@ namespace Playserv.DataSubscription.JsonPatch
             throw new UpdateDataCorruptionException("Patch target must be a JSON object.");
         }
 
-        private static void ApplyOperation(IDictionary<string, object> target, PatchOperation operation)
+        private static void ApplyOperation(IDictionary<string, object> target, PatchOperation operation, IJsonCodec jsonCodec)
         {
             var path = NormalizePath(operation.Path);
             var segments = ParsePath(path);
@@ -95,22 +112,22 @@ namespace Playserv.DataSubscription.JsonPatch
             switch (operation.Op == null ? string.Empty : operation.Op.ToLowerInvariant())
             {
                 case "add":
-                    ApplyAdd(target, segments, operation.Value);
+                    ApplyAdd(target, segments, operation.Value, jsonCodec);
                     break;
                 case "remove":
                     ApplyRemove(target, segments);
                     break;
                 case "replace":
-                    ApplyReplace(target, segments, operation.Value);
+                    ApplyReplace(target, segments, operation.Value, jsonCodec);
                     break;
                 case "move":
-                    ApplyMove(target, segments, operation.From);
+                    ApplyMove(target, segments, operation.From, jsonCodec);
                     break;
                 case "copy":
-                    ApplyCopy(target, segments, operation.From);
+                    ApplyCopy(target, segments, operation.From, jsonCodec);
                     break;
                 case "test":
-                    ApplyTest(target, segments, operation.Value);
+                    ApplyTest(target, segments, operation.Value, jsonCodec);
                     break;
                 default:
                     throw new UpdateDataCorruptionException($"Unknown patch operation: {operation.Op}");
@@ -165,13 +182,13 @@ namespace Playserv.DataSubscription.JsonPatch
             throw new UpdateDataCorruptionException($"Cannot navigate path segment: {segment}");
         }
 
-        private static void ApplyAdd(IDictionary<string, object> root, string[] segments, object value)
+        private static void ApplyAdd(IDictionary<string, object> root, string[] segments, object value, IJsonCodec jsonCodec)
         {
             if (segments.Length == 0)
                 throw new UpdateDataCorruptionException("Cannot add to root");
 
             var parent = NavigateToParent(root, segments, out var lastSegment);
-            var clonedValue = JsonCodec.Clone(value);
+            var clonedValue = jsonCodec.Clone(value);
 
             if (parent is IDictionary<string, object> obj)
             {
@@ -217,13 +234,13 @@ namespace Playserv.DataSubscription.JsonPatch
             throw new UpdateDataCorruptionException($"Cannot remove value at path segment: {lastSegment}");
         }
 
-        private static void ApplyReplace(IDictionary<string, object> root, string[] segments, object value)
+        private static void ApplyReplace(IDictionary<string, object> root, string[] segments, object value, IJsonCodec jsonCodec)
         {
             if (segments.Length == 0)
                 throw new UpdateDataCorruptionException("Cannot replace root");
 
             var parent = NavigateToParent(root, segments, out var lastSegment);
-            var clonedValue = JsonCodec.Clone(value);
+            var clonedValue = jsonCodec.Clone(value);
 
             if (parent is IDictionary<string, object> obj)
             {
@@ -244,15 +261,15 @@ namespace Playserv.DataSubscription.JsonPatch
             throw new UpdateDataCorruptionException($"Cannot replace value at path segment: {lastSegment}");
         }
 
-        private static void ApplyMove(IDictionary<string, object> root, string[] toSegments, string from)
+        private static void ApplyMove(IDictionary<string, object> root, string[] toSegments, string from, IJsonCodec jsonCodec)
         {
             var fromSegments = ParsePath(NormalizePath(from));
             var parent = NavigateToParent(root, fromSegments, out var lastSegment);
             var value = ExtractAndRemoveValue(parent, lastSegment);
-            ApplyAdd(root, toSegments, value);
+            ApplyAdd(root, toSegments, value, jsonCodec);
         }
 
-        private static void ApplyCopy(IDictionary<string, object> root, string[] toSegments, string from)
+        private static void ApplyCopy(IDictionary<string, object> root, string[] toSegments, string from, IJsonCodec jsonCodec)
         {
             var fromSegments = ParsePath(NormalizePath(from));
             object current = root;
@@ -262,10 +279,10 @@ namespace Playserv.DataSubscription.JsonPatch
                 current = NavigateSegment(current, fromSegments[i]);
             }
 
-            ApplyAdd(root, toSegments, JsonCodec.Clone(current));
+            ApplyAdd(root, toSegments, jsonCodec.Clone(current), jsonCodec);
         }
 
-        private static void ApplyTest(IDictionary<string, object> root, string[] segments, object expectedValue)
+        private static void ApplyTest(IDictionary<string, object> root, string[] segments, object expectedValue, IJsonCodec jsonCodec)
         {
             object current = root;
             for (int i = 0; i < segments.Length; i++)
@@ -273,8 +290,8 @@ namespace Playserv.DataSubscription.JsonPatch
                 current = NavigateSegment(current, segments[i]);
             }
 
-            var actualJson = JsonCodec.ToCanonicalJson(current);
-            var expectedJson = JsonCodec.ToCanonicalJson(JsonCodec.ToPlainValue(expectedValue));
+            var actualJson = jsonCodec.ToCanonicalJson(current);
+            var expectedJson = jsonCodec.ToCanonicalJson(jsonCodec.ToPlainValue(expectedValue));
             if (!string.Equals(actualJson, expectedJson, StringComparison.Ordinal))
                 throw new UpdateDataCorruptionException("Test operation failed - value mismatch");
         }

@@ -9,8 +9,13 @@ namespace Playserv.Proxy.Common
     {
         public static IMessageSerializer CreateDefaultSerializer()
         {
-            var jsonCodec = CreateDefaultCodec();
+            var jsonCodec = CreateDefaultJsonCodec();
             return new JsonSerializer(jsonCodec, new NewtonsoftCommandPayloadMapper());
+        }
+
+        public static IJsonCodec CreateDefaultJsonCodec()
+        {
+            return new NewtonsoftJsonCodec();
         }
 
         public static PlayServJsonComposition Resolve(IMessageSerializer serializer)
@@ -23,16 +28,11 @@ namespace Playserv.Proxy.Common
                 ResolveCodec(serializer));
         }
 
-        private static IJsonCodec CreateDefaultCodec()
-        {
-            return new NewtonsoftJsonCodec();
-        }
-
         private static IJsonCodec ResolveCodec(IMessageSerializer serializer)
         {
             return serializer is JsonSerializer jsonSerializer
                 ? jsonSerializer.JsonCodec
-                : CreateDefaultCodec();
+                : CreateDefaultJsonCodec();
         }
     }
 

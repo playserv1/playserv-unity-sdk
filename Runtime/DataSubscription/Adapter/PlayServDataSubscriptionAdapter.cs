@@ -170,7 +170,7 @@ namespace Playserv.DataSubscription
                 throw new ArgumentNullException(nameof(map));
 
             var entityTypeName = typeof(TEntity).Name;
-            var query = QueryBuilder.BuildQuery<TEntity>(entityTypeName, playerId);
+            var query = QueryBuilder.BuildQuery<TEntity>(entityTypeName, playerId, jsonCodec: _jsonCodec);
             var variables = QueryBuilder.BuildVariables(playerId);
 
             if (mode == DataSubscriptionMode.Transport)

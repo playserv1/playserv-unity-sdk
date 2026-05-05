@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using Playserv.Serialization;
 
 namespace Playserv.RPC
@@ -239,6 +240,26 @@ namespace Playserv.RPC
 
         private static Action<object, object[]> CompileInvoker(MethodInfo method)
         {
+#if ENABLE_IL2CPP
+            return CreateReflectionInvoker(method);
+#else
+            try
+            {
+                return CompileExpressionInvoker(method);
+            }
+            catch (PlatformNotSupportedException)
+            {
+                return CreateReflectionInvoker(method);
+            }
+            catch (NotSupportedException)
+            {
+                return CreateReflectionInvoker(method);
+            }
+#endif
+        }
+
+        private static Action<object, object[]> CompileExpressionInvoker(MethodInfo method)
+        {
             var service = Expression.Parameter(typeof(object), "service");
             var arguments = Expression.Parameter(typeof(object[]), "arguments");
             var parameters = method.GetParameters();
@@ -260,6 +281,22 @@ namespace Playserv.RPC
                 : Expression.Block(call, Expression.Empty());
 
             return Expression.Lambda<Action<object, object[]>>(body, service, arguments).Compile();
+        }
+
+        private static Action<object, object[]> CreateReflectionInvoker(MethodInfo method)
+        {
+            return (service, arguments) =>
+            {
+                try
+                {
+                    method.Invoke(service, arguments);
+                }
+                catch (TargetInvocationException ex) when (ex.InnerException != null)
+                {
+                    ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+                    throw;
+                }
+            };
         }
     }
 

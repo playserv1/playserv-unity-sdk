@@ -15,6 +15,7 @@ using Playserv.RPC;
 #endif
 using Playserv.Runtime.Abstractions;
 using Playserv.Server;
+using Playserv.Serialization;
 #if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using Playserv.Spawn;
 #endif
@@ -100,7 +101,8 @@ namespace Playserv.Wrapper
             _rpcFacade = new PlayServApiRpcFacade(
                 _localExecution,
                 () => _configFacade.CurrentInstance,
-                GetInstanceForFireAndForget);
+                GetInstanceForFireAndForget,
+                ResolveJsonCodec);
 #endif
         }
 
@@ -327,5 +329,16 @@ namespace Playserv.Wrapper
                 ? instance
                 : null;
         }
+
+#if !PLAYSERV_DISABLE_RPC
+        private IJsonCodec ResolveJsonCodec()
+        {
+            var instance = _configFacade.CurrentInstance;
+            if (instance != null && instance.ModuleServices.TryGet<IJsonCodec>(out var jsonCodec))
+                return jsonCodec;
+
+            return null;
+        }
+#endif
     }
 }

@@ -18,10 +18,12 @@ namespace Playserv.Http.Modules.Unity
         private const string LatestVersionPathTemplate = "games/{0}/version/latest";
 
         private readonly PlayServRuntimeSettings _settings;
+        private readonly IJsonCodec _jsonCodec;
 
-        public UnityWebRequestRuntimeHttpClient(PlayServRuntimeSettings settings)
+        public UnityWebRequestRuntimeHttpClient(PlayServRuntimeSettings settings, IJsonCodec jsonCodec = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _jsonCodec = jsonCodec;
         }
 
         public async Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
@@ -43,7 +45,7 @@ namespace Playserv.Http.Modules.Unity
             if (string.IsNullOrWhiteSpace(body))
                 throw new InvalidOperationException("Latest version response body is empty.");
 
-            var version = JsonResponseReader.GetStringValueIgnoreCase(body, "version");
+            var version = JsonResponseReader.GetStringValueIgnoreCase(body, "version", _jsonCodec);
 
             if (string.IsNullOrWhiteSpace(version))
                 throw new InvalidOperationException("Latest version was not found in response.");
