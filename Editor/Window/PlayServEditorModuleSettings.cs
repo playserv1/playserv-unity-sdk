@@ -17,7 +17,6 @@ namespace Playserv.Editor
 
         public bool Deployment { get; private set; } = DefaultOptionalModuleState;
         public bool ModelSync { get; private set; } = DefaultOptionalModuleState;
-        public bool Events { get; private set; } = DefaultOptionalModuleState;
         public bool Codegen { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeEvents { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeData { get; private set; } = DefaultOptionalModuleState;
@@ -30,7 +29,6 @@ namespace Playserv.Editor
         {
             Deployment = EditorPrefs.GetBool(Const.PrefModuleDeployment, DefaultOptionalModuleState);
             ModelSync = EditorPrefs.GetBool(Const.PrefModuleModelSync, DefaultOptionalModuleState);
-            Events = EditorPrefs.GetBool(Const.PrefModuleEvents, DefaultOptionalModuleState);
             Codegen = EditorPrefs.GetBool(Const.PrefModuleCodegen, DefaultOptionalModuleState);
             LoadRuntimeModuleDefines();
         }
@@ -38,8 +36,6 @@ namespace Playserv.Editor
         public bool SetDeployment(bool enabled) => Set(Const.PrefModuleDeployment, Deployment, enabled, value => Deployment = value);
 
         public bool SetModelSync(bool enabled) => Set(Const.PrefModuleModelSync, ModelSync, enabled, value => ModelSync = value);
-
-        public bool SetEvents(bool enabled) => Set(Const.PrefModuleEvents, Events, enabled, value => Events = value);
 
         public bool SetCodegen(bool enabled) => Set(Const.PrefModuleCodegen, Codegen, enabled, value => Codegen = value);
 
@@ -153,7 +149,6 @@ namespace Playserv.Editor
         {
             SetDeployment(DefaultOptionalModuleState);
             SetModelSync(DefaultOptionalModuleState);
-            SetEvents(DefaultOptionalModuleState);
             SetCodegen(DefaultOptionalModuleState);
             ApplyRuntimeState(new PlayServRuntimeModuleState
             {

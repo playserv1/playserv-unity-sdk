@@ -141,8 +141,7 @@ namespace Playserv.Events.Editor
         private static bool IsEventsModuleEnabled()
         {
             var defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup);
-            var runtimeEventsEnabled = defines.IndexOf(Playserv.Editor.Const.DefineDisableEvents, StringComparison.Ordinal) < 0;
-            return runtimeEventsEnabled && EditorPrefs.GetBool(Playserv.Editor.Const.PrefModuleEvents, true);
+            return defines.IndexOf(Playserv.Editor.Const.DefineDisableEvents, StringComparison.Ordinal) < 0;
         }
     }
 }

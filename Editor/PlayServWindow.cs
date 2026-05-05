@@ -160,7 +160,7 @@ namespace Playserv.Editor
             }
 
 #if !PLAYSERV_DISABLE_EVENTS
-            if (_state.ModuleSettings.Events && _state.ModuleSettings.RuntimeEvents)
+            if (_state.ModuleSettings.RuntimeEvents)
             {
                 GUILayout.Space(12f);
                 _eventsSectionPresenter.Draw(context);

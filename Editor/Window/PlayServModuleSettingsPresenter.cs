@@ -42,7 +42,7 @@ namespace Playserv.Editor
                 changed |= DrawRuntimeModule(
                     settings,
                     PlayServEditorModuleSettings.RuntimeModuleEvents,
-                    "Typed publish/subscribe runtime. Cannot be disabled while dependent modules are enabled.",
+                    "Typed publish/subscribe runtime and typed event API generation controls. Cannot be disabled while dependent modules are enabled.",
                     settings.RuntimeEvents,
                     settings.SetRuntimeEvents,
                     dependencies: null,
@@ -66,20 +66,20 @@ namespace Playserv.Editor
                 changed |= DrawRuntimeModule(
                     settings,
                     PlayServEditorModuleSettings.RuntimeModuleRpc,
-                    "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs. Enables hidden RPC Core.",
+                    "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs.",
                     settings.RuntimeRpc,
                     settings.SetRuntimeRpc,
-                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleRpcCore },
+                    dependencies: null,
                     dependents: null);
 
                 GUILayout.Space(6f);
                 changed |= DrawRuntimeModule(
                     settings,
                     PlayServEditorModuleSettings.RuntimeModuleServerRpc,
-                    "Server-side in-process RPC invoker, service registry, and PlayServServerRpc API. Enables hidden RPC Core.",
+                    "Server-side in-process RPC invoker, service registry, and PlayServServerRpc API.",
                     settings.RuntimeServerRpc,
                     settings.SetRuntimeServerRpc,
-                    dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleRpcCore },
+                    dependencies: null,
                     dependents: null);
 
                 GUILayout.Space(6f);
@@ -101,11 +101,6 @@ namespace Playserv.Editor
                     settings.SetRuntimePulse,
                     dependencies: null,
                     dependents: null);
-
-                GUILayout.Space(10f);
-                PlayServWindowChrome.DrawNotice(
-                    "Changing runtime modules updates Player Settings scripting defines and triggers a Unity script reload. If a module is disabled, its public SDK types are intentionally unavailable to gameplay code.",
-                    MessageType.Info);
 
                 GUILayout.Space(12f);
                 GUILayout.Label("Editor tools", PlayServWindowTheme.MiniHeadingStyle);
@@ -132,13 +127,6 @@ namespace Playserv.Editor
 
                 GUILayout.Space(6f);
                 changed |= DrawToggleModule(
-                    "Events API",
-                    "Typed event API generation controls. Hidden automatically when runtime Events are disabled.",
-                    settings.Events,
-                    settings.SetEvents);
-
-                GUILayout.Space(6f);
-                changed |= DrawToggleModule(
                     "DTO Codegen",
                     "Shared DTO generation and cleanup controls.",
                     settings.Codegen,
@@ -147,7 +135,14 @@ namespace Playserv.Editor
                 GUILayout.Space(12f);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUILayout.FlexibleSpace();
+                    using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
+                    {
+                        PlayServWindowChrome.DrawNotice(
+                            "Changing runtime modules updates Player Settings scripting defines and triggers a Unity script reload. If a module is disabled, its public SDK types are intentionally unavailable to gameplay code.",
+                            MessageType.Info);
+                    }
+
+                    GUILayout.Space(12f);
 
                     if (PlayServWindowChrome.DrawActionButton("Reset Defaults", PlayServWindowButtonTone.Secondary, GUILayout.Width(130f), GUILayout.Height(30f)))
                     {
