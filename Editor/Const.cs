@@ -14,7 +14,6 @@ namespace Playserv.Editor
 
         internal const string PrefModuleDeployment = "PlayServ.Window.Module.Deployment";
         internal const string PrefModuleModelSync = "PlayServ.Window.Module.ModelSync";
-        internal const string PrefModuleEvents = "PlayServ.Window.Module.Events";
         internal const string PrefModuleCodegen = "PlayServ.Window.Module.Codegen";
 
         internal const string DefineDisableEvents = "PLAYSERV_DISABLE_EVENTS";
