@@ -15,6 +15,7 @@ namespace Playserv.DataSubscription
         private readonly PlayServDataSubscriptionAdapter _adapter;
         private readonly long _subscriptionId;
         private readonly LambdaExpression _selector;
+        private readonly Func<object, T> _compiledSelectorMapper;
         private readonly Func<object, T> _mapFunc;
         private readonly IDisposable _subscription;
         private readonly string _query;
@@ -47,6 +48,9 @@ namespace Playserv.DataSubscription
             _variables = variables ?? throw new ArgumentNullException(nameof(variables));
             _mapFunc = mapFunc;
             _jsonCodec = _adapter.GetJsonCodec();
+            _compiledSelectorMapper = _selector == null
+                ? null
+                : SharedDataMapper.CreateCompiledMapper<T>(_selector, _jsonCodec);
 
             _subscription = _adapter.OnSubscriptionUpdate(_subscriptionId, OnServerUpdate);
         }
@@ -74,6 +78,9 @@ namespace Playserv.DataSubscription
             _variables = variables ?? throw new ArgumentNullException(nameof(variables));
             _mapFunc = mapFunc;
             _jsonCodec = _adapter.GetJsonCodec();
+            _compiledSelectorMapper = _selector == null
+                ? null
+                : SharedDataMapper.CreateCompiledMapper<T>(_selector, _jsonCodec);
 
             _subscription = _adapter.RegisterPollingSubscription(
                 _subscriptionId,
@@ -184,8 +191,8 @@ namespace Playserv.DataSubscription
             if (_mapFunc != null)
                 return _mapFunc(raw);
 
-            if (_selector != null)
-                return SharedDataMapper.Map<T>(_selector, raw, _jsonCodec);
+            if (_compiledSelectorMapper != null)
+                return _compiledSelectorMapper(raw);
 
             var mapped = _jsonCodec.Convert<T>(raw);
             return mapped ?? new T();

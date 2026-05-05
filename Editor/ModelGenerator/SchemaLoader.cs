@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Playserv.DataSubscription;
 using Playserv.ModelGenerator.Editor;
 using Playserv.Wrapper;
 using UnityEditor;
@@ -39,6 +40,7 @@ public static class SchemaLoader
         await File.WriteAllTextAsync(filePath, json);
         
         AssetDatabase.Refresh();
+        SchemaSelectionProvider.Reset();
 
         Debug.Log($"[SchemaDownloader] schema.json saved to {filePath}");
     }

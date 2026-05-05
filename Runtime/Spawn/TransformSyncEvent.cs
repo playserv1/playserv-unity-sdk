@@ -33,6 +33,11 @@ namespace Playserv.Spawn
         public Quaternion Rotation;
         public Vector3 Scale;
 
+        // Field mask
+        public bool HasPosition = true;
+        public bool HasRotation = true;
+        public bool HasScale = true;
+
         // Velocities for prediction
         public Vector3 Velocity;
         public float AngularVelocityYaw; // degrees/sec around Y axis
@@ -68,6 +73,9 @@ namespace Playserv.Spawn
         /// <param name="scaleVelocity">Scale velocity estimate.</param>
         /// <param name="stepTime">Delta time used by sender.</param>
         /// <param name="teleport">Whether receiver should snap immediately.</param>
+        /// <param name="hasPosition">Whether position payload is valid.</param>
+        /// <param name="hasRotation">Whether rotation payload is valid.</param>
+        /// <param name="hasScale">Whether scale payload is valid.</param>
         public TransformSyncEvent(
             string networkId,
             uint seq,
@@ -78,13 +86,19 @@ namespace Playserv.Spawn
             float angularVelocityYaw,
             Vector3 scaleVelocity,
             float stepTime,
-            bool teleport = false)
+            bool teleport = false,
+            bool hasPosition = true,
+            bool hasRotation = true,
+            bool hasScale = true)
         {
             NetworkId = networkId;
             Seq = seq;
             Position = position;
             Rotation = rotation;
             Scale = scale;
+            HasPosition = hasPosition;
+            HasRotation = hasRotation;
+            HasScale = hasScale;
             Velocity = velocity;
             AngularVelocityYaw = angularVelocityYaw;
             ScaleVelocity = scaleVelocity;

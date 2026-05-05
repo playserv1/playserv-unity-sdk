@@ -20,7 +20,7 @@ namespace Playserv.Proxy.Common
             IMessageSerializer serializer,
             IRequestIdGenerator requestIdGenerator,
             ILogger logger,
-            Func<string, ITransportImplementation> transportImplementationFactory,
+            PlayServTransportImplementationFactory transportImplementationFactory,
             SynchronizationContext mainThreadContext,
             Action<TransportError> notifyTransportError,
             Action notifyKeepAlivePingSent,
@@ -47,11 +47,14 @@ namespace Playserv.Proxy.Common
             if (string.IsNullOrWhiteSpace(endpoint))
                 throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
 
+            var jsonComposition = PlayServJsonCompositionRoot.Resolve(serializer);
+            serializer = jsonComposition.Serializer;
+            var jsonCodec = jsonComposition.JsonCodec;
+
             if (transportImplementationFactory == null)
                 transportImplementationFactory = CreateDefaultTransportImplementationFactory(logger);
-            var jsonCodec = new NewtonsoftJsonCodec();
 
-            var implementation = transportImplementationFactory(endpoint);
+            var implementation = transportImplementationFactory(endpoint, jsonCodec);
             if (implementation == null)
                 throw new InvalidOperationException("Transport implementation factory returned null.");
 
@@ -82,10 +85,10 @@ namespace Playserv.Proxy.Common
                 transportSession);
         }
 
-        private static Func<string, ITransportImplementation> CreateDefaultTransportImplementationFactory(ILogger logger)
+        private static PlayServTransportImplementationFactory CreateDefaultTransportImplementationFactory(ILogger logger)
         {
-            return endpoint => TransportImplementationResolver.Create(
-                new TransportModuleContext(endpoint, logger, jsonCodec: new NewtonsoftJsonCodec()));
+            return (endpoint, jsonCodec) => TransportImplementationResolver.Create(
+                new TransportModuleContext(endpoint, logger, jsonCodec: jsonCodec));
         }
 
         private static PlayServModuleHost CreateModuleHost(

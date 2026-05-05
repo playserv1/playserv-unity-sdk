@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using Playserv.CodeGenerator;
+using Playserv.DataSubscription;
 using Playserv.Editor;
 
 namespace Playserv.ModelGenerator.Editor
@@ -24,6 +25,7 @@ namespace Playserv.ModelGenerator.Editor
             }
 
             AssetDatabase.Refresh();
+            SchemaSelectionProvider.Reset();
         }
 
         public static void GenerateModels(bool isLatestSchemaUse = true)
@@ -37,6 +39,7 @@ namespace Playserv.ModelGenerator.Editor
             }
 
             AssetDatabase.Refresh();
+            SchemaSelectionProvider.Reset();
         }
 
         private static Dictionary<string, string> GetFilesDataCollection(bool selectFile = true,

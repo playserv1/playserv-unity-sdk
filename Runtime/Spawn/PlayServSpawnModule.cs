@@ -11,7 +11,7 @@ namespace Playserv.Spawn
 {
     public sealed class PlayServSpawnModule : IPlayServModule, IPlayServConnectionAwareModule, IPlayServSpawnModule
     {
-        private readonly SpawnManager _spawnManager = new SpawnManager();
+        private readonly SpawnService _spawnService = new SpawnService();
         private readonly HashSet<string> _joinedScopeGroupNames = new HashSet<string>(StringComparer.Ordinal);
         private IEventsAdapter _eventsAdapter;
         private IPlayServRuntimeIdentity _runtimeIdentity;
@@ -35,12 +35,12 @@ namespace Playserv.Spawn
 
         public void OnConnected()
         {
-            _spawnManager.Initialize(_eventsAdapter, () => _runtimeIdentity?.UserId ?? string.Empty);
+            _spawnService.Initialize(_eventsAdapter, () => _runtimeIdentity?.UserId ?? string.Empty);
         }
 
         public Task<GameObject> SpawnAsync(string assetName, Vector3 position, Quaternion rotation)
         {
-            return _spawnManager.SpawnAsync(assetName, position, rotation);
+            return _spawnService.SpawnAsync(assetName, position, rotation);
         }
 
         public string CurrentScope => _defaultScopeGroupName;
@@ -63,7 +63,7 @@ namespace Playserv.Spawn
 
             _joinedScopeGroupNames.Add(normalizedGroupName);
             SetDefaultScope(normalizedGroupName);
-            _spawnManager.PublishScopeJoined(normalizedGroupName);
+            _spawnService.PublishScopeJoined(normalizedGroupName);
             return true;
         }
 
@@ -84,32 +84,32 @@ namespace Playserv.Spawn
 
         public bool TryGetSpawnedObject(string spawnId, out GameObject obj)
         {
-            return _spawnManager.TryGetSpawnedObject(spawnId, out obj);
+            return _spawnService.TryGetSpawnedObject(spawnId, out obj);
         }
 
         public bool Despawn(string spawnId)
         {
-            return _spawnManager.Despawn(spawnId);
+            return _spawnService.Despawn(spawnId);
         }
 
         public bool Despawn(GameObject instance)
         {
-            return _spawnManager.Despawn(instance);
+            return _spawnService.Despawn(instance);
         }
 
         public void SetPrefabRegistry(INetworkPrefabRegistry prefabRegistry)
         {
-            _spawnManager.SetPrefabRegistry(prefabRegistry);
+            _spawnService.SetPrefabRegistry(prefabRegistry);
         }
 
         public NetworkObject GetNetworkObject(string networkId)
         {
-            return _spawnManager.GetNetworkObject(networkId);
+            return _spawnService.GetNetworkObject(networkId);
         }
 
         public void Shutdown()
         {
-            _spawnManager.Dispose();
+            _spawnService.Dispose();
             _joinedScopeGroupNames.Clear();
             _defaultScopeGroupName = null;
             _eventsAdapter = null;
@@ -119,7 +119,7 @@ namespace Playserv.Spawn
         private void SetDefaultScope(string groupName)
         {
             _defaultScopeGroupName = groupName;
-            _spawnManager.SetDefaultScope(groupName);
+            _spawnService.SetDefaultScope(groupName);
         }
 
         private string GetNextJoinedScopeOrNull()
