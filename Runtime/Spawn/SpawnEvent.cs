@@ -16,7 +16,22 @@ namespace Playserv.Spawn
         public string SpawnId;
 
         /// <summary>
-        /// Prefab path in Resources.
+        /// User id of the client that owns this spawned object.
+        /// </summary>
+        public string OwnerId;
+
+        /// <summary>
+        /// Optional event group used for this object's spawn/transform lifecycle.
+        /// </summary>
+        public string ScopeGroupName;
+
+        /// <summary>
+        /// Monotonic lifecycle sequence assigned by the owner.
+        /// </summary>
+        public uint Seq;
+
+        /// <summary>
+        /// Prefab registry id. Default registry resolves it as a Resources path.
         /// </summary>
         public string AssetName;
 
@@ -41,9 +56,12 @@ namespace Playserv.Spawn
         /// <param name="assetName">Prefab path in Resources.</param>
         /// <param name="position">World position.</param>
         /// <param name="rotation">World rotation.</param>
-        public SpawnEvent(string assetName, Vector3 position, Quaternion rotation)
+        public SpawnEvent(string assetName, Vector3 position, Quaternion rotation, string ownerId = null, uint seq = 0)
         {
             SpawnId = Guid.NewGuid().ToString();
+            OwnerId = ownerId ?? string.Empty;
+            ScopeGroupName = string.Empty;
+            Seq = seq;
             AssetName = assetName;
             Position = position;
             Rotation = rotation;

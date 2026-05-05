@@ -16,7 +16,7 @@ using Playserv.RPC;
 
 namespace Playserv.Proxy.Common
 {
-    public sealed partial class PlayServImplementation : IDisposable
+    public sealed partial class PlayServImplementation : IDisposable, IPlayServRuntimeIdentity
     {
         private readonly ILogger _logger;
         private readonly PlayServFeatureFacade _featureFacade;
@@ -25,6 +25,8 @@ namespace Playserv.Proxy.Common
         private readonly PlayServModuleHost _moduleHost;
 
         public PlayServState State => _transportSession.State;
+
+        public string UserId => _transportSession.UserId;
 
         public IPlayServModuleServiceProvider ModuleServices => _moduleHost.Services;
 

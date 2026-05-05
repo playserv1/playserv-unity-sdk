@@ -14,14 +14,26 @@ namespace Playserv.Spawn
         public string NetworkId { get; private set; }
 
         /// <summary>
+        /// User id of the client that owns this object.
+        /// </summary>
+        public string OwnerId { get; private set; }
+
+        /// <summary>
+        /// Event group that owns spawn and transform routing for this object.
+        /// </summary>
+        public string ScopeGroupName { get; private set; }
+
+        /// <summary>
         /// Indicates whether this object was spawned by local client.
         /// </summary>
         public bool IsLocallyOwned { get; private set; }
 
-        internal void SetNetworkId(string networkId, bool isLocallyOwned)
+        internal void SetNetworkId(string networkId, string ownerId, bool isLocallyOwned, string scopeGroupName)
         {
             NetworkId = networkId;
+            OwnerId = ownerId ?? string.Empty;
             IsLocallyOwned = isLocallyOwned;
+            ScopeGroupName = string.IsNullOrWhiteSpace(scopeGroupName) ? string.Empty : scopeGroupName.Trim();
         }
     }
 }

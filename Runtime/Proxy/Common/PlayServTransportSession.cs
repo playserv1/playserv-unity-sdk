@@ -38,6 +38,8 @@ namespace Playserv.Proxy.Common
 
         public PlayServState State { get; private set; } = PlayServState.Offline;
 
+        public string UserId => _userId ?? string.Empty;
+
         public PlayServTransportSession(
             ITransport transport,
             ILogger logger,
