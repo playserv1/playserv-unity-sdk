@@ -33,20 +33,6 @@ namespace Playserv.Editor
 
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardStyle))
             {
-                GUILayout.Label("Always enabled", PlayServWindowTheme.MiniHeadingStyle);
-                GUILayout.Space(8f);
-
-                DrawLockedModule("Runtime Config", "Game identity, SDK version, endpoints, keepalive, and base runtime settings.");
-                GUILayout.Space(6f);
-                DrawLockedModule("Transport Core", "Connection lifecycle, transport selection, serialization boundary, and command routing.");
-                GUILayout.Space(6f);
-                DrawLockedModule("Module Contracts", "Shared module host, service registry, and compile-time module switches.");
-            }
-
-            GUILayout.Space(12f);
-
-            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardStyle))
-            {
                 GUILayout.Label("Runtime modules", PlayServWindowTheme.MiniHeadingStyle);
                 GUILayout.Space(8f);
 
@@ -165,22 +151,6 @@ namespace Playserv.Editor
                     settings.Load();
                     context.Repaint();
                 }
-            }
-        }
-
-        private static void DrawLockedModule(string title, string description)
-        {
-            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.Label(title, PlayServWindowTheme.SectionLabelStyle);
-                    GUILayout.FlexibleSpace();
-                    GUILayout.Label("Core", PlayServWindowTheme.SectionPillStyle, GUILayout.Height(22f));
-                }
-
-                GUILayout.Space(2f);
-                GUILayout.Label(description, PlayServWindowTheme.SectionSubtitleStyle);
             }
         }
 
