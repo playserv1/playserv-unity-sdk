@@ -40,12 +40,14 @@ namespace Playserv.Spawn
         [Header("Interpolation")]
         [SerializeField] private float renderDelay = 0.12f;
         [SerializeField] private float teleportDistance = 3f;
+        [SerializeField] private float maxPredictionTime = 0.25f;
 
         private NetworkObject _networkObject;
         private IDisposable _subscription;
         private float _nextSyncTime;
         private float _syncInterval;
         private uint _sendSeq;
+        private uint _lastReceivedSeq;
 
         // Owner state for velocity calculation
         private Vector3 _lastSentPosition;
@@ -159,52 +161,7 @@ namespace Playserv.Spawn
 
         private void SendTransformUpdate()
         {
-            var networkId = _networkObject.NetworkId;
-            if (string.IsNullOrEmpty(networkId))
-                return;
-
-            float currentTime = Time.time;
-            float stepTime = currentTime - _lastSendTime;
-            if (stepTime <= 0f)
-                stepTime = _syncInterval;
-
-            Vector3 velocity = Vector3.zero;
-            float angVelYaw = 0f;
-            Vector3 scaleVel = Vector3.zero;
-
-            if (SyncPosition)
-            {
-                velocity = (transform.position - _lastSentPosition) / stepTime;
-            }
-
-            if (SyncRotation)
-            {
-                angVelYaw = CalculateYawVelocity(_lastSentRotation, transform.rotation, stepTime);
-            }
-
-            if (SyncScale)
-            {
-                scaleVel = (transform.localScale - _lastSentScale) / stepTime;
-            }
-
-            _lastSentPosition = transform.position;
-            _lastSentRotation = transform.rotation;
-            _lastSentScale = transform.localScale;
-            _lastSendTime = currentTime;
-            _sendSeq++;
-
-            var syncEvent = new TransformSyncEvent(
-                networkId,
-                _sendSeq,
-                SyncPosition ? _lastSentPosition : Vector3.zero,
-                SyncRotation ? _lastSentRotation : Quaternion.identity,
-                SyncScale ? _lastSentScale : Vector3.one,
-                velocity,
-                angVelYaw,
-                scaleVel,
-                stepTime);
-
-            PlayServ.Publish(syncEvent);
+            SendTransformSnapshot(teleport: false, forceZeroVelocity: false);
         }
 
         private static float CalculateYawVelocity(Quaternion from, Quaternion to, float deltaTime)
@@ -224,6 +181,26 @@ namespace Playserv.Spawn
             if (_networkObject.IsLocallyOwned)
                 return;
 
+            var objectScopeGroupName = NormalizeScopeGroupName(_networkObject.ScopeGroupName);
+            var eventScopeGroupName = NormalizeScopeGroupName(syncEvent.ScopeGroupName);
+            if (!string.IsNullOrEmpty(objectScopeGroupName) &&
+                !string.IsNullOrEmpty(eventScopeGroupName) &&
+                !string.Equals(objectScopeGroupName, eventScopeGroupName, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(syncEvent.OwnerId) &&
+                !string.IsNullOrEmpty(_networkObject.OwnerId) &&
+                !string.Equals(syncEvent.OwnerId, _networkObject.OwnerId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (IsStaleSequence(syncEvent.Seq))
+                return;
+
+            _lastReceivedSeq = syncEvent.Seq;
             _packetsReceived++;
 
             var snapshot = new TransformSnapshot
@@ -231,7 +208,10 @@ namespace Playserv.Spawn
                 RecvTime = Time.time,
                 Position = syncEvent.Position,
                 Rotation = syncEvent.Rotation,
-                Scale = syncEvent.Scale
+                Scale = syncEvent.Scale,
+                Velocity = syncEvent.Velocity,
+                AngularVelocityYaw = syncEvent.AngularVelocityYaw,
+                ScaleVelocity = syncEvent.ScaleVelocity
             };
 
             if (!_hasInitialized || syncEvent.Teleport)
@@ -307,8 +287,8 @@ namespace Playserv.Spawn
 
             if (indexA == indexB)
             {
-                // targetTime is newer than newest snapshot - freeze at newest
-                ApplySnapshot(_snapshotBuffer[indexA]);
+                // targetTime is newer than newest snapshot - predict briefly using sender velocity.
+                ApplyPredictedSnapshot(_snapshotBuffer[indexA], targetTime);
                 _freezeCount++;
                 return;
             }
@@ -377,6 +357,20 @@ namespace Playserv.Spawn
                 transform.localScale = snapshot.Scale;
         }
 
+        private void ApplyPredictedSnapshot(TransformSnapshot snapshot, float targetTime)
+        {
+            var predictionTime = Mathf.Clamp(targetTime - snapshot.RecvTime, 0f, maxPredictionTime);
+
+            if (SyncPosition)
+                transform.position = snapshot.Position + snapshot.Velocity * predictionTime;
+
+            if (SyncRotation)
+                transform.rotation = Quaternion.Euler(0f, snapshot.AngularVelocityYaw * predictionTime, 0f) * snapshot.Rotation;
+
+            if (SyncScale)
+                transform.localScale = snapshot.Scale + snapshot.ScaleVelocity * predictionTime;
+        }
+
         /// <summary>
         /// Forcefully teleports locally owned object and sends teleport sync event.
         /// </summary>
@@ -396,25 +390,84 @@ namespace Playserv.Spawn
             _lastSentRotation = rotation;
             _lastSentScale = scale;
 
+            SendTransformSnapshot(teleport: true, forceZeroVelocity: true);
+        }
+
+        internal void ForceSendSnapshot()
+        {
+            if (!_networkObject.IsLocallyOwned)
+                return;
+
+            SendTransformSnapshot(teleport: true, forceZeroVelocity: true);
+        }
+
+        private void SendTransformSnapshot(bool teleport, bool forceZeroVelocity)
+        {
             var networkId = _networkObject.NetworkId;
             if (string.IsNullOrEmpty(networkId))
                 return;
 
+            float currentTime = Time.time;
+            float stepTime = currentTime - _lastSendTime;
+            if (stepTime <= 0f)
+                stepTime = _syncInterval;
+
+            Vector3 velocity = Vector3.zero;
+            float angVelYaw = 0f;
+            Vector3 scaleVel = Vector3.zero;
+
+            if (!forceZeroVelocity)
+            {
+                if (SyncPosition)
+                    velocity = (transform.position - _lastSentPosition) / stepTime;
+
+                if (SyncRotation)
+                    angVelYaw = CalculateYawVelocity(_lastSentRotation, transform.rotation, stepTime);
+
+                if (SyncScale)
+                    scaleVel = (transform.localScale - _lastSentScale) / stepTime;
+            }
+
+            _lastSentPosition = transform.position;
+            _lastSentRotation = transform.rotation;
+            _lastSentScale = transform.localScale;
+            _lastSendTime = currentTime;
             _sendSeq++;
 
             var syncEvent = new TransformSyncEvent(
                 networkId,
                 _sendSeq,
-                position,
-                rotation,
-                scale,
-                Vector3.zero,
-                0f,
-                Vector3.zero,
-                _syncInterval,
-                teleport: true);
+                SyncPosition ? _lastSentPosition : Vector3.zero,
+                SyncRotation ? _lastSentRotation : Quaternion.identity,
+                SyncScale ? _lastSentScale : Vector3.one,
+                velocity,
+                angVelYaw,
+                scaleVel,
+                stepTime,
+                teleport);
+            syncEvent.OwnerId = _networkObject.OwnerId;
+            syncEvent.ScopeGroupName = _networkObject.ScopeGroupName;
 
+            PublishTransformSync(syncEvent);
+        }
+
+        private void PublishTransformSync(TransformSyncEvent syncEvent)
+        {
+            var groupName = NormalizeScopeGroupName(_networkObject.ScopeGroupName);
+            if (!string.IsNullOrEmpty(groupName))
+            {
+                syncEvent.ScopeGroupName = groupName;
+                PlayServ.PublishForGroup(groupName, syncEvent);
+                return;
+            }
+
+            syncEvent.ScopeGroupName = string.Empty;
             PlayServ.Publish(syncEvent);
+        }
+
+        private static string NormalizeScopeGroupName(string groupName)
+        {
+            return string.IsNullOrWhiteSpace(groupName) ? null : groupName.Trim();
         }
 
         /// <summary>
@@ -428,6 +481,7 @@ namespace Playserv.Spawn
             _hasInitialized = false;
 
             _sendSeq = 0;
+            _lastReceivedSeq = 0;
             _packetsReceived = 0;
             _snapCount = 0;
             _freezeCount = 0;
@@ -502,6 +556,14 @@ namespace Playserv.Spawn
             public Vector3 Position;
             public Quaternion Rotation;
             public Vector3 Scale;
+            public Vector3 Velocity;
+            public float AngularVelocityYaw;
+            public Vector3 ScaleVelocity;
+        }
+
+        private bool IsStaleSequence(uint seq)
+        {
+            return seq != 0 && _lastReceivedSeq != 0 && seq <= _lastReceivedSeq;
         }
     }
 }

@@ -99,6 +99,7 @@ namespace Playserv.Proxy.Common
             var moduleHost = new PlayServModuleHost();
             var services = moduleHost.ServiceRegistry;
             services.Register(owner);
+            services.Register<IPlayServRuntimeIdentity>(owner);
             services.Register(transport);
             services.Register(serializer);
             services.Register(requestIdGenerator);

@@ -14,6 +14,7 @@ using Playserv.RPC;
 using Playserv.Runtime.Abstractions;
 using Playserv.Server;
 #if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
+using Playserv.Spawn;
 using UnityEngine;
 #endif
 
@@ -340,6 +341,63 @@ namespace Playserv.Wrapper
         /// <returns>Spawned GameObject or null when spawn failed.</returns>
         public static Task<GameObject> Spawn(string assetName, Vector3 position) =>
             SpawnApi.Spawn(assetName, position);
+
+        /// <summary>
+        /// Default group used by new Spawn calls. Existing NetworkObjects keep their own scope.
+        /// </summary>
+        public static string CurrentSpawnScope => SpawnApi.CurrentSpawnScope;
+
+        /// <summary>
+        /// Joins event group used by Spawn routing and makes it the default scope for new objects.
+        /// </summary>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group join succeeded.</returns>
+        public static Task<bool> JoinSpawnScopeAsync(string groupName, CancellationToken ct = default) =>
+            SpawnApi.JoinSpawnScopeAsync(groupName, ct);
+
+        /// <summary>
+        /// Joins event group used by Spawn routing and makes it the default scope for new objects.
+        /// </summary>
+        /// <param name="groupName">Target group name.</param>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group join succeeded.</returns>
+        public static Task<bool> JoinSpawnScope(string groupName, CancellationToken ct = default) =>
+            SpawnApi.JoinSpawnScopeAsync(groupName, ct);
+
+        /// <summary>
+        /// Leaves current default Spawn group scope.
+        /// </summary>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group leave succeeded.</returns>
+        public static Task<bool> LeaveSpawnScopeAsync(CancellationToken ct = default) =>
+            SpawnApi.LeaveSpawnScopeAsync(ct);
+
+        /// <summary>
+        /// Leaves current default Spawn group scope.
+        /// </summary>
+        /// <param name="ct">Optional cancellation token.</param>
+        /// <returns>True when group leave succeeded.</returns>
+        public static Task<bool> LeaveSpawnScope(CancellationToken ct = default) =>
+            SpawnApi.LeaveSpawnScopeAsync(ct);
+
+        /// <summary>
+        /// Publishes a network despawn event for a spawned object id.
+        /// </summary>
+        public static bool Despawn(string spawnId) =>
+            SpawnApi.Despawn(spawnId);
+
+        /// <summary>
+        /// Publishes a network despawn event for a spawned GameObject.
+        /// </summary>
+        public static bool Despawn(GameObject instance) =>
+            SpawnApi.Despawn(instance);
+
+        /// <summary>
+        /// Replaces default Resources-based network prefab lookup.
+        /// </summary>
+        public static void SetSpawnPrefabRegistry(INetworkPrefabRegistry prefabRegistry) =>
+            SpawnApi.SetSpawnPrefabRegistry(prefabRegistry);
 #endif
 
 #if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS

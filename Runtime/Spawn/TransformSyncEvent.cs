@@ -14,6 +14,16 @@ namespace Playserv.Spawn
         public string NetworkId;
 
         /// <summary>
+        /// User id of the client that owns this transform stream.
+        /// </summary>
+        public string OwnerId;
+
+        /// <summary>
+        /// Optional event group used for this object's transform stream.
+        /// </summary>
+        public string ScopeGroupName;
+
+        /// <summary>
         /// Monotonic sequence number.
         /// </summary>
         public uint Seq;

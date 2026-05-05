@@ -15,6 +15,9 @@ using Playserv.RPC;
 #endif
 using Playserv.Runtime.Abstractions;
 using Playserv.Server;
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
+using Playserv.Spawn;
+#endif
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -46,6 +49,9 @@ namespace Playserv.Wrapper
 #endif
 #if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         private readonly PlayServApiDataFacade _dataFacade;
+#endif
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
+        private INetworkPrefabRegistry _spawnPrefabRegistry;
 #endif
         private readonly PlayServApiConfigFacade _configFacade;
         private readonly PlayServApiConnectionOrchestrator _connectionOrchestrator;
@@ -199,6 +205,27 @@ namespace Playserv.Wrapper
 
         public Task<GameObject> Spawn(string assetName, Vector3 position) =>
             Instance.Spawn(assetName, position);
+
+        public string CurrentSpawnScope =>
+            _configFacade.CurrentInstance?.CurrentSpawnScope;
+
+        public Task<bool> JoinSpawnScopeAsync(string groupName, CancellationToken ct = default) =>
+            Instance.JoinSpawnScopeAsync(groupName, ct);
+
+        public Task<bool> LeaveSpawnScopeAsync(CancellationToken ct = default) =>
+            Instance.LeaveSpawnScopeAsync(ct);
+
+        public bool Despawn(string spawnId) =>
+            Instance.Despawn(spawnId);
+
+        public bool Despawn(GameObject instance) =>
+            Instance.Despawn(instance);
+
+        public void SetSpawnPrefabRegistry(INetworkPrefabRegistry prefabRegistry)
+        {
+            _spawnPrefabRegistry = prefabRegistry;
+            _configFacade.CurrentInstance?.SetSpawnPrefabRegistry(prefabRegistry);
+        }
 #endif
 
         public void Disconnect() => _configFacade.Disconnect();
@@ -260,6 +287,10 @@ namespace Playserv.Wrapper
             instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
 #if !PLAYSERV_DISABLE_RPC
             instance.OnRpcInvokeResponse += HandleRpcInvokeResponse;
+#endif
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
+            if (_spawnPrefabRegistry != null)
+                instance.SetSpawnPrefabRegistry(_spawnPrefabRegistry);
 #endif
         }
 
