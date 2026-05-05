@@ -27,7 +27,9 @@ namespace Playserv.Wrapper
 
         public static void SetCommandHandler(ICommandHandler commandHandler) => Api.SetCommandHandler(commandHandler);
 
+#if !PLAYSERV_DISABLE_LOCAL_RPC
         public static void SetRpcInvoker(IRpcInvoker rpcInvoker) => Api.SetRpcInvoker(rpcInvoker);
+#endif
 
         public static void Invoke(string serviceName, string methodName, object payload) =>
             Api.Invoke(serviceName, methodName, payload);

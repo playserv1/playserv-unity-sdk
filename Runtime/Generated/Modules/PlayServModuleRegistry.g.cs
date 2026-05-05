@@ -31,6 +31,9 @@ namespace Playserv.Modules
 #if !PLAYSERV_DISABLE_RPC
             host.Register(new PlayServRpcModule());
 #endif
+#if !PLAYSERV_DISABLE_RPC && !PLAYSERV_DISABLE_LOCAL_RPC
+            host.Register(new PlayServLocalRpcModule());
+#endif
 #if !PLAYSERV_DISABLE_PULSE
             host.Register(new PlayServPulseModule());
 #endif

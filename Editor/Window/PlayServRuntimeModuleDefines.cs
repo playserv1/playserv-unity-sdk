@@ -18,6 +18,7 @@ namespace Playserv.Editor
                 Events = !defines.Contains(Const.DefineDisableEvents),
                 Data = !defines.Contains(Const.DefineDisableData) && !defines.Contains(Const.DefineDisableEvents),
                 Rpc = !defines.Contains(Const.DefineDisableRpc),
+                LocalRpc = !defines.Contains(Const.DefineDisableLocalRpc) && !defines.Contains(Const.DefineDisableRpc),
                 Spawn = !defines.Contains(Const.DefineDisableSpawn) && !defines.Contains(Const.DefineDisableEvents),
                 Pulse = !defines.Contains(Const.DefineDisablePulse)
             };
@@ -33,6 +34,7 @@ namespace Playserv.Editor
             changed |= SetDisabled(defines, Const.DefineDisableEvents, !state.Events);
             changed |= SetDisabled(defines, Const.DefineDisableData, !state.Data);
             changed |= SetDisabled(defines, Const.DefineDisableRpc, !state.Rpc);
+            changed |= SetDisabled(defines, Const.DefineDisableLocalRpc, !state.LocalRpc);
             changed |= SetDisabled(defines, Const.DefineDisableSpawn, !state.Spawn);
             changed |= SetDisabled(defines, Const.DefineDisablePulse, !state.Pulse);
 
@@ -46,10 +48,17 @@ namespace Playserv.Editor
         public static void NormalizeDependencies(ref PlayServRuntimeModuleState state)
         {
             if (state.Events)
+            {
+                if (!state.Rpc)
+                    state.LocalRpc = false;
                 return;
+            }
 
             state.Data = false;
             state.Spawn = false;
+
+            if (!state.Rpc)
+                state.LocalRpc = false;
         }
 
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)

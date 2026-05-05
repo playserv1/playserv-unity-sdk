@@ -18,7 +18,9 @@ namespace Playserv.Wrapper
 
         void SetCommandHandler(ICommandHandler commandHandler);
 
+#if !PLAYSERV_DISABLE_LOCAL_RPC
         void SetRpcInvoker(IRpcInvoker rpcInvoker);
+#endif
 
         void Invoke(string serviceName, string methodName, object payload);
 
