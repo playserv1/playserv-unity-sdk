@@ -3,13 +3,6 @@ namespace Playserv.Proxy.Common
 {
     public sealed partial class PlayServImplementation
     {
-        private void InitializeSpawnManager()
-        {
-        }
-
-        private void DisposeSpawnManager()
-        {
-        }
     }
 }
 #endif

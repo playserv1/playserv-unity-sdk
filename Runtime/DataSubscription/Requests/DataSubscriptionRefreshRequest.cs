@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.DataSubscription.Requests
@@ -19,3 +20,5 @@ namespace Playserv.DataSubscription.Requests
         public long SubscriptionId { get; set; }
     }
 }
+
+#endif

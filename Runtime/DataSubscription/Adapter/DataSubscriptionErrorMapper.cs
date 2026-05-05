@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
@@ -96,3 +97,5 @@ namespace Playserv.DataSubscription
         }
     }
 }
+
+#endif

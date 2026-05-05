@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
+#endif
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
+#endif
 using Playserv.Runtime.Abstractions;
 using Playserv.Server;
 #if UNITY_5_3_OR_NEWER
@@ -17,17 +21,32 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApi : IPlayServConnectionApi, IPlayServRpcApi, IPlayServEventsApi, IPlayServDataApi
-#if UNITY_5_3_OR_NEWER
+    internal sealed class PlayServApi : IPlayServConnectionApi
+#if !PLAYSERV_DISABLE_RPC
+        , IPlayServRpcApi
+#endif
+#if !PLAYSERV_DISABLE_EVENTS
+        , IPlayServEventsApi
+#endif
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
+        , IPlayServDataApi
+#endif
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
         , IPlayServSpawnApi
 #endif
     {
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;
         private readonly PlayServApiLocalExecutionFacade _localExecution;
+#if !PLAYSERV_DISABLE_RPC
         private readonly PlayServApiRpcFacade _rpcFacade;
+#endif
+#if !PLAYSERV_DISABLE_EVENTS
         private readonly PlayServApiEventsFacade _eventsFacade;
+#endif
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         private readonly PlayServApiDataFacade _dataFacade;
+#endif
         private readonly PlayServApiConfigFacade _configFacade;
         private readonly PlayServApiConnectionOrchestrator _connectionOrchestrator;
 
@@ -39,7 +58,9 @@ namespace Playserv.Wrapper
         public event Action<TransportError> OnTransportError;
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
+#if !PLAYSERV_DISABLE_RPC
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
+#endif
 
         public PlayServApi()
         {
@@ -59,16 +80,22 @@ namespace Playserv.Wrapper
                 logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
                 shouldIgnoreMissingInstance: ShouldIgnoreMissingInstance,
                 logShutdownIgnoreWarning: LogShutdownIgnoreWarning);
+#if !PLAYSERV_DISABLE_EVENTS
             _eventsFacade = new PlayServApiEventsFacade(
                 _localExecution,
                 () => _configFacade.CurrentInstance,
                 GetInstanceForFireAndForget,
                 () => Instance);
+#endif
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
             _dataFacade = new PlayServApiDataFacade(() => Instance);
+#endif
+#if !PLAYSERV_DISABLE_RPC
             _rpcFacade = new PlayServApiRpcFacade(
                 _localExecution,
                 () => _configFacade.CurrentInstance,
                 GetInstanceForFireAndForget);
+#endif
         }
 
         public void Config(PlayServSettings settings) => _configFacade.Config(settings);
@@ -84,10 +111,13 @@ namespace Playserv.Wrapper
         public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
             _configFacade.GetLatestVersionAsync(gameId, ct);
 
+#if !PLAYSERV_DISABLE_EVENTS
         public IDisposable Subscribe<T>(Action<T> onNext) => _eventsFacade.Subscribe(onNext);
 
         public IObservable<T> Subscribe<T>() => _eventsFacade.Subscribe<T>();
+#endif
 
+#if !PLAYSERV_DISABLE_RPC
         public void Send<T>(T command)
         {
             if (_localExecution.TryHandleCommand(command, moduleName: null, _configFacade.CurrentInstance != null))
@@ -113,9 +143,14 @@ namespace Playserv.Wrapper
             instance.Send(command, moduleName);
         }
 
+#endif
+
+#if !PLAYSERV_DISABLE_EVENTS
         public void SetEventHandler(IEventHandler eventHandler) =>
             _eventsFacade.SetEventHandler(eventHandler);
+#endif
 
+#if !PLAYSERV_DISABLE_RPC
         public void Invoke(string serviceName, string methodName, object payload) =>
             _rpcFacade.Invoke(serviceName, methodName, payload);
 
@@ -139,10 +174,12 @@ namespace Playserv.Wrapper
 
         public void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
             _rpcFacade.Invoke(method, payloadBase64);
+#endif
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             Instance.GetTransportImplementation();
 
+#if !PLAYSERV_DISABLE_EVENTS
         public void Publish<T>(T @event) => _eventsFacade.Publish(@event);
 
         public void PublishForGroup<T>(string groupName, T @event) => _eventsFacade.PublishForGroup(groupName, @event);
@@ -154,17 +191,19 @@ namespace Playserv.Wrapper
 
         public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
             _eventsFacade.UnsubscribeGroupAsync(groupName, ct);
+#endif
 
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
         public Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
-            _dataFacade.Spawn(assetName, position, rotation);
+            Instance.Spawn(assetName, position, rotation);
 
         public Task<GameObject> Spawn(string assetName, Vector3 position) =>
-            _dataFacade.Spawn(assetName, position);
+            Instance.Spawn(assetName, position);
 #endif
 
         public void Disconnect() => _configFacade.Disconnect();
 
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
             string playerId,
             Func<TEntity, TDto> map,
@@ -187,6 +226,7 @@ namespace Playserv.Wrapper
             Action<DataGetResponse> onData,
             Action<Exception> onError = null) =>
             _dataFacade.StartDataByKeyPolling(key, query, variables, onData, onError);
+#endif
 
         private PlayServImplementation Instance =>
             _configFacade.CurrentInstance ?? throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
@@ -211,18 +251,24 @@ namespace Playserv.Wrapper
             instance.OnTransportError -= HandleTransportError;
             instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
             instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
+#if !PLAYSERV_DISABLE_RPC
             instance.OnRpcInvokeResponse -= HandleRpcInvokeResponse;
+#endif
 
             instance.OnTransportError += HandleTransportError;
             instance.OnKeepAlivePingSent += HandleKeepAlivePingSent;
             instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
+#if !PLAYSERV_DISABLE_RPC
             instance.OnRpcInvokeResponse += HandleRpcInvokeResponse;
+#endif
         }
 
         private void HandleTransportError(TransportError error) => OnTransportError?.Invoke(error);
         private void HandleKeepAlivePingSent() => OnKeepAlivePingSent?.Invoke();
         private void HandleKeepAlivePongReceived() => OnKeepAlivePongReceived?.Invoke();
+#if !PLAYSERV_DISABLE_RPC
         private void HandleRpcInvokeResponse(InvokeRpcResponse response) => OnRpcInvokeResponse?.Invoke(response);
+#endif
 
 #if UNITY_5_3_OR_NEWER
         private void ResetShutdownState()

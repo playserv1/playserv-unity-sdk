@@ -1,6 +1,8 @@
 using System;
 using Playserv.Proxy.Common;
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
+#endif
 using Playserv.Server;
 
 namespace Playserv.Wrapper
@@ -8,12 +10,20 @@ namespace Playserv.Wrapper
     internal sealed class PlayServApiLocalExecutionFacade
     {
         private ICommandHandler _commandHandler;
+#if !PLAYSERV_DISABLE_EVENTS
         private IEventHandler _eventHandler;
+#endif
+#if !PLAYSERV_DISABLE_RPC
         private IRpcInvoker _rpcInvoker;
+#endif
 
         public void SetCommandHandler(ICommandHandler commandHandler) => _commandHandler = commandHandler;
+#if !PLAYSERV_DISABLE_EVENTS
         public void SetEventHandler(IEventHandler eventHandler) => _eventHandler = eventHandler;
+#endif
+#if !PLAYSERV_DISABLE_RPC
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) => _rpcInvoker = rpcInvoker;
+#endif
 
         public bool TryHandleCommand(object command, string moduleName, bool hasTransport)
         {
@@ -33,6 +43,7 @@ namespace Playserv.Wrapper
             return false;
         }
 
+#if !PLAYSERV_DISABLE_EVENTS
         public bool TrySubscribe<T>(bool hasTransport, out IObservable<T> observable)
         {
             if (_eventHandler != null &&
@@ -128,7 +139,9 @@ namespace Playserv.Wrapper
 
             return false;
         }
+#endif
 
+#if !PLAYSERV_DISABLE_RPC
         public bool TryInvokeRpc(string serviceName, string methodName, string payloadBase64, bool hasTransport)
         {
             if (_rpcInvoker == null)
@@ -146,5 +159,6 @@ namespace Playserv.Wrapper
 
             return false;
         }
+#endif
     }
 }

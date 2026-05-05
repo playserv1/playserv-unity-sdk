@@ -3,13 +3,17 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
+#endif
 using Playserv.Proxy.Common;
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
+#endif
 using Playserv.Runtime.Abstractions;
 using Playserv.Server;
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using UnityEngine;
 #endif
 
@@ -23,10 +27,16 @@ namespace Playserv.Wrapper
     public static class PlayServ
     {
         private static IPlayServConnectionApi ConnectionApi => PlayServApiHost.Connection;
+#if !PLAYSERV_DISABLE_RPC
         private static IPlayServRpcApi RpcApi => PlayServApiHost.Rpc;
+#endif
+#if !PLAYSERV_DISABLE_EVENTS
         private static IPlayServEventsApi EventsApi => PlayServApiHost.Events;
+#endif
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         private static IPlayServDataApi DataApi => PlayServApiHost.Data;
-#if UNITY_5_3_OR_NEWER
+#endif
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
         private static IPlayServSpawnApi SpawnApi => PlayServApiHost.Spawn;
 #endif
 
@@ -75,11 +85,13 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Raised when RPC module returns InvokeRpcResponse command.
         /// </summary>
+#if !PLAYSERV_DISABLE_RPC
         public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {
             add => RpcApi.OnRpcInvokeResponse += value;
             remove => RpcApi.OnRpcInvokeResponse -= value;
         }
+#endif
 
         /// <summary>
         /// Applies full SDK settings object.
@@ -125,6 +137,7 @@ namespace Playserv.Wrapper
         public static Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
             ConnectionApi.GetLatestVersionAsync(gameId, ct);
 
+#if !PLAYSERV_DISABLE_EVENTS
         /// <summary>
         /// Subscribes to incoming events of type <typeparamref name="T"/>.
         /// </summary>
@@ -141,7 +154,9 @@ namespace Playserv.Wrapper
         /// <returns>Subscription handle that should be disposed when no longer needed.</returns>
         public static IDisposable Subscribe<T>(Action<T> onNext) =>
             EventsApi.Subscribe(onNext);
+#endif
 
+#if !PLAYSERV_DISABLE_RPC
         /// <summary>
         /// Sends command object using default command namespace resolution.
         /// </summary>
@@ -165,14 +180,18 @@ namespace Playserv.Wrapper
         /// <param name="moduleName">Target module path, for example "rpc.InvokeRpc" or "module_dataflow".</param>
         public static void Send<T>(T command, string moduleName) =>
             RpcApi.Send(command,  moduleName);
+#endif
 
+#if !PLAYSERV_DISABLE_EVENTS
         /// <summary>
         /// Sets optional local event handler for server-side/in-process execution.
         /// </summary>
         /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
         public static void SetEventHandler(IEventHandler eventHandler) =>
             EventsApi.SetEventHandler(eventHandler);
+#endif
 
+#if !PLAYSERV_DISABLE_RPC
         /// <summary>
         /// Invokes server RPC method using object payload serialized to base64 JSON.
         /// </summary>
@@ -241,6 +260,7 @@ namespace Playserv.Wrapper
         /// <param name="payloadBase64">Base64-encoded UTF8 JSON payload.</param>
         public static void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
             RpcApi.Invoke(method, payloadBase64);
+#endif
 
         /// <summary>
         /// Returns low-level transport implementation used by SDK.
@@ -249,6 +269,7 @@ namespace Playserv.Wrapper
         public static Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             ConnectionApi.GetTransportImplementation();
 
+#if !PLAYSERV_DISABLE_EVENTS
         /// <summary>
         /// Publishes global event to all interested listeners.
         /// </summary>
@@ -292,6 +313,7 @@ namespace Playserv.Wrapper
         /// <returns>True when group leave succeeded.</returns>
         public static Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
             EventsApi.UnsubscribeGroupAsync(groupName, ct);
+#endif
 
         /// <summary>
         /// Disconnects SDK transport and disposes internal runtime instance.
@@ -299,7 +321,7 @@ namespace Playserv.Wrapper
         public static void Disconnect() =>
             ConnectionApi.Disconnect();
 
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
         /// <summary>
         /// Spawns networked prefab from Resources at given position and rotation.
         /// </summary>
@@ -320,6 +342,7 @@ namespace Playserv.Wrapper
             SpawnApi.Spawn(assetName, position);
 #endif
 
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         /// <summary>
         /// Creates shared data subscription for a player entity and maps server model to DTO.
         /// </summary>
@@ -368,5 +391,6 @@ namespace Playserv.Wrapper
             Action<DataGetResponse> onData,
             Action<Exception> onError = null) =>
             DataApi.StartDataByKeyPolling(key, query, variables, onData, onError);
+#endif
     }
 }

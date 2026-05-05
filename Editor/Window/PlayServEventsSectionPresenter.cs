@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+#if UNITY_EDITOR && !PLAYSERV_DISABLE_EVENTS
 using UnityEditor;
 using UnityEngine;
 using Playserv.Events.Editor;

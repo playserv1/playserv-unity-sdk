@@ -29,6 +29,9 @@ namespace Playserv.Editor
         public static GUIStyle CardStyle { get; private set; }
         public static GUIStyle CardBodyStyle { get; private set; }
         public static GUIStyle SectionPillStyle { get; private set; }
+        public static GUIStyle ModuleTagEnabledStyle { get; private set; }
+        public static GUIStyle ModuleTagDisabledStyle { get; private set; }
+        public static GUIStyle ModuleTagBlockedStyle { get; private set; }
         public static GUIStyle SectionTitleButtonStyle { get; private set; }
         public static GUIStyle SectionSubtitleStyle { get; private set; }
         public static GUIStyle MiniHeadingStyle { get; private set; }
@@ -65,6 +68,9 @@ namespace Playserv.Editor
 
             PillStyle = CreateChipStyle("#171B22", "#2A303A", "#C3CBD8", 11, FontStyle.Bold, new RectOffset(10, 10, 5, 5));
             SectionPillStyle = CreateChipStyle("#171B22", "#2A303A", "#8CB2FF", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
+            ModuleTagEnabledStyle = CreateChipStyle("#10291D", "#1E6B42", "#80E6A7", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
+            ModuleTagDisabledStyle = CreateChipStyle("#1A1E25", "#303743", "#7D8794", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
+            ModuleTagBlockedStyle = CreateChipStyle("#2C2215", "#6E4D1F", "#F2B66D", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
 
             HeroTitleStyle = CreateWrappedLabelStyle(30, FontStyle.Bold, "#F3F5F8");
             HeroAccentStyle = CreateWrappedLabelStyle(18, FontStyle.Bold, "#A8D3FF");

@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_RPC
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -50,3 +51,5 @@ namespace Playserv.Wrapper
             Api.Invoke(method, payloadBase64);
     }
 }
+
+#endif

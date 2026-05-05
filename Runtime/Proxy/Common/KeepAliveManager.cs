@@ -2,7 +2,9 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_EVENTS
 using Playserv.Events.Requests;
+#endif
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 
@@ -21,7 +23,9 @@ namespace Playserv.Proxy.Common
 
         private CancellationTokenSource _cts;
         private IDisposable _legacyPingSubscription;
+#if !PLAYSERV_DISABLE_EVENTS
         private IDisposable _eventKeepAliveSubscription;
+#endif
         private Task _sendLoop;
         private Task _monitorLoop;
         private bool _isRunning;
@@ -62,8 +66,10 @@ namespace Playserv.Proxy.Common
                 _legacyPingSubscription = _transport.OnReceive<KeepAliveRequest>()
                     .Subscribe(OnLegacyPingReceived);
 
+#if !PLAYSERV_DISABLE_EVENTS
                 _eventKeepAliveSubscription = _transport.OnReceive<EventMessage>()
                     .Subscribe(OnEventMessageReceived);
+#endif
 
 #if UNITY_WEBGL && !UNITY_EDITOR
                 // WebGL is single-threaded: Task.Run would detach the continuation from
@@ -92,10 +98,14 @@ namespace Playserv.Proxy.Common
                 _isRunning = false;
                 _cts?.Cancel();
                 _legacyPingSubscription?.Dispose();
+#if !PLAYSERV_DISABLE_EVENTS
                 _eventKeepAliveSubscription?.Dispose();
+#endif
 
                 _legacyPingSubscription = null;
+#if !PLAYSERV_DISABLE_EVENTS
                 _eventKeepAliveSubscription = null;
+#endif
 
                 LogKeepAlive(
                     $"{KeepAliveLogPrefix} manager stopped. lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
@@ -199,14 +209,19 @@ namespace Playserv.Proxy.Common
             var sequence = Interlocked.Increment(ref _heartbeatSequence);
             Interlocked.Exchange(ref _lastClientKeepAliveAtMs, nowMs);
 
-            var keepAliveEvent = new EventMessage(KeepAliveEventType, EmptyPayloadJson);
-
+#if !PLAYSERV_DISABLE_EVENTS
+            var keepAliveCommand = new EventMessage(KeepAliveEventType, EmptyPayloadJson);
             LogKeepAlive(
                 $"{KeepAliveLogPrefix} -> heartbeat#{sequence} send attempt. source={source}, event={KeepAliveEventType}, ts={FormatTimestamp(nowMs)}");
+#else
+            var keepAliveCommand = new KeepAliveRequest { Timestamp = nowMs };
+            LogKeepAlive(
+                $"{KeepAliveLogPrefix} -> heartbeat#{sequence} send attempt. source={source}, command=KeepAliveRequest, ts={FormatTimestamp(nowMs)}");
+#endif
 
             try
             {
-                await _transport.Send(keepAliveEvent);
+                await _transport.Send(keepAliveCommand);
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
@@ -222,6 +237,7 @@ namespace Playserv.Proxy.Common
             return true;
         }
 
+#if !PLAYSERV_DISABLE_EVENTS
         private void OnEventMessageReceived(EventMessage message)
         {
             if (message == null || string.IsNullOrWhiteSpace(message.EventType))
@@ -255,6 +271,7 @@ namespace Playserv.Proxy.Common
         {
             return string.Equals(eventTypeName, KeepAliveEventType, StringComparison.OrdinalIgnoreCase);
         }
+#endif
 
         private int ResolveKeepAliveIntervalMs()
         {

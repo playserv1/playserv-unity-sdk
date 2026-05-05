@@ -26,7 +26,9 @@ namespace Playserv.Editor
         private readonly PlayServConfigSectionPresenter _configSectionPresenter = new PlayServConfigSectionPresenter();
         private readonly PlayServDeploymentSectionPresenter _deploymentSectionPresenter = new PlayServDeploymentSectionPresenter();
         private readonly PlayServModelSectionPresenter _modelSectionPresenter = new PlayServModelSectionPresenter();
+#if !PLAYSERV_DISABLE_EVENTS
         private readonly PlayServEventsSectionPresenter _eventsSectionPresenter = new PlayServEventsSectionPresenter();
+#endif
         private readonly PlayServCodegenSectionPresenter _codegenSectionPresenter = new PlayServCodegenSectionPresenter();
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
@@ -157,11 +159,13 @@ namespace Playserv.Editor
                 _modelSectionPresenter.Draw(context);
             }
 
-            if (_state.ModuleSettings.Events)
+#if !PLAYSERV_DISABLE_EVENTS
+            if (_state.ModuleSettings.Events && _state.ModuleSettings.RuntimeEvents)
             {
                 GUILayout.Space(12f);
                 _eventsSectionPresenter.Draw(context);
             }
+#endif
 
             if (_state.ModuleSettings.Codegen)
             {

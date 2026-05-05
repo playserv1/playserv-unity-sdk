@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_RPC
 using Playserv.RPC;
 
 namespace Playserv.Proxy.Common
@@ -12,3 +13,5 @@ namespace Playserv.Proxy.Common
         }
     }
 }
+
+#endif

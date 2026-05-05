@@ -2,9 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
+#endif
+#if !PLAYSERV_DISABLE_EVENTS
 using Playserv.Events;
+#endif
+using Playserv.Modules;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 
@@ -13,17 +18,14 @@ namespace Playserv.Proxy.Common
     internal sealed class PlayServFeatureFacade : IDisposable
     {
         private readonly ITransport _transport;
-        private readonly PlayServEventsAdapter _eventsAdapter;
-        private readonly PlayServDataSubscriptionAdapter _dataSubscriptionAdapter;
+        private readonly IPlayServModuleServiceProvider _moduleServices;
 
         public PlayServFeatureFacade(
             ITransport transport,
-            PlayServEventsAdapter eventsAdapter,
-            PlayServDataSubscriptionAdapter dataSubscriptionAdapter)
+            IPlayServModuleServiceProvider moduleServices)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
-            _eventsAdapter = eventsAdapter ?? throw new ArgumentNullException(nameof(eventsAdapter));
-            _dataSubscriptionAdapter = dataSubscriptionAdapter ?? throw new ArgumentNullException(nameof(dataSubscriptionAdapter));
+            _moduleServices = moduleServices ?? throw new ArgumentNullException(nameof(moduleServices));
         }
 
         public IDisposable On<T>(Action<T> onNext)
@@ -71,40 +73,42 @@ namespace Playserv.Proxy.Common
             return OnCommand(commandName).Subscribe(onNext);
         }
 
+#if !PLAYSERV_DISABLE_EVENTS
         public IObservable<T> Subscribe<T>()
         {
-            return _eventsAdapter.Subscribe<T>();
+            return EventsAdapter.Subscribe<T>();
         }
 
         public IDisposable Subscribe<T>(Action<T> onNext)
         {
-            return _eventsAdapter.Subscribe(onNext);
+            return EventsAdapter.Subscribe(onNext);
         }
 
         public void Publish<T>(T @event)
         {
-            _eventsAdapter.Publish(@event);
+            EventsAdapter.Publish(@event);
         }
 
         public void PublishForGroup<T>(string groupName, T @event)
         {
-            _eventsAdapter.PublishForGroup(groupName, @event);
+            EventsAdapter.PublishForGroup(groupName, @event);
         }
 
         public void PublishForUser<T>(string userId, T @event)
         {
-            _eventsAdapter.PublishForUser(userId, @event);
+            EventsAdapter.PublishForUser(userId, @event);
         }
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
-            return _eventsAdapter.SubscribeGroupAsync(groupName, ct);
+            return EventsAdapter.SubscribeGroupAsync(groupName, ct);
         }
 
         public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
-            return _eventsAdapter.UnsubscribeGroupAsync(groupName, ct);
+            return EventsAdapter.UnsubscribeGroupAsync(groupName, ct);
         }
+#endif
 
         public ITransportImplementation GetTransportImplementation()
         {
@@ -117,9 +121,10 @@ namespace Playserv.Proxy.Common
             return _transport;
         }
 
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
         public PlayServDataSubscriptionAdapter GetDataSubscriptionAdapter()
         {
-            return _dataSubscriptionAdapter;
+            return _moduleServices.Get<PlayServDataSubscriptionAdapter>();
         }
 
         public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
@@ -129,7 +134,7 @@ namespace Playserv.Proxy.Common
             where TEntity : class
             where TDto : class, new()
         {
-            return _dataSubscriptionAdapter.SelectEntity<TEntity, TDto>(playerId, map, mode);
+            return DataSubscriptionAdapter.SelectEntity<TEntity, TDto>(playerId, map, mode);
         }
 
         public Task<DataGetResponse> GetDataByKeyAsync(
@@ -138,7 +143,7 @@ namespace Playserv.Proxy.Common
             Dictionary<string, object> variables,
             CancellationToken ct = default)
         {
-            return _dataSubscriptionAdapter.GetDataByKeyAsync(key, query, variables, ct);
+            return DataSubscriptionAdapter.GetDataByKeyAsync(key, query, variables, ct);
         }
 
         public IDisposable StartDataByKeyPolling(
@@ -148,13 +153,21 @@ namespace Playserv.Proxy.Common
             Action<DataGetResponse> onData,
             Action<Exception> onError = null)
         {
-            return _dataSubscriptionAdapter.StartDataByKeyPolling(key, query, variables, onData, onError);
+            return DataSubscriptionAdapter.StartDataByKeyPolling(key, query, variables, onData, onError);
         }
+#endif
 
         public void Dispose()
         {
-            _dataSubscriptionAdapter.Dispose();
             _transport.Dispose();
         }
+
+#if !PLAYSERV_DISABLE_EVENTS
+        private IEventsAdapter EventsAdapter => _moduleServices.Get<IEventsAdapter>();
+#endif
+
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
+        private IDataSubscriptionAdapter DataSubscriptionAdapter => _moduleServices.Get<IDataSubscriptionAdapter>();
+#endif
     }
 }

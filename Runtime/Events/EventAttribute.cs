@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.Events
@@ -23,3 +24,5 @@ namespace Playserv.Events
         }
     }
 }
+
+#endif

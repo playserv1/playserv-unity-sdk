@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.DataSubscription.JsonPatch
@@ -29,3 +30,5 @@ namespace Playserv.DataSubscription.JsonPatch
         public string From { get; set; }
     }
 }
+
+#endif
