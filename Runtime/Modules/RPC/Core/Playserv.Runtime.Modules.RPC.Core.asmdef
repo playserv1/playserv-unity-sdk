@@ -12,7 +12,7 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "!PLAYSERV_DISABLE_RPC_CORE"
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE"
     ],
     "versionDefines": [],
     "noEngineReferences": false

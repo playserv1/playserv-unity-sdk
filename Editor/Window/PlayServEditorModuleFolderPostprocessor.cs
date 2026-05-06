@@ -9,7 +9,7 @@ namespace Playserv.Editor
         [InitializeOnLoadMethod]
         private static void SyncOnEditorLoad()
         {
-            EditorApplication.delayCall += PlayServEditorModuleAvailability.SyncUnavailableModuleDefines;
+            EditorApplication.delayCall += SyncModuleState;
         }
 
         private static void OnPostprocessAllAssets(
@@ -23,8 +23,14 @@ namespace Playserv.Editor
                 TouchesPlayServModuleFolders(movedAssets) ||
                 TouchesPlayServModuleFolders(movedFromAssetPaths))
             {
-                PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
+                SyncModuleState();
             }
+        }
+
+        private static void SyncModuleState()
+        {
+            PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
+            PlayServCoreAssemblyReferenceSync.Sync();
         }
 
         private static bool TouchesPlayServModuleFolders(string[] assetPaths)

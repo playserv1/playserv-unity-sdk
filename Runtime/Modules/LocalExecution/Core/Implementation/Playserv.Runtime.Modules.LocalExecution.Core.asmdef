@@ -1,0 +1,16 @@
+{
+    "name": "Playserv.Runtime.Modules.LocalExecution.Core",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

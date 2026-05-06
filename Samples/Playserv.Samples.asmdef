@@ -19,12 +19,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "!PLAYSERV_DISABLE_CLIENT_EXECUTION",
-        "!PLAYSERV_DISABLE_EVENTS",
-        "!PLAYSERV_DISABLE_DATA",
-        "!PLAYSERV_DISABLE_RPC_CORE",
-        "!PLAYSERV_DISABLE_CLIENT_RPC",
-        "!PLAYSERV_DISABLE_SPAWN"
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_EVENTS",
+        "!PLAYSERV_MODULE_DISABLED_DATA",
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC",
+        "!PLAYSERV_MODULE_DISABLED_SPAWN"
     ],
     "versionDefines": [],
     "noEngineReferences": false

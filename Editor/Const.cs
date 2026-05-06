@@ -17,6 +17,7 @@ namespace Playserv.Editor
         internal const string PrefModuleDeployment = "PlayServ.Window.Module.Deployment";
         internal const string PrefModuleModelSync = "PlayServ.Window.Module.ModelSync";
         internal const string PrefModuleCodegen = "PlayServ.Window.Module.Codegen";
+        internal const string PrefRuntimeModuleUserDisabledPrefix = "PlayServ.Runtime.Module.UserDisabled.";
 
         internal const string DefineDisableEvents = PlayServModuleManifest.DefineDisableEvents;
         internal const string DefineDisableData = PlayServModuleManifest.DefineDisableData;

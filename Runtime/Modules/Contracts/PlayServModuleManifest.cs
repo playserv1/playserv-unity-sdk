@@ -16,16 +16,16 @@ namespace Playserv.Modules
         public const string SpawnId = "spawn";
         public const string PulseId = "pulse";
 
-        public const string DefineDisableEvents = "PLAYSERV_DISABLE_EVENTS";
-        public const string DefineDisableData = "PLAYSERV_DISABLE_DATA";
-        public const string DefineDisableRpcCore = "PLAYSERV_DISABLE_RPC_CORE";
-        public const string DefineDisableClientRpc = "PLAYSERV_DISABLE_CLIENT_RPC";
-        public const string DefineDisableServerRpc = "PLAYSERV_DISABLE_SERVER_RPC";
-        public const string DefineDisableLocalExecutionCore = "PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE";
-        public const string DefineDisableClientExecution = "PLAYSERV_DISABLE_CLIENT_EXECUTION";
-        public const string DefineDisableLocalExecutionServer = "PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER";
-        public const string DefineDisableSpawn = "PLAYSERV_DISABLE_SPAWN";
-        public const string DefineDisablePulse = "PLAYSERV_DISABLE_PULSE";
+        public const string DefineDisableEvents = "PLAYSERV_MODULE_DISABLED_EVENTS";
+        public const string DefineDisableData = "PLAYSERV_MODULE_DISABLED_DATA";
+        public const string DefineDisableRpcCore = "PLAYSERV_MODULE_DISABLED_RPC_CORE";
+        public const string DefineDisableClientRpc = "PLAYSERV_MODULE_DISABLED_CLIENT_RPC";
+        public const string DefineDisableServerRpc = "PLAYSERV_MODULE_DISABLED_SERVER_RPC";
+        public const string DefineDisableLocalExecutionCore = "PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE";
+        public const string DefineDisableClientExecution = "PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION";
+        public const string DefineDisableLocalExecutionServer = "PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER";
+        public const string DefineDisableSpawn = "PLAYSERV_MODULE_DISABLED_SPAWN";
+        public const string DefineDisablePulse = "PLAYSERV_MODULE_DISABLED_PULSE";
 
         private static readonly PlayServModuleManifestEntry[] Modules =
         {
@@ -40,7 +40,7 @@ namespace Playserv.Modules
                 visibleInExport: true,
                 assetPaths: new[] { "Runtime/Modules/LocalExecution/Client" },
                 dependencyIds: null,
-                hiddenDependencyAssetPaths: new[] { "Runtime/Modules/LocalExecution/Core" },
+                hiddenDependencyAssetPaths: new[] { "Runtime/Modules/LocalExecution/Core/Implementation" },
                 hiddenDependencyModuleIds: new[] { LocalExecutionCoreId }),
 
             new PlayServModuleManifestEntry(
@@ -52,7 +52,7 @@ namespace Playserv.Modules
                 isServerModule: false,
                 visibleInSettings: true,
                 visibleInExport: true,
-                assetPaths: new[] { "Runtime/Modules/Events", "Editor/Events" },
+                assetPaths: new[] { "Runtime/Modules/Events/Implementation", "Editor/Events", "Runtime/Modules/Events/Compatibility/PlayServ.Events.cs" },
                 dependencyIds: new[] { ClientExecutionId },
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null),
@@ -66,7 +66,7 @@ namespace Playserv.Modules
                 isServerModule: false,
                 visibleInSettings: true,
                 visibleInExport: true,
-                assetPaths: new[] { "Runtime/Modules/DataSubscription" },
+                assetPaths: new[] { "Runtime/Modules/DataSubscription/Implementation", "Runtime/Modules/DataSubscription/Compatibility/PlayServ.Data.cs" },
                 dependencyIds: null,
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null),
@@ -94,7 +94,7 @@ namespace Playserv.Modules
                 isServerModule: false,
                 visibleInSettings: true,
                 visibleInExport: true,
-                assetPaths: new[] { "Runtime/Modules/RPC/Client" },
+                assetPaths: new[] { "Runtime/Modules/RPC/Client/Implementation", "Runtime/Modules/RPC/Client/Compatibility/PlayServ.Rpc.cs" },
                 dependencyIds: new[] { ClientExecutionId },
                 hiddenDependencyAssetPaths: new[] { "Runtime/Modules/RPC/Core" },
                 hiddenDependencyModuleIds: new[] { RpcCoreId }),
@@ -110,7 +110,7 @@ namespace Playserv.Modules
                 visibleInExport: true,
                 assetPaths: new[] { "Runtime/Modules/LocalExecution/Server" },
                 dependencyIds: null,
-                hiddenDependencyAssetPaths: new[] { "Runtime/Modules/LocalExecution/Core" },
+                hiddenDependencyAssetPaths: new[] { "Runtime/Modules/LocalExecution/Core/Implementation" },
                 hiddenDependencyModuleIds: new[] { LocalExecutionCoreId }),
 
             new PlayServModuleManifestEntry(
@@ -122,7 +122,7 @@ namespace Playserv.Modules
                 isServerModule: true,
                 visibleInSettings: true,
                 visibleInExport: true,
-                assetPaths: new[] { "Runtime/Modules/ServerRPC" },
+                assetPaths: new[] { "Runtime/Modules/ServerRPC/Implementation", "Runtime/Modules/ServerRPC/Compatibility/PlayServ.ServerRpc.cs" },
                 dependencyIds: new[] { ServerLocalExecutionId },
                 hiddenDependencyAssetPaths: new[] { "Runtime/Modules/RPC/Core" },
                 hiddenDependencyModuleIds: new[] { RpcCoreId }),
@@ -136,7 +136,7 @@ namespace Playserv.Modules
                 isServerModule: false,
                 visibleInSettings: false,
                 visibleInExport: false,
-                assetPaths: new[] { "Runtime/Modules/LocalExecution/Core" },
+                assetPaths: new[] { "Runtime/Modules/LocalExecution/Core/Implementation", "Runtime/Modules/LocalExecution/Core/Compatibility/PlayServCommandDispatchFactory.LocalExecution.cs" },
                 dependencyIds: null,
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null),
@@ -150,7 +150,7 @@ namespace Playserv.Modules
                 isServerModule: false,
                 visibleInSettings: true,
                 visibleInExport: true,
-                assetPaths: new[] { "Runtime/Modules/Spawn" },
+                assetPaths: new[] { "Runtime/Modules/Spawn/Implementation", "Runtime/Modules/Spawn/Compatibility/PlayServ.Spawn.cs" },
                 dependencyIds: new[] { EventsId },
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null),

@@ -4,7 +4,7 @@ namespace Playserv.Server
 {
     public sealed class NoOpPlayServLocalExecution : IPlayServLocalExecution
     {
-#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
+#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
         public void SetCommandHandler(ICommandHandler commandHandler)
         {
             ThrowIfProvided(commandHandler);
@@ -13,8 +13,8 @@ namespace Playserv.Server
 
         public bool TryHandleCommand(object command, string moduleName, bool hasTransport) => false;
 
-#if !PLAYSERV_DISABLE_EVENTS
-#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
+#if !PLAYSERV_MODULE_DISABLED_EVENTS
+#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
         public void SetEventHandler(IEventHandler eventHandler)
         {
             ThrowIfProvided(eventHandler);
@@ -40,18 +40,18 @@ namespace Playserv.Server
         public bool TryPublishForUser<T>(string userId, T @event, bool hasTransport) => false;
 #endif
 
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER_RPC && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
         public void SetRpcInvoker(object rpcInvoker)
         {
             ThrowIfProvided(rpcInvoker);
         }
 #endif
 
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_CLIENT_RPC
         public bool TryInvokeRpc(string serviceName, string methodName, string payloadBase64, bool hasTransport) => false;
 #endif
 
-#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
+#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
         private static void ThrowIfProvided(object value)
         {
             if (value == null)

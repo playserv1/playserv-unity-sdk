@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Runtime.Modules.Events",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Serialization",
+        "Playserv.Runtime.Modules.LocalExecution.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_EVENTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

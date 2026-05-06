@@ -34,7 +34,7 @@ namespace Playserv.Editor
 #if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
         private readonly PlayServModelSectionPresenter _modelSectionPresenter = new PlayServModelSectionPresenter();
 #endif
-#if !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_MODULE_DISABLED_EVENTS
         private readonly PlayServEventsSectionPresenter _eventsSectionPresenter = new PlayServEventsSectionPresenter();
 #endif
 #if !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
@@ -179,7 +179,7 @@ namespace Playserv.Editor
             }
 #endif
 
-#if !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_MODULE_DISABLED_EVENTS
             if (PlayServEditorModuleAvailability.EditorEvents && _state.ModuleSettings.RuntimeEvents)
             {
                 GUILayout.Space(12f);
