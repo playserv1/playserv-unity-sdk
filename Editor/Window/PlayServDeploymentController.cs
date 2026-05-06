@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
 using System;
 using System.Collections.Generic;
 using System.IO;

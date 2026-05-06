@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,7 +8,7 @@ using UnityEngine;
 
 namespace Playserv.Editor
 {
-    internal static class PlayServEditorModuleAvailability
+    public static class PlayServEditorModuleAvailability
     {
         private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Window/PlayServEditorModuleAvailability.cs";
@@ -17,8 +16,11 @@ namespace Playserv.Editor
 
         private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions = BuildRuntimeModuleDefinitions();
 
-        public static IEnumerable<PlayServRuntimeModuleDefinition> AvailableRuntimeModules =>
+        internal static IEnumerable<PlayServRuntimeModuleDefinition> AvailableRuntimeModules =>
             RuntimeModuleDefinitions.Where(module => IsRuntimeModuleAvailable(module.Name));
+
+        public static IEnumerable<PlayServModuleManifestEntry> AvailableExportModules =>
+            PlayServModuleManifest.ExportableRuntimeModules.Where(IsRuntimeModuleAvailable);
 
         public static bool RuntimeEvents => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleEvents);
         public static bool RuntimeData => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleData);
@@ -143,6 +145,11 @@ namespace Playserv.Editor
             return IsRuntimeModuleAvailable(moduleName, new HashSet<string>(StringComparer.Ordinal));
         }
 
+        public static bool IsRuntimeModuleAvailable(PlayServModuleManifestEntry module)
+        {
+            return module != null && IsRuntimeModuleAvailable(module.Label);
+        }
+
         private static bool IsRuntimeModuleAvailable(string moduleName, ISet<string> visited)
         {
             if (string.Equals(moduleName, PlayServEditorModuleSettings.RuntimeModuleRpcCore, StringComparison.Ordinal))
@@ -165,7 +172,7 @@ namespace Playserv.Editor
             return true;
         }
 
-        public static void NormalizeAvailableRuntimeState(ref PlayServRuntimeModuleState state)
+        internal static void NormalizeAvailableRuntimeState(ref PlayServRuntimeModuleState state)
         {
             state.Events &= RuntimeEvents;
             state.Data &= RuntimeData;
@@ -175,7 +182,6 @@ namespace Playserv.Editor
             if (!state.ClientExecution)
             {
                 state.Events = false;
-                state.Data = false;
                 state.Rpc = false;
                 state.Spawn = false;
                 state.Pulse = false;
@@ -345,4 +351,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

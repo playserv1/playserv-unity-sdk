@@ -89,7 +89,10 @@ namespace Playserv.Modules
                 InitializeModule(dependencies[i], context, visiting, visited);
 
             visiting.Remove(moduleId);
-            module.Initialize(context);
+            using (_services.BeginModuleRegistration(module.Descriptor.Id))
+            {
+                module.Initialize(context);
+            }
             _initializedModules.Add(module);
             visited.Add(moduleId);
         }

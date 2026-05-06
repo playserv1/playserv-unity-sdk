@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Threading.Tasks;
 using Playserv.DataSubscription.Exceptions;
@@ -56,5 +55,3 @@ namespace Playserv.DataSubscription
         Task RefreshAsync();
     }
 }
-
-#endif

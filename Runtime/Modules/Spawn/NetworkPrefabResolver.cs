@@ -1,4 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using Playserv.Proxy.Logging;
 using ISdkLogger = Playserv.Proxy.Logging.ILogger;
 using UnityEngine;
@@ -38,4 +37,3 @@ namespace Playserv.Spawn
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Threading;
 using UnityEditor;
@@ -54,4 +53,3 @@ namespace Playserv.Editor
         public string VersionSyncStatus = string.Empty;
     }
 }
-#endif

@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Runtime.Modules.DataSubscription",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Abstractions",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Serialization"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_DISABLE_DATA"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

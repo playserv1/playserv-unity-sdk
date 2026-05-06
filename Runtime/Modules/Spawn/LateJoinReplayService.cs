@@ -1,4 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.Spawn
@@ -61,4 +60,3 @@ namespace Playserv.Spawn
         }
     }
 }
-#endif

@@ -10,8 +10,6 @@ namespace Playserv.Modules
             if (host == null)
                 throw new ArgumentNullException(nameof(host));
 
-            host.Register(new PlayServProvidedModule(PlayServModuleIds.Transport));
-            host.Register(new PlayServProvidedModule(PlayServModuleIds.Serialization));
             RegisterGenerated(host);
         }
 

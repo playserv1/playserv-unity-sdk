@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EVENTS
 using System;
 using Playserv.Modules;
 using Playserv.Proxy.Common;
@@ -37,5 +36,3 @@ namespace Playserv.Events
         }
     }
 }
-
-#endif

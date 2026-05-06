@@ -1,5 +1,5 @@
-#if UNITY_EDITOR
 using System;
+using Playserv.Modules;
 using UnityEditor;
 
 namespace Playserv.Editor
@@ -71,9 +71,6 @@ namespace Playserv.Editor
         public bool SetRuntimeData(bool enabled)
         {
             if (!PlayServEditorModuleAvailability.RuntimeData)
-                return false;
-
-            if (enabled && !RuntimeEvents)
                 return false;
 
             var state = CreateRuntimeState();
@@ -171,7 +168,7 @@ namespace Playserv.Editor
                 case RuntimeModuleEvents:
                     return RuntimeEvents ? CanDisableRuntimeEvents : RuntimeClientExecution;
                 case RuntimeModuleData:
-                    return RuntimeData || RuntimeEvents;
+                    return true;
                 case RuntimeModuleRpc:
                     return RuntimeRpc || RuntimeClientExecution;
                 case RuntimeModuleServerRpc:
@@ -197,10 +194,10 @@ namespace Playserv.Editor
                         : string.Empty;
                 case RuntimeModuleEvents:
                     return RuntimeEvents && !CanDisableRuntimeEvents
-                        ? $"Disable dependent modules first: {BuildEnabledDependentsList(RuntimeData, RuntimeSpawn)}."
+                        ? $"Disable dependent modules first: {BuildEnabledDependentsList(RuntimeSpawn)}."
                         : string.Empty;
                 case RuntimeModuleData:
-                    return !RuntimeData && !RuntimeEvents ? "Enable Events first." : string.Empty;
+                    return string.Empty;
                 case RuntimeModuleRpc:
                     return !RuntimeRpc && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
                 case RuntimeModuleServerRpc:
@@ -270,6 +267,24 @@ namespace Playserv.Editor
             });
         }
 
+        public bool ApplyRuntimeProfile(PlayServSdkProfile profile)
+        {
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+
+            return ApplyRuntimeState(new PlayServRuntimeModuleState
+            {
+                Events = IsProfileModuleEnabled(profile, PlayServModuleManifest.EventsId),
+                Data = IsProfileModuleEnabled(profile, PlayServModuleManifest.DataSubscriptionId),
+                Rpc = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientRpcId),
+                ServerRpc = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerRpcId),
+                ClientExecution = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientExecutionId),
+                LocalExecutionServer = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerLocalExecutionId),
+                Spawn = IsProfileModuleEnabled(profile, PlayServModuleManifest.SpawnId),
+                Pulse = IsProfileModuleEnabled(profile, PlayServModuleManifest.PulseId)
+            });
+        }
+
         private static bool Set(string key, bool current, bool enabled, Action<bool> assign)
         {
             if (current == enabled)
@@ -280,18 +295,12 @@ namespace Playserv.Editor
             return true;
         }
 
-        private bool CanDisableRuntimeEvents => !RuntimeData && !RuntimeSpawn;
+        private bool CanDisableRuntimeEvents => !RuntimeSpawn;
 
         private bool CanDisableRuntimeClientExecution => !RuntimeEvents && !RuntimeRpc && !RuntimePulse;
 
-        private static string BuildEnabledDependentsList(bool dataEnabled, bool spawnEnabled)
+        private static string BuildEnabledDependentsList(bool spawnEnabled)
         {
-            if (dataEnabled && spawnEnabled)
-                return $"{RuntimeModuleData}, {RuntimeModuleSpawn}";
-
-            if (dataEnabled)
-                return RuntimeModuleData;
-
             if (spawnEnabled)
                 return RuntimeModuleSpawn;
 
@@ -373,6 +382,10 @@ namespace Playserv.Editor
 
             return PlayServRuntimeModuleDefines.Apply(state) || changed;
         }
+
+        private static bool IsProfileModuleEnabled(PlayServSdkProfile profile, string moduleId)
+        {
+            return profile.EnablesModule(moduleId);
+        }
     }
 }
-#endif

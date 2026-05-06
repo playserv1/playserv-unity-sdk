@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_RPC_CORE
 using System;
 
 namespace Playserv.RPC
@@ -11,5 +10,3 @@ namespace Playserv.RPC
     {
     }
 }
-
-#endif

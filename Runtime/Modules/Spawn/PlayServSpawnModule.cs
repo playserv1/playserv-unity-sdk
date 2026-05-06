@@ -1,4 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -28,6 +27,7 @@ namespace Playserv.Spawn
                 throw new ArgumentNullException(nameof(context));
 
             _eventsAdapter = context.Services.Get<IEventsAdapter>();
+            PlayServSpawnRuntime.Initialize(_eventsAdapter);
             _runtimeIdentity = context.Services.Get<IPlayServRuntimeIdentity>();
             context.Services.Register<IPlayServSpawnModule>(this);
             context.Services.Register(this);
@@ -102,6 +102,11 @@ namespace Playserv.Spawn
             _spawnService.SetPrefabRegistry(prefabRegistry);
         }
 
+        public void SetTransformSyncIntervalMs(int intervalMs)
+        {
+            PlayServSpawnRuntime.TransformSyncIntervalMs = Math.Max(1, intervalMs);
+        }
+
         public NetworkObject GetNetworkObject(string networkId)
         {
             return _spawnService.GetNetworkObject(networkId);
@@ -114,6 +119,7 @@ namespace Playserv.Spawn
             _defaultScopeGroupName = null;
             _eventsAdapter = null;
             _runtimeIdentity = null;
+            PlayServSpawnRuntime.Clear();
         }
 
         private void SetDefaultScope(string groupName)
@@ -131,4 +137,3 @@ namespace Playserv.Spawn
         }
     }
 }
-#endif

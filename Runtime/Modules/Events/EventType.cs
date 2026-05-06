@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.Events
@@ -30,5 +29,3 @@ namespace Playserv.Events
         All = Global | Group | User
     }
 }
-
-#endif

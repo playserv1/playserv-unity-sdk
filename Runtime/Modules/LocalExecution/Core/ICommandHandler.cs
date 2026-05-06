@@ -4,7 +4,7 @@ using System;
 namespace Playserv.Server
 {
     /// <summary>
-    /// Contract for local command handling used by PlayServ.Send.
+    /// Contract for local command handling used by PlayServRpc.Send.
     /// </summary>
     public interface ICommandHandler
     {

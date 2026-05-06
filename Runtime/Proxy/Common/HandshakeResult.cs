@@ -1,3 +1,5 @@
+using Playserv.Wrapper;
+
 namespace Playserv.Proxy.Common
 {
     /// <summary>

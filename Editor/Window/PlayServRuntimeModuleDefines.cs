@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,8 +18,7 @@ namespace Playserv.Editor
             var state = new PlayServRuntimeModuleState
             {
                 Events = IsEnabled(defines, PlayServModuleManifest.EventsId),
-                Data = IsEnabled(defines, PlayServModuleManifest.DataSubscriptionId) &&
-                       IsEnabled(defines, PlayServModuleManifest.EventsId),
+                Data = IsEnabled(defines, PlayServModuleManifest.DataSubscriptionId),
                 Rpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientRpcId),
                 ServerRpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerRpcId),
                 ClientExecution = !localExecutionCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientExecutionId),
@@ -65,7 +63,6 @@ namespace Playserv.Editor
             if (!state.ClientExecution)
             {
                 state.Events = false;
-                state.Data = false;
                 state.Rpc = false;
                 state.Spawn = false;
                 state.Pulse = false;
@@ -74,11 +71,8 @@ namespace Playserv.Editor
             if (!state.LocalExecutionServer)
                 state.ServerRpc = false;
 
-            if (state.Events)
-                return;
-
-            state.Data = false;
-            state.Spawn = false;
+            if (!state.Events)
+                state.Spawn = false;
         }
 
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)
@@ -123,4 +117,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

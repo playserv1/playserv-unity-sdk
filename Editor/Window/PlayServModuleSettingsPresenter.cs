@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Linq;
 using Playserv.Modules;
 using UnityEditor;
@@ -64,6 +63,12 @@ namespace Playserv.Editor
 
                 if (!hasRuntimeModules && !hasServerRuntimeModules)
                     PlayServWindowChrome.DrawNotice("No optional runtime modules are installed in this SDK package.", MessageType.Info);
+
+                if (hasRuntimeModules || hasServerRuntimeModules)
+                {
+                    GUILayout.Space(12f);
+                    changed |= DrawRuntimeProfiles(settings);
+                }
 
                 if (PlayServEditorModuleAvailability.HasAnyEditorTool)
                 {
@@ -132,6 +137,34 @@ namespace Playserv.Editor
                     context.Repaint();
                 }
             }
+        }
+
+        private static bool DrawRuntimeProfiles(PlayServEditorModuleSettings settings)
+        {
+            var changed = false;
+
+            GUILayout.Label("SDK profiles", PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Space(6f);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                foreach (var profile in PlayServSdkProfiles.All)
+                {
+                    if (PlayServWindowChrome.DrawActionButton(profile.Label, PlayServWindowButtonTone.Secondary, GUILayout.Height(28f)))
+                        changed |= settings.ApplyRuntimeProfile(profile);
+
+                    GUILayout.Space(6f);
+                }
+
+                GUILayout.FlexibleSpace();
+            }
+
+            GUILayout.Space(2f);
+            GUILayout.Label(
+                "Profiles apply the same module graph used by package export: Client SDK, Server SDK, Full SDK, or Core Only.",
+                PlayServWindowTheme.SectionSubtitleStyle);
+
+            return changed;
         }
 
         private static bool DrawRuntimeModuleGroup(
@@ -286,4 +319,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

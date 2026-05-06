@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_RPC_CORE
 using System;
 using System.Text;
 using Playserv.Serialization;
@@ -22,7 +21,7 @@ namespace Playserv.RPC
             return SerializeToBase64(payload, null);
         }
 
-        internal static string SerializeToBase64(object payload, IJsonCodec jsonCodec)
+        public static string SerializeToBase64(object payload, IJsonCodec jsonCodec)
         {
             var json = ResolveJsonCodec(jsonCodec).Serialize(payload);
             var bytes = Encoding.UTF8.GetBytes(json);
@@ -34,12 +33,12 @@ namespace Playserv.RPC
         /// </summary>
         /// <param name="payload">Mapped payload.</param>
         /// <returns>Base64-encoded UTF8 JSON string.</returns>
-        internal static string SerializeToBase64(RpcMappedPayload payload)
+        public static string SerializeToBase64(RpcMappedPayload payload)
         {
             return SerializeToBase64(payload, null);
         }
 
-        internal static string SerializeToBase64(RpcMappedPayload payload, IJsonCodec jsonCodec)
+        public static string SerializeToBase64(RpcMappedPayload payload, IJsonCodec jsonCodec)
         {
             if (payload == null)
                 throw new ArgumentNullException(nameof(payload));
@@ -67,5 +66,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#endif

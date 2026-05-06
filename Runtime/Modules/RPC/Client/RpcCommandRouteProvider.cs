@@ -1,5 +1,5 @@
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using Playserv.Proxy.Common;
+using Playserv.Serialization;
 
 namespace Playserv.RPC
 {
@@ -32,7 +32,13 @@ namespace Playserv.RPC
             var response = command as InvokeRpcResponse;
             if (response != null)
             {
-                routes.TransportSession.HandleInvokeRpcResponse(response);
+                var requestInfo = response.Request == null
+                    ? "n/a"
+                    : $"{response.Request.ServiceName}.{response.Request.MethodName}";
+                var resultInfo = string.IsNullOrWhiteSpace(response.Result) ? "<empty>" : response.Result;
+                routes.Logger.Log(
+                    $"InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
+                routes.NotifyModuleCommand("InvokeRpcResponse", response);
                 return;
             }
 
@@ -40,5 +46,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#endif

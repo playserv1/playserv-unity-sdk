@@ -1,13 +1,8 @@
-#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_CLIENT_EXECUTION
 using System;
-
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
-using Playserv.RPC;
-#endif
 
 namespace Playserv.Server
 {
-    internal sealed class NoOpPlayServLocalExecution : IPlayServLocalExecution
+    public sealed class NoOpPlayServLocalExecution : IPlayServLocalExecution
     {
 #if !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public void SetCommandHandler(ICommandHandler commandHandler)
@@ -46,7 +41,7 @@ namespace Playserv.Server
 #endif
 
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
-        public void SetRpcInvoker(IRpcInvoker rpcInvoker)
+        public void SetRpcInvoker(object rpcInvoker)
         {
             ThrowIfProvided(rpcInvoker);
         }
@@ -68,4 +63,3 @@ namespace Playserv.Server
 #endif
     }
 }
-#endif

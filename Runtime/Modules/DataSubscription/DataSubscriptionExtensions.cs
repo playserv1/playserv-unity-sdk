@@ -1,5 +1,5 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
+using Playserv.Modules;
 using Playserv.Proxy.Common;
 
 namespace Playserv.DataSubscription
@@ -23,7 +23,7 @@ namespace Playserv.DataSubscription
             if (proxy == null)
                 throw new ArgumentNullException(nameof(proxy));
 
-            var adapter = proxy.GetDataSubscriptionAdapter();
+            var adapter = proxy.ModuleServices.Get<PlayServDataSubscriptionAdapter>();
             var builder = new SharedEntityBuilder<T>(adapter, typeof(T).Name);
             return mode == DataSubscriptionMode.Transport
                 ? builder.UseTransport()
@@ -31,5 +31,3 @@ namespace Playserv.DataSubscription
         }
     }
 }
-
-#endif

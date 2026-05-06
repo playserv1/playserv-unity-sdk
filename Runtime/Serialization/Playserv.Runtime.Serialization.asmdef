@@ -1,0 +1,16 @@
+{
+    "name": "Playserv.Runtime.Serialization",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Abstractions"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

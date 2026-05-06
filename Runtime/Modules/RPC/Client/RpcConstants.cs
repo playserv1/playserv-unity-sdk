@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 namespace Playserv.RPC
 {
     /// <summary>
@@ -22,5 +21,3 @@ namespace Playserv.RPC
         public const string InvokeModuleName = "rpc.InvokeRpc";
     }
 }
-
-#endif

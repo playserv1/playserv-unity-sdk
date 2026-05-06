@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 
@@ -134,8 +135,8 @@ namespace Playserv.Wrapper
             {
                 var transportFactory = _createTransportImplementationFactory(settings);
                 instance = transportFactory == null
-                    ? new PlayServImplementation(endpoint)
-                    : new PlayServImplementation(endpoint, transportFactory);
+                    ? new PlayServImplementation(endpoint, PlayServModuleRegistry.RegisterDefaults)
+                    : new PlayServImplementation(endpoint, transportFactory, PlayServModuleRegistry.RegisterDefaults);
                 instanceEndpoint = endpoint;
                 instanceTransportKey = transportKey;
                 return;
@@ -147,8 +148,8 @@ namespace Playserv.Wrapper
             instance.Dispose();
             var replacementTransportFactory = _createTransportImplementationFactory(settings);
             instance = replacementTransportFactory == null
-                ? new PlayServImplementation(endpoint)
-                : new PlayServImplementation(endpoint, replacementTransportFactory);
+                ? new PlayServImplementation(endpoint, PlayServModuleRegistry.RegisterDefaults)
+                : new PlayServImplementation(endpoint, replacementTransportFactory, PlayServModuleRegistry.RegisterDefaults);
             instanceEndpoint = endpoint;
             instanceTransportKey = transportKey;
         }

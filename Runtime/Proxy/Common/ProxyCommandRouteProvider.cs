@@ -1,5 +1,6 @@
 using System;
 using Playserv.Proxy.Logging;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
 {

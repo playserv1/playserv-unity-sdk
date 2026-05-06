@@ -1,4 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 namespace Playserv.Spawn
 {
     internal readonly struct NetworkTransformSyncSettings
@@ -36,5 +35,3 @@ namespace Playserv.Spawn
         public float MaxPredictionTime { get; }
     }
 }
-
-#endif

@@ -1,5 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
-using Playserv.Wrapper;
 using UnityEngine;
 
 namespace Playserv.Spawn
@@ -135,12 +133,12 @@ namespace Playserv.Spawn
             if (!string.IsNullOrEmpty(groupName))
             {
                 syncEvent.ScopeGroupName = groupName;
-                PlayServ.PublishForGroup(groupName, syncEvent);
+                PlayServSpawnRuntime.PublishForGroup(groupName, syncEvent);
                 return;
             }
 
             syncEvent.ScopeGroupName = string.Empty;
-            PlayServ.Publish(syncEvent);
+            PlayServSpawnRuntime.Publish(syncEvent);
         }
 
         private static float CalculateYawVelocity(Quaternion from, Quaternion to, float deltaTime)
@@ -153,5 +151,3 @@ namespace Playserv.Spawn
         }
     }
 }
-
-#endif

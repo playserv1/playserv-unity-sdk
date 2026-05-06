@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -220,5 +219,3 @@ namespace Playserv.Events
         }
     }
 }
-
-#endif

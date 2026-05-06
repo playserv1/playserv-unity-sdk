@@ -1,4 +1,3 @@
-#if UNITY_EDITOR || (!PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS)
 using System;
 #if UNITY_EDITOR && UNITY_5_3_OR_NEWER
 using System.IO;
@@ -134,5 +133,3 @@ namespace Playserv.DataSubscription
         public bool HasSchema => !string.IsNullOrWhiteSpace(SchemaJson);
     }
 }
-
-#endif

@@ -1,12 +1,10 @@
-#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using System;
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 using Playserv.RPC;
-#endif
 
 namespace Playserv.Server
 {
-    internal sealed class PlayServServerLocalExecution : IPlayServLocalExecution
+    public sealed class PlayServServerLocalExecution : IPlayServLocalExecution
     {
         private ICommandHandler _commandHandler;
 #if !PLAYSERV_DISABLE_EVENTS
@@ -21,7 +19,7 @@ namespace Playserv.Server
         public void SetEventHandler(IEventHandler eventHandler) => _eventHandler = eventHandler;
 #endif
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
-        public void SetRpcInvoker(IRpcInvoker rpcInvoker) => _rpcInvoker = rpcInvoker;
+        public void SetRpcInvoker(object rpcInvoker) => _rpcInvoker = rpcInvoker as IRpcInvoker;
 #endif
 
         public bool TryHandleCommand(object command, string moduleName, bool hasTransport)

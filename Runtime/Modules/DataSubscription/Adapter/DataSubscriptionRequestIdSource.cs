@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System.Threading;
 
 namespace Playserv.DataSubscription
@@ -13,5 +12,3 @@ namespace Playserv.DataSubscription
         }
     }
 }
-
-#endif

@@ -1,10 +1,9 @@
-#if !PLAYSERV_DISABLE_RPC_CORE
 using System;
 using System.Collections.Generic;
 
 namespace Playserv.RPC
 {
-    internal enum RpcMappedPayloadKind
+    public enum RpcMappedPayloadKind
     {
         Named = 0,
         Positional = 1
@@ -13,7 +12,7 @@ namespace Playserv.RPC
     /// <summary>
     /// Internal normalized RPC payload representation used between mapper and serializer.
     /// </summary>
-    internal sealed class RpcMappedPayload
+    public sealed class RpcMappedPayload
     {
         private static readonly IReadOnlyDictionary<string, object> EmptyNamedPayload =
             new Dictionary<string, object>(0, StringComparer.Ordinal);
@@ -89,5 +88,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#endif

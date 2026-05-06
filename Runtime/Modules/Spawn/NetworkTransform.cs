@@ -1,6 +1,4 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using System;
-using Playserv.Wrapper;
 using UnityEngine;
 
 namespace Playserv.Spawn
@@ -66,7 +64,7 @@ namespace Playserv.Spawn
 
         private void OnEnable()
         {
-            _subscription = PlayServ.Subscribe<TransformSyncEvent>(OnTransformSyncReceived);
+            _subscription = PlayServSpawnRuntime.Subscribe<TransformSyncEvent>(OnTransformSyncReceived);
         }
 
         private void OnDisable()
@@ -197,5 +195,3 @@ namespace Playserv.Spawn
         }
     }
 }
-
-#endif

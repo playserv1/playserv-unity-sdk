@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EVENTS
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
 using Playserv.Proxy.Common;
@@ -21,9 +20,6 @@ namespace Playserv.Events
             builder.Register<SubscribeGroupResponse>();
             builder.Register<UnsubscribeGroupRequest>();
             builder.Register<UnsubscribeGroupResponse>();
-            builder.Register<ErrorResponse>();
         }
     }
 }
-
-#endif

@@ -4,11 +4,9 @@ using Playserv.Modules;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
-using Playserv.RPC;
-#endif
 using Playserv.Runtime.Abstractions;
 using Playserv.Serialization;
+using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Common
 {
@@ -21,16 +19,12 @@ namespace Playserv.Proxy.Common
             IRequestIdGenerator requestIdGenerator,
             ILogger logger,
             PlayServTransportImplementationFactory transportImplementationFactory,
+            Action<PlayServModuleHost> registerModules,
             SynchronizationContext mainThreadContext,
             Action<TransportError> notifyTransportError,
             Action notifyKeepAlivePingSent,
-            Action notifyKeepAlivePongReceived
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
-            ,
-            Action<InvokeRpcResponse> notifyRpcInvokeResponse)
-#else
-            )
-#endif
+            Action notifyKeepAlivePongReceived,
+            Action<string, object> notifyModuleCommand)
         {
             if (owner == null)
                 throw new ArgumentNullException(nameof(owner));
@@ -65,7 +59,8 @@ namespace Playserv.Proxy.Common
                 serializer,
                 requestIdGenerator,
                 logger,
-                jsonCodec);
+                jsonCodec,
+                registerModules);
             var transportSession = new PlayServTransportSession(
                 transport,
                 logger,
@@ -73,9 +68,7 @@ namespace Playserv.Proxy.Common
                 notifyTransportError,
                 notifyKeepAlivePingSent,
                 notifyKeepAlivePongReceived,
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
-                notifyRpcInvokeResponse,
-#endif
+                notifyModuleCommand,
                 moduleHost.NotifyConnected);
 
             return new PlayServImplementationComponents(
@@ -97,7 +90,8 @@ namespace Playserv.Proxy.Common
             IMessageSerializer serializer,
             IRequestIdGenerator requestIdGenerator,
             ILogger logger,
-            IJsonCodec jsonCodec)
+            IJsonCodec jsonCodec,
+            Action<PlayServModuleHost> registerModules)
         {
             var moduleHost = new PlayServModuleHost();
             var services = moduleHost.ServiceRegistry;
@@ -109,7 +103,9 @@ namespace Playserv.Proxy.Common
             services.Register(logger);
             services.Register(jsonCodec);
 
-            PlayServModuleRegistry.RegisterDefaults(moduleHost);
+            moduleHost.Register(new PlayServProvidedModule(PlayServModuleIds.Transport));
+            moduleHost.Register(new PlayServProvidedModule(PlayServModuleIds.Serialization));
+            registerModules?.Invoke(moduleHost);
 
             moduleHost.Initialize(new PlayServModuleContext(services));
             return moduleHost;

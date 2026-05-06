@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_PULSE
 namespace Playserv.Pulse
 {
     public interface IPlayServPulseModule
@@ -6,5 +5,3 @@ namespace Playserv.Pulse
         bool IsImplemented { get; }
     }
 }
-
-#endif

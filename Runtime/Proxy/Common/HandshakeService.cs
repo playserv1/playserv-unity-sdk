@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Common
 {
