@@ -1,8 +1,8 @@
 namespace Playserv.Proxy.Common
 {
-    internal static class ProxyCommandTypeRegistration
+    internal sealed class ProxyCommandTypeProvider : ICommandTypeProvider
     {
-        public static void Register(CommandTypeRegistryBuilder builder)
+        public void RegisterCommandTypes(CommandTypeRegistryBuilder builder)
         {
             builder.Register<HandshakeRequest>();
             builder.Register<HandshakeResponse>();

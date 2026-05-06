@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
 
@@ -14,89 +15,7 @@ namespace Playserv.Editor
         private const string ThisScriptSuffix = "/Editor/Window/PlayServEditorModuleAvailability.cs";
         private static string _packageRootPath;
 
-        private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions =
-        {
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleClientExecution,
-                "Client-side transport execution surface. Disable this for server-only SDK builds.",
-                new[] { "Runtime/Modules/LocalExecution/Core", "Runtime/Modules/LocalExecution/Client" },
-                dependencies: null,
-                dependents: new[]
-                {
-                    PlayServEditorModuleSettings.RuntimeModuleEvents,
-                    PlayServEditorModuleSettings.RuntimeModuleRpc,
-                    PlayServEditorModuleSettings.RuntimeModulePulse
-                },
-                settings => settings.RuntimeClientExecution,
-                (settings, enabled) => settings.SetRuntimeClientExecution(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleEvents,
-                "Typed publish/subscribe runtime and typed event API generation controls. Cannot be disabled while dependent modules are enabled.",
-                new[] { "Runtime/Modules/Events" },
-                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleClientExecution },
-                dependents: new[]
-                {
-                    PlayServEditorModuleSettings.RuntimeModuleData,
-                    PlayServEditorModuleSettings.RuntimeModuleSpawn
-                },
-                settings => settings.RuntimeEvents,
-                (settings, enabled) => settings.SetRuntimeEvents(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleData,
-                "Shared entity query, mutation, polling, and transport subscription APIs. Depends on Events.",
-                new[] { "Runtime/Modules/DataSubscription" },
-                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleEvents },
-                dependents: null,
-                settings => settings.RuntimeData,
-                (settings, enabled) => settings.SetRuntimeData(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleRpc,
-                "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs.",
-                new[] { "Runtime/Modules/RPC/Core", "Runtime/Modules/RPC/Client" },
-                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleClientExecution },
-                dependents: null,
-                settings => settings.RuntimeRpc,
-                (settings, enabled) => settings.SetRuntimeRpc(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleServerRpc,
-                "Server-side in-process RPC invoker, service registry, and PlayServServerRpc API.",
-                new[] { "Runtime/Modules/RPC/Core", "Runtime/Modules/ServerRPC" },
-                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer },
-                dependents: null,
-                settings => settings.RuntimeServerRpc,
-                (settings, enabled) => settings.SetRuntimeServerRpc(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer,
-                "Server-side local command/event execution bridge and default in-process handlers.",
-                new[] { "Runtime/Modules/LocalExecution/Core", "Runtime/Modules/LocalExecution/Server" },
-                dependencies: null,
-                dependents: new[] { PlayServEditorModuleSettings.RuntimeModuleServerRpc },
-                settings => settings.RuntimeLocalExecutionServer,
-                (settings, enabled) => settings.SetRuntimeLocalExecutionServer(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModuleSpawn,
-                "NetworkObject/NetworkTransform helpers and Resources-based spawn facade. Depends on Events.",
-                new[] { "Runtime/Modules/Spawn" },
-                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleEvents },
-                dependents: null,
-                settings => settings.RuntimeSpawn,
-                (settings, enabled) => settings.SetRuntimeSpawn(enabled)),
-
-            new PlayServRuntimeModuleDefinition(
-                PlayServEditorModuleSettings.RuntimeModulePulse,
-                "Realtime config placeholder module and future feature flag surface.",
-                new[] { "Runtime/Modules/Pulse" },
-                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleClientExecution },
-                dependents: null,
-                settings => settings.RuntimePulse,
-                (settings, enabled) => settings.SetRuntimePulse(enabled))
-        };
+        private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions = BuildRuntimeModuleDefinitions();
 
         public static IEnumerable<PlayServRuntimeModuleDefinition> AvailableRuntimeModules =>
             RuntimeModuleDefinitions.Where(module => IsRuntimeModuleAvailable(module.Name));
@@ -119,6 +38,102 @@ namespace Playserv.Editor
             EditorDeployment ||
             EditorModelSync ||
             EditorCodegen;
+
+        private static PlayServRuntimeModuleDefinition[] BuildRuntimeModuleDefinitions()
+        {
+            return PlayServModuleManifest.VisibleRuntimeModules
+                .Select(CreateRuntimeModuleDefinition)
+                .ToArray();
+        }
+
+        private static PlayServRuntimeModuleDefinition CreateRuntimeModuleDefinition(PlayServModuleManifestEntry module)
+        {
+            return new PlayServRuntimeModuleDefinition(
+                module.Id,
+                module.Label,
+                module.Description,
+                BuildRequiredFolderPaths(module),
+                ToLabels(module.DependencyIds),
+                BuildDependentLabels(module.Id),
+                ResolveIsEnabled(module.Id),
+                ResolveSetEnabled(module.Id));
+        }
+
+        private static string[] BuildRequiredFolderPaths(PlayServModuleManifestEntry module)
+        {
+            return module.AssetPaths
+                .Concat(module.HiddenDependencyAssetPaths)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static string[] ToLabels(string[] moduleIds)
+        {
+            if (moduleIds == null || moduleIds.Length == 0)
+                return Array.Empty<string>();
+
+            return moduleIds
+                .Select(PlayServModuleManifest.GetLabel)
+                .ToArray();
+        }
+
+        private static string[] BuildDependentLabels(string moduleId)
+        {
+            return PlayServModuleManifest.VisibleRuntimeModules
+                .Where(module => module.DependencyIds.Contains(moduleId, StringComparer.Ordinal))
+                .Select(module => module.Label)
+                .ToArray();
+        }
+
+        private static Func<PlayServEditorModuleSettings, bool> ResolveIsEnabled(string moduleId)
+        {
+            switch (moduleId)
+            {
+                case PlayServModuleManifest.EventsId:
+                    return settings => settings.RuntimeEvents;
+                case PlayServModuleManifest.DataSubscriptionId:
+                    return settings => settings.RuntimeData;
+                case PlayServModuleManifest.ClientRpcId:
+                    return settings => settings.RuntimeRpc;
+                case PlayServModuleManifest.ServerRpcId:
+                    return settings => settings.RuntimeServerRpc;
+                case PlayServModuleManifest.ClientExecutionId:
+                    return settings => settings.RuntimeClientExecution;
+                case PlayServModuleManifest.ServerLocalExecutionId:
+                    return settings => settings.RuntimeLocalExecutionServer;
+                case PlayServModuleManifest.SpawnId:
+                    return settings => settings.RuntimeSpawn;
+                case PlayServModuleManifest.PulseId:
+                    return settings => settings.RuntimePulse;
+                default:
+                    return _ => false;
+            }
+        }
+
+        private static Func<PlayServEditorModuleSettings, bool, bool> ResolveSetEnabled(string moduleId)
+        {
+            switch (moduleId)
+            {
+                case PlayServModuleManifest.EventsId:
+                    return (settings, enabled) => settings.SetRuntimeEvents(enabled);
+                case PlayServModuleManifest.DataSubscriptionId:
+                    return (settings, enabled) => settings.SetRuntimeData(enabled);
+                case PlayServModuleManifest.ClientRpcId:
+                    return (settings, enabled) => settings.SetRuntimeRpc(enabled);
+                case PlayServModuleManifest.ServerRpcId:
+                    return (settings, enabled) => settings.SetRuntimeServerRpc(enabled);
+                case PlayServModuleManifest.ClientExecutionId:
+                    return (settings, enabled) => settings.SetRuntimeClientExecution(enabled);
+                case PlayServModuleManifest.ServerLocalExecutionId:
+                    return (settings, enabled) => settings.SetRuntimeLocalExecutionServer(enabled);
+                case PlayServModuleManifest.SpawnId:
+                    return (settings, enabled) => settings.SetRuntimeSpawn(enabled);
+                case PlayServModuleManifest.PulseId:
+                    return (settings, enabled) => settings.SetRuntimePulse(enabled);
+                default:
+                    return (_, __) => false;
+            }
+        }
 
         public static bool IsRuntimeModuleAvailable(string moduleName)
         {
@@ -178,16 +193,16 @@ namespace Playserv.Editor
             var defines = ReadDefines();
             var changed = false;
 
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableEvents, RuntimeEvents);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableData, RuntimeData);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableClientRpc, RuntimeClientRpc);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableServerRpc, RuntimeServerRpc);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableRpcCore, RuntimeClientRpc || RuntimeServerRpc);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableClientExecution, RuntimeClientExecution);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableLocalExecutionCore, RuntimeClientExecution || RuntimeLocalExecutionServer);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableLocalExecutionServer, RuntimeLocalExecutionServer);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisableSpawn, RuntimeSpawn);
-            changed |= DisableIfUnavailable(defines, Const.DefineDisablePulse, RuntimePulse);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.EventsId, RuntimeEvents);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.DataSubscriptionId, RuntimeData);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ClientRpcId, RuntimeClientRpc);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ServerRpcId, RuntimeServerRpc);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.RpcCoreId, RuntimeClientRpc || RuntimeServerRpc);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ClientExecutionId, RuntimeClientExecution);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.LocalExecutionCoreId, RuntimeClientExecution || RuntimeLocalExecutionServer);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ServerLocalExecutionId, RuntimeLocalExecutionServer);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.SpawnId, RuntimeSpawn);
+            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.PulseId, RuntimePulse);
 
             changed |= SetDisabled(defines, Const.DefineDisableEditorDeployment, !EditorDeployment);
             changed |= SetDisabled(defines, Const.DefineDisableEditorModelSync, !EditorModelSync);
@@ -248,6 +263,11 @@ namespace Playserv.Editor
             return available ? false : defines.Add(symbol);
         }
 
+        private static bool DisableModuleIfUnavailable(ISet<string> defines, string moduleId, bool available)
+        {
+            return DisableIfUnavailable(defines, PlayServModuleManifest.GetRequired(moduleId).DisableDefine, available);
+        }
+
         private static ISet<string> ReadDefines()
         {
             var group = EditorUserBuildSettings.selectedBuildTargetGroup;
@@ -274,6 +294,7 @@ namespace Playserv.Editor
             private readonly Func<PlayServEditorModuleSettings, bool, bool> _setEnabled;
 
             public PlayServRuntimeModuleDefinition(
+                string id,
                 string name,
                 string description,
                 string[] folderPaths,
@@ -282,6 +303,7 @@ namespace Playserv.Editor
                 Func<PlayServEditorModuleSettings, bool> isEnabled,
                 Func<PlayServEditorModuleSettings, bool, bool> setEnabled)
             {
+                Id = id ?? throw new ArgumentNullException(nameof(id));
                 Name = name ?? throw new ArgumentNullException(nameof(name));
                 Description = description ?? string.Empty;
                 Dependencies = dependencies ?? Array.Empty<string>();
@@ -291,6 +313,7 @@ namespace Playserv.Editor
                 _setEnabled = setEnabled ?? throw new ArgumentNullException(nameof(setEnabled));
             }
 
+            public string Id { get; }
             public string Name { get; }
             public string Description { get; }
             public string[] Dependencies { get; }

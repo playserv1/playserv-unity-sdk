@@ -5,8 +5,8 @@ namespace Playserv.Proxy.Common
 {
     internal static class CommandTypeRegistry
     {
-        private static readonly Lazy<IReadOnlyDictionary<string, Type>> TypesByCommandName =
-            new Lazy<IReadOnlyDictionary<string, Type>>(BuildRegistry);
+        private static readonly object Sync = new object();
+        private static IReadOnlyDictionary<string, Type> _typesByCommandName;
 
         public static bool TryResolve(string commandName, out Type type)
         {
@@ -16,7 +16,7 @@ namespace Playserv.Proxy.Common
 
             var trimmed = commandName.Trim();
             var normalized = Normalize(trimmed);
-            var registry = TypesByCommandName.Value;
+            var registry = GetRegistry();
 
             if (registry.TryGetValue(trimmed, out type))
                 return true;
@@ -36,19 +36,30 @@ namespace Playserv.Proxy.Common
             return false;
         }
 
+        internal static void Invalidate()
+        {
+            lock (Sync)
+                _typesByCommandName = null;
+        }
+
+        private static IReadOnlyDictionary<string, Type> GetRegistry()
+        {
+            lock (Sync)
+            {
+                if (_typesByCommandName == null)
+                    _typesByCommandName = BuildRegistry();
+
+                return _typesByCommandName;
+            }
+        }
+
         private static IReadOnlyDictionary<string, Type> BuildRegistry()
         {
             var builder = new CommandTypeRegistryBuilder();
-            ProxyCommandTypeRegistration.Register(builder);
-#if !PLAYSERV_DISABLE_EVENTS
-            EventCommandTypeRegistration.Register(builder);
-#endif
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
-            DataSubscriptionCommandTypeRegistration.Register(builder);
-#endif
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
-            RpcCommandTypeRegistration.Register(builder);
-#endif
+            var providers = CommandTypeProviderRegistry.Snapshot();
+            for (var i = 0; i < providers.Length; i++)
+                providers[i].RegisterCommandTypes(builder);
+
             return builder.Build();
         }
 

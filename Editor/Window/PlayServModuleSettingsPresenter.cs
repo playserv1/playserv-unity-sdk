@@ -1,4 +1,6 @@
 #if UNITY_EDITOR
+using System.Linq;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
 
@@ -7,20 +9,16 @@ namespace Playserv.Editor
     internal sealed class PlayServModuleSettingsPresenter
     {
         private static readonly string[] RuntimeModuleNames =
-        {
-            PlayServEditorModuleSettings.RuntimeModuleClientExecution,
-            PlayServEditorModuleSettings.RuntimeModuleEvents,
-            PlayServEditorModuleSettings.RuntimeModuleData,
-            PlayServEditorModuleSettings.RuntimeModuleRpc,
-            PlayServEditorModuleSettings.RuntimeModuleSpawn,
-            PlayServEditorModuleSettings.RuntimeModulePulse
-        };
+            PlayServModuleManifest.VisibleRuntimeModules
+                .Where(module => !module.IsServerModule)
+                .Select(module => module.Label)
+                .ToArray();
 
         private static readonly string[] ServerRuntimeModuleNames =
-        {
-            PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer,
-            PlayServEditorModuleSettings.RuntimeModuleServerRpc
-        };
+            PlayServModuleManifest.VisibleRuntimeModules
+                .Where(module => module.IsServerModule)
+                .Select(module => module.Label)
+                .ToArray();
 
         public void Draw(PlayServWindowContext context)
         {

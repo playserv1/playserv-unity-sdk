@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Playserv.Proxy.Common
 {
-    internal sealed class CommandTypeRegistryBuilder
+    public sealed class CommandTypeRegistryBuilder
     {
         private readonly Dictionary<string, Type> _typesByCommandName =
             new Dictionary<string, Type>(StringComparer.Ordinal);

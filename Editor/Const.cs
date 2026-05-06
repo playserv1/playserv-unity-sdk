@@ -1,3 +1,5 @@
+using Playserv.Modules;
+
 namespace Playserv.Editor
 {
     internal class Const
@@ -16,16 +18,16 @@ namespace Playserv.Editor
         internal const string PrefModuleModelSync = "PlayServ.Window.Module.ModelSync";
         internal const string PrefModuleCodegen = "PlayServ.Window.Module.Codegen";
 
-        internal const string DefineDisableEvents = "PLAYSERV_DISABLE_EVENTS";
-        internal const string DefineDisableData = "PLAYSERV_DISABLE_DATA";
-        internal const string DefineDisableRpcCore = "PLAYSERV_DISABLE_RPC_CORE";
-        internal const string DefineDisableClientRpc = "PLAYSERV_DISABLE_CLIENT_RPC";
-        internal const string DefineDisableServerRpc = "PLAYSERV_DISABLE_SERVER_RPC";
-        internal const string DefineDisableLocalExecutionCore = "PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE";
-        internal const string DefineDisableClientExecution = "PLAYSERV_DISABLE_CLIENT_EXECUTION";
-        internal const string DefineDisableLocalExecutionServer = "PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER";
-        internal const string DefineDisableSpawn = "PLAYSERV_DISABLE_SPAWN";
-        internal const string DefineDisablePulse = "PLAYSERV_DISABLE_PULSE";
+        internal const string DefineDisableEvents = PlayServModuleManifest.DefineDisableEvents;
+        internal const string DefineDisableData = PlayServModuleManifest.DefineDisableData;
+        internal const string DefineDisableRpcCore = PlayServModuleManifest.DefineDisableRpcCore;
+        internal const string DefineDisableClientRpc = PlayServModuleManifest.DefineDisableClientRpc;
+        internal const string DefineDisableServerRpc = PlayServModuleManifest.DefineDisableServerRpc;
+        internal const string DefineDisableLocalExecutionCore = PlayServModuleManifest.DefineDisableLocalExecutionCore;
+        internal const string DefineDisableClientExecution = PlayServModuleManifest.DefineDisableClientExecution;
+        internal const string DefineDisableLocalExecutionServer = PlayServModuleManifest.DefineDisableLocalExecutionServer;
+        internal const string DefineDisableSpawn = PlayServModuleManifest.DefineDisableSpawn;
+        internal const string DefineDisablePulse = PlayServModuleManifest.DefineDisablePulse;
         internal const string DefineDisableEditorDeployment = "PLAYSERV_DISABLE_EDITOR_DEPLOYMENT";
         internal const string DefineDisableEditorModelSync = "PLAYSERV_DISABLE_EDITOR_MODEL_SYNC";
         internal const string DefineDisableEditorCodegen = "PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN";

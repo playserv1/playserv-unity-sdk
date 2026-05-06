@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Playserv.Modules;
 using UnityEditor;
 
 namespace Playserv.Editor
@@ -13,18 +14,20 @@ namespace Playserv.Editor
         public static PlayServRuntimeModuleState Load()
         {
             var defines = ReadDefines();
-            var rpcCoreDisabled = defines.Contains(Const.DefineDisableRpcCore);
-            var localExecutionCoreDisabled = defines.Contains(Const.DefineDisableLocalExecutionCore);
+            var rpcCoreDisabled = IsDisabled(defines, PlayServModuleManifest.RpcCoreId);
+            var localExecutionCoreDisabled = IsDisabled(defines, PlayServModuleManifest.LocalExecutionCoreId);
             var state = new PlayServRuntimeModuleState
             {
-                Events = !defines.Contains(Const.DefineDisableEvents),
-                Data = !defines.Contains(Const.DefineDisableData) && !defines.Contains(Const.DefineDisableEvents),
-                Rpc = !rpcCoreDisabled && !defines.Contains(Const.DefineDisableClientRpc),
-                ServerRpc = !rpcCoreDisabled && !defines.Contains(Const.DefineDisableServerRpc),
-                ClientExecution = !localExecutionCoreDisabled && !defines.Contains(Const.DefineDisableClientExecution),
-                LocalExecutionServer = !localExecutionCoreDisabled && !defines.Contains(Const.DefineDisableLocalExecutionServer),
-                Spawn = !defines.Contains(Const.DefineDisableSpawn) && !defines.Contains(Const.DefineDisableEvents),
-                Pulse = !defines.Contains(Const.DefineDisablePulse)
+                Events = IsEnabled(defines, PlayServModuleManifest.EventsId),
+                Data = IsEnabled(defines, PlayServModuleManifest.DataSubscriptionId) &&
+                       IsEnabled(defines, PlayServModuleManifest.EventsId),
+                Rpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientRpcId),
+                ServerRpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerRpcId),
+                ClientExecution = !localExecutionCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientExecutionId),
+                LocalExecutionServer = !localExecutionCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerLocalExecutionId),
+                Spawn = IsEnabled(defines, PlayServModuleManifest.SpawnId) &&
+                        IsEnabled(defines, PlayServModuleManifest.EventsId),
+                Pulse = IsEnabled(defines, PlayServModuleManifest.PulseId)
             };
             NormalizeDependencies(ref state);
             return state;
@@ -39,16 +42,16 @@ namespace Playserv.Editor
             var rpcCoreEnabled = state.Rpc || state.ServerRpc;
             var localExecutionCoreEnabled = state.ClientExecution || state.LocalExecutionServer;
 
-            changed |= SetDisabled(defines, Const.DefineDisableEvents, !state.Events);
-            changed |= SetDisabled(defines, Const.DefineDisableData, !state.Data);
-            changed |= SetDisabled(defines, Const.DefineDisableRpcCore, !rpcCoreEnabled);
-            changed |= SetDisabled(defines, Const.DefineDisableClientRpc, !state.Rpc);
-            changed |= SetDisabled(defines, Const.DefineDisableServerRpc, !state.ServerRpc);
-            changed |= SetDisabled(defines, Const.DefineDisableLocalExecutionCore, !localExecutionCoreEnabled);
-            changed |= SetDisabled(defines, Const.DefineDisableClientExecution, !state.ClientExecution);
-            changed |= SetDisabled(defines, Const.DefineDisableLocalExecutionServer, !state.LocalExecutionServer);
-            changed |= SetDisabled(defines, Const.DefineDisableSpawn, !state.Spawn);
-            changed |= SetDisabled(defines, Const.DefineDisablePulse, !state.Pulse);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.EventsId, !state.Events);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.DataSubscriptionId, !state.Data);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.RpcCoreId, !rpcCoreEnabled);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientRpcId, !state.Rpc);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ServerRpcId, !state.ServerRpc);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.LocalExecutionCoreId, !localExecutionCoreEnabled);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ServerLocalExecutionId, !state.LocalExecutionServer);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.SpawnId, !state.Spawn);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.PulseId, !state.Pulse);
 
             if (!changed)
                 return false;
@@ -81,6 +84,23 @@ namespace Playserv.Editor
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)
         {
             return disabled ? defines.Add(symbol) : defines.Remove(symbol);
+        }
+
+        private static bool SetModuleDisabled(ISet<string> defines, string moduleId, bool disabled)
+        {
+            var module = PlayServModuleManifest.GetRequired(moduleId);
+            return SetDisabled(defines, module.DisableDefine, disabled);
+        }
+
+        private static bool IsEnabled(ISet<string> defines, string moduleId)
+        {
+            return !IsDisabled(defines, moduleId);
+        }
+
+        private static bool IsDisabled(ISet<string> defines, string moduleId)
+        {
+            var module = PlayServModuleManifest.GetRequired(moduleId);
+            return defines.Contains(module.DisableDefine);
         }
 
         private static ISet<string> ReadDefines()

@@ -1,13 +1,13 @@
 #if !PLAYSERV_DISABLE_EVENTS
-using Playserv.Events;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
+using Playserv.Proxy.Common;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.Events
 {
-    internal static class EventCommandTypeRegistration
+    internal sealed class EventCommandTypeProvider : ICommandTypeProvider
     {
-        public static void Register(CommandTypeRegistryBuilder builder)
+        public void RegisterCommandTypes(CommandTypeRegistryBuilder builder)
         {
             builder.Register<EventMessage>("BroadcastEvent");
             builder.Register<GroupEventMessage>();

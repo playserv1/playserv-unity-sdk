@@ -1,11 +1,11 @@
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
-using Playserv.RPC;
+using Playserv.Proxy.Common;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.RPC
 {
-    internal static class RpcCommandTypeRegistration
+    internal sealed class RpcCommandTypeProvider : ICommandTypeProvider
     {
-        public static void Register(CommandTypeRegistryBuilder builder)
+        public void RegisterCommandTypes(CommandTypeRegistryBuilder builder)
         {
             builder.Register<InvokeRpc>();
             builder.Register<RpcInvokeRequest>("InvokeRpcRequest");
