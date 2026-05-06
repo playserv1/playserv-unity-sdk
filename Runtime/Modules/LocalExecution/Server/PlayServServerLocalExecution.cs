@@ -1,13 +1,12 @@
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using System;
-using Playserv.Proxy.Common;
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 using Playserv.RPC;
 #endif
-using Playserv.Server;
 
-namespace Playserv.Wrapper
+namespace Playserv.Server
 {
-    internal sealed class PlayServApiLocalExecutionFacade
+    internal sealed class PlayServServerLocalExecution : IPlayServLocalExecution
     {
         private ICommandHandler _commandHandler;
 #if !PLAYSERV_DISABLE_EVENTS
@@ -166,3 +165,4 @@ namespace Playserv.Wrapper
 #endif
     }
 }
+#endif

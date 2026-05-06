@@ -2,7 +2,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using Playserv.Server;
+#endif
 
 namespace Playserv.Wrapper
 {
@@ -29,7 +31,9 @@ namespace Playserv.Wrapper
         public static Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
             Api.UnsubscribeGroupAsync(groupName, ct);
 
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public static void SetEventHandler(IEventHandler eventHandler) => Api.SetEventHandler(eventHandler);
+#endif
     }
 }
 

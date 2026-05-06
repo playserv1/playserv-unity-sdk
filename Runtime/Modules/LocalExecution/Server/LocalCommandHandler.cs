@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using System;
 using System.Collections.Generic;
 
@@ -77,3 +78,4 @@ namespace Playserv.Server
         }
     }
 }
+#endif

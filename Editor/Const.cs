@@ -21,6 +21,9 @@ namespace Playserv.Editor
         internal const string DefineDisableRpcCore = "PLAYSERV_DISABLE_RPC_CORE";
         internal const string DefineDisableClientRpc = "PLAYSERV_DISABLE_CLIENT_RPC";
         internal const string DefineDisableServerRpc = "PLAYSERV_DISABLE_SERVER_RPC";
+        internal const string DefineDisableLocalExecutionCore = "PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE";
+        internal const string DefineDisableClientExecution = "PLAYSERV_DISABLE_CLIENT_EXECUTION";
+        internal const string DefineDisableLocalExecutionServer = "PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER";
         internal const string DefineDisableSpawn = "PLAYSERV_DISABLE_SPAWN";
         internal const string DefineDisablePulse = "PLAYSERV_DISABLE_PULSE";
         internal const string DefineDisableEditorDeployment = "PLAYSERV_DISABLE_EDITOR_DEPLOYMENT";

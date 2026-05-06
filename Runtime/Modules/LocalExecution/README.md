@@ -1,8 +1,22 @@
-# PlayServ Server Runtime Guide
+# PlayServ Local Execution
 
-This folder provides **in-process server adapters** for `PlayServ` API.
+This module family provides the local execution path for `PlayServ` API.
 
 Use this when you want to run gameplay/backend logic on server **without websocket transport** and **without adding server logic into this SDK project**.
+
+## Module layout
+
+- `Core` contains the internal local-execution contract shared by client/server slices.
+- `Client` contains the removable client-side no-op bridge used by transport-backed SDK builds.
+- `Server` is the removable server-side slice with default in-process implementations: `LocalCommandHandler` and `LocalEventHandler`.
+
+When `PLAYSERV_DISABLE_CLIENT_EXECUTION` is defined, the client execution slice is unavailable. Editor module settings also disable client-facing modules that depend on it (`Events`, client `RPC`, `Pulse`, and their dependents).
+
+When both client and server local-execution slices are disabled, `PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE` removes the shared internal local-execution contract.
+
+When `PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER` is defined, the server-side slice is unavailable:
+`PlayServ.SetCommandHandler(...)`, `PlayServ.SetEventHandler(...)`, `PlayServServerRpc.SetRpcInvoker(...)`,
+`ICommandHandler`, `IEventHandler`, `LocalCommandHandler`, and `LocalEventHandler` are intentionally removed from the public SDK surface.
 
 ## Recommended architecture
 

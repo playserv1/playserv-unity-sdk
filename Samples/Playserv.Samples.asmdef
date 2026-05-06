@@ -11,7 +11,14 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "!PLAYSERV_DISABLE_CLIENT_EXECUTION",
+        "!PLAYSERV_DISABLE_EVENTS",
+        "!PLAYSERV_DISABLE_DATA",
+        "!PLAYSERV_DISABLE_RPC_CORE",
+        "!PLAYSERV_DISABLE_CLIENT_RPC",
+        "!PLAYSERV_DISABLE_SPAWN"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

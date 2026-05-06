@@ -14,15 +14,20 @@ namespace Playserv.Editor
         {
             var defines = ReadDefines();
             var rpcCoreDisabled = defines.Contains(Const.DefineDisableRpcCore);
-            return new PlayServRuntimeModuleState
+            var localExecutionCoreDisabled = defines.Contains(Const.DefineDisableLocalExecutionCore);
+            var state = new PlayServRuntimeModuleState
             {
                 Events = !defines.Contains(Const.DefineDisableEvents),
                 Data = !defines.Contains(Const.DefineDisableData) && !defines.Contains(Const.DefineDisableEvents),
                 Rpc = !rpcCoreDisabled && !defines.Contains(Const.DefineDisableClientRpc),
                 ServerRpc = !rpcCoreDisabled && !defines.Contains(Const.DefineDisableServerRpc),
+                ClientExecution = !localExecutionCoreDisabled && !defines.Contains(Const.DefineDisableClientExecution),
+                LocalExecutionServer = !localExecutionCoreDisabled && !defines.Contains(Const.DefineDisableLocalExecutionServer),
                 Spawn = !defines.Contains(Const.DefineDisableSpawn) && !defines.Contains(Const.DefineDisableEvents),
                 Pulse = !defines.Contains(Const.DefineDisablePulse)
             };
+            NormalizeDependencies(ref state);
+            return state;
         }
 
         public static bool Apply(PlayServRuntimeModuleState state)
@@ -32,12 +37,16 @@ namespace Playserv.Editor
             var defines = ReadDefines();
             var changed = false;
             var rpcCoreEnabled = state.Rpc || state.ServerRpc;
+            var localExecutionCoreEnabled = state.ClientExecution || state.LocalExecutionServer;
 
             changed |= SetDisabled(defines, Const.DefineDisableEvents, !state.Events);
             changed |= SetDisabled(defines, Const.DefineDisableData, !state.Data);
             changed |= SetDisabled(defines, Const.DefineDisableRpcCore, !rpcCoreEnabled);
             changed |= SetDisabled(defines, Const.DefineDisableClientRpc, !state.Rpc);
             changed |= SetDisabled(defines, Const.DefineDisableServerRpc, !state.ServerRpc);
+            changed |= SetDisabled(defines, Const.DefineDisableLocalExecutionCore, !localExecutionCoreEnabled);
+            changed |= SetDisabled(defines, Const.DefineDisableClientExecution, !state.ClientExecution);
+            changed |= SetDisabled(defines, Const.DefineDisableLocalExecutionServer, !state.LocalExecutionServer);
             changed |= SetDisabled(defines, Const.DefineDisableSpawn, !state.Spawn);
             changed |= SetDisabled(defines, Const.DefineDisablePulse, !state.Pulse);
 
@@ -50,6 +59,18 @@ namespace Playserv.Editor
 
         public static void NormalizeDependencies(ref PlayServRuntimeModuleState state)
         {
+            if (!state.ClientExecution)
+            {
+                state.Events = false;
+                state.Data = false;
+                state.Rpc = false;
+                state.Spawn = false;
+                state.Pulse = false;
+            }
+
+            if (!state.LocalExecutionServer)
+                state.ServerRpc = false;
+
             if (state.Events)
                 return;
 

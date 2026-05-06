@@ -14,7 +14,9 @@ using Playserv.Proxy.Logging;
 using Playserv.RPC;
 #endif
 using Playserv.Runtime.Abstractions;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
 using Playserv.Server;
+#endif
 using Playserv.Serialization;
 #if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using Playserv.Spawn;
@@ -29,7 +31,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         , IPlayServRpcApi
 #endif
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         , IPlayServServerRpcApi
 #endif
 #if !PLAYSERV_DISABLE_EVENTS
@@ -44,7 +46,9 @@ namespace Playserv.Wrapper
     {
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;
-        private readonly PlayServApiLocalExecutionFacade _localExecution;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
+        private readonly IPlayServLocalExecution _localExecution;
+#endif
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private readonly PlayServApiRpcFacade _rpcFacade;
 #endif
@@ -74,7 +78,9 @@ namespace Playserv.Wrapper
 
         public PlayServApi()
         {
-            _localExecution = new PlayServApiLocalExecutionFacade();
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
+            _localExecution = PlayServLocalExecutionFactory.Create();
+#endif
             _configFacade = new PlayServApiConfigFacade(
                 subscribeToInstanceEvents: SubscribeToInstanceEvents,
                 logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
@@ -92,7 +98,9 @@ namespace Playserv.Wrapper
                 logShutdownIgnoreWarning: LogShutdownIgnoreWarning);
 #if !PLAYSERV_DISABLE_EVENTS
             _eventsFacade = new PlayServApiEventsFacade(
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
                 _localExecution,
+#endif
                 () => _configFacade.CurrentInstance,
                 GetInstanceForFireAndForget,
                 () => Instance);
@@ -102,7 +110,9 @@ namespace Playserv.Wrapper
 #endif
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
             _rpcFacade = new PlayServApiRpcFacade(
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
                 _localExecution,
+#endif
                 () => _configFacade.CurrentInstance,
                 GetInstanceForFireAndForget,
                 ResolveJsonCodec);
@@ -131,8 +141,10 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         public void Send<T>(T command)
         {
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
             if (_localExecution.TryHandleCommand(command, moduleName: null, _configFacade.CurrentInstance != null))
                 return;
+#endif
 
             if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("command send", out var instance))
                 return;
@@ -140,13 +152,17 @@ namespace Playserv.Wrapper
             instance.Send(command);
         }
 
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public void SetCommandHandler(ICommandHandler commandHandler) =>
             _localExecution.SetCommandHandler(commandHandler);
+#endif
 
         public void Send<T>(T command, string moduleName)
         {
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
             if (_localExecution.TryHandleCommand(command, moduleName, _configFacade.CurrentInstance != null))
                 return;
+#endif
 
             if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("command send", out var instance))
                 return;
@@ -157,8 +173,10 @@ namespace Playserv.Wrapper
 #endif
 
 #if !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public void SetEventHandler(IEventHandler eventHandler) =>
             _eventsFacade.SetEventHandler(eventHandler);
+#endif
 #endif
 
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
@@ -185,8 +203,10 @@ namespace Playserv.Wrapper
 #endif
 
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
             _localExecution.SetRpcInvoker(rpcInvoker);
+#endif
 #endif
 
         public Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>

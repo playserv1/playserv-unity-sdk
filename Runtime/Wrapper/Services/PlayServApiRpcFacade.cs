@@ -4,24 +4,33 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
+using Playserv.Server;
+#endif
 using Playserv.Serialization;
 
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApiRpcFacade
     {
-        private readonly PlayServApiLocalExecutionFacade _localExecution;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
+        private readonly IPlayServLocalExecution _localExecution;
+#endif
         private readonly Func<PlayServImplementation> _getCurrentInstance;
         private readonly Func<string, PlayServImplementation> _getInstanceForFireAndForget;
         private readonly Func<IJsonCodec> _getJsonCodec;
 
         public PlayServApiRpcFacade(
-            PlayServApiLocalExecutionFacade localExecution,
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
+            IPlayServLocalExecution localExecution,
+#endif
             Func<PlayServImplementation> getCurrentInstance,
             Func<string, PlayServImplementation> getInstanceForFireAndForget,
             Func<IJsonCodec> getJsonCodec)
         {
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
             _localExecution = localExecution ?? throw new ArgumentNullException(nameof(localExecution));
+#endif
             _getCurrentInstance = getCurrentInstance ?? throw new ArgumentNullException(nameof(getCurrentInstance));
             _getInstanceForFireAndForget = getInstanceForFireAndForget ?? throw new ArgumentNullException(nameof(getInstanceForFireAndForget));
             _getJsonCodec = getJsonCodec ?? throw new ArgumentNullException(nameof(getJsonCodec));
@@ -55,8 +64,10 @@ namespace Playserv.Wrapper
             if (string.IsNullOrWhiteSpace(payloadBase64))
                 throw new ArgumentException("Payload base64 is required.", nameof(payloadBase64));
 
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE
             if (_localExecution.TryInvokeRpc(serviceName, methodName, payloadBase64, _getCurrentInstance() != null))
                 return;
+#endif
 
             var request = new InvokeRpc
             {

@@ -17,10 +17,24 @@ namespace Playserv.Editor
         private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions =
         {
             new PlayServRuntimeModuleDefinition(
+                PlayServEditorModuleSettings.RuntimeModuleClientExecution,
+                "Client-side transport execution surface. Disable this for server-only SDK builds.",
+                new[] { "Runtime/Modules/LocalExecution/Core", "Runtime/Modules/LocalExecution/Client" },
+                dependencies: null,
+                dependents: new[]
+                {
+                    PlayServEditorModuleSettings.RuntimeModuleEvents,
+                    PlayServEditorModuleSettings.RuntimeModuleRpc,
+                    PlayServEditorModuleSettings.RuntimeModulePulse
+                },
+                settings => settings.RuntimeClientExecution,
+                (settings, enabled) => settings.SetRuntimeClientExecution(enabled)),
+
+            new PlayServRuntimeModuleDefinition(
                 PlayServEditorModuleSettings.RuntimeModuleEvents,
                 "Typed publish/subscribe runtime and typed event API generation controls. Cannot be disabled while dependent modules are enabled.",
                 new[] { "Runtime/Modules/Events" },
-                dependencies: null,
+                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleClientExecution },
                 dependents: new[]
                 {
                     PlayServEditorModuleSettings.RuntimeModuleData,
@@ -42,7 +56,7 @@ namespace Playserv.Editor
                 PlayServEditorModuleSettings.RuntimeModuleRpc,
                 "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs.",
                 new[] { "Runtime/Modules/RPC/Core", "Runtime/Modules/RPC/Client" },
-                dependencies: null,
+                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleClientExecution },
                 dependents: null,
                 settings => settings.RuntimeRpc,
                 (settings, enabled) => settings.SetRuntimeRpc(enabled)),
@@ -51,10 +65,19 @@ namespace Playserv.Editor
                 PlayServEditorModuleSettings.RuntimeModuleServerRpc,
                 "Server-side in-process RPC invoker, service registry, and PlayServServerRpc API.",
                 new[] { "Runtime/Modules/RPC/Core", "Runtime/Modules/ServerRPC" },
-                dependencies: null,
+                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer },
                 dependents: null,
                 settings => settings.RuntimeServerRpc,
                 (settings, enabled) => settings.SetRuntimeServerRpc(enabled)),
+
+            new PlayServRuntimeModuleDefinition(
+                PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer,
+                "Server-side local command/event execution bridge and default in-process handlers.",
+                new[] { "Runtime/Modules/LocalExecution/Core", "Runtime/Modules/LocalExecution/Server" },
+                dependencies: null,
+                dependents: new[] { PlayServEditorModuleSettings.RuntimeModuleServerRpc },
+                settings => settings.RuntimeLocalExecutionServer,
+                (settings, enabled) => settings.SetRuntimeLocalExecutionServer(enabled)),
 
             new PlayServRuntimeModuleDefinition(
                 PlayServEditorModuleSettings.RuntimeModuleSpawn,
@@ -69,7 +92,7 @@ namespace Playserv.Editor
                 PlayServEditorModuleSettings.RuntimeModulePulse,
                 "Realtime config placeholder module and future feature flag surface.",
                 new[] { "Runtime/Modules/Pulse" },
-                dependencies: null,
+                dependencies: new[] { PlayServEditorModuleSettings.RuntimeModuleClientExecution },
                 dependents: null,
                 settings => settings.RuntimePulse,
                 (settings, enabled) => settings.SetRuntimePulse(enabled))
@@ -82,6 +105,8 @@ namespace Playserv.Editor
         public static bool RuntimeData => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleData);
         public static bool RuntimeClientRpc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleRpc);
         public static bool RuntimeServerRpc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServerRpc);
+        public static bool RuntimeClientExecution => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleClientExecution);
+        public static bool RuntimeLocalExecutionServer => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer);
         public static bool RuntimeSpawn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleSpawn);
         public static bool RuntimePulse => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModulePulse);
 
@@ -131,6 +156,19 @@ namespace Playserv.Editor
             state.Data &= RuntimeData;
             state.Rpc &= RuntimeClientRpc;
             state.ServerRpc &= RuntimeServerRpc;
+            state.ClientExecution &= RuntimeClientExecution;
+            if (!state.ClientExecution)
+            {
+                state.Events = false;
+                state.Data = false;
+                state.Rpc = false;
+                state.Spawn = false;
+                state.Pulse = false;
+            }
+
+            state.LocalExecutionServer &= RuntimeLocalExecutionServer;
+            if (!state.LocalExecutionServer)
+                state.ServerRpc = false;
             state.Spawn &= RuntimeSpawn;
             state.Pulse &= RuntimePulse;
         }
@@ -145,6 +183,9 @@ namespace Playserv.Editor
             changed |= DisableIfUnavailable(defines, Const.DefineDisableClientRpc, RuntimeClientRpc);
             changed |= DisableIfUnavailable(defines, Const.DefineDisableServerRpc, RuntimeServerRpc);
             changed |= DisableIfUnavailable(defines, Const.DefineDisableRpcCore, RuntimeClientRpc || RuntimeServerRpc);
+            changed |= DisableIfUnavailable(defines, Const.DefineDisableClientExecution, RuntimeClientExecution);
+            changed |= DisableIfUnavailable(defines, Const.DefineDisableLocalExecutionCore, RuntimeClientExecution || RuntimeLocalExecutionServer);
+            changed |= DisableIfUnavailable(defines, Const.DefineDisableLocalExecutionServer, RuntimeLocalExecutionServer);
             changed |= DisableIfUnavailable(defines, Const.DefineDisableSpawn, RuntimeSpawn);
             changed |= DisableIfUnavailable(defines, Const.DefineDisablePulse, RuntimePulse);
 

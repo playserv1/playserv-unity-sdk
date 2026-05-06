@@ -1,3 +1,4 @@
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using System;
 
 namespace Playserv.Server
@@ -16,3 +17,4 @@ namespace Playserv.Server
         bool TryHandle(object command, string moduleName);
     }
 }
+#endif
