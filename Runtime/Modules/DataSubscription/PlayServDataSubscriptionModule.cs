@@ -21,6 +21,8 @@ namespace Playserv.DataSubscription
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
+            CommandTypeProviderRegistry.Register(new DataSubscriptionCommandTypeProvider());
+
             _adapter = new PlayServDataSubscriptionAdapter(
                 context.Services.Get<PlayServImplementation>(),
                 PlayServLog.ForCategory(PlayServLogCategory.Data));

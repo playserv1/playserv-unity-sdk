@@ -1,6 +1,7 @@
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using System;
 using Playserv.Modules;
+using Playserv.Proxy.Common;
 
 namespace Playserv.RPC
 {
@@ -19,6 +20,9 @@ namespace Playserv.RPC
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
+
+            CommandTypeProviderRegistry.Register(new RpcCommandTypeProvider());
+            CommandRouteProviderRegistry.Register(new RpcCommandRouteProvider());
 
             context.Services.Register<IPlayServClientRpcModule>(this);
             context.Services.Register(this);

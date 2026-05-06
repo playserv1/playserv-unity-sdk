@@ -1,6 +1,7 @@
 #if !PLAYSERV_DISABLE_EVENTS
 using System;
 using Playserv.Modules;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Serialization;
@@ -19,6 +20,8 @@ namespace Playserv.Events
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
+
+            CommandTypeProviderRegistry.Register(new EventCommandTypeProvider());
 
             var adapter = new PlayServEventsAdapter(
                 context.Services.Get<ITransport>(),

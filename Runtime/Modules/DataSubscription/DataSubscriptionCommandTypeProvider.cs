@@ -1,13 +1,13 @@
 #if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
-using Playserv.DataSubscription;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
+using Playserv.Proxy.Common;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.DataSubscription
 {
-    internal static class DataSubscriptionCommandTypeRegistration
+    internal sealed class DataSubscriptionCommandTypeProvider : ICommandTypeProvider
     {
-        public static void Register(CommandTypeRegistryBuilder builder)
+        public void RegisterCommandTypes(CommandTypeRegistryBuilder builder)
         {
             builder.Register<DataGetRequest>();
             builder.Register<DataGetResponse>();
