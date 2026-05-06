@@ -12,7 +12,9 @@ using Playserv.Proxy.Common;
 using Playserv.RPC;
 #endif
 using Playserv.Runtime.Abstractions;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using Playserv.Server;
+#endif
 #if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using Playserv.Spawn;
 using UnityEngine;
@@ -31,7 +33,7 @@ namespace Playserv.Wrapper
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
         private static IPlayServRpcApi RpcApi => PlayServApiHost.Rpc;
 #endif
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         private static IPlayServServerRpcApi ServerRpcApi => PlayServApiHost.ServerRpc;
 #endif
 #if !PLAYSERV_DISABLE_EVENTS
@@ -173,8 +175,10 @@ namespace Playserv.Wrapper
         /// Sets optional local command handler for server-side/in-process execution.
         /// </summary>
         /// <param name="commandHandler">Local command handler. Pass null to disable local handling.</param>
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public static void SetCommandHandler(ICommandHandler commandHandler) =>
             RpcApi.SetCommandHandler(commandHandler);
+#endif
 
         /// <summary>
         /// Sends command object to explicit backend module/command path.
@@ -191,8 +195,10 @@ namespace Playserv.Wrapper
         /// Sets optional local event handler for server-side/in-process execution.
         /// </summary>
         /// <param name="eventHandler">Local event handler. Pass null to disable local handling.</param>
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public static void SetEventHandler(IEventHandler eventHandler) =>
             EventsApi.SetEventHandler(eventHandler);
+#endif
 #endif
 
 #if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
@@ -259,7 +265,7 @@ namespace Playserv.Wrapper
             RpcApi.Invoke(method, payloadBase64);
 #endif
 
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         /// <summary>
         /// Sets optional server RPC invoker for in-process execution.
         /// </summary>

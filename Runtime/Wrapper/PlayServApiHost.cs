@@ -10,7 +10,7 @@ namespace Playserv.Wrapper
         internal static IPlayServRpcApi Rpc => Api;
 #endif
 
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         internal static IPlayServServerRpcApi ServerRpc => Api;
 #endif
 

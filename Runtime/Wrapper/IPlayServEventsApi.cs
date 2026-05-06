@@ -2,7 +2,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using Playserv.Server;
+#endif
 
 namespace Playserv.Wrapper
 {
@@ -12,7 +14,9 @@ namespace Playserv.Wrapper
 
         IDisposable Subscribe<T>(Action<T> onNext);
 
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         void SetEventHandler(IEventHandler eventHandler);
+#endif
 
         void Publish<T>(T @event);
 

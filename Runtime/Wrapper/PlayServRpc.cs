@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
 using Playserv.Server;
+#endif
 
 namespace Playserv.Wrapper
 {
@@ -25,7 +27,9 @@ namespace Playserv.Wrapper
 
         public static void Send<T>(T command, string moduleName) => Api.Send(command, moduleName);
 
+#if !PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE && !PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER
         public static void SetCommandHandler(ICommandHandler commandHandler) => Api.SetCommandHandler(commandHandler);
+#endif
 
         public static void Invoke(string serviceName, string methodName, object payload) =>
             Api.Invoke(serviceName, methodName, payload);

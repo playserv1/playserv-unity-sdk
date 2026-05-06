@@ -6,6 +6,22 @@ namespace Playserv.Editor
 {
     internal sealed class PlayServModuleSettingsPresenter
     {
+        private static readonly string[] RuntimeModuleNames =
+        {
+            PlayServEditorModuleSettings.RuntimeModuleClientExecution,
+            PlayServEditorModuleSettings.RuntimeModuleEvents,
+            PlayServEditorModuleSettings.RuntimeModuleData,
+            PlayServEditorModuleSettings.RuntimeModuleRpc,
+            PlayServEditorModuleSettings.RuntimeModuleSpawn,
+            PlayServEditorModuleSettings.RuntimeModulePulse
+        };
+
+        private static readonly string[] ServerRuntimeModuleNames =
+        {
+            PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer,
+            PlayServEditorModuleSettings.RuntimeModuleServerRpc
+        };
+
         public void Draw(PlayServWindowContext context)
         {
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.HeroCardStyle))
@@ -33,23 +49,22 @@ namespace Playserv.Editor
 
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardStyle))
             {
-                GUILayout.Label("Runtime modules", PlayServWindowTheme.MiniHeadingStyle);
-                GUILayout.Space(8f);
-
                 var settings = context.State.ModuleSettings;
                 var changed = false;
-                var hasRuntimeModules = false;
+                var hasRuntimeModules = DrawRuntimeModuleGroup(
+                    "Runtime",
+                    RuntimeModuleNames,
+                    settings,
+                    ref changed);
 
-                foreach (var module in PlayServEditorModuleAvailability.AvailableRuntimeModules)
-                {
-                    if (hasRuntimeModules)
-                        GUILayout.Space(6f);
+                var hasServerRuntimeModules = DrawRuntimeModuleGroup(
+                    "Server Runtime",
+                    ServerRuntimeModuleNames,
+                    settings,
+                    ref changed,
+                    hasRuntimeModules);
 
-                    changed |= DrawRuntimeModule(settings, module);
-                    hasRuntimeModules = true;
-                }
-
-                if (!hasRuntimeModules)
+                if (!hasRuntimeModules && !hasServerRuntimeModules)
                     PlayServWindowChrome.DrawNotice("No optional runtime modules are installed in this SDK package.", MessageType.Info);
 
                 if (PlayServEditorModuleAvailability.HasAnyEditorTool)
@@ -119,6 +134,52 @@ namespace Playserv.Editor
                     context.Repaint();
                 }
             }
+        }
+
+        private static bool DrawRuntimeModuleGroup(
+            string title,
+            string[] moduleNames,
+            PlayServEditorModuleSettings settings,
+            ref bool changed,
+            bool addTopSpacing = false)
+        {
+            var drewAny = false;
+
+            for (var i = 0; i < moduleNames.Length; i++)
+            {
+                var module = FindAvailableRuntimeModule(moduleNames[i]);
+                if (module == null)
+                    continue;
+
+                if (!drewAny)
+                {
+                    if (addTopSpacing)
+                        GUILayout.Space(14f);
+
+                    GUILayout.Label(title, PlayServWindowTheme.MiniHeadingStyle);
+                    GUILayout.Space(8f);
+                }
+                else
+                {
+                    GUILayout.Space(6f);
+                }
+
+                changed |= DrawRuntimeModule(settings, module);
+                drewAny = true;
+            }
+
+            return drewAny;
+        }
+
+        private static PlayServEditorModuleAvailability.PlayServRuntimeModuleDefinition FindAvailableRuntimeModule(string moduleName)
+        {
+            foreach (var module in PlayServEditorModuleAvailability.AvailableRuntimeModules)
+            {
+                if (string.Equals(module.Name, moduleName, System.StringComparison.Ordinal))
+                    return module;
+            }
+
+            return null;
         }
 
         private static bool DrawToggleModule(string title, string description, bool enabled, System.Func<bool, bool> apply)
