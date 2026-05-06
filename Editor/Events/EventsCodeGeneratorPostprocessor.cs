@@ -1,5 +1,5 @@
 // Assets/Playserv/Editor/Events/EventsCodeGeneratorPostprocessor.cs
-#if UNITY_EDITOR && !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Linq;
 using UnityEditor;

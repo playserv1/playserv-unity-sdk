@@ -3,7 +3,7 @@ using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
 {
-    internal delegate ITransportImplementation PlayServTransportImplementationFactory(
+    public delegate ITransportImplementation PlayServTransportImplementationFactory(
         string endpoint,
         IJsonCodec jsonCodec);
 }

@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 
 namespace Playserv.DataSubscription.Responses
@@ -77,5 +76,3 @@ namespace Playserv.DataSubscription.Responses
         public object Payload { get; set; }
     }
 }
-
-#endif

@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 namespace Playserv.DataSubscription
 {
     /// <summary>
@@ -17,5 +16,3 @@ namespace Playserv.DataSubscription
         Patch
     }
 }
-
-#endif

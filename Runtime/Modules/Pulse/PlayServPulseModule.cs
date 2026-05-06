@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_PULSE
 using System;
 using Playserv.Modules;
 
@@ -28,5 +27,3 @@ namespace Playserv.Pulse
         }
     }
 }
-
-#endif

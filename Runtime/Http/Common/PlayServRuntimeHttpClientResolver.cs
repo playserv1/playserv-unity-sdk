@@ -4,7 +4,7 @@ using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Http.Common
 {
-    internal static class PlayServRuntimeHttpClientResolver
+    public static class PlayServRuntimeHttpClientResolver
     {
         private static readonly object Gate = new object();
         private static IPlayServHttpModuleFactory[] _factories;

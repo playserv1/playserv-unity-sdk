@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
+using Playserv.Wrapper;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.Proxy.Common

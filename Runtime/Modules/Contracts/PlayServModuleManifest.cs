@@ -60,14 +60,14 @@ namespace Playserv.Modules
             new PlayServModuleManifestEntry(
                 DataSubscriptionId,
                 "Data Subscription",
-                "Shared entity query, mutation, polling, and transport subscription APIs. Depends on Events.",
+                "Shared entity query, mutation, polling, and transport subscription APIs.",
                 DefineDisableData,
                 defaultEnabled: true,
                 isServerModule: false,
                 visibleInSettings: true,
                 visibleInExport: true,
                 assetPaths: new[] { "Runtime/Modules/DataSubscription" },
-                dependencyIds: new[] { EventsId },
+                dependencyIds: null,
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null),
 

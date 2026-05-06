@@ -1,5 +1,4 @@
 using System;
-using Playserv.Proxy.Common;
 
 namespace Playserv.Serialization
 {

@@ -5,7 +5,7 @@ using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
 {
-    internal static class PlayServJsonCompositionRoot
+    public static class PlayServJsonCompositionRoot
     {
         public static IMessageSerializer CreateDefaultSerializer()
         {
@@ -18,7 +18,7 @@ namespace Playserv.Proxy.Common
             return new NewtonsoftJsonCodec();
         }
 
-        public static PlayServJsonComposition Resolve(IMessageSerializer serializer)
+        internal static PlayServJsonComposition Resolve(IMessageSerializer serializer)
         {
             if (serializer == null)
                 throw new ArgumentNullException(nameof(serializer));

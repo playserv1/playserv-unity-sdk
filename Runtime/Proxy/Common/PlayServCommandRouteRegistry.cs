@@ -19,7 +19,12 @@ namespace Playserv.Proxy.Common
 
         internal PlayServTransportSession TransportSession { get; }
 
-        internal ILogger Logger { get; }
+        public ILogger Logger { get; }
+
+        public void NotifyModuleCommand(string commandName, object command)
+        {
+            TransportSession.HandleModuleCommand(commandName, command);
+        }
 
         public void Register(string commandName, Action<object> onNext)
         {

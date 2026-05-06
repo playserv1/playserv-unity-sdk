@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
+#if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
 using System;
 using UnityEditor;
 using UnityEngine;

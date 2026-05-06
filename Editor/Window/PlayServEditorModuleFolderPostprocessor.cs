@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using UnityEditor;
 
 namespace Playserv.Editor
@@ -47,4 +46,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

@@ -6,17 +6,17 @@ namespace Playserv.Proxy.Common
 {
     internal sealed class PlayServCommandRouter : IDisposable
     {
-        private readonly PlayServFeatureFacade _featureFacade;
+        private readonly CoreTransportFacade _transportFacade;
         private readonly PlayServTransportSession _transportSession;
         private readonly ILogger _logger;
         private readonly List<IDisposable> _subscriptions = new List<IDisposable>();
 
         public PlayServCommandRouter(
-            PlayServFeatureFacade featureFacade,
+            CoreTransportFacade transportFacade,
             PlayServTransportSession transportSession,
             ILogger logger)
         {
-            _featureFacade = featureFacade ?? throw new ArgumentNullException(nameof(featureFacade));
+            _transportFacade = transportFacade ?? throw new ArgumentNullException(nameof(transportFacade));
             _transportSession = transportSession ?? throw new ArgumentNullException(nameof(transportSession));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -41,7 +41,7 @@ namespace Playserv.Proxy.Common
 
         private void Register(string commandName, Action<object> onNext)
         {
-            _subscriptions.Add(_featureFacade.OnCommand(commandName, onNext));
+            _subscriptions.Add(_transportFacade.OnCommand(commandName, onNext));
         }
 
     }

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Playserv.Http.Interfaces
 {
-    internal interface IPlayServRuntimeHttpClient
+    public interface IPlayServRuntimeHttpClient
     {
         Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default);
     }

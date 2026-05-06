@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
 {

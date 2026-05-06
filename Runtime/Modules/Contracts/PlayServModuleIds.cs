@@ -2,6 +2,7 @@ namespace Playserv.Modules
 {
     public static class PlayServModuleIds
     {
+        public const string Core = "core";
         public const string Transport = "transport";
         public const string Serialization = "serialization";
         public const string Events = PlayServModuleManifest.EventsId;

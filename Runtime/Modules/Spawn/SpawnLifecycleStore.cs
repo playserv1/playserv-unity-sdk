@@ -1,4 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -158,4 +157,3 @@ namespace Playserv.Spawn
         }
     }
 }
-#endif

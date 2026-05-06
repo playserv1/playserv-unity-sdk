@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -137,5 +136,3 @@ namespace Playserv.DataSubscription
         }
     }
 }
-
-#endif

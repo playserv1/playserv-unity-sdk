@@ -1,0 +1,22 @@
+{
+    "name": "Playserv.Runtime.Modules.Spawn",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Modules.Events"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_5_3_OR_NEWER",
+        "!PLAYSERV_DISABLE_EVENTS",
+        "!PLAYSERV_DISABLE_SPAWN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

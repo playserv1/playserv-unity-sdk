@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
+#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
 using System;
 using UnityEditor;
 using UnityEngine;

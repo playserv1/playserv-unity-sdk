@@ -4,7 +4,7 @@ using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Common
 {
-    internal static class TransportImplementationResolver
+    public static class TransportImplementationResolver
     {
         private static readonly object Gate = new object();
         private static ITransportModuleFactory[] _factories;

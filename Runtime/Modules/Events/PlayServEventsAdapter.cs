@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -6,6 +5,7 @@ using System.Threading.Tasks;
 using Playserv.Events.Requests;
 using Playserv.Events.Responses;
 using Playserv.Proxy;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Serialization;
@@ -62,7 +62,7 @@ namespace Playserv.Events
             var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new EventMessage(eventType, payload);
-            _ = _transport.Send(message);
+            _ = _transport.Send(message, "module_events");
         }
 
         public void PublishForGroup<T>(string groupName, T @event)
@@ -160,7 +160,7 @@ namespace Playserv.Events
                     _logger.Log($"Event subscription successful: eventType={eventType}, subscriptionId={response.eventSubscriptionId}");
                 });
 
-            _transport.OnReceive<ErrorResponse>()
+            _transport.OnReceive<Playserv.Proxy.Common.ErrorResponse>()
                 .Subscribe(error =>
                 {
                     _logger.LogError($"SDK error: code={error.ErrorCode}, message={error.Message}");
@@ -352,5 +352,3 @@ namespace Playserv.Events
         }
     }
 }
-
-#endif

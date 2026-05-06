@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -6,7 +5,6 @@ using System.Threading.Tasks;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
-using Playserv.Events.Responses;
 using Playserv.Proxy.Common;
 using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
@@ -213,5 +211,3 @@ namespace Playserv.DataSubscription
         }
     }
 }
-
-#endif

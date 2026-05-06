@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Collections.Generic;
 
@@ -31,5 +30,3 @@ namespace Playserv.DataSubscription.Requests
         public Dictionary<string, object> Variables { get; set; } = new Dictionary<string, object>();
     }
 }
-
-#endif

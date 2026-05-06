@@ -2,7 +2,21 @@
     "name": "Playserv.Runtime",
     "rootNamespace": "",
     "references": [
-        "Playserv.Runtime.Modules"
+        "Playserv.Runtime.Abstractions",
+        "Playserv.Runtime.Serialization",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Http",
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Modules.Events",
+        "Playserv.Runtime.Modules.DataSubscription",
+        "Playserv.Runtime.Modules.RPC.Core",
+        "Playserv.Runtime.Modules.RPC.Client",
+        "Playserv.Runtime.Modules.ServerRPC",
+        "Playserv.Runtime.Modules.LocalExecution.Core",
+        "Playserv.Runtime.Modules.LocalExecution.Client",
+        "Playserv.Runtime.Modules.LocalExecution.Server",
+        "Playserv.Runtime.Modules.Spawn",
+        "Playserv.Runtime.Modules.Pulse"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

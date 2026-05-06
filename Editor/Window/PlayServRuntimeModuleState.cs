@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 namespace Playserv.Editor
 {
     internal struct PlayServRuntimeModuleState
@@ -13,4 +12,3 @@ namespace Playserv.Editor
         public bool Pulse;
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_DISABLE_SPAWN && !PLAYSERV_DISABLE_EVENTS
 using System.Threading.Tasks;
 using System.Threading;
 using UnityEngine;
@@ -21,9 +20,10 @@ namespace Playserv.Spawn
 
         void SetPrefabRegistry(INetworkPrefabRegistry prefabRegistry);
 
+        void SetTransformSyncIntervalMs(int intervalMs);
+
         bool TryGetSpawnedObject(string spawnId, out GameObject obj);
 
         NetworkObject GetNetworkObject(string networkId);
     }
 }
-#endif

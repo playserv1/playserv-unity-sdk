@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace Playserv.Serialization
 {
-    internal static class UnityJsonCodecOptionsFactory
+    public static class UnityJsonCodecOptionsFactory
     {
         public static JsonCodecOptions CreateDefaultEventOptions()
         {

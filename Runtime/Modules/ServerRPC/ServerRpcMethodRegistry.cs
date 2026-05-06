@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -334,5 +333,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#endif

@@ -1,0 +1,19 @@
+{
+    "name": "Playserv.Runtime.Modules.RPC.Core",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Serialization"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_DISABLE_RPC_CORE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

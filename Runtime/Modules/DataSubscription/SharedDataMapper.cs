@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_DATA && !PLAYSERV_DISABLE_EVENTS
 using System;
 using System.Linq.Expressions;
 using Playserv.Serialization;
@@ -60,5 +59,3 @@ namespace Playserv.DataSubscription
         }
     }
 }
-
-#endif

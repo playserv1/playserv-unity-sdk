@@ -1,4 +1,4 @@
-#if UNITY_EDITOR && !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
+#if !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
 using UnityEditor;
 using UnityEngine;
 using Playserv.CodeGenerator.Editor;

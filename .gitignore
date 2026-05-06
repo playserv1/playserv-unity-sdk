@@ -41,7 +41,6 @@
 ExportedObj/
 .consulo/
 *.csproj
-!Runtime/PlayServ.Shared.Runtime.csproj
 *.unityproj
 *.sln
 *.suo

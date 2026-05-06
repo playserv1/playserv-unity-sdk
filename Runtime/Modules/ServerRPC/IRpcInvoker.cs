@@ -1,8 +1,7 @@
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
 namespace Playserv.RPC
 {
     /// <summary>
-    /// Contract for in-process RPC invocation used by PlayServ.Invoke.
+    /// Contract for in-process RPC invocation used by PlayServRpc.Invoke.
     /// </summary>
     public interface IRpcInvoker
     {
@@ -16,5 +15,3 @@ namespace Playserv.RPC
         bool TryInvoke(string serviceName, string methodName, string payloadBase64);
     }
 }
-
-#endif

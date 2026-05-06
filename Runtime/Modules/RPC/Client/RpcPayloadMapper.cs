@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -12,7 +11,7 @@ namespace Playserv.RPC
     /// <summary>
     /// Maps RPC method expressions and explicit payload objects to transport-ready payload structures.
     /// </summary>
-    internal static class RpcPayloadMapper
+    public static class RpcPayloadMapper
     {
         private static readonly ConcurrentDictionary<MethodInfo, RpcMethodBindingPlan> MethodBindingPlanCache = new();
         private static readonly ConcurrentDictionary<Type, PayloadPropertyAccessor[]> PayloadAccessorCache = new();
@@ -409,5 +408,3 @@ namespace Playserv.RPC
         }
     }
 }
-
-#endif
