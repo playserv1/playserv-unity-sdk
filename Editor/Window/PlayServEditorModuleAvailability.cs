@@ -63,10 +63,29 @@ namespace Playserv.Editor
 
         private static string[] BuildRequiredFolderPaths(PlayServModuleManifestEntry module)
         {
-            return module.AssetPaths
-                .Concat(module.HiddenDependencyAssetPaths)
+            var paths = new List<string>();
+            AddModuleAssetPaths(module, paths, new HashSet<string>(StringComparer.Ordinal));
+            return paths
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
+        }
+
+        private static void AddModuleAssetPaths(
+            PlayServModuleManifestEntry module,
+            List<string> paths,
+            ISet<string> visited)
+        {
+            if (module == null || !visited.Add(module.Id))
+                return;
+
+            paths.AddRange(module.AssetPaths);
+            paths.AddRange(module.HiddenDependencyAssetPaths);
+
+            for (var i = 0; i < module.HiddenDependencyModuleIds.Length; i++)
+            {
+                if (PlayServModuleManifest.TryGet(module.HiddenDependencyModuleIds[i], out var dependency))
+                    AddModuleAssetPaths(dependency, paths, visited);
+            }
         }
 
         private static string[] ToLabels(string[] moduleIds)
@@ -197,18 +216,18 @@ namespace Playserv.Editor
         public static void SyncUnavailableModuleDefines()
         {
             var defines = ReadDefines();
-            var changed = false;
+            var changed = PlayServRuntimeModuleDefines.RemoveLegacyRuntimeModuleDefines(defines);
 
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.EventsId, RuntimeEvents);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.DataSubscriptionId, RuntimeData);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ClientRpcId, RuntimeClientRpc);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ServerRpcId, RuntimeServerRpc);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.RpcCoreId, RuntimeClientRpc || RuntimeServerRpc);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ClientExecutionId, RuntimeClientExecution);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.LocalExecutionCoreId, RuntimeClientExecution || RuntimeLocalExecutionServer);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.ServerLocalExecutionId, RuntimeLocalExecutionServer);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.SpawnId, RuntimeSpawn);
-            changed |= DisableModuleIfUnavailable(defines, PlayServModuleManifest.PulseId, RuntimePulse);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.EventsId, RuntimeEvents);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.DataSubscriptionId, RuntimeData);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ClientRpcId, RuntimeClientRpc);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ServerRpcId, RuntimeServerRpc);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.RpcCoreId, RuntimeClientRpc || RuntimeServerRpc);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ClientExecutionId, RuntimeClientExecution);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.LocalExecutionCoreId, RuntimeClientExecution || RuntimeLocalExecutionServer);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ServerLocalExecutionId, RuntimeLocalExecutionServer);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.SpawnId, RuntimeSpawn);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.PulseId, RuntimePulse);
 
             changed |= SetDisabled(defines, Const.DefineDisableEditorDeployment, !EditorDeployment);
             changed |= SetDisabled(defines, Const.DefineDisableEditorModelSync, !EditorModelSync);
@@ -216,6 +235,12 @@ namespace Playserv.Editor
 
             if (changed)
                 WriteDefines(defines);
+        }
+
+        private static bool HasAssetPath(string relativePath)
+        {
+            var absolutePath = Path.Combine(PackageRootPath, relativePath);
+            return Directory.Exists(absolutePath) || File.Exists(absolutePath);
         }
 
         private static bool HasFolder(string relativePath)
@@ -264,14 +289,11 @@ namespace Playserv.Editor
             return disabled ? defines.Add(symbol) : defines.Remove(symbol);
         }
 
-        private static bool DisableIfUnavailable(ISet<string> defines, string symbol, bool available)
+        private static bool SyncModuleDefine(ISet<string> defines, string moduleId, bool available)
         {
-            return available ? false : defines.Add(symbol);
-        }
-
-        private static bool DisableModuleIfUnavailable(ISet<string> defines, string moduleId, bool available)
-        {
-            return DisableIfUnavailable(defines, PlayServModuleManifest.GetRequired(moduleId).DisableDefine, available);
+            var module = PlayServModuleManifest.GetRequired(moduleId);
+            var shouldDisable = !available || PlayServRuntimeModuleDefines.IsUserDisabled(moduleId);
+            return SetDisabled(defines, module.DisableDefine, shouldDisable);
         }
 
         private static ISet<string> ReadDefines()
@@ -331,7 +353,7 @@ namespace Playserv.Editor
                 {
                     for (var i = 0; i < _folderPaths.Length; i++)
                     {
-                        if (!HasFolder(_folderPaths[i]))
+                        if (!HasAssetPath(_folderPaths[i]))
                             return false;
                     }
 

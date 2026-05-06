@@ -10,11 +10,11 @@ Use this when you want to run gameplay/backend logic on server **without websock
 - `Client` contains the removable client-side no-op bridge used by transport-backed SDK builds.
 - `Server` is the removable server-side slice with default in-process implementations: `LocalCommandHandler` and `LocalEventHandler`.
 
-When `PLAYSERV_DISABLE_CLIENT_EXECUTION` is defined, the client execution slice is unavailable. Editor module settings also disable client-facing modules that depend on it (`Events`, client `RPC`, `Pulse`, and their dependents).
+When `PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION` is defined, the client execution slice is unavailable. Editor module settings also disable client-facing modules that depend on it (`Events`, client `RPC`, `Pulse`, and their dependents).
 
-When both client and server local-execution slices are disabled, `PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE` removes the shared internal local-execution contract.
+When both client and server local-execution slices are disabled, `PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE` removes the shared internal local-execution contract.
 
-When `PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER` is defined, the server-side slice is unavailable:
+When `PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER` is defined, the server-side slice is unavailable:
 `PlayServ.SetCommandHandler(...)`, `PlayServ.SetEventHandler(...)`, `PlayServServerRpc.SetRpcInvoker(...)`,
 `ICommandHandler`, `IEventHandler`, `LocalCommandHandler`, and `LocalEventHandler` are intentionally removed from the public SDK surface.
 

@@ -12,8 +12,8 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "!PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE",
-        "!PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER"
+        "!PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE",
+        "!PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER"
     ],
     "versionDefines": [],
     "noEngineReferences": false

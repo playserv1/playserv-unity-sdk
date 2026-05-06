@@ -9,6 +9,19 @@ namespace Playserv.Editor
     internal static class PlayServRuntimeModuleDefines
     {
         private static readonly char[] DefineSeparators = { ';' };
+        private static readonly string[] LegacyRuntimeModuleDisableDefines =
+        {
+            "PLAYSERV_DISABLE_EVENTS",
+            "PLAYSERV_DISABLE_DATA",
+            "PLAYSERV_DISABLE_RPC_CORE",
+            "PLAYSERV_DISABLE_CLIENT_RPC",
+            "PLAYSERV_DISABLE_SERVER_RPC",
+            "PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE",
+            "PLAYSERV_DISABLE_CLIENT_EXECUTION",
+            "PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER",
+            "PLAYSERV_DISABLE_SPAWN",
+            "PLAYSERV_DISABLE_PULSE"
+        };
 
         public static PlayServRuntimeModuleState Load()
         {
@@ -34,9 +47,10 @@ namespace Playserv.Editor
         public static bool Apply(PlayServRuntimeModuleState state)
         {
             NormalizeDependencies(ref state);
+            WriteUserDisabledPrefs(state);
 
             var defines = ReadDefines();
-            var changed = false;
+            var changed = RemoveLegacyRuntimeModuleDefines(defines);
             var rpcCoreEnabled = state.Rpc || state.ServerRpc;
             var localExecutionCoreEnabled = state.ClientExecution || state.LocalExecutionServer;
 
@@ -56,6 +70,26 @@ namespace Playserv.Editor
 
             WriteDefines(defines);
             return true;
+        }
+
+        public static bool IsUserDisabled(string moduleId)
+        {
+            if (string.IsNullOrEmpty(moduleId))
+                return false;
+
+            return EditorPrefs.GetBool(BuildUserDisabledPrefKey(moduleId), false);
+        }
+
+        public static bool RemoveLegacyRuntimeModuleDefines(ISet<string> defines)
+        {
+            if (defines == null)
+                return false;
+
+            var changed = false;
+            for (var i = 0; i < LegacyRuntimeModuleDisableDefines.Length; i++)
+                changed |= defines.Remove(LegacyRuntimeModuleDisableDefines[i]);
+
+            return changed;
         }
 
         public static void NormalizeDependencies(ref PlayServRuntimeModuleState state)
@@ -84,6 +118,33 @@ namespace Playserv.Editor
         {
             var module = PlayServModuleManifest.GetRequired(moduleId);
             return SetDisabled(defines, module.DisableDefine, disabled);
+        }
+
+        private static void WriteUserDisabledPrefs(PlayServRuntimeModuleState state)
+        {
+            var rpcCoreEnabled = state.Rpc || state.ServerRpc;
+            var localExecutionCoreEnabled = state.ClientExecution || state.LocalExecutionServer;
+
+            SetUserDisabled(PlayServModuleManifest.EventsId, !state.Events);
+            SetUserDisabled(PlayServModuleManifest.DataSubscriptionId, !state.Data);
+            SetUserDisabled(PlayServModuleManifest.RpcCoreId, !rpcCoreEnabled);
+            SetUserDisabled(PlayServModuleManifest.ClientRpcId, !state.Rpc);
+            SetUserDisabled(PlayServModuleManifest.ServerRpcId, !state.ServerRpc);
+            SetUserDisabled(PlayServModuleManifest.LocalExecutionCoreId, !localExecutionCoreEnabled);
+            SetUserDisabled(PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
+            SetUserDisabled(PlayServModuleManifest.ServerLocalExecutionId, !state.LocalExecutionServer);
+            SetUserDisabled(PlayServModuleManifest.SpawnId, !state.Spawn);
+            SetUserDisabled(PlayServModuleManifest.PulseId, !state.Pulse);
+        }
+
+        private static void SetUserDisabled(string moduleId, bool disabled)
+        {
+            EditorPrefs.SetBool(BuildUserDisabledPrefKey(moduleId), disabled);
+        }
+
+        private static string BuildUserDisabledPrefKey(string moduleId)
+        {
+            return Const.PrefRuntimeModuleUserDisabledPrefix + moduleId;
         }
 
         private static bool IsEnabled(ISet<string> defines, string moduleId)

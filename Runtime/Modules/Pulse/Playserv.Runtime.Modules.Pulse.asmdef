@@ -11,7 +11,7 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "!PLAYSERV_DISABLE_PULSE"
+        "!PLAYSERV_MODULE_DISABLED_PULSE"
     ],
     "versionDefines": [],
     "noEngineReferences": false

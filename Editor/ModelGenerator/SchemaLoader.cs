@@ -3,7 +3,9 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+#if !PLAYSERV_MODULE_DISABLED_DATA
 using Playserv.DataSubscription;
+#endif
 using Playserv.ModelGenerator.Editor;
 using Playserv.Wrapper;
 using UnityEditor;
@@ -40,7 +42,9 @@ public static class SchemaLoader
         await File.WriteAllTextAsync(filePath, json);
         
         AssetDatabase.Refresh();
+#if !PLAYSERV_MODULE_DISABLED_DATA
         SchemaSelectionProvider.Reset();
+#endif
 
         Debug.Log($"[SchemaDownloader] schema.json saved to {filePath}");
     }

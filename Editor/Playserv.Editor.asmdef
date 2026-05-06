@@ -7,8 +7,8 @@
         "GUID:3a764377fd4b41079f58b06388d25699",
         "GUID:d56cc792bddf46f29ad15a50f1b88d20",
         "GUID:558599bafc954e9eb0b852954a58e989",
-        "GUID:3345d20ea9d248848dadbb9c721d9b84",
-        "GUID:a3846cbb7e3942bb9772eab66008a83b"
+        "Playserv.Runtime.Modules.DataSubscription",
+        "Playserv.Runtime.Modules.Events"
     ],
     "includePlatforms": [
         "Editor"

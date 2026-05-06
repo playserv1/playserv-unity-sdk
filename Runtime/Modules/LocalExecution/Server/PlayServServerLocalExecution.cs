@@ -1,5 +1,5 @@
 using System;
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER_RPC
 using Playserv.RPC;
 
 namespace Playserv.Server
@@ -7,18 +7,18 @@ namespace Playserv.Server
     public sealed class PlayServServerLocalExecution : IPlayServLocalExecution
     {
         private ICommandHandler _commandHandler;
-#if !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_MODULE_DISABLED_EVENTS
         private IEventHandler _eventHandler;
 #endif
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER_RPC
         private IRpcInvoker _rpcInvoker;
 #endif
 
         public void SetCommandHandler(ICommandHandler commandHandler) => _commandHandler = commandHandler;
-#if !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_MODULE_DISABLED_EVENTS
         public void SetEventHandler(IEventHandler eventHandler) => _eventHandler = eventHandler;
 #endif
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_SERVER_RPC
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER_RPC
         public void SetRpcInvoker(object rpcInvoker) => _rpcInvoker = rpcInvoker as IRpcInvoker;
 #endif
 
@@ -40,7 +40,7 @@ namespace Playserv.Server
             return false;
         }
 
-#if !PLAYSERV_DISABLE_EVENTS
+#if !PLAYSERV_MODULE_DISABLED_EVENTS
         public bool TrySubscribe<T>(bool hasTransport, out IObservable<T> observable)
         {
             if (_eventHandler != null &&
@@ -138,10 +138,10 @@ namespace Playserv.Server
         }
 #endif
 
-#if !PLAYSERV_DISABLE_RPC_CORE && !PLAYSERV_DISABLE_CLIENT_RPC
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_CLIENT_RPC
         public bool TryInvokeRpc(string serviceName, string methodName, string payloadBase64, bool hasTransport)
         {
-#if PLAYSERV_DISABLE_SERVER_RPC
+#if PLAYSERV_MODULE_DISABLED_SERVER_RPC
             return false;
 #else
             if (_rpcInvoker == null)
