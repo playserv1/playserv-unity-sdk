@@ -4,27 +4,18 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-#if !PLAYSERV_MODULE_DISABLED_DATA
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
-#endif
-#if !PLAYSERV_MODULE_DISABLED_RPC_CORE
 using Playserv.RPC;
-#endif
 using Playserv.Proxy.Common;
-#if !PLAYSERV_MODULE_DISABLED_SERVER
 using Playserv.Server;
-#endif
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_MODULE_DISABLED_SPAWN && !PLAYSERV_MODULE_DISABLED_EVENTS
 using Playserv.Spawn;
 using UnityEngine;
-#endif
 
 namespace Playserv.Wrapper
 {
     public static partial class PlayServ
     {
-#if !PLAYSERV_MODULE_DISABLED_DATA
         public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
             string playerId,
             Func<TEntity, TDto> map,
@@ -48,8 +39,6 @@ namespace Playserv.Wrapper
             Action<Exception> onError = null) =>
             PlayServData.StartDataByKeyPolling(key, query, variables, onData, onError);
 
-#endif
-#if !PLAYSERV_MODULE_DISABLED_EVENTS
         public static IObservable<T> Subscribe<T>() =>
             PlayServEvents.Subscribe<T>();
 
@@ -71,8 +60,6 @@ namespace Playserv.Wrapper
         public static Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
             PlayServEvents.UnsubscribeGroupAsync(groupName, ct);
 
-#endif
-#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_CLIENT_RPC
         public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {
             add => PlayServRpc.OnRpcInvokeResponse += value;
@@ -106,8 +93,6 @@ namespace Playserv.Wrapper
         public static void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
             PlayServRpc.Invoke(method, payloadBase64);
 
-#endif
-#if !PLAYSERV_MODULE_DISABLED_SERVER
         public static void SetCommandHandler(ICommandHandler commandHandler)
         {
             var configurator = Playserv.Proxy.Common.PlayServRuntimeHost.LocalExecution as ILocalCommandExecutionConfigurator;
@@ -126,13 +111,9 @@ namespace Playserv.Wrapper
             configurator.SetEventHandler(eventHandler);
         }
 
-#endif
-#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER
         public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
             PlayServServerRpc.SetRpcInvoker(rpcInvoker);
 
-#endif
-#if UNITY_5_3_OR_NEWER && !PLAYSERV_MODULE_DISABLED_SPAWN && !PLAYSERV_MODULE_DISABLED_EVENTS
         public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
             PlayServSpawn.Spawn(assetName, position, rotation);
 
@@ -161,7 +142,6 @@ namespace Playserv.Wrapper
 
         public static void SetSpawnPrefabRegistry(INetworkPrefabRegistry prefabRegistry) =>
             PlayServSpawn.SetPrefabRegistry(prefabRegistry);
-#endif
 
     }
 
@@ -176,13 +156,7 @@ namespace Playserv.Wrapper
 
         private static ILocalCommandExecution CreateLocalExecution()
         {
-#if !PLAYSERV_MODULE_DISABLED_SERVER
             return new PlayServServerLocalExecution();
-#elif !PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION
-            return new NoOpPlayServLocalExecution();
-#else
-            return null;
-#endif
         }
     }
 

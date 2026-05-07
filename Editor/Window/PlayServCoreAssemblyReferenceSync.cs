@@ -12,7 +12,8 @@ namespace Playserv.Editor
     {
         private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Window/PlayServCoreAssemblyReferenceSync.cs";
-        private const string CoreAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
+        private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
+        private const string EditorAsmdefRelativePath = "Editor/Playserv.Editor.asmdef";
 
         private static readonly string[] BaseReferences =
         {
@@ -43,8 +44,17 @@ namespace Playserv.Editor
         public static void Sync()
         {
             PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
+            var state = PlayServRuntimeModuleDefines.Load();
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
 
-            var asmdefPath = Path.Combine(PackageRootPath, CoreAsmdefRelativePath);
+            SyncRuntimeAsmdefReferences(state);
+            SyncEditorAsmdefReferences(state);
+        }
+
+        private static void SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state)
+        {
+            var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
                 return;
 
@@ -53,7 +63,7 @@ namespace Playserv.Editor
             if (model == null)
                 return;
 
-            var nextReferences = BuildReferences();
+            var nextReferences = BuildRuntimeReferences(state);
             if (SequenceEqual(model.references, nextReferences))
                 return;
 
@@ -62,54 +72,99 @@ namespace Playserv.Editor
             AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
         }
 
-        private static string[] BuildReferences()
+        private static void SyncEditorAsmdefReferences(PlayServRuntimeModuleState state)
+        {
+            var asmdefPath = Path.Combine(PackageRootPath, EditorAsmdefRelativePath);
+            if (!File.Exists(asmdefPath))
+                return;
+
+            var json = File.ReadAllText(asmdefPath);
+            var model = JsonUtility.FromJson<AssemblyDefinitionModel>(json);
+            if (model == null)
+                return;
+
+            var nextReferences = BuildEditorReferences(model.references, state);
+            if (SequenceEqual(model.references, nextReferences))
+                return;
+
+            model.references = nextReferences;
+            File.WriteAllText(asmdefPath, JsonUtility.ToJson(model, prettyPrint: true) + Environment.NewLine);
+            AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
+        }
+
+        private static string[] BuildRuntimeReferences(PlayServRuntimeModuleState state)
         {
             var references = new List<string>(BaseReferences);
+            if (state.Events)
+                AddModuleReference(references, PlayServModuleManifest.EventsId);
 
-            for (var i = 0; i < ModuleReferences.Length; i++)
-            {
-                var moduleReference = ModuleReferences[i];
-                if (!IsModuleAvailable(moduleReference.ModuleId))
-                    continue;
+            if (state.Data)
+                AddModuleReference(references, PlayServModuleManifest.DataSubscriptionId);
 
-                references.Add(moduleReference.AssemblyName);
-            }
+            if (state.Rpc || state.Server)
+                AddModuleReference(references, PlayServModuleManifest.RpcCoreId);
+
+            if (state.Rpc)
+                AddModuleReference(references, PlayServModuleManifest.ClientRpcId);
+
+            if (state.Server)
+                AddModuleReference(references, PlayServModuleManifest.ServerId);
+
+            if (state.Spawn && state.Events)
+                AddModuleReference(references, PlayServModuleManifest.SpawnId);
+
+            if (state.Pulse)
+                AddModuleReference(references, PlayServModuleManifest.PulseId);
 
             return references.Distinct(StringComparer.Ordinal).ToArray();
         }
 
-        private static bool IsModuleAvailable(string moduleId)
+        private static string[] BuildEditorReferences(string[] currentReferences, PlayServRuntimeModuleState state)
         {
-            if (!PlayServModuleManifest.TryGet(moduleId, out var module))
-                return false;
+            var references = new List<string>();
+            currentReferences = currentReferences ?? Array.Empty<string>();
 
-            var paths = new List<string>();
-            AddModuleAssetPaths(module, paths, new HashSet<string>(StringComparer.Ordinal));
-            return paths.All(HasAssetPath);
+            for (var i = 0; i < currentReferences.Length; i++)
+            {
+                if (IsModuleAssemblyReference(currentReferences[i]))
+                    continue;
+
+                references.Add(currentReferences[i]);
+            }
+
+            if (state.Events)
+                AddModuleReference(references, PlayServModuleManifest.EventsId);
+
+            if (state.Data)
+                AddModuleReference(references, PlayServModuleManifest.DataSubscriptionId);
+
+            return references.Distinct(StringComparer.Ordinal).ToArray();
         }
 
-        private static void AddModuleAssetPaths(
-            PlayServModuleManifestEntry module,
-            List<string> paths,
-            ISet<string> visited)
+        private static void AddModuleReference(List<string> references, string moduleId)
         {
-            if (module == null || !visited.Add(module.Id))
-                return;
-
-            paths.AddRange(module.AssetPaths);
-            paths.AddRange(module.HiddenDependencyAssetPaths);
-
-            for (var i = 0; i < module.HiddenDependencyModuleIds.Length; i++)
+            for (var i = 0; i < ModuleReferences.Length; i++)
             {
-                if (PlayServModuleManifest.TryGet(module.HiddenDependencyModuleIds[i], out var dependency))
-                    AddModuleAssetPaths(dependency, paths, visited);
+                if (!string.Equals(ModuleReferences[i].ModuleId, moduleId, StringComparison.Ordinal))
+                    continue;
+
+                references.Add(ModuleReferences[i].AssemblyName);
+                return;
             }
         }
 
-        private static bool HasAssetPath(string relativePath)
+        private static bool IsModuleAssemblyReference(string reference)
         {
-            var absolutePath = Path.Combine(PackageRootPath, relativePath);
-            return Directory.Exists(absolutePath) || File.Exists(absolutePath);
+            if (string.IsNullOrEmpty(reference))
+                return false;
+
+            for (var i = 0; i < ModuleReferences.Length; i++)
+            {
+                if (string.Equals(ModuleReferences[i].AssemblyName, reference, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool SequenceEqual(string[] left, string[] right)
