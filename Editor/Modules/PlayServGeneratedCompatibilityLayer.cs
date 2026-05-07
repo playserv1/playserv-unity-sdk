@@ -51,17 +51,19 @@ namespace Playserv.Editor
 
         private static PlayServGeneratedModuleState BuildState()
         {
+            var runtimeState = PlayServRuntimeModuleDefines.Load();
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref runtimeState);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(ref runtimeState);
+
             return new PlayServGeneratedModuleState(
-                events: PlayServEditorModuleAvailability.RuntimeEvents,
-                data: PlayServEditorModuleAvailability.RuntimeData,
-                rpcCore: PlayServEditorModuleAvailability.RuntimeClientRpc ||
-                         PlayServEditorModuleAvailability.RuntimeServer,
-                clientRpc: PlayServEditorModuleAvailability.RuntimeClientRpc,
-                server: PlayServEditorModuleAvailability.RuntimeServer,
-                clientExecution: PlayServEditorModuleAvailability.RuntimeClientExecution,
-                spawn: PlayServEditorModuleAvailability.RuntimeSpawn &&
-                       PlayServEditorModuleAvailability.RuntimeEvents,
-                pulse: PlayServEditorModuleAvailability.RuntimePulse);
+                events: runtimeState.Events,
+                data: runtimeState.Data,
+                rpcCore: runtimeState.Rpc || runtimeState.Server,
+                clientRpc: runtimeState.Rpc,
+                server: runtimeState.Server,
+                clientExecution: runtimeState.ClientExecution,
+                spawn: runtimeState.Spawn && runtimeState.Events,
+                pulse: runtimeState.Pulse);
         }
 
         private static string GenerateCompatibility(PlayServGeneratedModuleState state)
@@ -109,17 +111,13 @@ namespace Playserv.Editor
 
             if (state.Data)
             {
-                usings.Add($"#if !{PlayServModuleManifest.DefineDisableData}");
                 usings.Add("using Playserv.DataSubscription;");
                 usings.Add("using Playserv.DataSubscription.Responses;");
-                usings.Add("#endif");
             }
 
             if (state.ClientRpc || state.Server)
             {
-                usings.Add($"#if !{PlayServModuleManifest.DefineDisableRpcCore}");
                 usings.Add("using Playserv.RPC;");
-                usings.Add("#endif");
             }
 
             if (state.HasLocalExecution)
@@ -129,17 +127,13 @@ namespace Playserv.Editor
 
             if (state.Server)
             {
-                usings.Add($"#if !{PlayServModuleManifest.DefineDisableServer}");
                 usings.Add("using Playserv.Server;");
-                usings.Add("#endif");
             }
 
             if (state.Spawn)
             {
-                usings.Add($"#if UNITY_5_3_OR_NEWER && !{PlayServModuleManifest.DefineDisableSpawn} && !{PlayServModuleManifest.DefineDisableEvents}");
                 usings.Add("using Playserv.Spawn;");
                 usings.Add("using UnityEngine;");
-                usings.Add("#endif");
             }
 
             return usings;
@@ -151,34 +145,18 @@ namespace Playserv.Editor
             sb.AppendLine("    {");
 
             if (state.Data)
-            {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableData}");
                 AppendDataFacade(sb);
-                sb.AppendLine("#endif");
-            }
 
             if (state.Events)
-            {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableEvents}");
                 AppendEventsFacade(sb);
-                sb.AppendLine("#endif");
-            }
 
             if (state.ClientRpc)
-            {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableRpcCore} && !{PlayServModuleManifest.DefineDisableClientRpc}");
                 AppendClientRpcFacade(sb);
-                sb.AppendLine("#endif");
-            }
 
             if (state.Server)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableServer}");
                 AppendServerLocalFacade(sb);
-                sb.AppendLine("#endif");
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableRpcCore} && !{PlayServModuleManifest.DefineDisableServer}");
                 AppendServerRpcFacade(sb);
-                sb.AppendLine("#endif");
             }
 
             if (state.Spawn)
@@ -309,7 +287,6 @@ namespace Playserv.Editor
 
         private static void AppendSpawnFacade(StringBuilder sb)
         {
-            sb.AppendLine($"#if UNITY_5_3_OR_NEWER && !{PlayServModuleManifest.DefineDisableSpawn} && !{PlayServModuleManifest.DefineDisableEvents}");
             sb.AppendLine("        public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>");
             sb.AppendLine("            PlayServSpawn.Spawn(assetName, position, rotation);");
             sb.AppendLine();
@@ -338,7 +315,6 @@ namespace Playserv.Editor
             sb.AppendLine();
             sb.AppendLine("        public static void SetSpawnPrefabRegistry(INetworkPrefabRegistry prefabRegistry) =>");
             sb.AppendLine("            PlayServSpawn.SetPrefabRegistry(prefabRegistry);");
-            sb.AppendLine("#endif");
             sb.AppendLine();
         }
 
@@ -355,13 +331,12 @@ namespace Playserv.Editor
             sb.AppendLine();
             sb.AppendLine("        private static ILocalCommandExecution CreateLocalExecution()");
             sb.AppendLine("        {");
-            sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableServer}");
-            sb.AppendLine("            return new PlayServServerLocalExecution();");
-            sb.AppendLine($"#elif !{PlayServModuleManifest.DefineDisableClientExecution}");
-            sb.AppendLine("            return new NoOpPlayServLocalExecution();");
-            sb.AppendLine("#else");
-            sb.AppendLine("            return null;");
-            sb.AppendLine("#endif");
+            if (state.Server)
+                sb.AppendLine("            return new PlayServServerLocalExecution();");
+            else if (state.ClientExecution)
+                sb.AppendLine("            return new NoOpPlayServLocalExecution();");
+            else
+                sb.AppendLine("            return null;");
             sb.AppendLine("        }");
             sb.AppendLine("    }");
             sb.AppendLine();
@@ -391,39 +366,29 @@ namespace Playserv.Editor
 
             if (state.Data)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableData}");
                 sb.AppendLine("using Playserv.DataSubscription;");
-                sb.AppendLine("#endif");
             }
 
             if (state.Events)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableEvents}");
                 sb.AppendLine("using Playserv.Events;");
-                sb.AppendLine("#endif");
             }
 
             sb.AppendLine("using Playserv.Modules;");
 
             if (state.Pulse)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisablePulse}");
                 sb.AppendLine("using Playserv.Pulse;");
-                sb.AppendLine("#endif");
             }
 
             if (state.RpcCore || state.ClientRpc || state.Server)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableRpcCore}");
                 sb.AppendLine("using Playserv.RPC;");
-                sb.AppendLine("#endif");
             }
 
             if (state.Spawn)
             {
-                sb.AppendLine($"#if UNITY_5_3_OR_NEWER && !{PlayServModuleManifest.DefineDisableSpawn} && !{PlayServModuleManifest.DefineDisableEvents}");
                 sb.AppendLine("using Playserv.Spawn;");
-                sb.AppendLine("#endif");
             }
 
             sb.AppendLine();
@@ -436,51 +401,37 @@ namespace Playserv.Editor
 
             if (state.Events)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableEvents}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.EventsId, () => new PlayServEventsModule());");
-                sb.AppendLine("#endif");
             }
 
             if (state.Data)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableData}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.DataSubscriptionId, () => new PlayServDataSubscriptionModule());");
-                sb.AppendLine("#endif");
             }
 
             if (state.RpcCore)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableRpcCore}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.RpcCoreId, () => new PlayServRpcCoreModule());");
-                sb.AppendLine("#endif");
             }
 
             if (state.ClientRpc)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableRpcCore} && !{PlayServModuleManifest.DefineDisableClientRpc}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.ClientRpcId, () => new PlayServClientRpcModule());");
-                sb.AppendLine("#endif");
             }
 
             if (state.Server)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisableRpcCore} && !{PlayServModuleManifest.DefineDisableServer}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.ServerId, () => new PlayServServerModule());");
-                sb.AppendLine("#endif");
             }
 
             if (state.Pulse)
             {
-                sb.AppendLine($"#if !{PlayServModuleManifest.DefineDisablePulse}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.PulseId, () => new PlayServPulseModule());");
-                sb.AppendLine("#endif");
             }
 
             if (state.Spawn)
             {
-                sb.AppendLine($"#if UNITY_5_3_OR_NEWER && !{PlayServModuleManifest.DefineDisableSpawn} && !{PlayServModuleManifest.DefineDisableEvents}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.SpawnId, () => new PlayServSpawnModule());");
-                sb.AppendLine("#endif");
             }
 
             sb.AppendLine("        }");
