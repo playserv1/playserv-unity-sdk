@@ -1,6 +1,6 @@
 using Playserv.Modules;
 
-namespace Playserv.RPC
+namespace Playserv.Server
 {
     public sealed class PlayServServerModule : IPlayServModule, IPlayServServerModule
     {

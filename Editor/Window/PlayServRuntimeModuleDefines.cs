@@ -79,6 +79,11 @@ namespace Playserv.Editor
             return EditorPrefs.GetBool(BuildUserDisabledPrefKey(moduleId), false);
         }
 
+        public static bool IsModuleEnabled(ISet<string> defines, string moduleId)
+        {
+            return IsEnabled(defines, moduleId);
+        }
+
         public static bool RemoveLegacyRuntimeModuleDefines(ISet<string> defines)
         {
             if (defines == null)
@@ -120,19 +125,29 @@ namespace Playserv.Editor
         {
             var rpcCoreEnabled = state.Rpc || state.Server;
 
-            SetUserDisabled(PlayServModuleManifest.EventsId, !state.Events);
-            SetUserDisabled(PlayServModuleManifest.DataSubscriptionId, !state.Data);
-            SetUserDisabled(PlayServModuleManifest.RpcCoreId, !rpcCoreEnabled);
-            SetUserDisabled(PlayServModuleManifest.ClientRpcId, !state.Rpc);
-            SetUserDisabled(PlayServModuleManifest.ServerId, !state.Server);
-            SetUserDisabled(PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
-            SetUserDisabled(PlayServModuleManifest.SpawnId, !state.Spawn);
-            SetUserDisabled(PlayServModuleManifest.PulseId, !state.Pulse);
+            SetUserModulePreference(PlayServModuleManifest.EventsId, state.Events);
+            SetUserModulePreference(PlayServModuleManifest.DataSubscriptionId, state.Data);
+            SetUserModulePreference(PlayServModuleManifest.RpcCoreId, rpcCoreEnabled);
+            SetUserModulePreference(PlayServModuleManifest.ClientRpcId, state.Rpc);
+            SetUserModulePreference(PlayServModuleManifest.ServerId, state.Server);
+            SetUserModulePreference(PlayServModuleManifest.ClientExecutionId, state.ClientExecution);
+            SetUserModulePreference(PlayServModuleManifest.SpawnId, state.Spawn);
+            SetUserModulePreference(PlayServModuleManifest.PulseId, state.Pulse);
         }
 
-        private static void SetUserDisabled(string moduleId, bool disabled)
+        private static void SetUserModulePreference(string moduleId, bool enabled)
         {
-            EditorPrefs.SetBool(BuildUserDisabledPrefKey(moduleId), disabled);
+            var module = PlayServModuleManifest.GetRequired(moduleId);
+            var disabledKey = BuildUserDisabledPrefKey(moduleId);
+            var enabledKey = BuildUserEnabledPrefKey(moduleId);
+
+            EditorPrefs.DeleteKey(disabledKey);
+            EditorPrefs.DeleteKey(enabledKey);
+
+            if (enabled == module.DefaultEnabled)
+                return;
+
+            EditorPrefs.SetBool(enabled ? enabledKey : disabledKey, true);
         }
 
         private static string BuildUserDisabledPrefKey(string moduleId)
@@ -140,9 +155,24 @@ namespace Playserv.Editor
             return Const.PrefRuntimeModuleUserDisabledPrefix + moduleId;
         }
 
+        private static string BuildUserEnabledPrefKey(string moduleId)
+        {
+            return $"{Const.PrefRuntimeModuleUserDisabledPrefix}enabled.{moduleId}";
+        }
+
         private static bool IsEnabled(ISet<string> defines, string moduleId)
         {
-            return !IsDisabled(defines, moduleId);
+            if (IsDisabled(defines, moduleId))
+                return false;
+
+            var module = PlayServModuleManifest.GetRequired(moduleId);
+            if (EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false))
+                return true;
+
+            if (IsUserDisabled(moduleId))
+                return false;
+
+            return module.DefaultEnabled;
         }
 
         private static bool IsDisabled(ISet<string> defines, string moduleId)

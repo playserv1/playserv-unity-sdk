@@ -1,4 +1,4 @@
-namespace Playserv.RPC
+namespace Playserv.Server
 {
     public interface IPlayServServerModule
     {

@@ -150,8 +150,8 @@ namespace Playserv.Editor
             {
                 foreach (var profile in PlayServSdkProfiles.All)
                 {
-                    if (PlayServWindowChrome.DrawActionButton(profile.Label, PlayServWindowButtonTone.Secondary, GUILayout.Height(28f)))
-                        changed |= settings.ApplyRuntimeProfile(profile);
+                    if (PlayServWindowChrome.DrawActionButton($"Apply {profile.Label}", PlayServWindowButtonTone.Secondary, GUILayout.Height(28f)))
+                        changed |= PlayServRuntimeModuleLifecycle.ApplyProfile(settings, profile);
 
                     GUILayout.Space(6f);
                 }
@@ -161,7 +161,7 @@ namespace Playserv.Editor
 
             GUILayout.Space(2f);
             GUILayout.Label(
-                "Profiles apply the same module graph used by package export: Client SDK, Server SDK, Full SDK, or Core Only.",
+                "Apply Profile updates module defines, generated compatibility code, and root asmdef references before Unity reloads scripts.",
                 PlayServWindowTheme.SectionSubtitleStyle);
 
             return changed;
@@ -239,11 +239,34 @@ namespace Playserv.Editor
             {
                 var canChange = settings.CanChangeRuntimeModule(title);
                 var blockReason = settings.GetRuntimeModuleBlockReason(title);
+                var canUninstall = PlayServRuntimeModuleLifecycle.CanUninstallModule(settings, module, out var uninstallBlockReason);
                 bool nextEnabled;
 
-                using (new EditorGUI.DisabledScope(!canChange))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    nextEnabled = EditorGUILayout.ToggleLeft(title, enabled);
+                    using (new EditorGUI.DisabledScope(!canChange))
+                    {
+                        nextEnabled = EditorGUILayout.ToggleLeft(title, enabled);
+                    }
+
+                    GUILayout.FlexibleSpace();
+
+                    using (new EditorGUI.DisabledScope(!canUninstall))
+                    {
+                        if (PlayServWindowChrome.DrawActionButton("Uninstall", PlayServWindowButtonTone.Ghost, GUILayout.Width(96f), GUILayout.Height(24f)))
+                        {
+                            if (ConfirmUninstall(module) &&
+                                !PlayServRuntimeModuleLifecycle.UninstallModule(settings, module, out var error))
+                            {
+                                EditorUtility.DisplayDialog(
+                                    "PlayServ module uninstall failed",
+                                    string.IsNullOrEmpty(error) ? "Unknown uninstall error." : error,
+                                    "OK");
+                            }
+
+                            return true;
+                        }
+                    }
                 }
 
                 GUILayout.Space(2f);
@@ -256,12 +279,30 @@ namespace Playserv.Editor
                     GUILayout.Space(4f);
                     GUILayout.Label(blockReason, PlayServWindowTheme.SectionSubtitleStyle);
                 }
+                else if (!canUninstall && !string.IsNullOrEmpty(uninstallBlockReason))
+                {
+                    GUILayout.Space(4f);
+                    GUILayout.Label($"Uninstall blocked: {uninstallBlockReason}", PlayServWindowTheme.SectionSubtitleStyle);
+                }
 
                 if (canChange && nextEnabled != enabled)
                     return module.SetEnabled(settings, nextEnabled);
             }
 
             return false;
+        }
+
+        private static bool ConfirmUninstall(PlayServEditorModuleAvailability.PlayServRuntimeModuleDefinition module)
+        {
+            if (!PlayServModuleManifest.TryGet(module.Id, out var manifest))
+                return false;
+
+            var paths = string.Join("\n", manifest.AssetPaths);
+            return EditorUtility.DisplayDialog(
+                $"Uninstall {module.Name} module?",
+                $"This will first disable {module.Name}, regenerate compatibility code, sync asmdef references, and then delete these package paths:\n\n{paths}",
+                "Uninstall",
+                "Cancel");
         }
 
         private static void DrawModuleTags(PlayServEditorModuleSettings settings, string label, string[] moduleNames)

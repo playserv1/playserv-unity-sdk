@@ -17,7 +17,6 @@ namespace Playserv.Modules
             RegisterManifestModule(host, PlayServModuleManifest.DataSubscriptionId, () => new PlayServDataSubscriptionModule());
             RegisterManifestModule(host, PlayServModuleManifest.RpcCoreId, () => new PlayServRpcCoreModule());
             RegisterManifestModule(host, PlayServModuleManifest.ClientRpcId, () => new PlayServClientRpcModule());
-            RegisterManifestModule(host, PlayServModuleManifest.ServerId, () => new PlayServServerModule());
             RegisterManifestModule(host, PlayServModuleManifest.PulseId, () => new PlayServPulseModule());
             RegisterManifestModule(host, PlayServModuleManifest.SpawnId, () => new PlayServSpawnModule());
         }
