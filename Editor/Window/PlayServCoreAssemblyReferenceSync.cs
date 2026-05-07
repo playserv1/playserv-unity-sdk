@@ -29,10 +29,7 @@ namespace Playserv.Editor
             new ModuleAssemblyReference(PlayServModuleManifest.DataSubscriptionId, "Playserv.Runtime.Modules.DataSubscription"),
             new ModuleAssemblyReference(PlayServModuleManifest.RpcCoreId, "Playserv.Runtime.Modules.RPC.Core"),
             new ModuleAssemblyReference(PlayServModuleManifest.ClientRpcId, "Playserv.Runtime.Modules.RPC.Client"),
-            new ModuleAssemblyReference(PlayServModuleManifest.ServerRpcId, "Playserv.Runtime.Modules.ServerRPC"),
-            new ModuleAssemblyReference(PlayServModuleManifest.LocalExecutionCoreId, "Playserv.Runtime.Modules.LocalExecution.Core"),
-            new ModuleAssemblyReference(PlayServModuleManifest.ClientExecutionId, "Playserv.Runtime.Modules.LocalExecution.Client"),
-            new ModuleAssemblyReference(PlayServModuleManifest.ServerLocalExecutionId, "Playserv.Runtime.Modules.LocalExecution.Server"),
+            new ModuleAssemblyReference(PlayServModuleManifest.ServerId, "Playserv.Runtime.Modules.Server"),
             new ModuleAssemblyReference(PlayServModuleManifest.SpawnId, "Playserv.Runtime.Modules.Spawn"),
             new ModuleAssemblyReference(PlayServModuleManifest.PulseId, "Playserv.Runtime.Modules.Pulse")
         };
@@ -56,7 +53,7 @@ namespace Playserv.Editor
             if (model == null)
                 return;
 
-            var nextReferences = BuildReferences(ReadDefines());
+            var nextReferences = BuildReferences();
             if (SequenceEqual(model.references, nextReferences))
                 return;
 
@@ -65,16 +62,13 @@ namespace Playserv.Editor
             AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
         }
 
-        private static string[] BuildReferences(ISet<string> defines)
+        private static string[] BuildReferences()
         {
             var references = new List<string>(BaseReferences);
 
             for (var i = 0; i < ModuleReferences.Length; i++)
             {
                 var moduleReference = ModuleReferences[i];
-                if (!IsModuleEnabled(defines, moduleReference.ModuleId))
-                    continue;
-
                 if (!IsModuleAvailable(moduleReference.ModuleId))
                     continue;
 
@@ -82,12 +76,6 @@ namespace Playserv.Editor
             }
 
             return references.Distinct(StringComparer.Ordinal).ToArray();
-        }
-
-        private static bool IsModuleEnabled(ISet<string> defines, string moduleId)
-        {
-            return PlayServModuleManifest.TryGet(moduleId, out var module) &&
-                   !defines.Contains(module.DisableDefine);
         }
 
         private static bool IsModuleAvailable(string moduleId)
@@ -122,18 +110,6 @@ namespace Playserv.Editor
         {
             var absolutePath = Path.Combine(PackageRootPath, relativePath);
             return Directory.Exists(absolutePath) || File.Exists(absolutePath);
-        }
-
-        private static ISet<string> ReadDefines()
-        {
-            var group = EditorUserBuildSettings.selectedBuildTargetGroup;
-            var rawDefines = PlayerSettings.GetScriptingDefineSymbolsForGroup(group);
-            var symbols = rawDefines
-                .Split(';')
-                .Select(symbol => symbol.Trim())
-                .Where(symbol => !string.IsNullOrEmpty(symbol));
-
-            return new HashSet<string>(symbols, StringComparer.Ordinal);
         }
 
         private static bool SequenceEqual(string[] left, string[] right)

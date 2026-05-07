@@ -5,8 +5,7 @@
         "Playserv.Runtime.Modules",
         "Playserv.Runtime.Core",
         "Playserv.Runtime.Modules.RPC.Core",
-        "Playserv.Runtime.Serialization",
-        "Playserv.Runtime.Modules.LocalExecution.Core"
+        "Playserv.Runtime.Serialization"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

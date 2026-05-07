@@ -11,9 +11,8 @@ namespace Playserv.Editor
         public const string RuntimeModuleData = "Data Subscription";
         public const string RuntimeModuleRpcCore = "RPC Core";
         public const string RuntimeModuleRpc = "RPC";
-        public const string RuntimeModuleServerRpc = "Server RPC";
+        public const string RuntimeModuleServer = "Server";
         public const string RuntimeModuleClientExecution = "Client Execution";
-        public const string RuntimeModuleLocalExecutionServer = "Server Local Execution";
         public const string RuntimeModuleSpawn = "Spawn";
         public const string RuntimeModulePulse = "Pulse";
 
@@ -23,9 +22,8 @@ namespace Playserv.Editor
         public bool RuntimeEvents { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeData { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeRpc { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeServerRpc { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeServer { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeClientExecution { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeLocalExecutionServer { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeSpawn { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimePulse { get; private set; } = DefaultOptionalModuleState;
 
@@ -91,16 +89,13 @@ namespace Playserv.Editor
             return ApplyRuntimeState(state);
         }
 
-        public bool SetRuntimeServerRpc(bool enabled)
+        public bool SetRuntimeServer(bool enabled)
         {
-            if (!PlayServEditorModuleAvailability.RuntimeServerRpc)
-                return false;
-
-            if (enabled && !RuntimeLocalExecutionServer)
+            if (!PlayServEditorModuleAvailability.RuntimeServer)
                 return false;
 
             var state = CreateRuntimeState();
-            state.ServerRpc = enabled;
+            state.Server = enabled;
             return ApplyRuntimeState(state);
         }
 
@@ -114,19 +109,6 @@ namespace Playserv.Editor
 
             var state = CreateRuntimeState();
             state.ClientExecution = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeLocalExecutionServer(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeLocalExecutionServer)
-                return false;
-
-            if (!enabled && RuntimeServerRpc)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.LocalExecutionServer = enabled;
             return ApplyRuntimeState(state);
         }
 
@@ -171,10 +153,8 @@ namespace Playserv.Editor
                     return true;
                 case RuntimeModuleRpc:
                     return RuntimeRpc || RuntimeClientExecution;
-                case RuntimeModuleServerRpc:
-                    return RuntimeServerRpc || RuntimeLocalExecutionServer;
-                case RuntimeModuleLocalExecutionServer:
-                    return !RuntimeLocalExecutionServer || !RuntimeServerRpc;
+                case RuntimeModuleServer:
+                    return true;
                 case RuntimeModuleSpawn:
                     return RuntimeSpawn || RuntimeEvents;
                 case RuntimeModulePulse:
@@ -200,10 +180,8 @@ namespace Playserv.Editor
                     return string.Empty;
                 case RuntimeModuleRpc:
                     return !RuntimeRpc && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleServerRpc:
-                    return !RuntimeServerRpc && !RuntimeLocalExecutionServer ? "Enable Server Local Execution first." : string.Empty;
-                case RuntimeModuleLocalExecutionServer:
-                    return RuntimeLocalExecutionServer && RuntimeServerRpc ? $"Disable dependent modules first: {RuntimeModuleServerRpc}." : string.Empty;
+                case RuntimeModuleServer:
+                    return string.Empty;
                 case RuntimeModuleSpawn:
                     return !RuntimeSpawn && !RuntimeEvents ? "Enable Events first." : string.Empty;
                 case RuntimeModulePulse:
@@ -225,15 +203,13 @@ namespace Playserv.Editor
                 case RuntimeModuleData:
                     return RuntimeData;
                 case RuntimeModuleRpcCore:
-                    return RuntimeRpc || RuntimeServerRpc;
+                    return RuntimeRpc || RuntimeServer;
                 case RuntimeModuleRpc:
                     return RuntimeRpc;
-                case RuntimeModuleServerRpc:
-                    return RuntimeServerRpc;
+                case RuntimeModuleServer:
+                    return RuntimeServer;
                 case RuntimeModuleClientExecution:
                     return RuntimeClientExecution;
-                case RuntimeModuleLocalExecutionServer:
-                    return RuntimeLocalExecutionServer;
                 case RuntimeModuleSpawn:
                     return RuntimeSpawn;
                 case RuntimeModulePulse:
@@ -259,9 +235,8 @@ namespace Playserv.Editor
                 Events = PlayServEditorModuleAvailability.RuntimeEvents && DefaultOptionalModuleState,
                 Data = PlayServEditorModuleAvailability.RuntimeData && DefaultOptionalModuleState,
                 Rpc = PlayServEditorModuleAvailability.RuntimeClientRpc && DefaultOptionalModuleState,
-                ServerRpc = PlayServEditorModuleAvailability.RuntimeServerRpc && DefaultOptionalModuleState,
+                Server = PlayServEditorModuleAvailability.RuntimeServer && DefaultOptionalModuleState,
                 ClientExecution = PlayServEditorModuleAvailability.RuntimeClientExecution && DefaultOptionalModuleState,
-                LocalExecutionServer = PlayServEditorModuleAvailability.RuntimeLocalExecutionServer && DefaultOptionalModuleState,
                 Spawn = PlayServEditorModuleAvailability.RuntimeSpawn && DefaultOptionalModuleState,
                 Pulse = PlayServEditorModuleAvailability.RuntimePulse && DefaultOptionalModuleState
             });
@@ -277,9 +252,8 @@ namespace Playserv.Editor
                 Events = IsProfileModuleEnabled(profile, PlayServModuleManifest.EventsId),
                 Data = IsProfileModuleEnabled(profile, PlayServModuleManifest.DataSubscriptionId),
                 Rpc = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientRpcId),
-                ServerRpc = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerRpcId),
+                Server = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerId),
                 ClientExecution = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientExecutionId),
-                LocalExecutionServer = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerLocalExecutionId),
                 Spawn = IsProfileModuleEnabled(profile, PlayServModuleManifest.SpawnId),
                 Pulse = IsProfileModuleEnabled(profile, PlayServModuleManifest.PulseId)
             });
@@ -335,9 +309,8 @@ namespace Playserv.Editor
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;
             RuntimeRpc = state.Rpc;
-            RuntimeServerRpc = state.ServerRpc;
+            RuntimeServer = state.Server;
             RuntimeClientExecution = state.ClientExecution;
-            RuntimeLocalExecutionServer = state.LocalExecutionServer;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
         }
@@ -349,9 +322,8 @@ namespace Playserv.Editor
                 Events = RuntimeEvents,
                 Data = RuntimeData,
                 Rpc = RuntimeRpc,
-                ServerRpc = RuntimeServerRpc,
+                Server = RuntimeServer,
                 ClientExecution = RuntimeClientExecution,
-                LocalExecutionServer = RuntimeLocalExecutionServer,
                 Spawn = RuntimeSpawn,
                 Pulse = RuntimePulse
             };
@@ -365,18 +337,16 @@ namespace Playserv.Editor
             var changed = RuntimeEvents != state.Events ||
                           RuntimeData != state.Data ||
                           RuntimeRpc != state.Rpc ||
-                          RuntimeServerRpc != state.ServerRpc ||
+                          RuntimeServer != state.Server ||
                           RuntimeClientExecution != state.ClientExecution ||
-                          RuntimeLocalExecutionServer != state.LocalExecutionServer ||
                           RuntimeSpawn != state.Spawn ||
                           RuntimePulse != state.Pulse;
 
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;
             RuntimeRpc = state.Rpc;
-            RuntimeServerRpc = state.ServerRpc;
+            RuntimeServer = state.Server;
             RuntimeClientExecution = state.ClientExecution;
-            RuntimeLocalExecutionServer = state.LocalExecutionServer;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
 

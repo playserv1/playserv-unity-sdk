@@ -25,9 +25,8 @@ namespace Playserv.Editor
         public static bool RuntimeEvents => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleEvents);
         public static bool RuntimeData => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleData);
         public static bool RuntimeClientRpc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleRpc);
-        public static bool RuntimeServerRpc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServerRpc);
+        public static bool RuntimeServer => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServer);
         public static bool RuntimeClientExecution => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleClientExecution);
-        public static bool RuntimeLocalExecutionServer => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleLocalExecutionServer);
         public static bool RuntimeSpawn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleSpawn);
         public static bool RuntimePulse => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModulePulse);
 
@@ -116,12 +115,10 @@ namespace Playserv.Editor
                     return settings => settings.RuntimeData;
                 case PlayServModuleManifest.ClientRpcId:
                     return settings => settings.RuntimeRpc;
-                case PlayServModuleManifest.ServerRpcId:
-                    return settings => settings.RuntimeServerRpc;
+                case PlayServModuleManifest.ServerId:
+                    return settings => settings.RuntimeServer;
                 case PlayServModuleManifest.ClientExecutionId:
                     return settings => settings.RuntimeClientExecution;
-                case PlayServModuleManifest.ServerLocalExecutionId:
-                    return settings => settings.RuntimeLocalExecutionServer;
                 case PlayServModuleManifest.SpawnId:
                     return settings => settings.RuntimeSpawn;
                 case PlayServModuleManifest.PulseId:
@@ -141,12 +138,10 @@ namespace Playserv.Editor
                     return (settings, enabled) => settings.SetRuntimeData(enabled);
                 case PlayServModuleManifest.ClientRpcId:
                     return (settings, enabled) => settings.SetRuntimeRpc(enabled);
-                case PlayServModuleManifest.ServerRpcId:
-                    return (settings, enabled) => settings.SetRuntimeServerRpc(enabled);
+                case PlayServModuleManifest.ServerId:
+                    return (settings, enabled) => settings.SetRuntimeServer(enabled);
                 case PlayServModuleManifest.ClientExecutionId:
                     return (settings, enabled) => settings.SetRuntimeClientExecution(enabled);
-                case PlayServModuleManifest.ServerLocalExecutionId:
-                    return (settings, enabled) => settings.SetRuntimeLocalExecutionServer(enabled);
                 case PlayServModuleManifest.SpawnId:
                     return (settings, enabled) => settings.SetRuntimeSpawn(enabled);
                 case PlayServModuleManifest.PulseId:
@@ -159,7 +154,7 @@ namespace Playserv.Editor
         public static bool IsRuntimeModuleAvailable(string moduleName)
         {
             if (string.Equals(moduleName, PlayServEditorModuleSettings.RuntimeModuleRpcCore, StringComparison.Ordinal))
-                return RuntimeClientRpc || RuntimeServerRpc;
+                return RuntimeClientRpc || RuntimeServer;
 
             return IsRuntimeModuleAvailable(moduleName, new HashSet<string>(StringComparer.Ordinal));
         }
@@ -173,7 +168,7 @@ namespace Playserv.Editor
         {
             if (string.Equals(moduleName, PlayServEditorModuleSettings.RuntimeModuleRpcCore, StringComparison.Ordinal))
                 return IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleRpc, visited) ||
-                       IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServerRpc, visited);
+                       IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServer, visited);
 
             var module = FindRuntimeModule(moduleName);
             if (module == null || !module.HasRequiredFolders)
@@ -196,7 +191,7 @@ namespace Playserv.Editor
             state.Events &= RuntimeEvents;
             state.Data &= RuntimeData;
             state.Rpc &= RuntimeClientRpc;
-            state.ServerRpc &= RuntimeServerRpc;
+            state.Server &= RuntimeServer;
             state.ClientExecution &= RuntimeClientExecution;
             if (!state.ClientExecution)
             {
@@ -206,9 +201,6 @@ namespace Playserv.Editor
                 state.Pulse = false;
             }
 
-            state.LocalExecutionServer &= RuntimeLocalExecutionServer;
-            if (!state.LocalExecutionServer)
-                state.ServerRpc = false;
             state.Spawn &= RuntimeSpawn;
             state.Pulse &= RuntimePulse;
         }
@@ -221,11 +213,9 @@ namespace Playserv.Editor
             changed |= SyncModuleDefine(defines, PlayServModuleManifest.EventsId, RuntimeEvents);
             changed |= SyncModuleDefine(defines, PlayServModuleManifest.DataSubscriptionId, RuntimeData);
             changed |= SyncModuleDefine(defines, PlayServModuleManifest.ClientRpcId, RuntimeClientRpc);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ServerRpcId, RuntimeServerRpc);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.RpcCoreId, RuntimeClientRpc || RuntimeServerRpc);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ServerId, RuntimeServer);
+            changed |= SyncModuleDefine(defines, PlayServModuleManifest.RpcCoreId, RuntimeClientRpc || RuntimeServer);
             changed |= SyncModuleDefine(defines, PlayServModuleManifest.ClientExecutionId, RuntimeClientExecution);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.LocalExecutionCoreId, RuntimeClientExecution || RuntimeLocalExecutionServer);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ServerLocalExecutionId, RuntimeLocalExecutionServer);
             changed |= SyncModuleDefine(defines, PlayServModuleManifest.SpawnId, RuntimeSpawn);
             changed |= SyncModuleDefine(defines, PlayServModuleManifest.PulseId, RuntimePulse);
 

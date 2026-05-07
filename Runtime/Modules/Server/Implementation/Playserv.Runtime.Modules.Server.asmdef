@@ -1,10 +1,11 @@
 {
-    "name": "Playserv.Runtime.Modules.Events",
+    "name": "Playserv.Runtime.Modules.Server",
     "rootNamespace": "",
     "references": [
         "Playserv.Runtime.Modules",
         "Playserv.Runtime.Core",
-        "Playserv.Runtime.Serialization"
+        "Playserv.Runtime.Serialization",
+        "Playserv.Runtime.Modules.RPC.Core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -13,7 +14,8 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [
-        "!PLAYSERV_MODULE_DISABLED_EVENTS"
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_SERVER"
     ],
     "versionDefines": [],
     "noEngineReferences": false

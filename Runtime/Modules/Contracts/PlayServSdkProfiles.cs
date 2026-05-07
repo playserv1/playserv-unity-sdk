@@ -32,8 +32,7 @@ namespace Playserv.Modules
                 "Server runtime package. Client gameplay facades are excluded.",
                 new[]
                 {
-                    PlayServModuleManifest.ServerLocalExecutionId,
-                    PlayServModuleManifest.ServerRpcId
+                    PlayServModuleManifest.ServerId
                 }),
 
             new PlayServSdkProfile(
@@ -46,8 +45,7 @@ namespace Playserv.Modules
                     PlayServModuleManifest.EventsId,
                     PlayServModuleManifest.DataSubscriptionId,
                     PlayServModuleManifest.ClientRpcId,
-                    PlayServModuleManifest.ServerLocalExecutionId,
-                    PlayServModuleManifest.ServerRpcId,
+                    PlayServModuleManifest.ServerId,
                     PlayServModuleManifest.SpawnId,
                     PlayServModuleManifest.PulseId
                 }),
