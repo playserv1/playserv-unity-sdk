@@ -49,16 +49,21 @@ namespace Playserv.Editor
 
         public static void Sync()
         {
+            Sync(importAssets: true);
+        }
+
+        internal static void Sync(bool importAssets)
+        {
             PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
             var state = PlayServRuntimeModuleDefines.Load();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
 
-            SyncRuntimeAsmdefReferences(state);
-            SyncEditorAsmdefReferences();
+            SyncRuntimeAsmdefReferences(state, importAssets);
+            SyncEditorAsmdefReferences(importAssets);
         }
 
-        private static void SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state)
+        private static void SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state, bool importAssets)
         {
             var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
@@ -75,10 +80,11 @@ namespace Playserv.Editor
 
             model.references = nextReferences;
             File.WriteAllText(asmdefPath, JsonUtility.ToJson(model, prettyPrint: true) + Environment.NewLine);
-            AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
+            if (importAssets)
+                AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
         }
 
-        private static void SyncEditorAsmdefReferences()
+        private static void SyncEditorAsmdefReferences(bool importAssets)
         {
             var asmdefPath = Path.Combine(PackageRootPath, EditorAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
@@ -95,7 +101,8 @@ namespace Playserv.Editor
 
             model.references = nextReferences;
             File.WriteAllText(asmdefPath, JsonUtility.ToJson(model, prettyPrint: true) + Environment.NewLine);
-            AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
+            if (importAssets)
+                AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
         }
 
         private static string[] BuildRuntimeReferences(PlayServRuntimeModuleState state)
