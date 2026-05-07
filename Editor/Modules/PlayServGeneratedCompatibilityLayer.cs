@@ -436,9 +436,14 @@ namespace Playserv.Editor
                 sb.AppendLine("using Playserv.Pulse;");
             }
 
-            if (state.RpcCore || state.ClientRpc || state.Server)
+            if (state.RpcCore || state.ClientRpc)
             {
                 sb.AppendLine("using Playserv.RPC;");
+            }
+
+            if (state.Server)
+            {
+                sb.AppendLine("using Playserv.Server;");
             }
 
             if (state.Spawn)

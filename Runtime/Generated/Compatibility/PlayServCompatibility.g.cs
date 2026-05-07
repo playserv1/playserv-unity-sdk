@@ -8,7 +8,6 @@ using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
 using Playserv.RPC;
 using Playserv.Proxy.Common;
-using Playserv.Server;
 using Playserv.Spawn;
 using UnityEngine;
 
@@ -93,27 +92,6 @@ namespace Playserv.Wrapper
         public static void Invoke<TService>(Expression<Action<TService>> method, string payloadBase64) =>
             PlayServRpc.Invoke(method, payloadBase64);
 
-        public static void SetCommandHandler(ICommandHandler commandHandler)
-        {
-            var configurator = Playserv.Proxy.Common.PlayServRuntimeHost.LocalExecution as ILocalCommandExecutionConfigurator;
-            if (configurator == null)
-                throw new InvalidOperationException("Server module is not installed or enabled.");
-
-            configurator.SetCommandHandler(commandHandler);
-        }
-
-        public static void SetEventHandler(IEventHandler eventHandler)
-        {
-            var configurator = Playserv.Proxy.Common.PlayServRuntimeHost.LocalExecution as ILocalEventExecutionConfigurator;
-            if (configurator == null)
-                throw new InvalidOperationException("Server module is not installed or enabled.");
-
-            configurator.SetEventHandler(eventHandler);
-        }
-
-        public static void SetRpcInvoker(IRpcInvoker rpcInvoker) =>
-            PlayServServerRpc.SetRpcInvoker(rpcInvoker);
-
         public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
             PlayServSpawn.Spawn(assetName, position, rotation);
 
@@ -156,7 +134,7 @@ namespace Playserv.Wrapper
 
         private static ILocalCommandExecution CreateLocalExecution()
         {
-            return new PlayServServerLocalExecution();
+            return new NoOpPlayServLocalExecution();
         }
     }
 

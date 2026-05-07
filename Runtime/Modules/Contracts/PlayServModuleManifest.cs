@@ -100,7 +100,7 @@ namespace Playserv.Modules
                 "Server",
                 "Server-side local command/event execution, in-process RPC invoker, service registry, and PlayServServerRpc API.",
                 DefineDisableServer,
-                defaultEnabled: true,
+                defaultEnabled: false,
                 isServerModule: true,
                 visibleInSettings: true,
                 visibleInExport: true,

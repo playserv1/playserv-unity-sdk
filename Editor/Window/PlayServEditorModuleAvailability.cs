@@ -282,7 +282,7 @@ namespace Playserv.Editor
         private static bool SyncModuleDefine(ISet<string> defines, string moduleId, bool available)
         {
             var module = PlayServModuleManifest.GetRequired(moduleId);
-            var shouldDisable = !available || PlayServRuntimeModuleDefines.IsUserDisabled(moduleId);
+            var shouldDisable = !available || !PlayServRuntimeModuleDefines.IsModuleEnabled(defines, moduleId);
             return SetDisabled(defines, module.DisableDefine, shouldDisable);
         }
 

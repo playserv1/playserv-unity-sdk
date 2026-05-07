@@ -15,7 +15,7 @@ RPC is split into `Runtime/Modules/RPC/Core` and `Runtime/Modules/RPC/Client`.
 Server-side in-process RPC lives in the optional `Server` module under `Runtime/Modules/Server`.
 If server RPC invoker is configured (`PlayServServerRpc.SetRpcInvoker(...)` or `PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
 If invoker is configured but service is not registered, SDK falls back to transport (or throws if transport is not connected).
-When `PLAYSERV_MODULE_DISABLED_SERVER` is defined, `ServerRpcInvoker`, `IRpcInvoker`, and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled.
+When the Server module is disabled, `Playserv.Server.ServerRpcInvoker` and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled. `IRpcInvoker` remains the RPC contract in `Playserv.RPC`.
 
 ## Payload format
 
@@ -88,7 +88,7 @@ For this variant payload is built automatically as:
 using Playserv.RPC;
 using Playserv.Wrapper;
 
-var invoker = new ServerRpcInvoker()
+var invoker = new Playserv.Server.ServerRpcInvoker()
     .RegisterService(new NotificationService(context));
 
 PlayServServerRpc.SetRpcInvoker(invoker);

@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Playserv.RPC;
 using Playserv.Serialization;
 
-namespace Playserv.RPC
+namespace Playserv.Server
 {
     /// <summary>
     /// In-process RPC invoker for server/runtime usage without websocket transport.

@@ -4,9 +4,10 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using Playserv.RPC;
 using Playserv.Serialization;
 
-namespace Playserv.RPC
+namespace Playserv.Server
 {
     internal sealed class ServerRpcMethodRegistry
     {

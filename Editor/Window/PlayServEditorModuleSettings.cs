@@ -230,16 +230,7 @@ namespace Playserv.Editor
             if (PlayServEditorModuleAvailability.EditorCodegen)
                 SetCodegen(DefaultOptionalModuleState);
 
-            ApplyRuntimeState(new PlayServRuntimeModuleState
-            {
-                Events = PlayServEditorModuleAvailability.RuntimeEvents && DefaultOptionalModuleState,
-                Data = PlayServEditorModuleAvailability.RuntimeData && DefaultOptionalModuleState,
-                Rpc = PlayServEditorModuleAvailability.RuntimeClientRpc && DefaultOptionalModuleState,
-                Server = PlayServEditorModuleAvailability.RuntimeServer && DefaultOptionalModuleState,
-                ClientExecution = PlayServEditorModuleAvailability.RuntimeClientExecution && DefaultOptionalModuleState,
-                Spawn = PlayServEditorModuleAvailability.RuntimeSpawn && DefaultOptionalModuleState,
-                Pulse = PlayServEditorModuleAvailability.RuntimePulse && DefaultOptionalModuleState
-            });
+            ApplyRuntimeProfile(PlayServSdkProfiles.ClientSdk);
         }
 
         public bool ApplyRuntimeProfile(PlayServSdkProfile profile)
