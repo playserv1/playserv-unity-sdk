@@ -45,6 +45,24 @@ namespace Playserv.Editor
             return state;
         }
 
+        public static PlayServRuntimeModuleState LoadUserPreferenceState()
+        {
+            var rpcCoreEnabled = IsEnabledByUserPreference(PlayServModuleManifest.RpcCoreId);
+            var eventsEnabled = IsEnabledByUserPreference(PlayServModuleManifest.EventsId);
+            var state = new PlayServRuntimeModuleState
+            {
+                Events = eventsEnabled,
+                Data = IsEnabledByUserPreference(PlayServModuleManifest.DataSubscriptionId),
+                Rpc = rpcCoreEnabled && IsEnabledByUserPreference(PlayServModuleManifest.ClientRpcId),
+                Server = rpcCoreEnabled && IsEnabledByUserPreference(PlayServModuleManifest.ServerId),
+                ClientExecution = IsEnabledByUserPreference(PlayServModuleManifest.ClientExecutionId),
+                Spawn = eventsEnabled && IsEnabledByUserPreference(PlayServModuleManifest.SpawnId),
+                Pulse = IsEnabledByUserPreference(PlayServModuleManifest.PulseId)
+            };
+            NormalizeDependencies(ref state);
+            return state;
+        }
+
         public static bool Apply(PlayServRuntimeModuleState state)
         {
             NormalizeDependencies(ref state);
@@ -84,6 +102,21 @@ namespace Playserv.Editor
             return IsEnabled(defines, moduleId);
         }
 
+        public static bool IsEnabledByUserPreference(string moduleId)
+        {
+            if (string.IsNullOrEmpty(moduleId))
+                return false;
+
+            var module = PlayServModuleManifest.GetRequired(moduleId);
+            if (EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false))
+                return true;
+
+            if (IsUserDisabled(moduleId))
+                return false;
+
+            return module.DefaultEnabled;
+        }
+
         public static bool RemoveLegacyRuntimeModuleDefines(ISet<string> defines)
         {
             if (defines == null)
@@ -94,6 +127,57 @@ namespace Playserv.Editor
                 changed |= defines.Remove(LegacyRuntimeModuleDisableDefines[i]);
 
             return changed;
+        }
+
+        public static bool RestoreDefaultEnabledModules(IEnumerable<string> moduleIds)
+        {
+            if (moduleIds == null)
+                return false;
+
+            var defines = ReadDefines();
+            var changed = false;
+
+            foreach (var moduleId in moduleIds)
+            {
+                if (!PlayServModuleManifest.TryGet(moduleId, out var module) || !module.DefaultEnabled)
+                    continue;
+
+                EditorPrefs.DeleteKey(BuildUserDisabledPrefKey(moduleId));
+                EditorPrefs.DeleteKey(BuildUserEnabledPrefKey(moduleId));
+                changed |= defines.Remove(module.DisableDefine);
+            }
+
+            if (!changed)
+                return false;
+
+            WriteDefines(defines);
+            return true;
+        }
+
+        public static bool RemoveStaleDefaultDisableDefines(IEnumerable<string> moduleIds)
+        {
+            if (moduleIds == null)
+                return false;
+
+            var defines = ReadDefines();
+            var changed = false;
+
+            foreach (var moduleId in moduleIds)
+            {
+                if (!PlayServModuleManifest.TryGet(moduleId, out var module) || !module.DefaultEnabled)
+                    continue;
+
+                if (IsUserDisabled(moduleId))
+                    continue;
+
+                changed |= defines.Remove(module.DisableDefine);
+            }
+
+            if (!changed)
+                return false;
+
+            WriteDefines(defines);
+            return true;
         }
 
         public static void NormalizeDependencies(ref PlayServRuntimeModuleState state)
@@ -166,13 +250,10 @@ namespace Playserv.Editor
                 return false;
 
             var module = PlayServModuleManifest.GetRequired(moduleId);
-            if (EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false))
+            if (module.DefaultEnabled)
                 return true;
 
-            if (IsUserDisabled(moduleId))
-                return false;
-
-            return module.DefaultEnabled;
+            return EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false);
         }
 
         private static bool IsDisabled(ISet<string> defines, string moduleId)

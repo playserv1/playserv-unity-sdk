@@ -21,6 +21,8 @@ namespace Playserv.Events.Editor
         private const int EventTypeGroup = 2;
         private const int EventTypeUser = 4;
         private const int EventTypeAll = EventTypeGlobal | EventTypeGroup | EventTypeUser;
+        private const string PackageSamplesAssemblyName = "Playserv.Samples";
+        private const string PackageSamplesNamespace = "Playserv.Samples";
 
         public static void Generate()
         {
@@ -34,7 +36,9 @@ namespace Playserv.Events.Editor
             if (!CanGenerateEvents(out var eventAttributeType))
                 return GenerateDisabledOutput();
 
-            var eventTypes = TypeCache.GetTypesWithAttribute(eventAttributeType);
+            var eventTypes = TypeCache.GetTypesWithAttribute(eventAttributeType)
+                .Where(IsGeneratedOutputEventType)
+                .ToArray();
             var changed = false;
 
             changed |= GenerateApiExtensionsCode(eventTypes, eventAttributeType);
@@ -53,6 +57,20 @@ namespace Playserv.Events.Editor
             Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
             return state.Events && Playserv.Editor.PlayServEditorModuleAvailability.EditorEvents;
+        }
+
+        private static bool IsGeneratedOutputEventType(Type type)
+        {
+            if (type == null)
+                return false;
+
+            var assemblyName = type.Assembly.GetName().Name;
+            if (string.Equals(assemblyName, PackageSamplesAssemblyName, StringComparison.Ordinal))
+                return false;
+
+            var typeNamespace = type.Namespace ?? string.Empty;
+            return !string.Equals(typeNamespace, PackageSamplesNamespace, StringComparison.Ordinal) &&
+                   !typeNamespace.StartsWith(PackageSamplesNamespace + ".", StringComparison.Ordinal);
         }
 
         private static Type ResolveEventAttributeType()

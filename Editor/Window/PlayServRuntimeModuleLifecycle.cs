@@ -125,8 +125,8 @@ namespace Playserv.Editor
 
         private static void SyncGeneratedAndReferences()
         {
-            PlayServGeneratedCompatibilityLayer.SyncNow();
             PlayServCoreAssemblyReferenceSync.Sync();
+            PlayServGeneratedCompatibilityLayer.SyncNow();
         }
 
         private static string BuildDeleteFailureMessage(IReadOnlyList<string> failedPaths)

@@ -17,6 +17,7 @@ namespace Playserv.Editor
         private const string ModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
         private const string GeneratedEventsApiExtensionsAssetPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string GeneratedEventsAdapterExtensionsAssetPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
+        private const string SpawnCompileGuard = "!PLAYSERV_MODULE_DISABLED_EVENTS && !PLAYSERV_MODULE_DISABLED_SPAWN";
 
         private static string _packageRootPath;
         private static bool _syncQueued;
@@ -28,18 +29,23 @@ namespace Playserv.Editor
 
         public static void SyncNow()
         {
+            SyncNow(refreshAssetDatabase: true);
+        }
+
+        internal static void SyncNow(bool refreshAssetDatabase)
+        {
             _syncQueued = false;
 
+            PlayServCoreAssemblyReferenceSync.Sync(importAssets: refreshAssetDatabase);
             var state = BuildState();
+
             var changed = false;
 
             changed |= WriteIfChanged(CompatibilityRelativePath, GenerateCompatibility(state));
             changed |= WriteIfChanged(ModuleRegistryRelativePath, GenerateModuleRegistry(state));
             changed |= SyncGeneratedEventsOutput();
 
-            PlayServCoreAssemblyReferenceSync.Sync();
-
-            if (changed && !EditorApplication.isCompiling)
+            if (changed && refreshAssetDatabase && !EditorApplication.isCompiling)
                 AssetDatabase.Refresh();
         }
 
@@ -158,10 +164,10 @@ namespace Playserv.Editor
             if (state.ClientRpc)
                 usings.Add("using System.Linq.Expressions;");
 
-            if (state.Data || state.Events || state.Spawn)
+            if (state.Data || state.Events || state.Spawn || state.HasPlayServFacade)
                 usings.Add("using System.Threading;");
 
-            if (state.Data || state.Events || state.Spawn)
+            if (state.Data || state.Events || state.Spawn || state.HasPlayServFacade)
                 usings.Add("using System.Threading.Tasks;");
 
             if (state.Data)
@@ -185,11 +191,8 @@ namespace Playserv.Editor
                 usings.Add("using Playserv.Server;");
             }
 
-            if (state.Spawn)
-            {
-                usings.Add("using Playserv.Spawn;");
+            if (state.HasPlayServFacade)
                 usings.Add("using UnityEngine;");
-            }
 
             return usings;
         }
@@ -214,8 +217,7 @@ namespace Playserv.Editor
                 AppendServerRpcFacade(sb);
             }
 
-            if (state.Spawn)
-                AppendSpawnFacade(sb);
+            AppendSpawnFacade(sb);
 
             sb.AppendLine("    }");
             sb.AppendLine();
@@ -343,33 +345,87 @@ namespace Playserv.Editor
         private static void AppendSpawnFacade(StringBuilder sb)
         {
             sb.AppendLine("        public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>");
-            sb.AppendLine("            PlayServSpawn.Spawn(assetName, position, rotation);");
+            sb.AppendLine("            InvokeSpawnGameObject(nameof(Spawn), new[] { typeof(string), typeof(Vector3), typeof(Quaternion) }, assetName, position, rotation);");
             sb.AppendLine();
             sb.AppendLine("        public static Task<GameObject> Spawn(string assetName, Vector3 position) =>");
-            sb.AppendLine("            PlayServSpawn.Spawn(assetName, position);");
+            sb.AppendLine("            InvokeSpawnGameObject(nameof(Spawn), new[] { typeof(string), typeof(Vector3) }, assetName, position);");
             sb.AppendLine();
-            sb.AppendLine("        public static string CurrentSpawnScope => PlayServSpawn.CurrentScope;");
+            sb.AppendLine("        public static string CurrentSpawnScope => InvokeSpawnStringProperty(\"CurrentScope\");");
             sb.AppendLine();
             sb.AppendLine("        public static Task<bool> JoinSpawnScopeAsync(string groupName, CancellationToken ct = default) =>");
-            sb.AppendLine("            PlayServSpawn.JoinSpawnScopeAsync(groupName, ct);");
+            sb.AppendLine("            InvokeSpawnBoolTask(nameof(JoinSpawnScopeAsync), new[] { typeof(string), typeof(CancellationToken) }, groupName, ct);");
             sb.AppendLine();
             sb.AppendLine("        public static Task<bool> JoinSpawnScope(string groupName, CancellationToken ct = default) =>");
-            sb.AppendLine("            PlayServSpawn.JoinSpawnScope(groupName, ct);");
+            sb.AppendLine("            InvokeSpawnBoolTask(nameof(JoinSpawnScope), new[] { typeof(string), typeof(CancellationToken) }, groupName, ct);");
             sb.AppendLine();
             sb.AppendLine("        public static Task<bool> LeaveSpawnScopeAsync(CancellationToken ct = default) =>");
-            sb.AppendLine("            PlayServSpawn.LeaveSpawnScopeAsync(ct);");
+            sb.AppendLine("            InvokeSpawnBoolTask(nameof(LeaveSpawnScopeAsync), new[] { typeof(CancellationToken) }, ct);");
             sb.AppendLine();
             sb.AppendLine("        public static Task<bool> LeaveSpawnScope(CancellationToken ct = default) =>");
-            sb.AppendLine("            PlayServSpawn.LeaveSpawnScope(ct);");
+            sb.AppendLine("            InvokeSpawnBoolTask(nameof(LeaveSpawnScope), new[] { typeof(CancellationToken) }, ct);");
             sb.AppendLine();
             sb.AppendLine("        public static bool Despawn(string spawnId) =>");
-            sb.AppendLine("            PlayServSpawn.Despawn(spawnId);");
+            sb.AppendLine("            InvokeSpawnBool(nameof(Despawn), new[] { typeof(string) }, spawnId);");
             sb.AppendLine();
             sb.AppendLine("        public static bool Despawn(GameObject instance) =>");
-            sb.AppendLine("            PlayServSpawn.Despawn(instance);");
+            sb.AppendLine("            InvokeSpawnBool(nameof(Despawn), new[] { typeof(GameObject) }, instance);");
             sb.AppendLine();
-            sb.AppendLine("        public static void SetSpawnPrefabRegistry(INetworkPrefabRegistry prefabRegistry) =>");
-            sb.AppendLine("            PlayServSpawn.SetPrefabRegistry(prefabRegistry);");
+            sb.AppendLine("        private const string SpawnFacadeTypeName = \"Playserv.Wrapper.PlayServSpawn, Playserv.Runtime.Modules.Spawn\";");
+            sb.AppendLine();
+            sb.AppendLine("        private static Task<GameObject> InvokeSpawnGameObject(string methodName, Type[] parameterTypes, params object[] args)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return InvokeSpawn<Task<GameObject>>(methodName, parameterTypes, args) ?? FaultedSpawnTask<GameObject>(SpawnModuleUnavailableException());");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static Task<bool> InvokeSpawnBoolTask(string methodName, Type[] parameterTypes, params object[] args)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return InvokeSpawn<Task<bool>>(methodName, parameterTypes, args) ?? FaultedSpawnTask<bool>(SpawnModuleUnavailableException());");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static bool InvokeSpawnBool(string methodName, Type[] parameterTypes, params object[] args)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return InvokeSpawn<bool>(methodName, parameterTypes, args);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static string InvokeSpawnStringProperty(string propertyName)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var type = Type.GetType(SpawnFacadeTypeName, throwOnError: false);");
+            sb.AppendLine("            var property = type?.GetProperty(propertyName);");
+            sb.AppendLine("            return property?.GetValue(null, null) as string ?? string.Empty;");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static T InvokeSpawn<T>(string methodName, Type[] parameterTypes, params object[] args)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var type = Type.GetType(SpawnFacadeTypeName, throwOnError: false);");
+            sb.AppendLine("            var method = type?.GetMethod(methodName, parameterTypes);");
+            sb.AppendLine("            if (method == null)");
+            sb.AppendLine("                return default;");
+            sb.AppendLine();
+            sb.AppendLine("            try");
+            sb.AppendLine("            {");
+            sb.AppendLine("                return (T)method.Invoke(null, args);");
+            sb.AppendLine("            }");
+            sb.AppendLine("            catch (Exception ex)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                if (typeof(T) == typeof(Task<GameObject>))");
+            sb.AppendLine("                    return (T)(object)FaultedSpawnTask<GameObject>(ex.InnerException ?? ex);");
+            sb.AppendLine();
+            sb.AppendLine("                if (typeof(T) == typeof(Task<bool>))");
+            sb.AppendLine("                    return (T)(object)FaultedSpawnTask<bool>(ex.InnerException ?? ex);");
+            sb.AppendLine();
+            sb.AppendLine("                return default;");
+            sb.AppendLine("            }");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static Task<T> FaultedSpawnTask<T>(Exception exception)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var tcs = new TaskCompletionSource<T>();");
+            sb.AppendLine("            tcs.SetException(exception);");
+            sb.AppendLine("            return tcs.Task;");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        private static InvalidOperationException SpawnModuleUnavailableException() =>");
+            sb.AppendLine("            new InvalidOperationException(\"PlayServ Spawn module is not installed or enabled.\");");
             sb.AppendLine();
         }
 
@@ -448,7 +504,9 @@ namespace Playserv.Editor
 
             if (state.Spawn)
             {
+                sb.AppendLine($"#if {SpawnCompileGuard}");
                 sb.AppendLine("using Playserv.Spawn;");
+                sb.AppendLine("#endif");
             }
 
             sb.AppendLine();
@@ -491,7 +549,9 @@ namespace Playserv.Editor
 
             if (state.Spawn)
             {
+                sb.AppendLine($"#if {SpawnCompileGuard}");
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.SpawnId, () => new PlayServSpawnModule());");
+                sb.AppendLine("#endif");
             }
 
             sb.AppendLine("        }");
@@ -610,7 +670,7 @@ namespace Playserv.Editor
             public bool Spawn { get; }
             public bool Pulse { get; }
             public bool HasLocalExecution => ClientExecution || Server;
-            public bool HasPlayServFacade => Data || Events || ClientRpc || Server || Spawn;
+            public bool HasPlayServFacade => true;
         }
     }
 

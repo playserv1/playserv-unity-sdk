@@ -207,17 +207,10 @@ namespace Playserv.Editor
 
         public static void SyncUnavailableModuleDefines()
         {
+            PlayServRuntimeModuleDefines.RemoveStaleDefaultDisableDefines(GetAvailableDefaultEnabledModuleIds());
+
             var defines = ReadDefines();
             var changed = PlayServRuntimeModuleDefines.RemoveLegacyRuntimeModuleDefines(defines);
-
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.EventsId, RuntimeEvents);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.DataSubscriptionId, RuntimeData);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ClientRpcId, RuntimeClientRpc);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ServerId, RuntimeServer);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.RpcCoreId, RuntimeClientRpc || RuntimeServer);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.ClientExecutionId, RuntimeClientExecution);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.SpawnId, RuntimeSpawn);
-            changed |= SyncModuleDefine(defines, PlayServModuleManifest.PulseId, RuntimePulse);
 
             changed |= SetDisabled(defines, Const.DefineDisableEditorDeployment, !EditorDeployment);
             changed |= SetDisabled(defines, Const.DefineDisableEditorModelSync, !EditorModelSync);
@@ -225,6 +218,17 @@ namespace Playserv.Editor
 
             if (changed)
                 WriteDefines(defines);
+        }
+
+        private static IEnumerable<string> GetAvailableDefaultEnabledModuleIds()
+        {
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (!module.DefaultEnabled || !IsRuntimeModuleAvailable(module))
+                    continue;
+
+                yield return module.Id;
+            }
         }
 
         private static bool HasAssetPath(string relativePath)
@@ -277,13 +281,6 @@ namespace Playserv.Editor
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)
         {
             return disabled ? defines.Add(symbol) : defines.Remove(symbol);
-        }
-
-        private static bool SyncModuleDefine(ISet<string> defines, string moduleId, bool available)
-        {
-            var module = PlayServModuleManifest.GetRequired(moduleId);
-            var shouldDisable = !available || !PlayServRuntimeModuleDefines.IsModuleEnabled(defines, moduleId);
-            return SetDisabled(defines, module.DisableDefine, shouldDisable);
         }
 
         private static ISet<string> ReadDefines()

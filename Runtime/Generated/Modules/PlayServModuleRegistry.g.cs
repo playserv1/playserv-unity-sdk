@@ -5,7 +5,9 @@ using Playserv.Events;
 using Playserv.Modules;
 using Playserv.Pulse;
 using Playserv.RPC;
+#if !PLAYSERV_MODULE_DISABLED_EVENTS && !PLAYSERV_MODULE_DISABLED_SPAWN
 using Playserv.Spawn;
+#endif
 
 namespace Playserv.Modules
 {
@@ -18,7 +20,9 @@ namespace Playserv.Modules
             RegisterManifestModule(host, PlayServModuleManifest.RpcCoreId, () => new PlayServRpcCoreModule());
             RegisterManifestModule(host, PlayServModuleManifest.ClientRpcId, () => new PlayServClientRpcModule());
             RegisterManifestModule(host, PlayServModuleManifest.PulseId, () => new PlayServPulseModule());
+#if !PLAYSERV_MODULE_DISABLED_EVENTS && !PLAYSERV_MODULE_DISABLED_SPAWN
             RegisterManifestModule(host, PlayServModuleManifest.SpawnId, () => new PlayServSpawnModule());
+#endif
         }
 
         private static void RegisterManifestModule(
