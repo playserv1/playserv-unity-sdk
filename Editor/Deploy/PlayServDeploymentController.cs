@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -241,4 +240,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

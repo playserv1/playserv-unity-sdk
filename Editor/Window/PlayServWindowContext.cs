@@ -14,9 +14,6 @@ namespace Playserv.Editor
         public PlayServWindowContext(
             EditorWindow window,
             PlayServWindowState state,
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-            PlayServDeploymentController deploymentController,
-#endif
             PlayServConnectionController connectionController,
             string docsUrl,
             float styledFieldHeight,
@@ -27,9 +24,6 @@ namespace Playserv.Editor
         {
             Window = window ?? throw new ArgumentNullException(nameof(window));
             State = state ?? throw new ArgumentNullException(nameof(state));
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-            DeploymentController = deploymentController ?? throw new ArgumentNullException(nameof(deploymentController));
-#endif
             ConnectionController = connectionController ?? throw new ArgumentNullException(nameof(connectionController));
             DocsUrl = docsUrl ?? string.Empty;
             StyledFieldHeight = styledFieldHeight;
@@ -42,10 +36,6 @@ namespace Playserv.Editor
         public EditorWindow Window { get; }
 
         public PlayServWindowState State { get; }
-
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-        public PlayServDeploymentController DeploymentController { get; }
-#endif
 
         public PlayServConnectionController ConnectionController { get; }
 

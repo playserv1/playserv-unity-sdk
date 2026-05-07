@@ -1,5 +1,3 @@
-// Assets/Playserv/Editor/Events/EventsCodeGeneratorPostprocessor.cs
-#if !PLAYSERV_MODULE_DISABLED_EVENTS
 using System;
 using System.Linq;
 using UnityEditor;
@@ -140,9 +138,10 @@ namespace Playserv.Events.Editor
 
         private static bool IsEventsModuleEnabled()
         {
-            var defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup);
-            return defines.IndexOf(Playserv.Editor.Const.DefineDisableEvents, StringComparison.Ordinal) < 0;
+            var state = Playserv.Editor.PlayServRuntimeModuleDefines.Load();
+            Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
+            Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
+            return state.Events && Playserv.Editor.PlayServEditorModuleAvailability.EditorEvents;
         }
     }
 }
-#endif

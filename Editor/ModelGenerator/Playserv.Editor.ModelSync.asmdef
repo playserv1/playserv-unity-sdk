@@ -1,0 +1,20 @@
+{
+    "name": "Playserv.Editor.ModelSync",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Runtime",
+        "Playserv.Runtime.Serialization"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

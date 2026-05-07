@@ -1,11 +1,8 @@
-#if UNITY_EDITOR
 using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-#if !PLAYSERV_MODULE_DISABLED_DATA
-using Playserv.DataSubscription;
-#endif
+using Playserv.Editor;
 using Playserv.ModelGenerator.Editor;
 using Playserv.Wrapper;
 using UnityEditor;
@@ -42,9 +39,7 @@ public static class SchemaLoader
         await File.WriteAllTextAsync(filePath, json);
         
         AssetDatabase.Refresh();
-#if !PLAYSERV_MODULE_DISABLED_DATA
-        SchemaSelectionProvider.Reset();
-#endif
+        ResetSchemaSelectionProviderIfAvailable();
 
         Debug.Log($"[SchemaDownloader] schema.json saved to {filePath}");
     }
@@ -96,5 +91,16 @@ public static class SchemaLoader
 
         return serverAddress.Trim().TrimEnd('/') + SchemaBySdkKeyEndpointPath;
     }
+
+    private static void ResetSchemaSelectionProviderIfAvailable()
+    {
+        if (!PlayServEditorModuleAvailability.RuntimeData)
+            return;
+
+        var providerType = Type.GetType(
+            "Playserv.DataSubscription.SchemaSelectionProvider, Playserv.Runtime.Modules.DataSubscription",
+            throwOnError: false);
+        var resetMethod = providerType?.GetMethod("Reset", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        resetMethod?.Invoke(null, null);
+    }
 }
-#endif

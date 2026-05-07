@@ -1,10 +1,6 @@
-#if UNITY_EDITOR
 using System;
 using UnityEditor;
 using UnityEngine;
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-using Playserv.Deploy.Editor;
-#endif
 using Playserv.Wrapper;
 
 namespace Playserv.Editor
@@ -19,35 +15,22 @@ namespace Playserv.Editor
         private const float MinWindowHeight = 760f;
         private const float MaxWindowHeight = 10000f;
         private const float StyledFieldHeight = 26f;
-        private const bool ShowWebSocketConnectionMenu = false;
+        private static readonly bool ShowWebSocketConnectionMenu = false;
 
         private readonly PlayServWindowState _state = new PlayServWindowState();
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-        private readonly DeploymentClosureFilter _deploymentClosureFilter = new DeploymentClosureFilter();
-        private readonly DeploymentZipBuilder _deploymentZipBuilder = new DeploymentZipBuilder();
-#endif
         private readonly PlayServOverviewPresenter _overviewPresenter = new PlayServOverviewPresenter();
         private readonly PlayServConfigSectionPresenter _configSectionPresenter = new PlayServConfigSectionPresenter();
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-        private readonly PlayServDeploymentSectionPresenter _deploymentSectionPresenter = new PlayServDeploymentSectionPresenter();
-#endif
-#if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
-        private readonly PlayServModelSectionPresenter _modelSectionPresenter = new PlayServModelSectionPresenter();
-#endif
-#if !PLAYSERV_MODULE_DISABLED_EVENTS
-        private readonly PlayServEventsSectionPresenter _eventsSectionPresenter = new PlayServEventsSectionPresenter();
-#endif
-#if !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
-        private readonly PlayServCodegenSectionPresenter _codegenSectionPresenter = new PlayServCodegenSectionPresenter();
-#endif
+        private readonly PlayServOptionalEditorSection _deploymentSection =
+            new PlayServOptionalEditorSection("Playserv.Editor.PlayServDeploymentWindowBridge, Playserv.Editor.Deployment");
+        private readonly PlayServOptionalEditorSection _modelSection =
+            new PlayServOptionalEditorSection("Playserv.Editor.PlayServModelSectionPresenter, Playserv.Editor.ModelSync");
+        private readonly PlayServOptionalEditorSection _eventsSection =
+            new PlayServOptionalEditorSection("Playserv.Editor.PlayServEventsSectionPresenter, Playserv.Editor.Events");
+        private readonly PlayServOptionalEditorSection _codegenSection =
+            new PlayServOptionalEditorSection("Playserv.Editor.PlayServCodegenSectionPresenter, Playserv.Editor.Codegen");
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
 
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-        private VersionSyncAction _versionSyncAction;
-        private DeploymentUploadAction _deploymentUploadAction;
-        private PlayServDeploymentController _deploymentController;
-#endif
         private PlayServConnectionController _connectionController;
 
         [MenuItem(MenuPath)]
@@ -110,9 +93,10 @@ namespace Playserv.Editor
         private void OnDisable()
         {
             _connectionController?.Dispose();
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-            _deploymentController?.Dispose();
-#endif
+            _deploymentSection.Dispose();
+            _modelSection.Dispose();
+            _eventsSection.Dispose();
+            _codegenSection.Dispose();
         }
 
         private void OnGUI()
@@ -162,38 +146,37 @@ namespace Playserv.Editor
 
             _configSectionPresenter.Draw(context);
 
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
             if (PlayServEditorModuleAvailability.EditorDeployment &&
-                (_state.ModuleSettings.Deployment || _state.DeployRunning || _state.VersionSyncRunning))
+                (_state.ModuleSettings.Deployment || _state.DeployRunning || _state.VersionSyncRunning) &&
+                _deploymentSection.IsAvailable)
             {
                 GUILayout.Space(12f);
-                _deploymentSectionPresenter.Draw(context);
+                _deploymentSection.Draw(context);
             }
-#endif
 
-#if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
-            if (PlayServEditorModuleAvailability.EditorModelSync && _state.ModuleSettings.ModelSync)
+            if (PlayServEditorModuleAvailability.EditorModelSync &&
+                _state.ModuleSettings.ModelSync &&
+                _modelSection.IsAvailable)
             {
                 GUILayout.Space(12f);
-                _modelSectionPresenter.Draw(context);
+                _modelSection.Draw(context);
             }
-#endif
 
-#if !PLAYSERV_MODULE_DISABLED_EVENTS
-            if (PlayServEditorModuleAvailability.EditorEvents && _state.ModuleSettings.RuntimeEvents)
+            if (PlayServEditorModuleAvailability.EditorEvents &&
+                _state.ModuleSettings.RuntimeEvents &&
+                _eventsSection.IsAvailable)
             {
                 GUILayout.Space(12f);
-                _eventsSectionPresenter.Draw(context);
+                _eventsSection.Draw(context);
             }
-#endif
 
-#if !PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN
-            if (PlayServEditorModuleAvailability.EditorCodegen && _state.ModuleSettings.Codegen)
+            if (PlayServEditorModuleAvailability.EditorCodegen &&
+                _state.ModuleSettings.Codegen &&
+                _codegenSection.IsAvailable)
             {
                 GUILayout.Space(12f);
-                _codegenSectionPresenter.Draw(context);
+                _codegenSection.Draw(context);
             }
-#endif
 
             if (ShowWebSocketConnectionMenu)
             {
@@ -212,22 +195,6 @@ namespace Playserv.Editor
 
         private void EnsureControllers()
         {
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-            if (_versionSyncAction == null)
-                _versionSyncAction = new VersionSyncAction(_deploymentZipBuilder);
-
-            if (_deploymentUploadAction == null)
-                _deploymentUploadAction = new DeploymentUploadAction(_deploymentZipBuilder);
-
-            if (_deploymentController == null)
-                _deploymentController = new PlayServDeploymentController(
-                    _state,
-                    _deploymentClosureFilter,
-                    _deploymentUploadAction,
-                    _versionSyncAction,
-                    Repaint);
-#endif
-
             if (_connectionController == null)
                 _connectionController = new PlayServConnectionController(_state, Repaint);
         }
@@ -300,9 +267,6 @@ namespace Playserv.Editor
             return new PlayServWindowContext(
                 this,
                 _state,
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
-                _deploymentController,
-#endif
                 _connectionController,
                 DocsUrl,
                 StyledFieldHeight,
@@ -313,4 +277,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EDITOR_MODEL_SYNC
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -197,4 +196,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

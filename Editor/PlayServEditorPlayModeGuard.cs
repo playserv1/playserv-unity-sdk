@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using Playserv.Wrapper;
 using System.Reflection;
 using UnityEditor;
@@ -59,4 +58,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif
