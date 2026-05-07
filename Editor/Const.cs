@@ -23,10 +23,8 @@ namespace Playserv.Editor
         internal const string DefineDisableData = PlayServModuleManifest.DefineDisableData;
         internal const string DefineDisableRpcCore = PlayServModuleManifest.DefineDisableRpcCore;
         internal const string DefineDisableClientRpc = PlayServModuleManifest.DefineDisableClientRpc;
-        internal const string DefineDisableServerRpc = PlayServModuleManifest.DefineDisableServerRpc;
-        internal const string DefineDisableLocalExecutionCore = PlayServModuleManifest.DefineDisableLocalExecutionCore;
+        internal const string DefineDisableServer = PlayServModuleManifest.DefineDisableServer;
         internal const string DefineDisableClientExecution = PlayServModuleManifest.DefineDisableClientExecution;
-        internal const string DefineDisableLocalExecutionServer = PlayServModuleManifest.DefineDisableLocalExecutionServer;
         internal const string DefineDisableSpawn = PlayServModuleManifest.DefineDisableSpawn;
         internal const string DefineDisablePulse = PlayServModuleManifest.DefineDisablePulse;
         internal const string DefineDisableEditorDeployment = "PLAYSERV_DISABLE_EDITOR_DEPLOYMENT";

@@ -3,18 +3,13 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE
-using Playserv.Server;
-#endif
 using Playserv.Serialization;
 
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApiRpcFacade : IPlayServRpcApi
     {
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE
-        private readonly IPlayServLocalExecution _localExecution;
-#endif
+        private readonly ILocalRpcExecution _localExecution;
         private readonly Func<PlayServImplementation> _getCurrentInstance;
         private readonly Func<string, PlayServImplementation> _getInstanceForFireAndForget;
         private readonly Func<IJsonCodec> _getJsonCodec;
@@ -23,9 +18,7 @@ namespace Playserv.Wrapper
 
         public PlayServApiRpcFacade()
             : this(
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE
-                (IPlayServLocalExecution)PlayServRuntimeHost.LocalExecution,
-#endif
+                (ILocalRpcExecution)PlayServRuntimeHost.LocalExecution,
                 () => PlayServRuntimeHost.CurrentInstance,
                 PlayServRuntimeHost.GetInstanceForFireAndForget,
                 PlayServRuntimeHost.ResolveJsonCodec)
@@ -34,25 +27,16 @@ namespace Playserv.Wrapper
         }
 
         public PlayServApiRpcFacade(
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE
-            IPlayServLocalExecution localExecution,
-#endif
+            ILocalRpcExecution localExecution,
             Func<PlayServImplementation> getCurrentInstance,
             Func<string, PlayServImplementation> getInstanceForFireAndForget,
             Func<IJsonCodec> getJsonCodec)
         {
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE
             _localExecution = localExecution ?? throw new ArgumentNullException(nameof(localExecution));
-#endif
             _getCurrentInstance = getCurrentInstance ?? throw new ArgumentNullException(nameof(getCurrentInstance));
             _getInstanceForFireAndForget = getInstanceForFireAndForget ?? throw new ArgumentNullException(nameof(getInstanceForFireAndForget));
             _getJsonCodec = getJsonCodec ?? throw new ArgumentNullException(nameof(getJsonCodec));
         }
-
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
-        public void SetCommandHandler(ICommandHandler commandHandler) =>
-            _localExecution.SetCommandHandler(commandHandler);
-#endif
 
         public void Send<T>(T command) => PlayServRuntimeHost.Send(command);
 
@@ -86,10 +70,8 @@ namespace Playserv.Wrapper
             if (string.IsNullOrWhiteSpace(payloadBase64))
                 throw new ArgumentException("Payload base64 is required.", nameof(payloadBase64));
 
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE
             if (_localExecution.TryInvokeRpc(serviceName, methodName, payloadBase64, _getCurrentInstance() != null))
                 return;
-#endif
 
             var request = new InvokeRpc
             {

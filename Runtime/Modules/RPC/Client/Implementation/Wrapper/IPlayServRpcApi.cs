@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
-using Playserv.Server;
-#endif
 
 namespace Playserv.Wrapper
 {
@@ -16,10 +13,6 @@ namespace Playserv.Wrapper
         void Send<T>(T command);
 
         void Send<T>(T command, string moduleName);
-
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
-        void SetCommandHandler(ICommandHandler commandHandler);
-#endif
 
         void Invoke(string serviceName, string methodName, object payload);
 

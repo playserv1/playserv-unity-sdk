@@ -9,7 +9,7 @@ namespace Playserv.Modules
         public const string Data = PlayServModuleManifest.DataSubscriptionId;
         public const string RpcCore = PlayServModuleManifest.RpcCoreId;
         public const string ClientRpc = PlayServModuleManifest.ClientRpcId;
-        public const string ServerRpc = PlayServModuleManifest.ServerRpcId;
+        public const string Server = PlayServModuleManifest.ServerId;
         public const string Rpc = ClientRpc;
         public const string Spawn = PlayServModuleManifest.SpawnId;
         public const string Pulse = PlayServModuleManifest.PulseId;

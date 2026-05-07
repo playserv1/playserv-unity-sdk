@@ -16,9 +16,12 @@ namespace Playserv.Editor
             "PLAYSERV_DISABLE_RPC_CORE",
             "PLAYSERV_DISABLE_CLIENT_RPC",
             "PLAYSERV_DISABLE_SERVER_RPC",
+            "PLAYSERV_MODULE_DISABLED_SERVER_RPC",
             "PLAYSERV_DISABLE_LOCAL_EXECUTION_CORE",
+            "PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE",
             "PLAYSERV_DISABLE_CLIENT_EXECUTION",
             "PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER",
+            "PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER",
             "PLAYSERV_DISABLE_SPAWN",
             "PLAYSERV_DISABLE_PULSE"
         };
@@ -27,15 +30,13 @@ namespace Playserv.Editor
         {
             var defines = ReadDefines();
             var rpcCoreDisabled = IsDisabled(defines, PlayServModuleManifest.RpcCoreId);
-            var localExecutionCoreDisabled = IsDisabled(defines, PlayServModuleManifest.LocalExecutionCoreId);
             var state = new PlayServRuntimeModuleState
             {
                 Events = IsEnabled(defines, PlayServModuleManifest.EventsId),
                 Data = IsEnabled(defines, PlayServModuleManifest.DataSubscriptionId),
                 Rpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientRpcId),
-                ServerRpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerRpcId),
-                ClientExecution = !localExecutionCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientExecutionId),
-                LocalExecutionServer = !localExecutionCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerLocalExecutionId),
+                Server = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerId),
+                ClientExecution = IsEnabled(defines, PlayServModuleManifest.ClientExecutionId),
                 Spawn = IsEnabled(defines, PlayServModuleManifest.SpawnId) &&
                         IsEnabled(defines, PlayServModuleManifest.EventsId),
                 Pulse = IsEnabled(defines, PlayServModuleManifest.PulseId)
@@ -51,17 +52,14 @@ namespace Playserv.Editor
 
             var defines = ReadDefines();
             var changed = RemoveLegacyRuntimeModuleDefines(defines);
-            var rpcCoreEnabled = state.Rpc || state.ServerRpc;
-            var localExecutionCoreEnabled = state.ClientExecution || state.LocalExecutionServer;
+            var rpcCoreEnabled = state.Rpc || state.Server;
 
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.EventsId, !state.Events);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.DataSubscriptionId, !state.Data);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.RpcCoreId, !rpcCoreEnabled);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientRpcId, !state.Rpc);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ServerRpcId, !state.ServerRpc);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.LocalExecutionCoreId, !localExecutionCoreEnabled);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ServerId, !state.Server);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ServerLocalExecutionId, !state.LocalExecutionServer);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.SpawnId, !state.Spawn);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.PulseId, !state.Pulse);
 
@@ -69,6 +67,7 @@ namespace Playserv.Editor
                 return false;
 
             WriteDefines(defines);
+            PlayServGeneratedCompatibilityLayer.SyncNow();
             return true;
         }
 
@@ -102,9 +101,6 @@ namespace Playserv.Editor
                 state.Pulse = false;
             }
 
-            if (!state.LocalExecutionServer)
-                state.ServerRpc = false;
-
             if (!state.Events)
                 state.Spawn = false;
         }
@@ -122,17 +118,14 @@ namespace Playserv.Editor
 
         private static void WriteUserDisabledPrefs(PlayServRuntimeModuleState state)
         {
-            var rpcCoreEnabled = state.Rpc || state.ServerRpc;
-            var localExecutionCoreEnabled = state.ClientExecution || state.LocalExecutionServer;
+            var rpcCoreEnabled = state.Rpc || state.Server;
 
             SetUserDisabled(PlayServModuleManifest.EventsId, !state.Events);
             SetUserDisabled(PlayServModuleManifest.DataSubscriptionId, !state.Data);
             SetUserDisabled(PlayServModuleManifest.RpcCoreId, !rpcCoreEnabled);
             SetUserDisabled(PlayServModuleManifest.ClientRpcId, !state.Rpc);
-            SetUserDisabled(PlayServModuleManifest.ServerRpcId, !state.ServerRpc);
-            SetUserDisabled(PlayServModuleManifest.LocalExecutionCoreId, !localExecutionCoreEnabled);
+            SetUserDisabled(PlayServModuleManifest.ServerId, !state.Server);
             SetUserDisabled(PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
-            SetUserDisabled(PlayServModuleManifest.ServerLocalExecutionId, !state.LocalExecutionServer);
             SetUserDisabled(PlayServModuleManifest.SpawnId, !state.Spawn);
             SetUserDisabled(PlayServModuleManifest.PulseId, !state.Pulse);
         }

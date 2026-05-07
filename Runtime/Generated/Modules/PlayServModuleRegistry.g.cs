@@ -35,8 +35,8 @@ namespace Playserv.Modules
 #if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_CLIENT_RPC
             RegisterManifestModule(host, PlayServModuleManifest.ClientRpcId, () => new PlayServClientRpcModule());
 #endif
-#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER_RPC && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
-            RegisterManifestModule(host, PlayServModuleManifest.ServerRpcId, () => new PlayServServerRpcModule());
+#if !PLAYSERV_MODULE_DISABLED_RPC_CORE && !PLAYSERV_MODULE_DISABLED_SERVER
+            RegisterManifestModule(host, PlayServModuleManifest.ServerId, () => new PlayServServerModule());
 #endif
 #if !PLAYSERV_MODULE_DISABLED_PULSE
             RegisterManifestModule(host, PlayServModuleManifest.PulseId, () => new PlayServPulseModule());

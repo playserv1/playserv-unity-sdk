@@ -1,16 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
-using Playserv.Server;
-#endif
 
 namespace Playserv.Wrapper
 {
     /// <summary>
     /// Event-oriented PlayServ SDK surface.
     /// </summary>
-    public static class PlayServEvents
+    public static partial class PlayServEvents
     {
         private static readonly IPlayServEventsApi Api = new PlayServApiEventsFacade();
 
@@ -29,9 +26,5 @@ namespace Playserv.Wrapper
 
         public static Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default) =>
             Api.UnsubscribeGroupAsync(groupName, ct);
-
-#if !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_CORE && !PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER
-        public static void SetEventHandler(IEventHandler eventHandler) => Api.SetEventHandler(eventHandler);
-#endif
     }
 }

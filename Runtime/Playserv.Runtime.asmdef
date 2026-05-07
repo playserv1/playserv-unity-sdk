@@ -11,10 +11,7 @@
         "Playserv.Runtime.Modules.DataSubscription",
         "Playserv.Runtime.Modules.RPC.Core",
         "Playserv.Runtime.Modules.RPC.Client",
-        "Playserv.Runtime.Modules.ServerRPC",
-        "Playserv.Runtime.Modules.LocalExecution.Core",
-        "Playserv.Runtime.Modules.LocalExecution.Client",
-        "Playserv.Runtime.Modules.LocalExecution.Server",
+        "Playserv.Runtime.Modules.Server",
         "Playserv.Runtime.Modules.Spawn",
         "Playserv.Runtime.Modules.Pulse"
     ],

@@ -11,11 +11,11 @@ Internally, PlayServ sends `RpcInvokeRequest` through module:
 
 - `rpc.InvokeRpc`
 
-RPC is split into `Runtime/RPC/Core`, `Runtime/RPC/Client`, and `Runtime/RPC/Server`.
-Server-side in-process RPC lives in the optional `Server RPC` module under `Runtime/RPC/Server`.
+RPC is split into `Runtime/Modules/RPC/Core` and `Runtime/Modules/RPC/Client`.
+Server-side in-process RPC lives in the optional `Server` module under `Runtime/Modules/Server`.
 If server RPC invoker is configured (`PlayServServerRpc.SetRpcInvoker(...)` or `PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
 If invoker is configured but service is not registered, SDK falls back to transport (or throws if transport is not connected).
-When `PLAYSERV_MODULE_DISABLED_SERVER_RPC` is defined, `ServerRpcInvoker`, `IRpcInvoker`, and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled.
+When `PLAYSERV_MODULE_DISABLED_SERVER` is defined, `ServerRpcInvoker`, `IRpcInvoker`, and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled.
 
 ## Payload format
 
