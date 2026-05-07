@@ -142,7 +142,12 @@ namespace Playserv.Wrapper
 
         private static bool TryLoadSettingsFromUnityResources(out PlayServSettings settings)
         {
+#if UNITY_5_3_OR_NEWER
             return PlayServSettingsResolver.TryLoadSettingsFromResourcesOrPackageDefaults(out settings);
+#else
+            settings = null;
+            return false;
+#endif
         }
 
         private static PlayServSettings LoadSettingsFromUnityResources()
