@@ -1,4 +1,3 @@
-#if !PLAYSERV_MODULE_DISABLED_EVENTS
 using Playserv.Events.Editor;
 using UnityEditor;
 using UnityEngine;
@@ -32,4 +31,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

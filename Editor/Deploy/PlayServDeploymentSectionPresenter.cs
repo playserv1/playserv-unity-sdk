@@ -1,4 +1,3 @@
-#if !PLAYSERV_DISABLE_EDITOR_DEPLOYMENT
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -7,9 +6,17 @@ namespace Playserv.Editor
 {
     internal sealed class PlayServDeploymentSectionPresenter
     {
+        private readonly Func<PlayServWindowContext, PlayServDeploymentController> _getController;
+
+        public PlayServDeploymentSectionPresenter(Func<PlayServWindowContext, PlayServDeploymentController> getController)
+        {
+            _getController = getController ?? throw new ArgumentNullException(nameof(getController));
+        }
+
         public void Draw(PlayServWindowContext context)
         {
             var state = context.State;
+            var controller = _getController(context);
             var expanded = PlayServWindowChrome.BeginSectionCard(
                 ref state.FoldDeployment,
                 "Release",
@@ -67,7 +74,7 @@ namespace Playserv.Editor
                     {
                         if (PlayServWindowChrome.DrawActionButton("Preview Files", PlayServWindowButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(30f)))
                         {
-                            state.DeployFilesPreview = context.DeploymentController.BuildDeployFileList(out var err);
+                            state.DeployFilesPreview = controller.BuildDeployFileList(out var err);
                             if (!string.IsNullOrEmpty(err))
                             {
                                 state.DeployStatus = err;
@@ -92,12 +99,12 @@ namespace Playserv.Editor
                         GUILayout.Space(6f);
 
                         if (PlayServWindowChrome.DrawActionButton("Sync Version", PlayServWindowButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(30f)))
-                            _ = context.DeploymentController.StartVersionSyncAsync(context);
+                            _ = controller.StartVersionSyncAsync(context);
 
                         GUILayout.Space(6f);
 
                         if (PlayServWindowChrome.DrawActionButton("Deploy Now", PlayServWindowButtonTone.Primary, GUILayout.Width(128f), GUILayout.Height(30f)))
-                            _ = context.DeploymentController.StartDeployAsync(context);
+                            _ = controller.StartDeployAsync(context);
                     }
 
                     GUILayout.Space(6f);
@@ -105,7 +112,7 @@ namespace Playserv.Editor
                     using (new EditorGUI.DisabledScope(!state.DeployRunning))
                     {
                         if (PlayServWindowChrome.DrawActionButton("Cancel", PlayServWindowButtonTone.Danger, GUILayout.Width(112f), GUILayout.Height(30f)))
-                            context.DeploymentController.CancelDeploy();
+                            controller.CancelDeploy();
                     }
                 }
 
@@ -149,4 +156,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

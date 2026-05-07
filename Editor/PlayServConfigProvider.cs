@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
 using Playserv.Wrapper;
@@ -199,4 +198,3 @@ namespace Playserv.Editor
         }
     }
 }
-#endif

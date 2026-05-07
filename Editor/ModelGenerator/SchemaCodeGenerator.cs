@@ -5,9 +5,6 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 using Playserv.CodeGenerator;
-#if !PLAYSERV_MODULE_DISABLED_DATA
-using Playserv.DataSubscription;
-#endif
 using Playserv.Editor;
 
 namespace Playserv.ModelGenerator.Editor
@@ -27,9 +24,7 @@ namespace Playserv.ModelGenerator.Editor
             }
 
             AssetDatabase.Refresh();
-#if !PLAYSERV_MODULE_DISABLED_DATA
-            SchemaSelectionProvider.Reset();
-#endif
+            ResetSchemaSelectionProviderIfAvailable();
         }
 
         public static void GenerateModels(bool isLatestSchemaUse = true)
@@ -43,9 +38,7 @@ namespace Playserv.ModelGenerator.Editor
             }
 
             AssetDatabase.Refresh();
-#if !PLAYSERV_MODULE_DISABLED_DATA
-            SchemaSelectionProvider.Reset();
-#endif
+            ResetSchemaSelectionProviderIfAvailable();
         }
 
         private static Dictionary<string, string> GetFilesDataCollection(bool selectFile = true,
@@ -144,6 +137,18 @@ namespace Playserv.ModelGenerator.Editor
             Debug.Log($"[LOG] Checking New Schema...");
             Debug.Log($"[LOG] Schema Version: {root.JsonSchema.XVersion}");
             Debug.Log($"[LOG] Timestamp: {root.JsonSchema.XTimestamp}");
+        }
+
+        private static void ResetSchemaSelectionProviderIfAvailable()
+        {
+            if (!PlayServEditorModuleAvailability.RuntimeData)
+                return;
+
+            var providerType = Type.GetType(
+                "Playserv.DataSubscription.SchemaSelectionProvider, Playserv.Runtime.Modules.DataSubscription",
+                throwOnError: false);
+            var resetMethod = providerType?.GetMethod("Reset", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            resetMethod?.Invoke(null, null);
         }
     }
 }

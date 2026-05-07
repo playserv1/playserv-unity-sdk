@@ -13,7 +13,7 @@ namespace Playserv.Editor
         private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Window/PlayServCoreAssemblyReferenceSync.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
-        private const string EditorAsmdefRelativePath = "Editor/Playserv.Editor.asmdef";
+        private const string EditorAsmdefRelativePath = "Editor/Playserv.Editor.Core.asmdef";
 
         private static readonly string[] BaseReferences =
         {
@@ -35,6 +35,12 @@ namespace Playserv.Editor
             new ModuleAssemblyReference(PlayServModuleManifest.PulseId, "Playserv.Runtime.Modules.Pulse")
         };
 
+        private static readonly string[] EditorCoreReferences =
+        {
+            "Playserv.Runtime",
+            "Playserv.Runtime.Modules"
+        };
+
         [InitializeOnLoadMethod]
         private static void SyncOnEditorLoad()
         {
@@ -49,7 +55,7 @@ namespace Playserv.Editor
             PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
 
             SyncRuntimeAsmdefReferences(state);
-            SyncEditorAsmdefReferences(state);
+            SyncEditorAsmdefReferences();
         }
 
         private static void SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state)
@@ -72,7 +78,7 @@ namespace Playserv.Editor
             AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
         }
 
-        private static void SyncEditorAsmdefReferences(PlayServRuntimeModuleState state)
+        private static void SyncEditorAsmdefReferences()
         {
             var asmdefPath = Path.Combine(PackageRootPath, EditorAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
@@ -83,7 +89,7 @@ namespace Playserv.Editor
             if (model == null)
                 return;
 
-            var nextReferences = BuildEditorReferences(model.references, state);
+            var nextReferences = EditorCoreReferences;
             if (SequenceEqual(model.references, nextReferences))
                 return;
 
@@ -119,28 +125,6 @@ namespace Playserv.Editor
             return references.Distinct(StringComparer.Ordinal).ToArray();
         }
 
-        private static string[] BuildEditorReferences(string[] currentReferences, PlayServRuntimeModuleState state)
-        {
-            var references = new List<string>();
-            currentReferences = currentReferences ?? Array.Empty<string>();
-
-            for (var i = 0; i < currentReferences.Length; i++)
-            {
-                if (IsModuleAssemblyReference(currentReferences[i]))
-                    continue;
-
-                references.Add(currentReferences[i]);
-            }
-
-            if (state.Events)
-                AddModuleReference(references, PlayServModuleManifest.EventsId);
-
-            if (state.Data)
-                AddModuleReference(references, PlayServModuleManifest.DataSubscriptionId);
-
-            return references.Distinct(StringComparer.Ordinal).ToArray();
-        }
-
         private static void AddModuleReference(List<string> references, string moduleId)
         {
             for (var i = 0; i < ModuleReferences.Length; i++)
@@ -151,20 +135,6 @@ namespace Playserv.Editor
                 references.Add(ModuleReferences[i].AssemblyName);
                 return;
             }
-        }
-
-        private static bool IsModuleAssemblyReference(string reference)
-        {
-            if (string.IsNullOrEmpty(reference))
-                return false;
-
-            for (var i = 0; i < ModuleReferences.Length; i++)
-            {
-                if (string.Equals(ModuleReferences[i].AssemblyName, reference, StringComparison.Ordinal))
-                    return true;
-            }
-
-            return false;
         }
 
         private static bool SequenceEqual(string[] left, string[] right)
