@@ -34,11 +34,13 @@ namespace Playserv.Editor
         public static bool EditorModelSync => HasFolder("Editor/ModelGenerator");
         public static bool EditorCodegen => HasFolder("Editor/CodeGenerator") && HasFolder("Runtime/CodeGenerator/Shared");
         public static bool EditorEvents => HasFolder("Editor/Events") && RuntimeEvents;
+        public static bool EditorModuleStressTests => HasFolder("Editor/ModuleStressTests");
 
         public static bool HasAnyEditorTool =>
             EditorDeployment ||
             EditorModelSync ||
-            EditorCodegen;
+            EditorCodegen ||
+            EditorModuleStressTests;
 
         private static PlayServRuntimeModuleDefinition[] BuildRuntimeModuleDefinitions()
         {

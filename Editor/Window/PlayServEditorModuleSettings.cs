@@ -7,6 +7,7 @@ namespace Playserv.Editor
     internal sealed class PlayServEditorModuleSettings
     {
         private const bool DefaultOptionalModuleState = true;
+        private const bool DefaultInternalToolState = false;
         public const string RuntimeModuleEvents = "Events";
         public const string RuntimeModuleData = "Data Subscription";
         public const string RuntimeModuleRpcCore = "RPC Core";
@@ -19,6 +20,7 @@ namespace Playserv.Editor
         public bool Deployment { get; private set; } = DefaultOptionalModuleState;
         public bool ModelSync { get; private set; } = DefaultOptionalModuleState;
         public bool Codegen { get; private set; } = DefaultOptionalModuleState;
+        public bool ModuleStressTests { get; private set; } = DefaultInternalToolState;
         public bool RuntimeEvents { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeData { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeRpc { get; private set; } = DefaultOptionalModuleState;
@@ -35,6 +37,8 @@ namespace Playserv.Editor
                         EditorPrefs.GetBool(Const.PrefModuleModelSync, DefaultOptionalModuleState);
             Codegen = PlayServEditorModuleAvailability.EditorCodegen &&
                       EditorPrefs.GetBool(Const.PrefModuleCodegen, DefaultOptionalModuleState);
+            ModuleStressTests = PlayServEditorModuleAvailability.EditorModuleStressTests &&
+                                EditorPrefs.GetBool(Const.PrefModuleStressTests, DefaultInternalToolState);
             LoadRuntimeModuleDefines();
         }
 
@@ -49,6 +53,10 @@ namespace Playserv.Editor
         public bool SetCodegen(bool enabled) =>
             PlayServEditorModuleAvailability.EditorCodegen &&
             Set(Const.PrefModuleCodegen, Codegen, enabled, value => Codegen = value);
+
+        public bool SetModuleStressTests(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorModuleStressTests &&
+            Set(Const.PrefModuleStressTests, ModuleStressTests, enabled, value => ModuleStressTests = value);
 
         public bool SetRuntimeEvents(bool enabled)
         {
@@ -230,6 +238,9 @@ namespace Playserv.Editor
             if (PlayServEditorModuleAvailability.EditorCodegen)
                 SetCodegen(DefaultOptionalModuleState);
 
+            if (PlayServEditorModuleAvailability.EditorModuleStressTests)
+                SetModuleStressTests(DefaultInternalToolState);
+
             ApplyRuntimeProfile(PlayServSdkProfiles.ClientSdk);
         }
 
@@ -295,7 +306,7 @@ namespace Playserv.Editor
 
         private void LoadRuntimeModuleDefines()
         {
-            var state = PlayServRuntimeModuleDefines.Load();
+            var state = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;

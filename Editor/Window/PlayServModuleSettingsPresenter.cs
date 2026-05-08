@@ -110,6 +110,16 @@ namespace Playserv.Editor
                             settings.Codegen,
                             settings.SetCodegen);
                     }
+
+                    if (PlayServEditorModuleAvailability.EditorModuleStressTests)
+                    {
+                        GUILayout.Space(6f);
+                        changed |= DrawToggleModule(
+                            "Module Stress Tests",
+                            "Internal delete/restore checks for optional module packaging. Excluded from SDK exports.",
+                            settings.ModuleStressTests,
+                            settings.SetModuleStressTests);
+                    }
                 }
 
                 GUILayout.Space(12f);
