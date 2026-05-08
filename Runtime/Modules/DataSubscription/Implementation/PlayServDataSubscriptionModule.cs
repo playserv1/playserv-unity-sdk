@@ -23,7 +23,7 @@ namespace Playserv.DataSubscription
             CommandTypeProviderRegistry.Register(new DataSubscriptionCommandTypeProvider());
 
             _adapter = new PlayServDataSubscriptionAdapter(
-                context.Services.Get<PlayServImplementation>(),
+                context.Services.Get<IPlayServCommandBus>(),
                 PlayServLog.ForCategory(PlayServLogCategory.Data));
             context.Services.Register<IDataSubscriptionAdapter>(_adapter);
             if (_adapter is PlayServDataSubscriptionAdapter concreteAdapter)

@@ -1,13 +1,22 @@
-using System.Collections.Generic;
-using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.Common;
+using UnityEngine;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.Proxy.Implementation
 {
-    internal static partial class TransportModuleRegistry
+    internal static class WebRtcTransportModuleRegistration
     {
-        static partial void RegisterWebRtc(List<ITransportModuleFactory> factories)
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Register()
         {
-            factories.Add(new Playserv.Proxy.Implementation.WebRtcTransportModuleFactory());
+            TransportModuleRegistry.Register(new WebRtcTransportModuleFactory());
         }
+
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void RegisterInEditor()
+        {
+            Register();
+        }
+#endif
     }
 }

@@ -29,6 +29,10 @@ namespace Playserv.Editor
         public static bool RuntimeClientExecution => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleClientExecution);
         public static bool RuntimeSpawn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleSpawn);
         public static bool RuntimePulse => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModulePulse);
+        public static bool RuntimeTransportWebSocket => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportWebSocket);
+        public static bool RuntimeTransportUdp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportUdp);
+        public static bool RuntimeTransportRudp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportRudp);
+        public static bool RuntimeTransportWebRtc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportWebRtc);
 
         public static bool EditorDeployment => HasFolder("Editor/Deploy");
         public static bool EditorModelSync => HasFolder("Editor/ModelGenerator");
@@ -125,6 +129,14 @@ namespace Playserv.Editor
                     return settings => settings.RuntimeSpawn;
                 case PlayServModuleManifest.PulseId:
                     return settings => settings.RuntimePulse;
+                case PlayServModuleManifest.TransportWebSocketId:
+                    return settings => settings.RuntimeTransportWebSocket;
+                case PlayServModuleManifest.TransportUdpId:
+                    return settings => settings.RuntimeTransportUdp;
+                case PlayServModuleManifest.TransportRudpId:
+                    return settings => settings.RuntimeTransportRudp;
+                case PlayServModuleManifest.TransportWebRtcId:
+                    return settings => settings.RuntimeTransportWebRtc;
                 default:
                     return _ => false;
             }
@@ -148,6 +160,14 @@ namespace Playserv.Editor
                     return (settings, enabled) => settings.SetRuntimeSpawn(enabled);
                 case PlayServModuleManifest.PulseId:
                     return (settings, enabled) => settings.SetRuntimePulse(enabled);
+                case PlayServModuleManifest.TransportWebSocketId:
+                    return (settings, enabled) => settings.SetRuntimeTransportWebSocket(enabled);
+                case PlayServModuleManifest.TransportUdpId:
+                    return (settings, enabled) => settings.SetRuntimeTransportUdp(enabled);
+                case PlayServModuleManifest.TransportRudpId:
+                    return (settings, enabled) => settings.SetRuntimeTransportRudp(enabled);
+                case PlayServModuleManifest.TransportWebRtcId:
+                    return (settings, enabled) => settings.SetRuntimeTransportWebRtc(enabled);
                 default:
                     return (_, __) => false;
             }
@@ -201,10 +221,18 @@ namespace Playserv.Editor
                 state.Rpc = false;
                 state.Spawn = false;
                 state.Pulse = false;
+                state.TransportWebSocket = false;
+                state.TransportUdp = false;
+                state.TransportRudp = false;
+                state.TransportWebRtc = false;
             }
 
             state.Spawn &= RuntimeSpawn;
             state.Pulse &= RuntimePulse;
+            state.TransportWebSocket &= RuntimeTransportWebSocket;
+            state.TransportUdp &= RuntimeTransportUdp;
+            state.TransportRudp &= RuntimeTransportRudp;
+            state.TransportWebRtc &= RuntimeTransportWebRtc;
         }
 
         public static void SyncUnavailableModuleDefines()

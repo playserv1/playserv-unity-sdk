@@ -1,7 +1,9 @@
 {
     "name": "Playserv.Runtime.Modules",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "Playserv.Runtime.Abstractions"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

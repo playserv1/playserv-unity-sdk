@@ -110,7 +110,6 @@ namespace Playserv.Editor
                 failedPaths.Add(assetPath);
             }
 
-            PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
             SyncGeneratedAndReferences();
             AssetDatabase.Refresh();
 
@@ -125,8 +124,7 @@ namespace Playserv.Editor
 
         private static void SyncGeneratedAndReferences()
         {
-            PlayServCoreAssemblyReferenceSync.Sync();
-            PlayServGeneratedCompatibilityLayer.SyncNow();
+            PlayServModuleGraphSynchronizer.SyncNow();
         }
 
         private static string BuildDeleteFailureMessage(IReadOnlyList<string> failedPaths)

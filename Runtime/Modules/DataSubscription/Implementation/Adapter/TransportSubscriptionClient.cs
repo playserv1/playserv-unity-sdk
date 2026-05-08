@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
+using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
@@ -13,18 +14,18 @@ namespace Playserv.DataSubscription
 {
     internal sealed class TransportSubscriptionClient
     {
-        private readonly PlayServImplementation _transport;
+        private readonly IPlayServCommandBus _commandBus;
         private readonly ILogger _logger;
         private readonly DataSubscriptionRequestIdSource _requestIds;
         private readonly IJsonCodec _jsonCodec;
 
         public TransportSubscriptionClient(
-            PlayServImplementation transport,
+            IPlayServCommandBus commandBus,
             ILogger logger,
             DataSubscriptionRequestIdSource requestIds,
             IJsonCodec jsonCodec)
         {
-            _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _commandBus = commandBus ?? throw new ArgumentNullException(nameof(commandBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _requestIds = requestIds ?? throw new ArgumentNullException(nameof(requestIds));
             _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
@@ -84,13 +85,13 @@ namespace Playserv.DataSubscription
             IDisposable commandErrorNamedSubscription = null;
             IDisposable commandErrorRpcSubscription = null;
 
-            typedSubscription = _transport.On<DataSubscriptionResponse>(response =>
+            typedSubscription = _commandBus.On<DataSubscriptionResponse>(response =>
             {
                 if (response != null && response.RequestId == request.RequestId)
                     tcs.TrySetResult(response);
             });
 
-            byCommandSubscription = _transport.OnCommand("DataSubscriptionResponse", command =>
+            byCommandSubscription = _commandBus.OnCommand("DataSubscriptionResponse", command =>
             {
                 if (!DataSubscriptionRequestSupport.TryMapDataSubscriptionResponse(_jsonCodec, command, out var response))
                     return;
@@ -99,7 +100,7 @@ namespace Playserv.DataSubscription
                     tcs.TrySetResult(response);
             });
 
-            byModuleCommandSubscription = _transport.OnCommand("module_dataflow.DataSubscriptionResponse", command =>
+            byModuleCommandSubscription = _commandBus.OnCommand("module_dataflow.DataSubscriptionResponse", command =>
             {
                 if (!DataSubscriptionRequestSupport.TryMapDataSubscriptionResponse(_jsonCodec, command, out var response))
                     return;
@@ -108,7 +109,7 @@ namespace Playserv.DataSubscription
                     tcs.TrySetResult(response);
             });
 
-            errorResponseSubscription = _transport.OnCommand("ErrorResponse", command =>
+            errorResponseSubscription = _commandBus.OnCommand("ErrorResponse", command =>
             {
                 if (command is not ErrorResponse errorResponse)
                     return;
@@ -124,7 +125,7 @@ namespace Playserv.DataSubscription
                 });
             });
 
-            commandErrorSubscription = _transport.OnCommand("error", command =>
+            commandErrorSubscription = _commandBus.OnCommand("error", command =>
             {
                 if (command is not CommandErrorResponse errorResponse)
                     return;
@@ -139,7 +140,7 @@ namespace Playserv.DataSubscription
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
             });
 
-            commandErrorNamedSubscription = _transport.OnCommand("CommandErrorResponse", command =>
+            commandErrorNamedSubscription = _commandBus.OnCommand("CommandErrorResponse", command =>
             {
                 if (command is not CommandErrorResponse errorResponse)
                     return;
@@ -154,7 +155,7 @@ namespace Playserv.DataSubscription
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
             });
 
-            commandErrorRpcSubscription = _transport.OnCommand("RpcErrorResponse", command =>
+            commandErrorRpcSubscription = _commandBus.OnCommand("RpcErrorResponse", command =>
             {
                 if (command is not CommandErrorResponse errorResponse)
                     return;
@@ -171,7 +172,7 @@ namespace Playserv.DataSubscription
 
             try
             {
-                await _transport.SendAsync(request, "module_dataflow");
+                await _commandBus.SendAsync(request, "module_dataflow");
                 var completedInTime = await DataSubscriptionRequestSupport.WaitForCompletionOrTimeoutAsync(
                     tcs.Task,
                     PlayServDataSubscriptionAdapter.DataSubscriptionResponseTimeoutMs,

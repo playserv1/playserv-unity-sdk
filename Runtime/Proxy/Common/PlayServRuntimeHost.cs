@@ -1,4 +1,5 @@
 using System;
+using Playserv.Modules;
 using Playserv.Serialization;
 
 namespace Playserv.Proxy.Common
@@ -36,6 +37,8 @@ namespace Playserv.Proxy.Common
         public static PlayServImplementation CurrentInstance => RequireConfigured(_getCurrentInstance, nameof(CurrentInstance))();
 
         public static PlayServImplementation RequiredInstance => RequireConfigured(_getRequiredInstance, nameof(RequiredInstance))();
+
+        public static IPlayServModuleServiceProvider RequiredModuleServices => RequiredInstance.ModuleServices;
 
         public static object LocalExecution => _getLocalExecution == null ? null : _getLocalExecution();
 

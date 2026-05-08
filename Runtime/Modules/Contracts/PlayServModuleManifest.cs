@@ -13,6 +13,10 @@ namespace Playserv.Modules
         public const string ServerId = "server";
         public const string SpawnId = "spawn";
         public const string PulseId = "pulse";
+        public const string TransportWebSocketId = "transport-websocket";
+        public const string TransportUdpId = "transport-udp";
+        public const string TransportRudpId = "transport-rudp";
+        public const string TransportWebRtcId = "transport-webrtc";
 
         public const string DefineDisableEvents = "PLAYSERV_MODULE_DISABLED_EVENTS";
         public const string DefineDisableData = "PLAYSERV_MODULE_DISABLED_DATA";
@@ -22,13 +26,17 @@ namespace Playserv.Modules
         public const string DefineDisableClientExecution = "PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION";
         public const string DefineDisableSpawn = "PLAYSERV_MODULE_DISABLED_SPAWN";
         public const string DefineDisablePulse = "PLAYSERV_MODULE_DISABLED_PULSE";
+        public const string DefineDisableTransportWebSocket = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET";
+        public const string DefineDisableTransportUdp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP";
+        public const string DefineDisableTransportRudp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP";
+        public const string DefineDisableTransportWebRtc = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBRTC";
 
         private static readonly PlayServModuleManifestEntry[] Modules =
         {
             new PlayServModuleManifestEntry(
                 ClientExecutionId,
                 "Client Execution",
-                "Client-side transport execution surface. Disable this for server-only SDK builds.",
+                "Client-side runtime execution surface. Disable this for server-only SDK builds.",
                 DefineDisableClientExecution,
                 defaultEnabled: true,
                 isServerModule: false,
@@ -56,7 +64,7 @@ namespace Playserv.Modules
             new PlayServModuleManifestEntry(
                 DataSubscriptionId,
                 "Data Subscription",
-                "Shared entity query, mutation, polling, and transport subscription APIs.",
+                "Shared entity query, mutation, polling, and live subscription APIs.",
                 DefineDisableData,
                 defaultEnabled: true,
                 isServerModule: false,
@@ -136,6 +144,62 @@ namespace Playserv.Modules
                 visibleInSettings: true,
                 visibleInExport: true,
                 assetPaths: new[] { "Runtime/Modules/Pulse" },
+                dependencyIds: new[] { ClientExecutionId },
+                hiddenDependencyAssetPaths: null,
+                hiddenDependencyModuleIds: null),
+
+            new PlayServModuleManifestEntry(
+                TransportWebSocketId,
+                "WebSocket",
+                "HTTP/WebSocket protocol implementation for ws, wss, http, and https endpoints.",
+                DefineDisableTransportWebSocket,
+                defaultEnabled: true,
+                isServerModule: false,
+                visibleInSettings: true,
+                visibleInExport: true,
+                assetPaths: new[] { "Runtime/Proxy/Modules/WebSocket" },
+                dependencyIds: new[] { ClientExecutionId },
+                hiddenDependencyAssetPaths: null,
+                hiddenDependencyModuleIds: null),
+
+            new PlayServModuleManifestEntry(
+                TransportUdpId,
+                "UDP",
+                "UDP protocol implementation for native/editor builds.",
+                DefineDisableTransportUdp,
+                defaultEnabled: true,
+                isServerModule: false,
+                visibleInSettings: true,
+                visibleInExport: true,
+                assetPaths: new[] { "Runtime/Proxy/Modules/Udp" },
+                dependencyIds: new[] { ClientExecutionId },
+                hiddenDependencyAssetPaths: null,
+                hiddenDependencyModuleIds: null),
+
+            new PlayServModuleManifestEntry(
+                TransportRudpId,
+                "RUDP",
+                "Reliable UDP protocol implementation for native/editor builds.",
+                DefineDisableTransportRudp,
+                defaultEnabled: true,
+                isServerModule: false,
+                visibleInSettings: true,
+                visibleInExport: true,
+                assetPaths: new[] { "Runtime/Proxy/Modules/Rudp" },
+                dependencyIds: new[] { ClientExecutionId },
+                hiddenDependencyAssetPaths: null,
+                hiddenDependencyModuleIds: null),
+
+            new PlayServModuleManifestEntry(
+                TransportWebRtcId,
+                "WebRTC",
+                "WebRTC data channel and signaling implementation.",
+                DefineDisableTransportWebRtc,
+                defaultEnabled: true,
+                isServerModule: false,
+                visibleInSettings: true,
+                visibleInExport: true,
+                assetPaths: new[] { "Runtime/Proxy/Modules/WebRtc" },
                 dependencyIds: new[] { ClientExecutionId },
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null)

@@ -66,6 +66,14 @@ namespace Playserv.Proxy.Common
             }
         }
 
+        internal static void ClearFactoryCache()
+        {
+            lock (Gate)
+            {
+                _factories = null;
+            }
+        }
+
         internal static string GetEndpointScheme(string endpoint)
         {
             if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))

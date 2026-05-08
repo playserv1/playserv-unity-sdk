@@ -1,16 +1,25 @@
-using System.Collections.Generic;
-using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.Common;
+using UnityEngine;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.Proxy.Implementation
 {
-    internal static partial class TransportModuleRegistry
+    internal static class WebSocketTransportModuleRegistration
     {
-        static partial void RegisterWebSocket(List<ITransportModuleFactory> factories)
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Register()
         {
-            factories.Add(new Playserv.Proxy.Implementation.WebSocketTransportModuleFactory("http"));
-            factories.Add(new Playserv.Proxy.Implementation.WebSocketTransportModuleFactory("https"));
-            factories.Add(new Playserv.Proxy.Implementation.WebSocketTransportModuleFactory("ws"));
-            factories.Add(new Playserv.Proxy.Implementation.WebSocketTransportModuleFactory("wss"));
+            TransportModuleRegistry.Register(new WebSocketTransportModuleFactory("http"));
+            TransportModuleRegistry.Register(new WebSocketTransportModuleFactory("https"));
+            TransportModuleRegistry.Register(new WebSocketTransportModuleFactory("ws"));
+            TransportModuleRegistry.Register(new WebSocketTransportModuleFactory("wss"));
         }
+
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void RegisterInEditor()
+        {
+            Register();
+        }
+#endif
     }
 }

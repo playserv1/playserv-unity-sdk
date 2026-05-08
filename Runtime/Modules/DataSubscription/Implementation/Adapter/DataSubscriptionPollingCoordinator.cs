@@ -3,24 +3,24 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription.Responses;
+using Playserv.Modules;
 using Playserv.Proxy.Common;
-using Playserv.Wrapper;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
 namespace Playserv.DataSubscription
 {
     internal sealed class DataSubscriptionPollingCoordinator
     {
-        private readonly PlayServImplementation _transport;
+        private readonly IPlayServCommandBus _commandBus;
         private readonly DataGetClient _dataGetClient;
         private readonly ILogger _logger;
 
         public DataSubscriptionPollingCoordinator(
-            PlayServImplementation transport,
+            IPlayServCommandBus commandBus,
             DataGetClient dataGetClient,
             ILogger logger)
         {
-            _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _commandBus = commandBus ?? throw new ArgumentNullException(nameof(commandBus));
             _dataGetClient = dataGetClient ?? throw new ArgumentNullException(nameof(dataGetClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -144,7 +144,7 @@ namespace Playserv.DataSubscription
             {
                 while (!ct.IsCancellationRequested)
                 {
-                    var sdkState = _transport.State;
+                    var sdkState = _commandBus.State;
                     if (sdkState != PlayServState.Online)
                     {
                         if (pausedAtState != sdkState)

@@ -11,16 +11,16 @@ namespace Playserv.Wrapper
 {
     internal sealed class PlayServApiDataFacade : IPlayServDataApi
     {
-        private readonly Func<PlayServImplementation> _getRequiredInstance;
+        private readonly Func<IPlayServModuleServiceProvider> _getRequiredServices;
 
         public PlayServApiDataFacade()
-            : this(() => PlayServRuntimeHost.RequiredInstance)
+            : this(() => PlayServRuntimeHost.RequiredModuleServices)
         {
         }
 
-        public PlayServApiDataFacade(Func<PlayServImplementation> getRequiredInstance)
+        public PlayServApiDataFacade(Func<IPlayServModuleServiceProvider> getRequiredServices)
         {
-            _getRequiredInstance = getRequiredInstance ?? throw new ArgumentNullException(nameof(getRequiredInstance));
+            _getRequiredServices = getRequiredServices ?? throw new ArgumentNullException(nameof(getRequiredServices));
         }
 
         public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
@@ -53,6 +53,6 @@ namespace Playserv.Wrapper
         }
 
         private IDataSubscriptionAdapter Adapter =>
-            _getRequiredInstance().ModuleServices.Get<IDataSubscriptionAdapter>();
+            _getRequiredServices().Get<IDataSubscriptionAdapter>();
     }
 }

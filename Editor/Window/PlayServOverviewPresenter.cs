@@ -40,7 +40,7 @@ namespace Playserv.Editor
                     PlayServWindowChrome.DrawOverviewCard(
                         "Backend",
                         string.IsNullOrWhiteSpace(context.Config != null ? context.Config.BackendServerAddress : null) ? "Not set" : context.Config.BackendServerAddress,
-                        "Primary transport");
+                        "Primary endpoint");
                 }
 
                 if (PlayServEditorModuleAvailability.EditorModelSync ||

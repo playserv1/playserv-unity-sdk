@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
-using Playserv.Proxy.Common;
+using Playserv.Modules;
 using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
@@ -19,7 +19,7 @@ namespace Playserv.DataSubscription
         internal const int SubscriptionPollIntervalMs = 3000;
         internal const int SubscriptionPollRequestTimeoutMs = 4000;
 
-        private readonly PlayServImplementation _transport;
+        private readonly IPlayServCommandBus _commandBus;
         private readonly ILogger _logger;
         private readonly IJsonCodec _jsonCodec;
         private readonly DataSubscriptionRegistry _registry;
@@ -28,17 +28,17 @@ namespace Playserv.DataSubscription
         private readonly DataGetClient _dataGetClient;
         private readonly DataSubscriptionPollingCoordinator _pollingCoordinator;
 
-        public PlayServDataSubscriptionAdapter(PlayServImplementation proxy, ILogger logger, IJsonCodec jsonCodec = null)
+        public PlayServDataSubscriptionAdapter(IPlayServCommandBus commandBus, ILogger logger, IJsonCodec jsonCodec = null)
         {
-            _transport = proxy ?? throw new ArgumentNullException(nameof(proxy));
+            _commandBus = commandBus ?? throw new ArgumentNullException(nameof(commandBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _jsonCodec = jsonCodec ?? new NewtonsoftJsonCodec();
             _registry = new DataSubscriptionRegistry(logger, _jsonCodec);
             var requestIds = new DataSubscriptionRequestIdSource();
-            _transportSubscriptionClient = new TransportSubscriptionClient(proxy, logger, requestIds, _jsonCodec);
-            _dataMutationClient = new DataMutationClient(proxy, requestIds);
-            _dataGetClient = new DataGetClient(proxy, logger, requestIds, _jsonCodec);
-            _pollingCoordinator = new DataSubscriptionPollingCoordinator(proxy, _dataGetClient, logger);
+            _transportSubscriptionClient = new TransportSubscriptionClient(commandBus, logger, requestIds, _jsonCodec);
+            _dataMutationClient = new DataMutationClient(commandBus, requestIds);
+            _dataGetClient = new DataGetClient(commandBus, logger, requestIds, _jsonCodec);
+            _pollingCoordinator = new DataSubscriptionPollingCoordinator(commandBus, _dataGetClient, logger);
         }
 
         internal IJsonCodec GetJsonCodec()
@@ -48,7 +48,7 @@ namespace Playserv.DataSubscription
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
         {
-            return _transport.On<DataSubscriptionUpdate>(update =>
+            return _commandBus.On<DataSubscriptionUpdate>(update =>
             {
                 if (update is DataSubscriptionUpdate dataUpdate && dataUpdate.DataSubscriptionId == subscriptionId)
                     onData(dataUpdate.Data);
@@ -57,7 +57,7 @@ namespace Playserv.DataSubscription
 
         public IDisposable OnSubscriptionUpdate(long subscriptionId, Action<DataSubscriptionUpdate> onUpdate)
         {
-            return _transport.On<DataSubscriptionUpdate>(update =>
+            return _commandBus.On<DataSubscriptionUpdate>(update =>
             {
                 if (update is DataSubscriptionUpdate dataUpdate && dataUpdate.DataSubscriptionId == subscriptionId)
                     onUpdate(dataUpdate);
