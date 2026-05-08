@@ -65,10 +65,7 @@ namespace Playserv.Editor
                     PlayServWindowChrome.DrawNotice("No optional runtime modules are installed in this SDK package.", MessageType.Info);
 
                 if (hasRuntimeModules || hasServerRuntimeModules)
-                {
-                    GUILayout.Space(12f);
-                    changed |= DrawRuntimeProfiles(settings);
-                }
+                    changed |= DrawRegisteredSections(context, settings, hasRuntimeModules, hasServerRuntimeModules);
 
                 if (PlayServEditorModuleAvailability.HasAnyEditorTool)
                 {
@@ -149,30 +146,16 @@ namespace Playserv.Editor
             }
         }
 
-        private static bool DrawRuntimeProfiles(PlayServEditorModuleSettings settings)
+        private static bool DrawRegisteredSections(
+            PlayServWindowContext context,
+            PlayServEditorModuleSettings settings,
+            bool hasRuntimeModules,
+            bool hasServerRuntimeModules)
         {
             var changed = false;
 
-            GUILayout.Label("SDK profiles", PlayServWindowTheme.MiniHeadingStyle);
-            GUILayout.Space(6f);
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                foreach (var profile in PlayServSdkProfiles.All)
-                {
-                    if (PlayServWindowChrome.DrawActionButton($"Apply {profile.Label}", PlayServWindowButtonTone.Secondary, GUILayout.Height(28f)))
-                        changed |= PlayServRuntimeModuleLifecycle.ApplyProfile(settings, profile);
-
-                    GUILayout.Space(6f);
-                }
-
-                GUILayout.FlexibleSpace();
-            }
-
-            GUILayout.Space(2f);
-            GUILayout.Label(
-                "Apply Profile updates module defines, generated compatibility code, and root asmdef references before Unity reloads scripts.",
-                PlayServWindowTheme.SectionSubtitleStyle);
+            foreach (var section in PlayServModuleSettingsSectionRegistry.RegisteredSections)
+                changed |= section.Draw(context, settings, hasRuntimeModules, hasServerRuntimeModules);
 
             return changed;
         }
