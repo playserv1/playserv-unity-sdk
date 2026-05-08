@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
+using Playserv.Events;
 using UnityEditor;
 using static System.IO.File;
 
@@ -16,7 +16,6 @@ namespace Playserv.Events.Editor
         internal const string GeneratedEventsDirectoryPath = "Assets/Shared/Generated/Events/";
         private const string ApiExtensionsOutputPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string AdapterExtensionsOutputPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
-        private const string EventAttributeTypeName = "Playserv.Events.EventAttribute, Playserv.Runtime.Modules.Events";
         private const int EventTypeGlobal = 1;
         private const int EventTypeGroup = 2;
         private const int EventTypeUser = 4;
@@ -33,26 +32,22 @@ namespace Playserv.Events.Editor
 
         public static bool SyncGeneratedOutputForCurrentState()
         {
-            if (!CanGenerateEvents(out var eventAttributeType))
+            if (!CanGenerateEvents())
                 return GenerateDisabledOutput();
 
-            var eventTypes = TypeCache.GetTypesWithAttribute(eventAttributeType)
+            var eventTypes = TypeCache.GetTypesWithAttribute<EventAttribute>()
                 .Where(IsGeneratedOutputEventType)
                 .ToArray();
             var changed = false;
 
-            changed |= GenerateApiExtensionsCode(eventTypes, eventAttributeType);
-            changed |= GenerateAdapterExtensionsCode(eventTypes, eventAttributeType);
+            changed |= GenerateApiExtensionsCode(eventTypes);
+            changed |= GenerateAdapterExtensionsCode(eventTypes);
 
             return changed;
         }
 
-        private static bool CanGenerateEvents(out Type eventAttributeType)
+        private static bool CanGenerateEvents()
         {
-            eventAttributeType = ResolveEventAttributeType();
-            if (eventAttributeType == null)
-                return false;
-
             var state = Playserv.Editor.PlayServRuntimeModuleDefines.Load();
             Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
@@ -71,11 +66,6 @@ namespace Playserv.Events.Editor
             var typeNamespace = type.Namespace ?? string.Empty;
             return !string.Equals(typeNamespace, PackageSamplesNamespace, StringComparison.Ordinal) &&
                    !typeNamespace.StartsWith(PackageSamplesNamespace + ".", StringComparison.Ordinal);
-        }
-
-        private static Type ResolveEventAttributeType()
-        {
-            return Type.GetType(EventAttributeTypeName, throwOnError: false);
         }
 
         private static bool GenerateDisabledOutput()
@@ -116,7 +106,7 @@ namespace Playserv.Events.Editor
             return sb.ToString();
         }
 
-        private static bool GenerateApiExtensionsCode(IEnumerable<Type> eventTypes, Type eventAttributeType)
+        private static bool GenerateApiExtensionsCode(IEnumerable<Type> eventTypes)
         {
             var methodSuffixMap = BuildMethodSuffixMap(eventTypes);
             var sb = new StringBuilder();
@@ -138,7 +128,7 @@ namespace Playserv.Events.Editor
 
             foreach (var type in eventTypes)
             {
-                if (!TryGetEventType(type, eventAttributeType, out var eventType))
+                if (!TryGetEventType(type, out var eventType))
                     continue;
 
                 if ((eventType & EventTypeGlobal) != 0)
@@ -158,7 +148,7 @@ namespace Playserv.Events.Editor
             return WriteFile(ApiExtensionsOutputPath, sb.ToString());
         }
 
-        private static bool GenerateAdapterExtensionsCode(IEnumerable<Type> eventTypes, Type eventAttributeType)
+        private static bool GenerateAdapterExtensionsCode(IEnumerable<Type> eventTypes)
         {
             var methodSuffixMap = BuildMethodSuffixMap(eventTypes);
             var sb = new StringBuilder();
@@ -180,7 +170,7 @@ namespace Playserv.Events.Editor
 
             foreach (var type in eventTypes)
             {
-                if (!TryGetEventType(type, eventAttributeType, out var eventType))
+                if (!TryGetEventType(type, out var eventType))
                     continue;
 
                 if ((eventType & EventTypeGlobal) != 0)
@@ -200,25 +190,18 @@ namespace Playserv.Events.Editor
             return WriteFile(AdapterExtensionsOutputPath, sb.ToString());
         }
 
-        private static bool TryGetEventType(Type type, Type eventAttributeType, out int eventType)
+        private static bool TryGetEventType(Type type, out int eventType)
         {
             eventType = EventTypeAll;
             var attribute = type
-                .GetCustomAttributes(eventAttributeType, inherit: false)
+                .GetCustomAttributes(typeof(EventAttribute), inherit: false)
+                .OfType<EventAttribute>()
                 .FirstOrDefault();
 
             if (attribute == null)
                 return false;
 
-            var property = eventAttributeType.GetProperty("Type", BindingFlags.Instance | BindingFlags.Public);
-            if (property == null)
-                return true;
-
-            var value = property.GetValue(attribute, null);
-            if (value == null)
-                return true;
-
-            eventType = Convert.ToInt32(value);
+            eventType = (int)attribute.Type;
             return true;
         }
 
@@ -458,10 +441,10 @@ namespace Playserv.Events.Editor
         // Helpers
         // ----------------------------
 
-        private static FieldInfo? GetSinglePublicInstanceField(Type type)
+        private static System.Reflection.FieldInfo? GetSinglePublicInstanceField(Type type)
         {
             var fields = type
-                .GetFields(BindingFlags.Instance | BindingFlags.Public)
+                .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
                 .Where(f => !f.IsStatic)
                 .ToArray();
 

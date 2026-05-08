@@ -1,68 +1,44 @@
 using System;
-using System.Reflection;
 
 namespace Playserv.Editor
 {
     internal sealed class PlayServOptionalEditorSection : IDisposable
     {
-        private readonly string _typeName;
-        private object _instance;
-        private MethodInfo _drawMethod;
-        private MethodInfo _disposeMethod;
+        private readonly string _sectionId;
+        private IPlayServEditorSection _instance;
 
-        public PlayServOptionalEditorSection(string typeName)
+        public PlayServOptionalEditorSection(string sectionId)
         {
-            _typeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+            _sectionId = sectionId ?? throw new ArgumentNullException(nameof(sectionId));
         }
 
-        public bool IsAvailable => ResolveType() != null;
+        public bool IsAvailable => PlayServEditorSectionRegistry.IsRegistered(_sectionId);
 
         public bool Draw(PlayServWindowContext context)
         {
             var instance = ResolveInstance();
-            if (instance == null || _drawMethod == null)
+            if (instance == null)
                 return false;
 
-            _drawMethod.Invoke(instance, new object[] { context });
+            instance.Draw(context);
             return true;
         }
 
         public void Dispose()
         {
-            _disposeMethod?.Invoke(_instance, null);
+            _instance?.Dispose();
             _instance = null;
-            _drawMethod = null;
-            _disposeMethod = null;
         }
 
-        private object ResolveInstance()
+        private IPlayServEditorSection ResolveInstance()
         {
             if (_instance != null)
                 return _instance;
 
-            var type = ResolveType();
-            if (type == null)
+            if (!PlayServEditorSectionRegistry.TryCreate(_sectionId, out _instance))
                 return null;
 
-            _instance = Activator.CreateInstance(type, nonPublic: true);
-            _drawMethod = type.GetMethod(
-                "Draw",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null,
-                new[] { typeof(PlayServWindowContext) },
-                null);
-            _disposeMethod = type.GetMethod(
-                "Dispose",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null,
-                Type.EmptyTypes,
-                null);
             return _instance;
-        }
-
-        private Type ResolveType()
-        {
-            return Type.GetType(_typeName, throwOnError: false);
         }
     }
 }

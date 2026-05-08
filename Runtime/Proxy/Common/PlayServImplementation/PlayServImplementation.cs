@@ -9,7 +9,7 @@ using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Common
 {
-    public sealed class PlayServImplementation : IDisposable, IPlayServRuntimeIdentity, IPlayServCommandBus, IPlayServModuleServiceHost
+    public sealed class PlayServImplementation : IPlayServRuntimeSession, IPlayServRuntimeIdentity
     {
         private readonly ILogger _logger;
         private readonly CoreTransportFacade _transportFacade;

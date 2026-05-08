@@ -5,8 +5,12 @@ using Playserv.ModelGenerator.Editor;
 
 namespace Playserv.Editor
 {
-    internal sealed class PlayServModelSectionPresenter
+    internal sealed class PlayServModelSectionPresenter : IPlayServEditorSection
     {
+        public void Dispose()
+        {
+        }
+
         public void Draw(PlayServWindowContext context)
         {
             var state = context.State;

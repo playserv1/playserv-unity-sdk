@@ -2,7 +2,8 @@
     "name": "Playserv.Editor.Events",
     "rootNamespace": "",
     "references": [
-        "Playserv.Editor.Core"
+        "Playserv.Editor.Core",
+        "Playserv.Runtime.Modules.Events"
     ],
     "includePlatforms": [
         "Editor"
@@ -12,7 +13,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_EVENTS"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

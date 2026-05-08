@@ -4,8 +4,12 @@ using UnityEngine;
 
 namespace Playserv.Editor
 {
-    internal sealed class PlayServEventsSectionPresenter
+    internal sealed class PlayServEventsSectionPresenter : IPlayServEditorSection
     {
+        public void Dispose()
+        {
+        }
+
         public void Draw(PlayServWindowContext context)
         {
             var state = context.State;

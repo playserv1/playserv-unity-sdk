@@ -1,5 +1,4 @@
 using Playserv.Wrapper;
-using System.Reflection;
 using UnityEditor;
 
 namespace Playserv.Editor
@@ -43,13 +42,10 @@ namespace Playserv.Editor
         {
             try
             {
-                var runtimeType = typeof(PlayServ).Assembly.GetType("Playserv.Wrapper.PlayServRuntimeShutdownState");
-                if (runtimeType == null)
-                    return;
-
-                var methodName = isShuttingDown ? "MarkShuttingDown" : "Reset";
-                var method = runtimeType.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
-                method?.Invoke(null, null);
+                if (isShuttingDown)
+                    PlayServRuntimeEditorBridge.MarkShuttingDown();
+                else
+                    PlayServRuntimeEditorBridge.ResetShutdownState();
             }
             catch
             {

@@ -10,9 +10,10 @@ namespace Playserv.Wrapper
     internal sealed class PlayServRuntimeSettingsService
     {
         private readonly Func<PlayServSettings> _loadSettings;
+        private readonly IPlayServRuntimeSessionFactory _sessionFactory;
         private readonly Func<PlayServSettings, PlayServTransportImplementationFactory> _createTransportImplementationFactory;
         private readonly Func<PlayServSettings, string> _buildTransportKey;
-        private readonly Action<PlayServImplementation> _subscribeToInstanceEvents;
+        private readonly Action<IPlayServRuntimeSession> _subscribeToInstanceEvents;
         private readonly Func<PlayServSettings, string, CancellationToken, Task<string>> _resolveLatestVersion;
         private readonly Action<string> _syncLoadedConfigGameVersion;
         private readonly Action<string> _logTrace;
@@ -20,15 +21,17 @@ namespace Playserv.Wrapper
 
         public PlayServRuntimeSettingsService(
             Func<PlayServSettings> loadSettings,
+            IPlayServRuntimeSessionFactory sessionFactory,
             Func<PlayServSettings, PlayServTransportImplementationFactory> createTransportImplementationFactory,
             Func<PlayServSettings, string> buildTransportKey,
-            Action<PlayServImplementation> subscribeToInstanceEvents,
+            Action<IPlayServRuntimeSession> subscribeToInstanceEvents,
             Func<PlayServSettings, string, CancellationToken, Task<string>> resolveLatestVersion,
             Action<string> syncLoadedConfigGameVersion,
             Action<string> logTrace,
             int versionRefreshTimeoutSeconds)
         {
             _loadSettings = loadSettings ?? throw new ArgumentNullException(nameof(loadSettings));
+            _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
             _createTransportImplementationFactory = createTransportImplementationFactory ?? throw new ArgumentNullException(nameof(createTransportImplementationFactory));
             _buildTransportKey = buildTransportKey ?? throw new ArgumentNullException(nameof(buildTransportKey));
             _subscribeToInstanceEvents = subscribeToInstanceEvents ?? throw new ArgumentNullException(nameof(subscribeToInstanceEvents));
@@ -50,7 +53,7 @@ namespace Playserv.Wrapper
         public void ApplySettings(
             PlayServSettings settings,
             ref PlayServSettings currentSettings,
-            ref PlayServImplementation instance,
+            ref IPlayServRuntimeSession instance,
             ref string instanceEndpoint,
             ref string instanceTransportKey)
         {
@@ -122,7 +125,7 @@ namespace Playserv.Wrapper
 
         private void EnsureInstanceForSettings(
             PlayServSettings settings,
-            ref PlayServImplementation instance,
+            ref IPlayServRuntimeSession instance,
             ref string instanceEndpoint,
             ref string instanceTransportKey)
         {
@@ -134,9 +137,7 @@ namespace Playserv.Wrapper
             if (instance == null)
             {
                 var transportFactory = _createTransportImplementationFactory(settings);
-                instance = transportFactory == null
-                    ? new PlayServImplementation(endpoint, PlayServModuleRegistry.RegisterDefaults)
-                    : new PlayServImplementation(endpoint, transportFactory, PlayServModuleRegistry.RegisterDefaults);
+                instance = _sessionFactory.Create(endpoint, transportFactory, PlayServModuleRegistry.RegisterDefaults);
                 instanceEndpoint = endpoint;
                 instanceTransportKey = transportKey;
                 return;
@@ -147,9 +148,7 @@ namespace Playserv.Wrapper
 
             instance.Dispose();
             var replacementTransportFactory = _createTransportImplementationFactory(settings);
-            instance = replacementTransportFactory == null
-                ? new PlayServImplementation(endpoint, PlayServModuleRegistry.RegisterDefaults)
-                : new PlayServImplementation(endpoint, replacementTransportFactory, PlayServModuleRegistry.RegisterDefaults);
+            instance = _sessionFactory.Create(endpoint, replacementTransportFactory, PlayServModuleRegistry.RegisterDefaults);
             instanceEndpoint = endpoint;
             instanceTransportKey = transportKey;
         }

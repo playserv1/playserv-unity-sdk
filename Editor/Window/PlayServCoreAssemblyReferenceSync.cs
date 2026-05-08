@@ -24,17 +24,6 @@ namespace Playserv.Editor
             "Playserv.Runtime.Modules"
         };
 
-        private static readonly ModuleAssemblyReference[] ModuleReferences =
-        {
-            new ModuleAssemblyReference(PlayServModuleManifest.EventsId, "Playserv.Runtime.Modules.Events"),
-            new ModuleAssemblyReference(PlayServModuleManifest.DataSubscriptionId, "Playserv.Runtime.Modules.DataSubscription"),
-            new ModuleAssemblyReference(PlayServModuleManifest.RpcCoreId, "Playserv.Runtime.Modules.RPC.Core"),
-            new ModuleAssemblyReference(PlayServModuleManifest.ClientRpcId, "Playserv.Runtime.Modules.RPC.Client"),
-            new ModuleAssemblyReference(PlayServModuleManifest.ServerId, "Playserv.Runtime.Modules.Server"),
-            new ModuleAssemblyReference(PlayServModuleManifest.SpawnId, "Playserv.Runtime.Modules.Spawn"),
-            new ModuleAssemblyReference(PlayServModuleManifest.PulseId, "Playserv.Runtime.Modules.Pulse")
-        };
-
         private static readonly string[] EditorCoreReferences =
         {
             "Playserv.Runtime",
@@ -96,23 +85,36 @@ namespace Playserv.Editor
         private static bool SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state, bool importAssets)
         {
             var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
-            if (!File.Exists(asmdefPath))
+            var nextModel = CreateRuntimeAsmdefModel(BuildRuntimeReferences(state));
+            var nextJson = JsonUtility.ToJson(nextModel, prettyPrint: true) + Environment.NewLine;
+
+            if (File.Exists(asmdefPath) && string.Equals(File.ReadAllText(asmdefPath), nextJson, StringComparison.Ordinal))
                 return false;
 
-            var json = File.ReadAllText(asmdefPath);
-            var model = JsonUtility.FromJson<AssemblyDefinitionModel>(json);
-            if (model == null)
-                return false;
-
-            var nextReferences = BuildRuntimeReferences(state);
-            if (SequenceEqual(model.references, nextReferences))
-                return false;
-
-            model.references = nextReferences;
-            File.WriteAllText(asmdefPath, JsonUtility.ToJson(model, prettyPrint: true) + Environment.NewLine);
+            Directory.CreateDirectory(Path.GetDirectoryName(asmdefPath));
+            File.WriteAllText(asmdefPath, nextJson);
             if (importAssets)
                 AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
             return true;
+        }
+
+        private static AssemblyDefinitionModel CreateRuntimeAsmdefModel(string[] references)
+        {
+            return new AssemblyDefinitionModel
+            {
+                name = "Playserv.Runtime",
+                rootNamespace = string.Empty,
+                references = references ?? Array.Empty<string>(),
+                includePlatforms = Array.Empty<string>(),
+                excludePlatforms = Array.Empty<string>(),
+                allowUnsafeCode = false,
+                overrideReferences = false,
+                precompiledReferences = Array.Empty<string>(),
+                autoReferenced = true,
+                defineConstraints = Array.Empty<string>(),
+                versionDefines = Array.Empty<string>(),
+                noEngineReferences = false
+            };
         }
 
         private static bool SyncEditorAsmdefReferences(bool importAssets)
@@ -140,28 +142,36 @@ namespace Playserv.Editor
         private static string[] BuildRuntimeReferences(PlayServRuntimeModuleState state)
         {
             var references = new List<string>(BaseReferences);
-            if (state.Events)
-                AddModuleReference(references, PlayServModuleManifest.EventsId);
-
-            if (state.Data)
-                AddModuleReference(references, PlayServModuleManifest.DataSubscriptionId);
-
-            if (state.Rpc || state.Server)
-                AddModuleReference(references, PlayServModuleManifest.RpcCoreId);
-
-            if (state.Rpc)
-                AddModuleReference(references, PlayServModuleManifest.ClientRpcId);
-
-            if (state.Server)
-                AddModuleReference(references, PlayServModuleManifest.ServerId);
-
-            if (state.Spawn && state.Events)
-                AddModuleReference(references, PlayServModuleManifest.SpawnId);
-
-            if (state.Pulse)
-                AddModuleReference(references, PlayServModuleManifest.PulseId);
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (IsRootReferencedModuleEnabled(state, module.Id))
+                    AddModuleReference(references, module.Id);
+            }
 
             return references.Distinct(StringComparer.Ordinal).ToArray();
+        }
+
+        private static bool IsRootReferencedModuleEnabled(PlayServRuntimeModuleState state, string moduleId)
+        {
+            switch (moduleId)
+            {
+                case PlayServModuleManifest.EventsId:
+                    return state.Events;
+                case PlayServModuleManifest.DataSubscriptionId:
+                    return state.Data;
+                case PlayServModuleManifest.RpcCoreId:
+                    return state.Rpc || state.Server;
+                case PlayServModuleManifest.ClientRpcId:
+                    return state.Rpc;
+                case PlayServModuleManifest.ServerId:
+                    return state.Server;
+                case PlayServModuleManifest.SpawnId:
+                    return state.Spawn && state.Events;
+                case PlayServModuleManifest.PulseId:
+                    return state.Pulse;
+                default:
+                    return false;
+            }
         }
 
         private static void AddModuleReference(List<string> references, string moduleId)
@@ -172,12 +182,10 @@ namespace Playserv.Editor
 
         private static bool TryGetModuleAssemblyName(string moduleId, out string assemblyName)
         {
-            for (var i = 0; i < ModuleReferences.Length; i++)
+            if (PlayServModuleManifest.TryGet(moduleId, out var module) &&
+                !string.IsNullOrWhiteSpace(module.RootAssemblyReference))
             {
-                if (!string.Equals(ModuleReferences[i].ModuleId, moduleId, StringComparison.Ordinal))
-                    continue;
-
-                assemblyName = ModuleReferences[i].AssemblyName;
+                assemblyName = module.RootAssemblyReference;
                 return true;
             }
 
@@ -246,19 +254,6 @@ namespace Playserv.Editor
                 ? fullPath.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 : absolutePath;
             return relative.Replace('\\', '/');
-        }
-
-        private readonly struct ModuleAssemblyReference
-        {
-            public ModuleAssemblyReference(string moduleId, string assemblyName)
-            {
-                ModuleId = moduleId;
-                AssemblyName = assemblyName;
-            }
-
-            public string ModuleId { get; }
-
-            public string AssemblyName { get; }
         }
 
         [Serializable]

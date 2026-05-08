@@ -144,11 +144,7 @@ namespace Playserv.ModelGenerator.Editor
             if (!PlayServEditorModuleAvailability.RuntimeData)
                 return;
 
-            var providerType = Type.GetType(
-                "Playserv.DataSubscription.SchemaSelectionProvider, Playserv.Runtime.Modules.DataSubscription",
-                throwOnError: false);
-            var resetMethod = providerType?.GetMethod("Reset", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            resetMethod?.Invoke(null, null);
+            PlayServSchemaSelectionRegistry.TryReset();
         }
     }
 }

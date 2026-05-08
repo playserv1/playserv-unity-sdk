@@ -21,13 +21,13 @@ namespace Playserv.Editor
         private readonly PlayServOverviewPresenter _overviewPresenter = new PlayServOverviewPresenter();
         private readonly PlayServConfigSectionPresenter _configSectionPresenter = new PlayServConfigSectionPresenter();
         private readonly PlayServOptionalEditorSection _deploymentSection =
-            new PlayServOptionalEditorSection("Playserv.Editor.PlayServDeploymentWindowBridge, Playserv.Editor.Deployment");
+            new PlayServOptionalEditorSection(PlayServEditorSectionIds.Deployment);
         private readonly PlayServOptionalEditorSection _modelSection =
-            new PlayServOptionalEditorSection("Playserv.Editor.PlayServModelSectionPresenter, Playserv.Editor.ModelSync");
+            new PlayServOptionalEditorSection(PlayServEditorSectionIds.ModelSync);
         private readonly PlayServOptionalEditorSection _eventsSection =
-            new PlayServOptionalEditorSection("Playserv.Editor.PlayServEventsSectionPresenter, Playserv.Editor.Events");
+            new PlayServOptionalEditorSection(PlayServEditorSectionIds.Events);
         private readonly PlayServOptionalEditorSection _codegenSection =
-            new PlayServOptionalEditorSection("Playserv.Editor.PlayServCodegenSectionPresenter, Playserv.Editor.Codegen");
+            new PlayServOptionalEditorSection(PlayServEditorSectionIds.Codegen);
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
 

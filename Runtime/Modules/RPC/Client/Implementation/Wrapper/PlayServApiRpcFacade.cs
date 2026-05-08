@@ -1,50 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using Playserv.Proxy.Common;
 using Playserv.RPC;
-using Playserv.Serialization;
 
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApiRpcFacade : IPlayServRpcApi
     {
-        private readonly ILocalRpcExecution _localExecution;
-        private readonly Func<PlayServImplementation> _getCurrentInstance;
-        private readonly Func<string, PlayServImplementation> _getInstanceForFireAndForget;
-        private readonly Func<IJsonCodec> _getJsonCodec;
+        private readonly IPlayServRpcRuntimeAccess _runtimeAccess;
 
         public event Action<InvokeRpcResponse> OnRpcInvokeResponse;
 
         public PlayServApiRpcFacade()
-            : this(
-                (ILocalRpcExecution)PlayServRuntimeHost.LocalExecution,
-                () => PlayServRuntimeHost.CurrentInstance,
-                PlayServRuntimeHost.GetInstanceForFireAndForget,
-                PlayServRuntimeHost.ResolveJsonCodec)
+            : this(new PlayServRpcRuntimeAccess())
         {
-            PlayServRuntimeHost.ModuleCommandReceived += HandleModuleCommand;
         }
 
-        public PlayServApiRpcFacade(
-            ILocalRpcExecution localExecution,
-            Func<PlayServImplementation> getCurrentInstance,
-            Func<string, PlayServImplementation> getInstanceForFireAndForget,
-            Func<IJsonCodec> getJsonCodec)
+        public PlayServApiRpcFacade(IPlayServRpcRuntimeAccess runtimeAccess)
         {
-            _localExecution = localExecution ?? throw new ArgumentNullException(nameof(localExecution));
-            _getCurrentInstance = getCurrentInstance ?? throw new ArgumentNullException(nameof(getCurrentInstance));
-            _getInstanceForFireAndForget = getInstanceForFireAndForget ?? throw new ArgumentNullException(nameof(getInstanceForFireAndForget));
-            _getJsonCodec = getJsonCodec ?? throw new ArgumentNullException(nameof(getJsonCodec));
+            _runtimeAccess = runtimeAccess ?? throw new ArgumentNullException(nameof(runtimeAccess));
+            _runtimeAccess.ModuleCommandReceived += HandleModuleCommand;
         }
 
-        public void Send<T>(T command) => PlayServRuntimeHost.Send(command);
+        public void Send<T>(T command) => _runtimeAccess.Send(command);
 
-        public void Send<T>(T command, string moduleName) => PlayServRuntimeHost.Send(command, moduleName);
+        public void Send<T>(T command, string moduleName) => _runtimeAccess.Send(command, moduleName);
 
         public void Invoke(string serviceName, string methodName, object payload)
         {
-            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _getJsonCodec());
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _runtimeAccess.ResolveJsonCodec());
             Invoke(serviceName, methodName, payloadBase64);
         }
 
@@ -70,7 +54,7 @@ namespace Playserv.Wrapper
             if (string.IsNullOrWhiteSpace(payloadBase64))
                 throw new ArgumentException("Payload base64 is required.", nameof(payloadBase64));
 
-            if (_localExecution.TryInvokeRpc(serviceName, methodName, payloadBase64, _getCurrentInstance() != null))
+            if (_runtimeAccess.LocalExecution.TryInvokeRpc(serviceName, methodName, payloadBase64, _runtimeAccess.HasCurrentInstance))
                 return;
 
             var request = new InvokeRpc
@@ -80,11 +64,7 @@ namespace Playserv.Wrapper
                 Payload = payloadBase64
             };
 
-            var instance = _getInstanceForFireAndForget("RPC invoke");
-            if (instance == null)
-                return;
-
-            instance.Send(request, RpcConstants.InvokeModuleServiceName);
+            _runtimeAccess.Send(request, RpcConstants.InvokeModuleServiceName);
         }
 
         public void Invoke<TService>(Expression<Action<TService>> method)
@@ -121,7 +101,7 @@ namespace Playserv.Wrapper
 
         private void InvokeMapped(string serviceName, string methodName, RpcMappedPayload payload)
         {
-            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _getJsonCodec());
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _runtimeAccess.ResolveJsonCodec());
             Invoke(serviceName, methodName, payloadBase64);
         }
 

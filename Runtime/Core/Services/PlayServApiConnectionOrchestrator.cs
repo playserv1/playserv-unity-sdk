@@ -12,7 +12,7 @@ namespace Playserv.Wrapper
         private readonly Func<PlayServSettings> _getOrCreateSettings;
         private readonly Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> _refreshConfiguredGameVersionAsync;
         private readonly Action<PlayServSettings> _applySettings;
-        private readonly Func<PlayServImplementation> _getCurrentInstance;
+        private readonly Func<IPlayServRuntimeSession> _getCurrentSession;
         private readonly Action _disconnect;
         private readonly Action _resetShutdownState;
         private readonly Action<string> _logTrace;
@@ -25,7 +25,7 @@ namespace Playserv.Wrapper
             Func<PlayServSettings> getOrCreateSettings,
             Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> refreshConfiguredGameVersionAsync,
             Action<PlayServSettings> applySettings,
-            Func<PlayServImplementation> getCurrentInstance,
+            Func<IPlayServRuntimeSession> getCurrentSession,
             Action disconnect,
             Action resetShutdownState,
             Action<string> logTrace,
@@ -36,7 +36,7 @@ namespace Playserv.Wrapper
             _getOrCreateSettings = getOrCreateSettings ?? throw new ArgumentNullException(nameof(getOrCreateSettings));
             _refreshConfiguredGameVersionAsync = refreshConfiguredGameVersionAsync ?? throw new ArgumentNullException(nameof(refreshConfiguredGameVersionAsync));
             _applySettings = applySettings ?? throw new ArgumentNullException(nameof(applySettings));
-            _getCurrentInstance = getCurrentInstance ?? throw new ArgumentNullException(nameof(getCurrentInstance));
+            _getCurrentSession = getCurrentSession ?? throw new ArgumentNullException(nameof(getCurrentSession));
             _disconnect = disconnect ?? throw new ArgumentNullException(nameof(disconnect));
             _resetShutdownState = resetShutdownState ?? throw new ArgumentNullException(nameof(resetShutdownState));
             _logTrace = logTrace ?? throw new ArgumentNullException(nameof(logTrace));
@@ -56,10 +56,10 @@ namespace Playserv.Wrapper
             }
         }
 
-        public bool TryGetInstanceForFireAndForget(string operationName, out PlayServImplementation instance)
+        public bool TryGetSessionForFireAndForget(string operationName, out IPlayServRuntimeSession session)
         {
-            instance = _getCurrentInstance();
-            if (instance != null)
+            session = _getCurrentSession();
+            if (session != null)
                 return true;
 
             if (_shouldIgnoreMissingInstance())
@@ -89,10 +89,10 @@ namespace Playserv.Wrapper
                 _applySettings(settings);
                 _logTrace("[PlayServ] Connect applied settings. Starting transport connect.");
 
-                var instance = _getCurrentInstance()
+                var session = _getCurrentSession()
                     ?? throw new InvalidOperationException("PlayServ instance is not initialized after applying settings.");
 
-                var connected = await instance.Connect();
+                var connected = await session.Connect();
                 _logTrace($"[PlayServ] Connect transport completed. connected={connected}, state={_getState()}");
                 if (!connected)
                     _disconnect();

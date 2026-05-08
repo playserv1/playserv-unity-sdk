@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Editor.DataSubscription",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Runtime.Modules.DataSubscription"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
