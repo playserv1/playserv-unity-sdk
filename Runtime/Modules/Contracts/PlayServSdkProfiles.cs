@@ -23,7 +23,11 @@ namespace Playserv.Modules
                     PlayServModuleManifest.DataSubscriptionId,
                     PlayServModuleManifest.ClientRpcId,
                     PlayServModuleManifest.SpawnId,
-                    PlayServModuleManifest.PulseId
+                    PlayServModuleManifest.PulseId,
+                    PlayServModuleManifest.TransportWebSocketId,
+                    PlayServModuleManifest.TransportUdpId,
+                    PlayServModuleManifest.TransportRudpId,
+                    PlayServModuleManifest.TransportWebRtcId
                 }),
 
             new PlayServSdkProfile(
@@ -47,13 +51,17 @@ namespace Playserv.Modules
                     PlayServModuleManifest.ClientRpcId,
                     PlayServModuleManifest.ServerId,
                     PlayServModuleManifest.SpawnId,
-                    PlayServModuleManifest.PulseId
+                    PlayServModuleManifest.PulseId,
+                    PlayServModuleManifest.TransportWebSocketId,
+                    PlayServModuleManifest.TransportUdpId,
+                    PlayServModuleManifest.TransportRudpId,
+                    PlayServModuleManifest.TransportWebRtcId
                 }),
 
             new PlayServSdkProfile(
                 CoreOnlyId,
                 "Core Only",
-                "Transport, config, serialization, and module contracts only.",
+                "Base config, serialization, and module contracts only.",
                 Array.Empty<string>())
         };
 

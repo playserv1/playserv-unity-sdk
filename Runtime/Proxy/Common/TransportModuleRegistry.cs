@@ -5,24 +5,36 @@ using Playserv.Proxy.Interfaces;
 
 namespace Playserv.Proxy.Common
 {
-    internal static partial class TransportModuleRegistry
+    internal static class TransportModuleRegistry
     {
-        internal static ITransportModuleFactory[] GetFactories()
-        {
-            var factories = new List<ITransportModuleFactory>();
-            RegisterWebSocket(factories);
-            RegisterUdp(factories);
-            RegisterRudp(factories);
-            RegisterWebRtc(factories);
+        private static readonly object Gate = new object();
+        private static readonly Dictionary<string, ITransportModuleFactory> Factories =
+            new Dictionary<string, ITransportModuleFactory>(StringComparer.OrdinalIgnoreCase);
 
-            return factories
-                .OrderBy(x => x.Scheme, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+        internal static void Register(ITransportModuleFactory factory)
+        {
+            if (factory == null)
+                throw new ArgumentNullException(nameof(factory));
+
+            if (string.IsNullOrWhiteSpace(factory.Scheme))
+                throw new ArgumentException("Transport module factory scheme cannot be empty.", nameof(factory));
+
+            lock (Gate)
+            {
+                Factories[factory.Scheme] = factory;
+            }
+
+            TransportImplementationResolver.ClearFactoryCache();
         }
 
-        static partial void RegisterWebSocket(List<ITransportModuleFactory> factories);
-        static partial void RegisterUdp(List<ITransportModuleFactory> factories);
-        static partial void RegisterRudp(List<ITransportModuleFactory> factories);
-        static partial void RegisterWebRtc(List<ITransportModuleFactory> factories);
+        internal static ITransportModuleFactory[] GetFactories()
+        {
+            lock (Gate)
+            {
+                return Factories.Values
+                    .OrderBy(x => x.Scheme, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
+        }
     }
 }

@@ -13,5 +13,9 @@ namespace Playserv.Modules
         public const string Rpc = ClientRpc;
         public const string Spawn = PlayServModuleManifest.SpawnId;
         public const string Pulse = PlayServModuleManifest.PulseId;
+        public const string TransportWebSocket = PlayServModuleManifest.TransportWebSocketId;
+        public const string TransportUdp = PlayServModuleManifest.TransportUdpId;
+        public const string TransportRudp = PlayServModuleManifest.TransportRudpId;
+        public const string TransportWebRtc = PlayServModuleManifest.TransportWebRtcId;
     }
 }

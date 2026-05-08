@@ -66,7 +66,7 @@ namespace Playserv.Editor
 
         private void OnEnable()
         {
-            PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
+            PlayServModuleGraphSynchronizer.QueueSync();
             EnsureControllers();
 
             _state.FoldCodegen = EditorPrefs.GetBool(Const.PrefFoldCodegen, true);

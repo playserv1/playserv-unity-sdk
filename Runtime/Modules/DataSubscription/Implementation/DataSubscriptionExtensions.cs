@@ -1,11 +1,10 @@
 using System;
 using Playserv.Modules;
-using Playserv.Proxy.Common;
 
 namespace Playserv.DataSubscription
 {
     /// <summary>
-    /// Extension helpers for creating subscription builders from <see cref="PlayServImplementation"/>.
+    /// Extension helpers for creating subscription builders from module service providers.
     /// </summary>
     public static class DataSubscriptionExtensions
     {
@@ -13,17 +12,17 @@ namespace Playserv.DataSubscription
         /// Creates shared entity builder for type <typeparamref name="T"/>.
         /// </summary>
         /// <typeparam name="T">Root entity type.</typeparam>
-        /// <param name="proxy">Connected PlayServ implementation.</param>
+        /// <param name="host">Module service host.</param>
         /// <param name="mode">Subscription backend mode. Defaults to Polling.</param>
         /// <returns>Fluent shared entity builder.</returns>
         public static ISharedEntityBuilder<T> Subscribe<T>(
-            this PlayServImplementation proxy,
+            this IPlayServModuleServiceHost host,
             DataSubscriptionMode mode = DataSubscriptionMode.Polling) where T : class, new()
         {
-            if (proxy == null)
-                throw new ArgumentNullException(nameof(proxy));
+            if (host == null)
+                throw new ArgumentNullException(nameof(host));
 
-            var adapter = proxy.ModuleServices.Get<PlayServDataSubscriptionAdapter>();
+            var adapter = host.ModuleServices.Get<PlayServDataSubscriptionAdapter>();
             var builder = new SharedEntityBuilder<T>(adapter, typeof(T).Name);
             return mode == DataSubscriptionMode.Transport
                 ? builder.UseTransport()

@@ -23,7 +23,11 @@ namespace Playserv.Editor
             "PLAYSERV_DISABLE_LOCAL_EXECUTION_SERVER",
             "PLAYSERV_MODULE_DISABLED_LOCAL_EXECUTION_SERVER",
             "PLAYSERV_DISABLE_SPAWN",
-            "PLAYSERV_DISABLE_PULSE"
+            "PLAYSERV_DISABLE_PULSE",
+            "PLAYSERV_DISABLE_TRANSPORT_WEBSOCKET",
+            "PLAYSERV_DISABLE_TRANSPORT_UDP",
+            "PLAYSERV_DISABLE_TRANSPORT_RUDP",
+            "PLAYSERV_DISABLE_TRANSPORT_WEBRTC"
         };
 
         public static PlayServRuntimeModuleState Load()
@@ -39,7 +43,11 @@ namespace Playserv.Editor
                 ClientExecution = IsEnabled(defines, PlayServModuleManifest.ClientExecutionId),
                 Spawn = IsEnabled(defines, PlayServModuleManifest.SpawnId) &&
                         IsEnabled(defines, PlayServModuleManifest.EventsId),
-                Pulse = IsEnabled(defines, PlayServModuleManifest.PulseId)
+                Pulse = IsEnabled(defines, PlayServModuleManifest.PulseId),
+                TransportWebSocket = IsEnabled(defines, PlayServModuleManifest.TransportWebSocketId),
+                TransportUdp = IsEnabled(defines, PlayServModuleManifest.TransportUdpId),
+                TransportRudp = IsEnabled(defines, PlayServModuleManifest.TransportRudpId),
+                TransportWebRtc = IsEnabled(defines, PlayServModuleManifest.TransportWebRtcId)
             };
             NormalizeDependencies(ref state);
             return state;
@@ -57,7 +65,11 @@ namespace Playserv.Editor
                 Server = rpcCoreEnabled && IsEnabledByUserPreference(PlayServModuleManifest.ServerId),
                 ClientExecution = IsEnabledByUserPreference(PlayServModuleManifest.ClientExecutionId),
                 Spawn = eventsEnabled && IsEnabledByUserPreference(PlayServModuleManifest.SpawnId),
-                Pulse = IsEnabledByUserPreference(PlayServModuleManifest.PulseId)
+                Pulse = IsEnabledByUserPreference(PlayServModuleManifest.PulseId),
+                TransportWebSocket = IsEnabledByUserPreference(PlayServModuleManifest.TransportWebSocketId),
+                TransportUdp = IsEnabledByUserPreference(PlayServModuleManifest.TransportUdpId),
+                TransportRudp = IsEnabledByUserPreference(PlayServModuleManifest.TransportRudpId),
+                TransportWebRtc = IsEnabledByUserPreference(PlayServModuleManifest.TransportWebRtcId)
             };
             NormalizeDependencies(ref state);
             return state;
@@ -80,12 +92,16 @@ namespace Playserv.Editor
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.SpawnId, !state.Spawn);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.PulseId, !state.Pulse);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportWebSocketId, !state.TransportWebSocket);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportUdpId, !state.TransportUdp);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportRudpId, !state.TransportRudp);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportWebRtcId, !state.TransportWebRtc);
 
             if (!changed)
                 return false;
 
             WriteDefines(defines);
-            PlayServGeneratedCompatibilityLayer.SyncNow();
+            PlayServModuleGraphSynchronizer.SyncNow();
             return true;
         }
 
@@ -188,6 +204,10 @@ namespace Playserv.Editor
                 state.Rpc = false;
                 state.Spawn = false;
                 state.Pulse = false;
+                state.TransportWebSocket = false;
+                state.TransportUdp = false;
+                state.TransportRudp = false;
+                state.TransportWebRtc = false;
             }
 
             if (!state.Events)
@@ -217,6 +237,10 @@ namespace Playserv.Editor
             SetUserModulePreference(PlayServModuleManifest.ClientExecutionId, state.ClientExecution);
             SetUserModulePreference(PlayServModuleManifest.SpawnId, state.Spawn);
             SetUserModulePreference(PlayServModuleManifest.PulseId, state.Pulse);
+            SetUserModulePreference(PlayServModuleManifest.TransportWebSocketId, state.TransportWebSocket);
+            SetUserModulePreference(PlayServModuleManifest.TransportUdpId, state.TransportUdp);
+            SetUserModulePreference(PlayServModuleManifest.TransportRudpId, state.TransportRudp);
+            SetUserModulePreference(PlayServModuleManifest.TransportWebRtcId, state.TransportWebRtc);
         }
 
         private static void SetUserModulePreference(string moduleId, bool enabled)

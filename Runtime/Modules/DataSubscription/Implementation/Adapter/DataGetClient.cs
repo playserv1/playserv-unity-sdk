@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription.Requests;
 using Playserv.DataSubscription.Responses;
+using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
@@ -12,18 +13,18 @@ namespace Playserv.DataSubscription
 {
     internal sealed class DataGetClient
     {
-        private readonly PlayServImplementation _transport;
+        private readonly IPlayServCommandBus _commandBus;
         private readonly ILogger _logger;
         private readonly DataSubscriptionRequestIdSource _requestIds;
         private readonly IJsonCodec _jsonCodec;
 
         public DataGetClient(
-            PlayServImplementation transport,
+            IPlayServCommandBus commandBus,
             ILogger logger,
             DataSubscriptionRequestIdSource requestIds,
             IJsonCodec jsonCodec)
         {
-            _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _commandBus = commandBus ?? throw new ArgumentNullException(nameof(commandBus));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _requestIds = requestIds ?? throw new ArgumentNullException(nameof(requestIds));
             _jsonCodec = jsonCodec ?? throw new ArgumentNullException(nameof(jsonCodec));
@@ -53,7 +54,7 @@ namespace Playserv.DataSubscription
             IDisposable commandErrorNamedSubscription = null;
             IDisposable commandErrorRpcSubscription = null;
 
-            responseSubscription = _transport.On<DataGetResponse>(response =>
+            responseSubscription = _commandBus.On<DataGetResponse>(response =>
             {
                 if (response != null && response.RequestId == request.RequestId)
                 {
@@ -64,7 +65,7 @@ namespace Playserv.DataSubscription
                 }
             });
 
-            responseByCommandSubscription = _transport.OnCommand("DataGetResponse", command =>
+            responseByCommandSubscription = _commandBus.OnCommand("DataGetResponse", command =>
             {
                 if (!DataSubscriptionRequestSupport.TryMapDataGetResponse(_jsonCodec, command, out var response))
                     return;
@@ -82,7 +83,7 @@ namespace Playserv.DataSubscription
                 }
             });
 
-            responseByModuleCommandSubscription = _transport.OnCommand("module_dataflow.DataGetResponse", command =>
+            responseByModuleCommandSubscription = _commandBus.OnCommand("module_dataflow.DataGetResponse", command =>
             {
                 if (!DataSubscriptionRequestSupport.TryMapDataGetResponse(_jsonCodec, command, out var response))
                     return;
@@ -100,7 +101,7 @@ namespace Playserv.DataSubscription
                 }
             });
 
-            commandErrorSubscription = _transport.OnCommand("error", command =>
+            commandErrorSubscription = _commandBus.OnCommand("error", command =>
             {
                 if (command is not CommandErrorResponse errorResponse)
                     return;
@@ -118,7 +119,7 @@ namespace Playserv.DataSubscription
 #endif
             });
 
-            commandErrorNamedSubscription = _transport.OnCommand("CommandErrorResponse", command =>
+            commandErrorNamedSubscription = _commandBus.OnCommand("CommandErrorResponse", command =>
             {
                 if (command is not CommandErrorResponse errorResponse)
                     return;
@@ -136,7 +137,7 @@ namespace Playserv.DataSubscription
 #endif
             });
 
-            commandErrorRpcSubscription = _transport.OnCommand("RpcErrorResponse", command =>
+            commandErrorRpcSubscription = _commandBus.OnCommand("RpcErrorResponse", command =>
             {
                 if (command is not CommandErrorResponse errorResponse)
                     return;
@@ -156,7 +157,7 @@ namespace Playserv.DataSubscription
 
             try
             {
-                await _transport.SendAsync(request, "module_dataflow");
+                await _commandBus.SendAsync(request, "module_dataflow");
                 var effectiveTimeoutMs = timeoutMs > 0 ? timeoutMs : PlayServDataSubscriptionAdapter.DataGetResponseTimeoutMs;
                 var completedInTime = await DataSubscriptionRequestSupport.WaitForCompletionOrTimeoutAsync(tcs.Task, effectiveTimeoutMs, ct);
                 if (!completedInTime)

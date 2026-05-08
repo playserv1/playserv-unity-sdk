@@ -16,6 +16,10 @@ namespace Playserv.Editor
         public const string RuntimeModuleClientExecution = "Client Execution";
         public const string RuntimeModuleSpawn = "Spawn";
         public const string RuntimeModulePulse = "Pulse";
+        public const string RuntimeModuleTransportWebSocket = "WebSocket";
+        public const string RuntimeModuleTransportUdp = "UDP";
+        public const string RuntimeModuleTransportRudp = "RUDP";
+        public const string RuntimeModuleTransportWebRtc = "WebRTC";
 
         public bool Deployment { get; private set; } = DefaultOptionalModuleState;
         public bool ModelSync { get; private set; } = DefaultOptionalModuleState;
@@ -28,6 +32,10 @@ namespace Playserv.Editor
         public bool RuntimeClientExecution { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeSpawn { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimePulse { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeTransportWebSocket { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeTransportUdp { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeTransportRudp { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeTransportWebRtc { get; private set; } = DefaultOptionalModuleState;
 
         public void Load()
         {
@@ -146,6 +154,30 @@ namespace Playserv.Editor
             return ApplyRuntimeState(state);
         }
 
+        public bool SetRuntimeTransportWebSocket(bool enabled) =>
+            SetRuntimeTransportModule(
+                enabled,
+                PlayServEditorModuleAvailability.RuntimeTransportWebSocket,
+                PlayServModuleManifest.TransportWebSocketId);
+
+        public bool SetRuntimeTransportUdp(bool enabled) =>
+            SetRuntimeTransportModule(
+                enabled,
+                PlayServEditorModuleAvailability.RuntimeTransportUdp,
+                PlayServModuleManifest.TransportUdpId);
+
+        public bool SetRuntimeTransportRudp(bool enabled) =>
+            SetRuntimeTransportModule(
+                enabled,
+                PlayServEditorModuleAvailability.RuntimeTransportRudp,
+                PlayServModuleManifest.TransportRudpId);
+
+        public bool SetRuntimeTransportWebRtc(bool enabled) =>
+            SetRuntimeTransportModule(
+                enabled,
+                PlayServEditorModuleAvailability.RuntimeTransportWebRtc,
+                PlayServModuleManifest.TransportWebRtcId);
+
         public bool CanChangeRuntimeModule(string moduleName)
         {
             if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
@@ -167,6 +199,14 @@ namespace Playserv.Editor
                     return RuntimeSpawn || RuntimeEvents;
                 case RuntimeModulePulse:
                     return RuntimePulse || RuntimeClientExecution;
+                case RuntimeModuleTransportWebSocket:
+                    return RuntimeTransportWebSocket || RuntimeClientExecution;
+                case RuntimeModuleTransportUdp:
+                    return RuntimeTransportUdp || RuntimeClientExecution;
+                case RuntimeModuleTransportRudp:
+                    return RuntimeTransportRudp || RuntimeClientExecution;
+                case RuntimeModuleTransportWebRtc:
+                    return RuntimeTransportWebRtc || RuntimeClientExecution;
                 default:
                     return true;
             }
@@ -194,6 +234,14 @@ namespace Playserv.Editor
                     return !RuntimeSpawn && !RuntimeEvents ? "Enable Events first." : string.Empty;
                 case RuntimeModulePulse:
                     return !RuntimePulse && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
+                case RuntimeModuleTransportWebSocket:
+                    return !RuntimeTransportWebSocket && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
+                case RuntimeModuleTransportUdp:
+                    return !RuntimeTransportUdp && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
+                case RuntimeModuleTransportRudp:
+                    return !RuntimeTransportRudp && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
+                case RuntimeModuleTransportWebRtc:
+                    return !RuntimeTransportWebRtc && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
                 default:
                     return string.Empty;
             }
@@ -222,6 +270,14 @@ namespace Playserv.Editor
                     return RuntimeSpawn;
                 case RuntimeModulePulse:
                     return RuntimePulse;
+                case RuntimeModuleTransportWebSocket:
+                    return RuntimeTransportWebSocket;
+                case RuntimeModuleTransportUdp:
+                    return RuntimeTransportUdp;
+                case RuntimeModuleTransportRudp:
+                    return RuntimeTransportRudp;
+                case RuntimeModuleTransportWebRtc:
+                    return RuntimeTransportWebRtc;
                 default:
                     return false;
             }
@@ -257,7 +313,11 @@ namespace Playserv.Editor
                 Server = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerId),
                 ClientExecution = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientExecutionId),
                 Spawn = IsProfileModuleEnabled(profile, PlayServModuleManifest.SpawnId),
-                Pulse = IsProfileModuleEnabled(profile, PlayServModuleManifest.PulseId)
+                Pulse = IsProfileModuleEnabled(profile, PlayServModuleManifest.PulseId),
+                TransportWebSocket = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportWebSocketId),
+                TransportUdp = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportUdpId),
+                TransportRudp = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportRudpId),
+                TransportWebRtc = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportWebRtcId)
             });
         }
 
@@ -273,7 +333,14 @@ namespace Playserv.Editor
 
         private bool CanDisableRuntimeEvents => !RuntimeSpawn;
 
-        private bool CanDisableRuntimeClientExecution => !RuntimeEvents && !RuntimeRpc && !RuntimePulse;
+        private bool CanDisableRuntimeClientExecution =>
+            !RuntimeEvents &&
+            !RuntimeRpc &&
+            !RuntimePulse &&
+            !RuntimeTransportWebSocket &&
+            !RuntimeTransportUdp &&
+            !RuntimeTransportRudp &&
+            !RuntimeTransportWebRtc;
 
         private static string BuildEnabledDependentsList(bool spawnEnabled)
         {
@@ -290,6 +357,10 @@ namespace Playserv.Editor
             AppendEnabledModule(ref result, RuntimeEvents, RuntimeModuleEvents);
             AppendEnabledModule(ref result, RuntimeRpc, RuntimeModuleRpc);
             AppendEnabledModule(ref result, RuntimePulse, RuntimeModulePulse);
+            AppendEnabledModule(ref result, RuntimeTransportWebSocket, RuntimeModuleTransportWebSocket);
+            AppendEnabledModule(ref result, RuntimeTransportUdp, RuntimeModuleTransportUdp);
+            AppendEnabledModule(ref result, RuntimeTransportRudp, RuntimeModuleTransportRudp);
+            AppendEnabledModule(ref result, RuntimeTransportWebRtc, RuntimeModuleTransportWebRtc);
 
             return result;
         }
@@ -315,6 +386,10 @@ namespace Playserv.Editor
             RuntimeClientExecution = state.ClientExecution;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
+            RuntimeTransportWebSocket = state.TransportWebSocket;
+            RuntimeTransportUdp = state.TransportUdp;
+            RuntimeTransportRudp = state.TransportRudp;
+            RuntimeTransportWebRtc = state.TransportWebRtc;
         }
 
         private PlayServRuntimeModuleState CreateRuntimeState()
@@ -327,8 +402,45 @@ namespace Playserv.Editor
                 Server = RuntimeServer,
                 ClientExecution = RuntimeClientExecution,
                 Spawn = RuntimeSpawn,
-                Pulse = RuntimePulse
+                Pulse = RuntimePulse,
+                TransportWebSocket = RuntimeTransportWebSocket,
+                TransportUdp = RuntimeTransportUdp,
+                TransportRudp = RuntimeTransportRudp,
+                TransportWebRtc = RuntimeTransportWebRtc
             };
+        }
+
+        private bool SetRuntimeTransportModule(
+            bool enabled,
+            bool available,
+            string moduleId)
+        {
+            if (!available)
+                return false;
+
+            if (enabled && !RuntimeClientExecution)
+                return false;
+
+            var state = CreateRuntimeState();
+            switch (moduleId)
+            {
+                case PlayServModuleManifest.TransportWebSocketId:
+                    state.TransportWebSocket = enabled;
+                    break;
+                case PlayServModuleManifest.TransportUdpId:
+                    state.TransportUdp = enabled;
+                    break;
+                case PlayServModuleManifest.TransportRudpId:
+                    state.TransportRudp = enabled;
+                    break;
+                case PlayServModuleManifest.TransportWebRtcId:
+                    state.TransportWebRtc = enabled;
+                    break;
+                default:
+                    return false;
+            }
+
+            return ApplyRuntimeState(state);
         }
 
         private bool ApplyRuntimeState(PlayServRuntimeModuleState state)
@@ -342,7 +454,11 @@ namespace Playserv.Editor
                           RuntimeServer != state.Server ||
                           RuntimeClientExecution != state.ClientExecution ||
                           RuntimeSpawn != state.Spawn ||
-                          RuntimePulse != state.Pulse;
+                          RuntimePulse != state.Pulse ||
+                          RuntimeTransportWebSocket != state.TransportWebSocket ||
+                          RuntimeTransportUdp != state.TransportUdp ||
+                          RuntimeTransportRudp != state.TransportRudp ||
+                          RuntimeTransportWebRtc != state.TransportWebRtc;
 
             RuntimeEvents = state.Events;
             RuntimeData = state.Data;
@@ -351,6 +467,10 @@ namespace Playserv.Editor
             RuntimeClientExecution = state.ClientExecution;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
+            RuntimeTransportWebSocket = state.TransportWebSocket;
+            RuntimeTransportUdp = state.TransportUdp;
+            RuntimeTransportRudp = state.TransportRudp;
+            RuntimeTransportWebRtc = state.TransportWebRtc;
 
             return PlayServRuntimeModuleDefines.Apply(state) || changed;
         }

@@ -2,18 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Playserv.DataSubscription.Requests;
-using Playserv.Proxy.Common;
+using Playserv.Modules;
 
 namespace Playserv.DataSubscription
 {
     internal sealed class DataMutationClient
     {
-        private readonly PlayServImplementation _transport;
+        private readonly IPlayServCommandBus _commandBus;
         private readonly DataSubscriptionRequestIdSource _requestIds;
 
-        public DataMutationClient(PlayServImplementation transport, DataSubscriptionRequestIdSource requestIds)
+        public DataMutationClient(IPlayServCommandBus commandBus, DataSubscriptionRequestIdSource requestIds)
         {
-            _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _commandBus = commandBus ?? throw new ArgumentNullException(nameof(commandBus));
             _requestIds = requestIds ?? throw new ArgumentNullException(nameof(requestIds));
         }
 
@@ -33,7 +33,7 @@ namespace Playserv.DataSubscription
                 Data = patch
             };
 
-            await _transport.SendAsync(mutationRequest, "module_dataflow");
+            await _commandBus.SendAsync(mutationRequest, "module_dataflow");
         }
     }
 }

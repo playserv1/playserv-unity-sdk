@@ -9,5 +9,9 @@ namespace Playserv.Editor
         public bool Server;
         public bool Spawn;
         public bool Pulse;
+        public bool TransportWebSocket;
+        public bool TransportUdp;
+        public bool TransportRudp;
+        public bool TransportWebRtc;
     }
 }

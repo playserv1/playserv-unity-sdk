@@ -8,6 +8,7 @@ using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
 using Playserv.RPC;
 using Playserv.Proxy.Common;
+using Playserv.Spawn;
 using UnityEngine;
 
 namespace Playserv.Wrapper
@@ -92,87 +93,30 @@ namespace Playserv.Wrapper
             PlayServRpc.Invoke(method, payloadBase64);
 
         public static Task<GameObject> Spawn(string assetName, Vector3 position, Quaternion rotation) =>
-            InvokeSpawnGameObject(nameof(Spawn), new[] { typeof(string), typeof(Vector3), typeof(Quaternion) }, assetName, position, rotation);
+            PlayServSpawn.Spawn(assetName, position, rotation);
 
         public static Task<GameObject> Spawn(string assetName, Vector3 position) =>
-            InvokeSpawnGameObject(nameof(Spawn), new[] { typeof(string), typeof(Vector3) }, assetName, position);
+            PlayServSpawn.Spawn(assetName, position);
 
-        public static string CurrentSpawnScope => InvokeSpawnStringProperty("CurrentScope");
+        public static string CurrentSpawnScope => PlayServSpawn.CurrentScope;
 
         public static Task<bool> JoinSpawnScopeAsync(string groupName, CancellationToken ct = default) =>
-            InvokeSpawnBoolTask(nameof(JoinSpawnScopeAsync), new[] { typeof(string), typeof(CancellationToken) }, groupName, ct);
+            PlayServSpawn.JoinSpawnScopeAsync(groupName, ct);
 
         public static Task<bool> JoinSpawnScope(string groupName, CancellationToken ct = default) =>
-            InvokeSpawnBoolTask(nameof(JoinSpawnScope), new[] { typeof(string), typeof(CancellationToken) }, groupName, ct);
+            PlayServSpawn.JoinSpawnScope(groupName, ct);
 
         public static Task<bool> LeaveSpawnScopeAsync(CancellationToken ct = default) =>
-            InvokeSpawnBoolTask(nameof(LeaveSpawnScopeAsync), new[] { typeof(CancellationToken) }, ct);
+            PlayServSpawn.LeaveSpawnScopeAsync(ct);
 
         public static Task<bool> LeaveSpawnScope(CancellationToken ct = default) =>
-            InvokeSpawnBoolTask(nameof(LeaveSpawnScope), new[] { typeof(CancellationToken) }, ct);
+            PlayServSpawn.LeaveSpawnScope(ct);
 
         public static bool Despawn(string spawnId) =>
-            InvokeSpawnBool(nameof(Despawn), new[] { typeof(string) }, spawnId);
+            PlayServSpawn.Despawn(spawnId);
 
         public static bool Despawn(GameObject instance) =>
-            InvokeSpawnBool(nameof(Despawn), new[] { typeof(GameObject) }, instance);
-
-        private static string SpawnFacadeTypeName => "Playserv.Wrapper.PlayServ" + "Spawn, Playserv.Runtime.Modules." + "Spawn";
-
-        private static Task<GameObject> InvokeSpawnGameObject(string methodName, Type[] parameterTypes, params object[] args)
-        {
-            return InvokeSpawn<Task<GameObject>>(methodName, parameterTypes, args) ?? FaultedSpawnTask<GameObject>(SpawnModuleUnavailableException());
-        }
-
-        private static Task<bool> InvokeSpawnBoolTask(string methodName, Type[] parameterTypes, params object[] args)
-        {
-            return InvokeSpawn<Task<bool>>(methodName, parameterTypes, args) ?? FaultedSpawnTask<bool>(SpawnModuleUnavailableException());
-        }
-
-        private static bool InvokeSpawnBool(string methodName, Type[] parameterTypes, params object[] args)
-        {
-            return InvokeSpawn<bool>(methodName, parameterTypes, args);
-        }
-
-        private static string InvokeSpawnStringProperty(string propertyName)
-        {
-            var type = Type.GetType(SpawnFacadeTypeName, throwOnError: false);
-            var property = type?.GetProperty(propertyName);
-            return property?.GetValue(null, null) as string ?? string.Empty;
-        }
-
-        private static T InvokeSpawn<T>(string methodName, Type[] parameterTypes, params object[] args)
-        {
-            var type = Type.GetType(SpawnFacadeTypeName, throwOnError: false);
-            var method = type?.GetMethod(methodName, parameterTypes);
-            if (method == null)
-                return default;
-
-            try
-            {
-                return (T)method.Invoke(null, args);
-            }
-            catch (Exception ex)
-            {
-                if (typeof(T) == typeof(Task<GameObject>))
-                    return (T)(object)FaultedSpawnTask<GameObject>(ex.InnerException ?? ex);
-
-                if (typeof(T) == typeof(Task<bool>))
-                    return (T)(object)FaultedSpawnTask<bool>(ex.InnerException ?? ex);
-
-                return default;
-            }
-        }
-
-        private static Task<T> FaultedSpawnTask<T>(Exception exception)
-        {
-            var tcs = new TaskCompletionSource<T>();
-            tcs.SetException(exception);
-            return tcs.Task;
-        }
-
-        private static InvalidOperationException SpawnModuleUnavailableException() =>
-            new InvalidOperationException("PlayServ Spawn module is not installed or enabled.");
+            PlayServSpawn.Despawn(instance);
 
     }
 

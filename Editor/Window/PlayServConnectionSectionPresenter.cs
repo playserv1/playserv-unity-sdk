@@ -10,7 +10,7 @@ namespace Playserv.Editor
             var state = context.State;
             var expanded = PlayServWindowChrome.BeginSectionCard(
                 ref state.FoldConnection,
-                "Transport",
+                "Connection",
                 "WebSocket Connection",
                 "Low-level socket smoke test for editor diagnostics and message tracing.");
 

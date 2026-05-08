@@ -38,7 +38,7 @@ namespace Playserv.Editor
 
                 GUILayout.Space(6f);
                 GUILayout.Label(
-                    "Core runtime, transport, serialization, and config stay enabled. Runtime toggles write scripting defines, so disabled module APIs are removed at compile time.",
+                    "Core runtime, serialization, and config stay enabled. Module toggles write scripting defines, so disabled module APIs are removed at compile time.",
                     PlayServWindowTheme.HeroBodyStyle);
             }
 

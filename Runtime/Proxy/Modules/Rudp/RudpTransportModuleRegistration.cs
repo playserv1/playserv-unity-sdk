@@ -1,13 +1,22 @@
-using System.Collections.Generic;
-using Playserv.Proxy.Interfaces;
+using Playserv.Proxy.Common;
+using UnityEngine;
 
-namespace Playserv.Proxy.Common
+namespace Playserv.Proxy.Implementation
 {
-    internal static partial class TransportModuleRegistry
+    internal static class RudpTransportModuleRegistration
     {
-        static partial void RegisterRudp(List<ITransportModuleFactory> factories)
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Register()
         {
-            factories.Add(new Playserv.Proxy.Implementation.RudpTransportModuleFactory());
+            TransportModuleRegistry.Register(new RudpTransportModuleFactory());
         }
+
+#if UNITY_EDITOR
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void RegisterInEditor()
+        {
+            Register();
+        }
+#endif
     }
 }

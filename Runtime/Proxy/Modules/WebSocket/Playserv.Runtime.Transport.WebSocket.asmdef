@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Runtime.Transport.WebSocket",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Abstractions",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Serialization"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

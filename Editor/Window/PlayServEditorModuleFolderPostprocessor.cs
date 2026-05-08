@@ -86,7 +86,7 @@ namespace Playserv.Editor
 
         private static void SyncModuleState()
         {
-            PlayServGeneratedCompatibilityLayer.SyncNow();
+            PlayServModuleGraphSynchronizer.SyncNow();
         }
 
         private static bool TouchesPlayServModuleFolders(string[] assetPaths)

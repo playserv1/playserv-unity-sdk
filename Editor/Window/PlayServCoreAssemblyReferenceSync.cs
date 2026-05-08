@@ -44,7 +44,7 @@ namespace Playserv.Editor
         [InitializeOnLoadMethod]
         private static void SyncOnEditorLoad()
         {
-            EditorApplication.delayCall += Sync;
+            PlayServModuleGraphSynchronizer.QueueSync();
         }
 
         public static void Sync()
@@ -52,57 +52,89 @@ namespace Playserv.Editor
             Sync(importAssets: true);
         }
 
-        internal static void Sync(bool importAssets)
+        internal static bool Sync(bool importAssets)
         {
             PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
             var state = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
 
-            SyncRuntimeAsmdefReferences(state, importAssets);
-            SyncEditorAsmdefReferences(importAssets);
+            return Sync(state, importAssets);
         }
 
-        private static void SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state, bool importAssets)
+        internal static bool Sync(PlayServRuntimeModuleState state, bool importAssets)
+        {
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
+
+            var changed = false;
+            changed |= SyncRuntimeAsmdefReferences(state, importAssets);
+            changed |= SyncEditorAsmdefReferences(importAssets);
+            return changed;
+        }
+
+        internal static bool HasRuntimeModuleReference(string moduleId)
+        {
+            if (!TryGetModuleAssemblyName(moduleId, out var assemblyName))
+                return false;
+
+            var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
+            if (!File.Exists(asmdefPath))
+                return false;
+
+            var model = JsonUtility.FromJson<AssemblyDefinitionModel>(File.ReadAllText(asmdefPath));
+            var references = model?.references ?? Array.Empty<string>();
+            for (var i = 0; i < references.Length; i++)
+            {
+                if (string.Equals(references[i], assemblyName, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state, bool importAssets)
         {
             var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
-                return;
+                return false;
 
             var json = File.ReadAllText(asmdefPath);
             var model = JsonUtility.FromJson<AssemblyDefinitionModel>(json);
             if (model == null)
-                return;
+                return false;
 
             var nextReferences = BuildRuntimeReferences(state);
             if (SequenceEqual(model.references, nextReferences))
-                return;
+                return false;
 
             model.references = nextReferences;
             File.WriteAllText(asmdefPath, JsonUtility.ToJson(model, prettyPrint: true) + Environment.NewLine);
             if (importAssets)
                 AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
+            return true;
         }
 
-        private static void SyncEditorAsmdefReferences(bool importAssets)
+        private static bool SyncEditorAsmdefReferences(bool importAssets)
         {
             var asmdefPath = Path.Combine(PackageRootPath, EditorAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
-                return;
+                return false;
 
             var json = File.ReadAllText(asmdefPath);
             var model = JsonUtility.FromJson<AssemblyDefinitionModel>(json);
             if (model == null)
-                return;
+                return false;
 
             var nextReferences = EditorCoreReferences;
             if (SequenceEqual(model.references, nextReferences))
-                return;
+                return false;
 
             model.references = nextReferences;
             File.WriteAllText(asmdefPath, JsonUtility.ToJson(model, prettyPrint: true) + Environment.NewLine);
             if (importAssets)
                 AssetDatabase.ImportAsset(ToAssetPath(asmdefPath), ImportAssetOptions.ForceUpdate);
+            return true;
         }
 
         private static string[] BuildRuntimeReferences(PlayServRuntimeModuleState state)
@@ -134,14 +166,23 @@ namespace Playserv.Editor
 
         private static void AddModuleReference(List<string> references, string moduleId)
         {
+            if (TryGetModuleAssemblyName(moduleId, out var assemblyName))
+                references.Add(assemblyName);
+        }
+
+        private static bool TryGetModuleAssemblyName(string moduleId, out string assemblyName)
+        {
             for (var i = 0; i < ModuleReferences.Length; i++)
             {
                 if (!string.Equals(ModuleReferences[i].ModuleId, moduleId, StringComparison.Ordinal))
                     continue;
 
-                references.Add(ModuleReferences[i].AssemblyName);
-                return;
+                assemblyName = ModuleReferences[i].AssemblyName;
+                return true;
             }
+
+            assemblyName = null;
+            return false;
         }
 
         private static bool SequenceEqual(string[] left, string[] right)

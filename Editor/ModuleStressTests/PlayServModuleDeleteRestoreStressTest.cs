@@ -19,6 +19,26 @@ namespace Playserv.Editor
         private const string EventsAdapterExtensionsAssetPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
         private const string PackageSamplesToken = "Playserv.Samples";
 
+        private static readonly TransportFolderExpectation[] TransportFolderExpectations =
+        {
+            new TransportFolderExpectation(
+                PlayServModuleManifest.TransportWebSocketId,
+                "Runtime/Proxy/Modules/WebSocket",
+                "Playserv.Runtime.Transport.WebSocket"),
+            new TransportFolderExpectation(
+                PlayServModuleManifest.TransportUdpId,
+                "Runtime/Proxy/Modules/Udp",
+                "Playserv.Runtime.Transport.Udp"),
+            new TransportFolderExpectation(
+                PlayServModuleManifest.TransportRudpId,
+                "Runtime/Proxy/Modules/Rudp",
+                "Playserv.Runtime.Transport.Rudp"),
+            new TransportFolderExpectation(
+                PlayServModuleManifest.TransportWebRtcId,
+                "Runtime/Proxy/Modules/WebRtc",
+                "Playserv.Runtime.Transport.WebRtc")
+        };
+
         private static readonly ModuleExpectation[] Expectations =
         {
             new ModuleExpectation(
@@ -55,7 +75,27 @@ namespace Playserv.Editor
                 PlayServModuleManifest.PulseId,
                 "Playserv.Runtime.Modules.Pulse",
                 Array.Empty<string>(),
-                new[] { "PlayServPulseModule" })
+                new[] { "PlayServPulseModule" }),
+            new ModuleExpectation(
+                PlayServModuleManifest.TransportWebSocketId,
+                "Playserv.Runtime.Transport.WebSocket",
+                Array.Empty<string>(),
+                Array.Empty<string>()),
+            new ModuleExpectation(
+                PlayServModuleManifest.TransportUdpId,
+                "Playserv.Runtime.Transport.Udp",
+                Array.Empty<string>(),
+                Array.Empty<string>()),
+            new ModuleExpectation(
+                PlayServModuleManifest.TransportRudpId,
+                "Playserv.Runtime.Transport.Rudp",
+                Array.Empty<string>(),
+                Array.Empty<string>()),
+            new ModuleExpectation(
+                PlayServModuleManifest.TransportWebRtcId,
+                "Playserv.Runtime.Transport.WebRtc",
+                Array.Empty<string>(),
+                Array.Empty<string>())
         };
 
         [MenuItem("Tools/PlayServ/Modules/Run Delete Restore Stress Test")]
@@ -66,7 +106,7 @@ namespace Playserv.Editor
                 var result = Run();
                 EditorUtility.DisplayDialog(
                     "PlayServ module stress test",
-                    $"Passed. Checked {result.CheckedModules} modules.",
+                    $"Passed. Checked {result.CheckedModules} modules and {result.CheckedTransportFolders} protocol folders.",
                     "OK");
             }
             catch (Exception ex)
@@ -88,7 +128,7 @@ namespace Playserv.Editor
             try
             {
                 var result = Run();
-                Debug.Log($"[PlayServ] Module delete/restore stress test passed. Checked {result.CheckedModules} modules.");
+                Debug.Log($"[PlayServ] Module delete/restore stress test passed. Checked {result.CheckedModules} modules and {result.CheckedTransportFolders} protocol folders.");
                 EditorApplication.Exit(0);
             }
             catch (Exception ex)
@@ -108,14 +148,16 @@ namespace Playserv.Editor
             var originalDefines = PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup);
             GeneratedSnapshot baseline = null;
             var checkedModules = 0;
+            var checkedTransportFolders = 0;
 
             try
             {
                 Directory.CreateDirectory(backupRoot);
-                PlayServGeneratedCompatibilityLayer.SyncNow(refreshAssetDatabase: false);
+                PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                 baseline = GeneratedSnapshot.Capture(packageRoot, projectRoot);
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                 ValidateUnavailableModulesDoNotLeak(packageRoot);
+                ValidateSpawnCompatibilityPath(packageRoot);
 
                 foreach (var module in PlayServModuleManifest.RuntimeModules)
                 {
@@ -126,27 +168,36 @@ namespace Playserv.Editor
                     if (movedPaths.Count == 0)
                         continue;
 
-                    PlayServGeneratedCompatibilityLayer.SyncNow(refreshAssetDatabase: false);
+                    PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                     ValidateUnavailableModulesDoNotLeak(packageRoot);
                     ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
+                    ValidateSpawnCompatibilityPath(packageRoot);
 
                     RestoreMovedPaths(movedPaths);
-                    PlayServGeneratedCompatibilityLayer.SyncNow(refreshAssetDatabase: false);
+                    PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                     ValidateUnavailableModulesDoNotLeak(packageRoot);
                     ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
+                    ValidateSpawnCompatibilityPath(packageRoot);
                     GeneratedSnapshot.Capture(packageRoot, projectRoot)
                         .AssertEquals(baseline, $"restore after {module.Label}");
 
                     checkedModules++;
                 }
 
-                return new StressTestResult(checkedModules);
+                checkedTransportFolders = RunTransportFolderDeleteRestoreScenarios(
+                    packageRoot,
+                    projectRoot,
+                    backupRoot,
+                    movedPaths,
+                    baseline);
+
+                return new StressTestResult(checkedModules, checkedTransportFolders);
             }
             finally
             {
                 RestoreMovedPaths(movedPaths);
                 PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, originalDefines);
-                PlayServGeneratedCompatibilityLayer.SyncNow(refreshAssetDatabase: false);
+                PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
 
                 if (baseline != null)
                     baseline.WriteBack(packageRoot, projectRoot);
@@ -191,6 +242,83 @@ namespace Playserv.Editor
 
                 movedPaths.Add(new MovedPath(sourcePath, backupPath));
             }
+        }
+
+        private static int RunTransportFolderDeleteRestoreScenarios(
+            string packageRoot,
+            string projectRoot,
+            string backupRoot,
+            List<MovedPath> movedPaths,
+            GeneratedSnapshot baseline)
+        {
+            var checkedFolders = 0;
+
+            for (var i = 0; i < TransportFolderExpectations.Length; i++)
+            {
+                var expectation = TransportFolderExpectations[i];
+                if (!PlayServModuleManifest.TryGet(expectation.ModuleId, out var module))
+                    throw new InvalidOperationException($"Missing manifest entry for protocol folder scenario: {expectation.ModuleId}");
+
+                MovePathOut(packageRoot, backupRoot, module.Id, expectation.RelativePath, movedPaths);
+                if (movedPaths.Count == 0)
+                    continue;
+
+                PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
+                ValidateProtocolFolderUnavailable(packageRoot, module, expectation);
+                ValidateUnavailableModulesDoNotLeak(packageRoot);
+                ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
+                ValidateSpawnCompatibilityPath(packageRoot);
+
+                RestoreMovedPaths(movedPaths);
+                PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
+                ValidateUnavailableModulesDoNotLeak(packageRoot);
+                ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
+                ValidateSpawnCompatibilityPath(packageRoot);
+                GeneratedSnapshot.Capture(packageRoot, projectRoot)
+                    .AssertEquals(baseline, $"explicit restore after {module.Label} folder");
+
+                checkedFolders++;
+            }
+
+            if (checkedFolders != TransportFolderExpectations.Length)
+                throw new InvalidOperationException(
+                    $"Protocol folder stress test checked {checkedFolders}/{TransportFolderExpectations.Length} folders.");
+
+            return checkedFolders;
+        }
+
+        private static void MovePathOut(
+            string packageRoot,
+            string backupRoot,
+            string moduleId,
+            string relativePath,
+            List<MovedPath> movedPaths)
+        {
+            movedPaths.Clear();
+
+            relativePath = NormalizeRelativePath(relativePath);
+            if (string.IsNullOrEmpty(relativePath))
+                return;
+
+            var sourcePath = Path.Combine(packageRoot, relativePath);
+            if (!Directory.Exists(sourcePath) && !File.Exists(sourcePath))
+                return;
+
+            var backupPath = Path.Combine(
+                backupRoot,
+                SanitizePathSegment(moduleId),
+                "explicit",
+                relativePath.Replace('/', Path.DirectorySeparatorChar));
+            var backupParent = Path.GetDirectoryName(backupPath);
+            if (!string.IsNullOrEmpty(backupParent))
+                Directory.CreateDirectory(backupParent);
+
+            if (Directory.Exists(sourcePath))
+                Directory.Move(sourcePath, backupPath);
+            else
+                File.Move(sourcePath, backupPath);
+
+            movedPaths.Add(new MovedPath(sourcePath, backupPath));
         }
 
         private static void RestoreMovedPaths(List<MovedPath> movedPaths)
@@ -245,6 +373,43 @@ namespace Playserv.Editor
             var adapterExtensions = ReadProjectFile(projectRoot, EventsAdapterExtensionsAssetPath);
             AssertDoesNotContain(apiExtensions, PackageSamplesToken, EventsApiExtensionsAssetPath, "Generated Events API");
             AssertDoesNotContain(adapterExtensions, PackageSamplesToken, EventsAdapterExtensionsAssetPath, "Generated Events adapter");
+        }
+
+        private static void ValidateProtocolFolderUnavailable(
+            string packageRoot,
+            PlayServModuleManifestEntry module,
+            TransportFolderExpectation expectation)
+        {
+            if (PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module.Label))
+                throw new InvalidOperationException($"{module.Label} remained available after deleting {expectation.RelativePath}.");
+
+            if (PlayServCoreAssemblyReferenceSync.HasRuntimeModuleReference(module.Id))
+                throw new InvalidOperationException($"{module.Label} leaked runtime asmdef reference after deleting {expectation.RelativePath}.");
+
+            var runtimeAsmdef = ReadPackageFile(packageRoot, RuntimeAsmdefRelativePath);
+            AssertDoesNotContain(runtimeAsmdef, expectation.AssemblyName, RuntimeAsmdefRelativePath, module.Label);
+        }
+
+        private static void ValidateSpawnCompatibilityPath(string packageRoot)
+        {
+            var compatibility = ReadPackageFile(packageRoot, CompatibilityRelativePath);
+            var spawnAvailable = PlayServEditorModuleAvailability.IsRuntimeModuleAvailable("Spawn") &&
+                                 PlayServCoreAssemblyReferenceSync.HasRuntimeModuleReference(PlayServModuleManifest.SpawnId);
+
+            AssertDoesNotContain(compatibility, "Type.GetType", CompatibilityRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, ".GetMethod(", CompatibilityRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, ".Invoke(null", CompatibilityRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, ".Invoke(new object", CompatibilityRelativePath, "Spawn compatibility");
+
+            if (!spawnAvailable)
+                return;
+
+            if (compatibility.IndexOf("PlayServSpawn.Spawn", StringComparison.Ordinal) < 0 ||
+                compatibility.IndexOf("PlayServSpawn.Despawn", StringComparison.Ordinal) < 0)
+            {
+                throw new InvalidOperationException(
+                    "Spawn compatibility must use typed direct PlayServSpawn calls when the Spawn assembly reference is enabled.");
+            }
         }
 
         private static void AssertDoesNotContain(string text, string token, string filePath, string context)
@@ -312,12 +477,15 @@ namespace Playserv.Editor
 
         internal sealed class StressTestResult
         {
-            public StressTestResult(int checkedModules)
+            public StressTestResult(int checkedModules, int checkedTransportFolders)
             {
                 CheckedModules = checkedModules;
+                CheckedTransportFolders = checkedTransportFolders;
             }
 
             public int CheckedModules { get; }
+
+            public int CheckedTransportFolders { get; }
         }
 
         private sealed class GeneratedSnapshot
@@ -400,6 +568,25 @@ namespace Playserv.Editor
             public string[] CompatibilityTokens { get; }
 
             public string[] RegistryTokens { get; }
+        }
+
+        private sealed class TransportFolderExpectation
+        {
+            public TransportFolderExpectation(
+                string moduleId,
+                string relativePath,
+                string assemblyName)
+            {
+                ModuleId = moduleId ?? throw new ArgumentNullException(nameof(moduleId));
+                RelativePath = relativePath ?? throw new ArgumentNullException(nameof(relativePath));
+                AssemblyName = assemblyName ?? throw new ArgumentNullException(nameof(assemblyName));
+            }
+
+            public string ModuleId { get; }
+
+            public string RelativePath { get; }
+
+            public string AssemblyName { get; }
         }
     }
 }
