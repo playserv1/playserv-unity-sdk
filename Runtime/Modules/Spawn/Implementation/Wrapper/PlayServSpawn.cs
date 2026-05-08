@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using System.Threading;
-using Playserv.Proxy.Common;
 using Playserv.Spawn;
 using UnityEngine;
 
@@ -11,9 +10,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServSpawn
     {
-        private static readonly SpawnRuntimeFacade Api = new SpawnRuntimeFacade(
-            () => PlayServRuntimeHost.RequiredInstance.ModuleServices,
-            () => PlayServRuntimeHost.CurrentInstance?.ModuleServices);
+        private static readonly SpawnRuntimeFacade Api = new SpawnRuntimeFacade(new PlayServSpawnRuntimeAccess());
 
         public static string CurrentScope => Api.CurrentScope;
 

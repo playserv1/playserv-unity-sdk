@@ -22,13 +22,13 @@ namespace Playserv.Wrapper
 
         private readonly PlayServRuntimeSettingsService _settingsService;
         private Func<PlayServRuntimeSettings, IWebRtcSignalingClient> _webRtcSignalingClientFactory;
-        private PlayServImplementation _instance;
+        private IPlayServRuntimeSession _instance;
         private PlayServSettings _settings;
         private string _instanceEndpoint;
         private string _instanceTransportKey;
 
         public PlayServApiConfigFacade(
-            Action<PlayServImplementation> subscribeToInstanceEvents,
+            Action<IPlayServRuntimeSession> subscribeToInstanceEvents,
             Action<string> logTrace,
             int versionRefreshTimeoutSeconds)
         {
@@ -40,6 +40,7 @@ namespace Playserv.Wrapper
 
             _settingsService = new PlayServRuntimeSettingsService(
                 loadSettings: LoadSettingsFromUnityResources,
+                sessionFactory: new PlayServRuntimeSessionFactory(),
                 createTransportImplementationFactory: CreateTransportImplementationFactory,
                 buildTransportKey: BuildTransportKey,
                 subscribeToInstanceEvents: subscribeToInstanceEvents,
@@ -51,7 +52,7 @@ namespace Playserv.Wrapper
 
         public PlayServSettings Settings => _settings;
 
-        public PlayServImplementation CurrentInstance => _instance;
+        public IPlayServRuntimeSession CurrentSession => _instance;
 
         public PlayServState State => _instance?.State ?? PlayServState.Offline;
 

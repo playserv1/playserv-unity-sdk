@@ -43,16 +43,10 @@ namespace Playserv.Editor
 
         private static bool SyncGeneratedEventsOutput(bool importAssets)
         {
-            var generatorType = Type.GetType("Playserv.Events.Editor.EventsCodeGenerator, Playserv.Editor.Events", throwOnError: false);
-            var syncMethod = generatorType?.GetMethod(
-                "SyncGeneratedOutputForCurrentState",
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-
-            if (syncMethod == null)
+            if (!PlayServGeneratedEventsOutputRegistry.TrySync(out var changed))
                 return SyncDisabledGeneratedEventsOutput(importAssets);
 
-            var result = syncMethod.Invoke(null, null);
-            return result is bool changed && changed;
+            return changed;
         }
 
         private static bool SyncDisabledGeneratedEventsOutput(bool importAssets)
@@ -308,22 +302,10 @@ namespace Playserv.Editor
         private static void AppendServerLocalFacade(StringBuilder sb)
         {
             sb.AppendLine("        public static void SetCommandHandler(ICommandHandler commandHandler)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            var configurator = Playserv.Proxy.Common.PlayServRuntimeHost.LocalExecution as ILocalCommandExecutionConfigurator;");
-            sb.AppendLine("            if (configurator == null)");
-            sb.AppendLine("                throw new InvalidOperationException(\"Server module is not installed or enabled.\");");
-            sb.AppendLine();
-            sb.AppendLine("            configurator.SetCommandHandler(commandHandler);");
-            sb.AppendLine("        }");
+            sb.AppendLine("            => PlayServServerRpc.SetCommandHandler(commandHandler);");
             sb.AppendLine();
             sb.AppendLine("        public static void SetEventHandler(IEventHandler eventHandler)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            var configurator = Playserv.Proxy.Common.PlayServRuntimeHost.LocalExecution as ILocalEventExecutionConfigurator;");
-            sb.AppendLine("            if (configurator == null)");
-            sb.AppendLine("                throw new InvalidOperationException(\"Server module is not installed or enabled.\");");
-            sb.AppendLine();
-            sb.AppendLine("            configurator.SetEventHandler(eventHandler);");
-            sb.AppendLine("        }");
+            sb.AppendLine("            => PlayServServerRpc.SetEventHandler(eventHandler);");
             sb.AppendLine();
         }
 
@@ -680,6 +662,8 @@ namespace Playserv.Editor
             {
                 var path = (paths[i] ?? string.Empty).Replace('\\', '/');
                 if (path.IndexOf("playserv-unity-sdk/Runtime/Modules/", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    path.IndexOf("playserv-unity-sdk/Runtime/Proxy/Modules/", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    path.IndexOf("playserv-unity-sdk/Runtime/Playserv.Runtime.asmdef", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     path.IndexOf("playserv-unity-sdk/Editor/Events/", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     path.IndexOf("playserv-unity-sdk/Editor/ModelGenerator/", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     path.IndexOf("playserv-unity-sdk/Editor/CodeGenerator/", StringComparison.OrdinalIgnoreCase) >= 0)

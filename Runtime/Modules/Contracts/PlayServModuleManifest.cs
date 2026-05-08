@@ -59,7 +59,8 @@ namespace Playserv.Modules
                 assetPaths: new[] { "Runtime/Modules/Events/Implementation", "Editor/Events" },
                 dependencyIds: new[] { ClientExecutionId },
                 hiddenDependencyAssetPaths: null,
-                hiddenDependencyModuleIds: null),
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.Events"),
 
             new PlayServModuleManifestEntry(
                 DataSubscriptionId,
@@ -73,7 +74,8 @@ namespace Playserv.Modules
                 assetPaths: new[] { "Runtime/Modules/DataSubscription/Implementation" },
                 dependencyIds: null,
                 hiddenDependencyAssetPaths: null,
-                hiddenDependencyModuleIds: null),
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.DataSubscription"),
 
             new PlayServModuleManifestEntry(
                 RpcCoreId,
@@ -87,7 +89,8 @@ namespace Playserv.Modules
                 assetPaths: new[] { "Runtime/Modules/RPC/Core" },
                 dependencyIds: null,
                 hiddenDependencyAssetPaths: null,
-                hiddenDependencyModuleIds: null),
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.RPC.Core"),
 
             new PlayServModuleManifestEntry(
                 ClientRpcId,
@@ -101,7 +104,8 @@ namespace Playserv.Modules
                 assetPaths: new[] { "Runtime/Modules/RPC/Client/Implementation" },
                 dependencyIds: new[] { ClientExecutionId },
                 hiddenDependencyAssetPaths: new[] { "Runtime/Modules/RPC/Core" },
-                hiddenDependencyModuleIds: new[] { RpcCoreId }),
+                hiddenDependencyModuleIds: new[] { RpcCoreId },
+                rootAssemblyReference: "Playserv.Runtime.Modules.RPC.Client"),
 
             new PlayServModuleManifestEntry(
                 ServerId,
@@ -118,7 +122,8 @@ namespace Playserv.Modules
                 {
                     "Runtime/Modules/RPC/Core"
                 },
-                hiddenDependencyModuleIds: new[] { RpcCoreId }),
+                hiddenDependencyModuleIds: new[] { RpcCoreId },
+                rootAssemblyReference: "Playserv.Runtime.Modules.Server"),
 
             new PlayServModuleManifestEntry(
                 SpawnId,
@@ -132,7 +137,8 @@ namespace Playserv.Modules
                 assetPaths: new[] { "Runtime/Modules/Spawn/Implementation" },
                 dependencyIds: new[] { EventsId },
                 hiddenDependencyAssetPaths: null,
-                hiddenDependencyModuleIds: null),
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.Spawn"),
 
             new PlayServModuleManifestEntry(
                 PulseId,
@@ -146,7 +152,8 @@ namespace Playserv.Modules
                 assetPaths: new[] { "Runtime/Modules/Pulse" },
                 dependencyIds: new[] { ClientExecutionId },
                 hiddenDependencyAssetPaths: null,
-                hiddenDependencyModuleIds: null),
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.Pulse"),
 
             new PlayServModuleManifestEntry(
                 TransportWebSocketId,

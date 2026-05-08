@@ -3,7 +3,7 @@ using Playserv.Deploy.Editor;
 
 namespace Playserv.Editor
 {
-    internal sealed class PlayServDeploymentWindowBridge : IDisposable
+    internal sealed class PlayServDeploymentWindowBridge : IPlayServEditorSection
     {
         private readonly DeploymentClosureFilter _closureFilter = new DeploymentClosureFilter();
         private readonly DeploymentZipBuilder _zipBuilder = new DeploymentZipBuilder();

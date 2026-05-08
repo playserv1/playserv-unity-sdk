@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
@@ -12,7 +13,7 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApi : IPlayServConnectionApi
+    internal sealed class PlayServApi : IPlayServConnectionApi, IPlayServRuntimeAccess
     {
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;
@@ -31,17 +32,11 @@ namespace Playserv.Wrapper
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
 
-        public PlayServImplementation CurrentInstance => _configFacade.CurrentInstance;
-
-        public PlayServImplementation RequiredInstance => Instance;
-
         public PlayServApi()
         {
             _commandDispatch = PlayServCommandDispatchFactory.Create();
             PlayServRuntimeHost.Configure(
-                getCurrentInstance: () => _configFacade?.CurrentInstance,
-                getRequiredInstance: () => Instance,
-                getInstanceForFireAndForget: GetInstanceForFireAndForget,
+                getRuntimeAccess: () => this,
                 resolveJsonCodec: ResolveJsonCodec,
                 getLocalExecution: () => _commandDispatch.LocalExecution,
                 send: command => SendCommand(command),
@@ -57,7 +52,7 @@ namespace Playserv.Wrapper
                 getOrCreateSettings: _configFacade.GetOrCreateSettings,
                 refreshConfiguredGameVersionAsync: _configFacade.RefreshConfiguredGameVersionAsync,
                 applySettings: _configFacade.ApplySettings,
-                getCurrentInstance: () => _configFacade.CurrentInstance,
+                getCurrentSession: () => _configFacade.CurrentSession,
                 disconnect: _configFacade.Disconnect,
                 resetShutdownState: ResetShutdownState,
                 logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
@@ -81,66 +76,82 @@ namespace Playserv.Wrapper
             _configFacade.GetLatestVersionAsync(gameId, ct);
 
         public ITransportImplementation GetTransportImplementation() =>
-            Instance.GetTransportImplementation();
+            RequiredSession.GetTransportImplementation();
 
         public void SendCommand<T>(T command)
         {
-            if (_commandDispatch.TryHandleCommand(command, moduleName: null, _configFacade.CurrentInstance != null))
+            if (_commandDispatch.TryHandleCommand(command, moduleName: null, _configFacade.CurrentSession != null))
                 return;
 
-            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("command send", out var instance))
+            if (!_connectionOrchestrator.TryGetSessionForFireAndForget("command send", out var session))
                 return;
 
-            instance.Send(command);
+            session.Send(command);
         }
 
         public void SendCommand<T>(T command, string moduleName)
         {
-            if (_commandDispatch.TryHandleCommand(command, moduleName, _configFacade.CurrentInstance != null))
+            if (_commandDispatch.TryHandleCommand(command, moduleName, _configFacade.CurrentSession != null))
                 return;
 
-            if (!_connectionOrchestrator.TryGetInstanceForFireAndForget("command send", out var instance))
+            if (!_connectionOrchestrator.TryGetSessionForFireAndForget("command send", out var session))
                 return;
 
-            instance.Send(command, moduleName);
+            session.Send(command, moduleName);
         }
 
-        public bool TryGetInstanceForFireAndForget(string operationName, out PlayServImplementation instance) =>
-            _connectionOrchestrator.TryGetInstanceForFireAndForget(operationName, out instance);
+        public bool HasCurrentInstance => _configFacade?.CurrentSession != null;
+
+        public IPlayServCommandBus CurrentCommandBus => _configFacade?.CurrentSession;
+
+        public IPlayServCommandBus RequiredCommandBus => RequiredSession;
+
+        public IPlayServModuleServiceProvider CurrentModuleServices => _configFacade?.CurrentSession?.ModuleServices;
+
+        public IPlayServModuleServiceProvider RequiredModuleServices => RequiredSession.ModuleServices;
+
+        public IPlayServCommandBus GetCommandBusForFireAndForget(string operationName) =>
+            GetSessionForFireAndForget(operationName);
+
+        public IPlayServModuleServiceProvider GetModuleServicesForFireAndForget(string operationName)
+        {
+            var session = GetSessionForFireAndForget(operationName);
+            return session?.ModuleServices;
+        }
 
         public IJsonCodec ResolveJsonCodec()
         {
-            var instance = _configFacade.CurrentInstance;
-            if (instance != null && instance.ModuleServices.TryGet<IJsonCodec>(out var jsonCodec))
+            var services = _configFacade.CurrentSession?.ModuleServices;
+            if (services != null && services.TryGet<IJsonCodec>(out var jsonCodec))
                 return jsonCodec;
 
             return null;
         }
 
-        private PlayServImplementation Instance =>
-            _configFacade.CurrentInstance ?? throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
+        private IPlayServRuntimeSession RequiredSession =>
+            _configFacade.CurrentSession ?? throw new InvalidOperationException("SDK is not connected. Call Connect() first.");
 
-        private PlayServImplementation GetInstanceForFireAndForget(string operationName)
+        private IPlayServRuntimeSession GetSessionForFireAndForget(string operationName)
         {
-            return _connectionOrchestrator.TryGetInstanceForFireAndForget(operationName, out var instance)
-                ? instance
+            return _connectionOrchestrator.TryGetSessionForFireAndForget(operationName, out var session)
+                ? session
                 : null;
         }
 
-        private void SubscribeToInstanceEvents(PlayServImplementation instance)
+        private void SubscribeToInstanceEvents(IPlayServRuntimeSession session)
         {
-            if (instance == null)
-                throw new ArgumentNullException(nameof(instance));
+            if (session == null)
+                throw new ArgumentNullException(nameof(session));
 
-            instance.OnTransportError -= HandleTransportError;
-            instance.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
-            instance.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
-            instance.OnModuleCommand -= HandleModuleCommand;
+            session.OnTransportError -= HandleTransportError;
+            session.OnKeepAlivePingSent -= HandleKeepAlivePingSent;
+            session.OnKeepAlivePongReceived -= HandleKeepAlivePongReceived;
+            session.OnModuleCommand -= HandleModuleCommand;
 
-            instance.OnTransportError += HandleTransportError;
-            instance.OnKeepAlivePingSent += HandleKeepAlivePingSent;
-            instance.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
-            instance.OnModuleCommand += HandleModuleCommand;
+            session.OnTransportError += HandleTransportError;
+            session.OnKeepAlivePingSent += HandleKeepAlivePingSent;
+            session.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
+            session.OnModuleCommand += HandleModuleCommand;
         }
 
         private void HandleTransportError(TransportError error) => OnTransportError?.Invoke(error);

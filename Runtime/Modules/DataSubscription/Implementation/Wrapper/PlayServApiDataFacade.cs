@@ -4,23 +4,21 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
-using Playserv.Modules;
-using Playserv.Proxy.Common;
 
 namespace Playserv.Wrapper
 {
     internal sealed class PlayServApiDataFacade : IPlayServDataApi
     {
-        private readonly Func<IPlayServModuleServiceProvider> _getRequiredServices;
+        private readonly IPlayServDataRuntimeAccess _runtimeAccess;
 
         public PlayServApiDataFacade()
-            : this(() => PlayServRuntimeHost.RequiredModuleServices)
+            : this(new PlayServDataRuntimeAccess())
         {
         }
 
-        public PlayServApiDataFacade(Func<IPlayServModuleServiceProvider> getRequiredServices)
+        public PlayServApiDataFacade(IPlayServDataRuntimeAccess runtimeAccess)
         {
-            _getRequiredServices = getRequiredServices ?? throw new ArgumentNullException(nameof(getRequiredServices));
+            _runtimeAccess = runtimeAccess ?? throw new ArgumentNullException(nameof(runtimeAccess));
         }
 
         public Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
@@ -53,6 +51,6 @@ namespace Playserv.Wrapper
         }
 
         private IDataSubscriptionAdapter Adapter =>
-            _getRequiredServices().Get<IDataSubscriptionAdapter>();
+            _runtimeAccess.RequiredServices.Get<IDataSubscriptionAdapter>();
     }
 }

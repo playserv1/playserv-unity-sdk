@@ -4,8 +4,12 @@ using Playserv.CodeGenerator.Editor;
 
 namespace Playserv.Editor
 {
-    internal sealed class PlayServCodegenSectionPresenter
+    internal sealed class PlayServCodegenSectionPresenter : IPlayServEditorSection
     {
+        public void Dispose()
+        {
+        }
+
         public void Draw(PlayServWindowContext context)
         {
             var state = context.State;

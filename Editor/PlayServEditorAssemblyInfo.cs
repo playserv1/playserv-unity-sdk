@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Playserv.Editor.Deployment")]
 [assembly: InternalsVisibleTo("Playserv.Editor.Codegen")]
 [assembly: InternalsVisibleTo("Playserv.Editor.ModuleStressTests")]
+[assembly: InternalsVisibleTo("Playserv.Editor.DataSubscription")]

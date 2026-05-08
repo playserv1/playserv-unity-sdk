@@ -1,5 +1,11 @@
 using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Playserv.Runtime")]
+[assembly: InternalsVisibleTo("Playserv.Runtime.Modules.Events")]
+[assembly: InternalsVisibleTo("Playserv.Runtime.Modules.DataSubscription")]
+[assembly: InternalsVisibleTo("Playserv.Runtime.Modules.RPC.Client")]
+[assembly: InternalsVisibleTo("Playserv.Runtime.Modules.Server")]
+[assembly: InternalsVisibleTo("Playserv.Runtime.Modules.Spawn")]
 [assembly: InternalsVisibleTo("Playserv.Runtime.Transport.WebSocket")]
 [assembly: InternalsVisibleTo("Playserv.Runtime.Transport.Udp")]
 [assembly: InternalsVisibleTo("Playserv.Runtime.Transport.Rudp")]

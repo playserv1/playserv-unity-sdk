@@ -1,7 +1,4 @@
 using System;
-#if UNITY_EDITOR
-using System.Reflection;
-#endif
 #if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
@@ -16,17 +13,6 @@ namespace Playserv.Wrapper
         private const string ConfigResourceName = "PlayServConfig";
 
 #if UNITY_EDITOR
-        private const string ClientBridgeTypeName = "Playserv.ClientEditor.PlayServProjectSettingsBridge";
-        private const string TryResolveSettingsMethodName = "TryResolveSettings";
-        private static readonly string[] ClientBridgeTypeCandidates =
-        {
-            ClientBridgeTypeName + ", Playserv.ClientEditor",
-            ClientBridgeTypeName + ", Assembly-CSharp-Editor",
-            ClientBridgeTypeName + ", Assembly-CSharp",
-            ClientBridgeTypeName
-        };
-        private static readonly Lazy<Type> ClientBridgeType = new Lazy<Type>(ResolveClientBridgeType);
-
         public static PlayServSettings ResolveEditorSettings(PlayServConfig config)
         {
             if (config == null)
@@ -45,53 +31,17 @@ namespace Playserv.Wrapper
 
             settings = config.ToSettings();
 
-            var bridgeType = FindClientBridgeType();
-            if (bridgeType == null)
+            if (!PlayServClientProjectSettingsRegistry.TryResolveSettings(config, out var resolvedSettings) ||
+                resolvedSettings == null)
                 return false;
 
-            var method = bridgeType.GetMethod(
-                TryResolveSettingsMethodName,
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-
-            if (method == null)
-                return false;
-
-            try
-            {
-                var args = new object[] { config, settings };
-                var result = method.Invoke(null, args);
-                if (args[1] is PlayServSettings resolvedSettings)
-                    settings = resolvedSettings;
-
-                return result is bool applied && applied;
-            }
-            catch
-            {
-                settings = config.ToSettings();
-                return false;
-            }
+            settings = resolvedSettings;
+            return true;
         }
 
         public static bool IsClientProjectContext()
         {
-            return FindClientBridgeType() != null;
-        }
-
-        private static Type FindClientBridgeType()
-        {
-            return ClientBridgeType.Value;
-        }
-
-        private static Type ResolveClientBridgeType()
-        {
-            foreach (var candidate in ClientBridgeTypeCandidates)
-            {
-                var type = Type.GetType(candidate, throwOnError: false);
-                if (type != null)
-                    return type;
-            }
-
-            return null;
+            return PlayServClientProjectSettingsRegistry.HasProvider;
         }
 #endif
 

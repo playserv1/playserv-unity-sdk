@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Modules;
+using Playserv.Wrapper;
 using UnityEngine;
 
 namespace Playserv.Spawn
@@ -10,6 +11,15 @@ namespace Playserv.Spawn
     {
         private readonly Func<IPlayServModuleServiceProvider> _getRequiredServices;
         private readonly Func<IPlayServModuleServiceProvider> _getCurrentServices;
+
+        internal SpawnRuntimeFacade(IPlayServSpawnRuntimeAccess runtimeAccess)
+            : this(
+                () => runtimeAccess.RequiredServices,
+                () => runtimeAccess.CurrentServices)
+        {
+            if (runtimeAccess == null)
+                throw new ArgumentNullException(nameof(runtimeAccess));
+        }
 
         public SpawnRuntimeFacade(
             Func<IPlayServModuleServiceProvider> getRequiredServices,
