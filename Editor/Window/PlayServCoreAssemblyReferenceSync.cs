@@ -55,7 +55,7 @@ namespace Playserv.Editor
         internal static void Sync(bool importAssets)
         {
             PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
-            var state = PlayServRuntimeModuleDefines.Load();
+            var state = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
             PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
 

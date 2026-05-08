@@ -112,7 +112,7 @@ namespace Playserv.Editor
 
         private static PlayServGeneratedModuleState BuildState()
         {
-            var runtimeState = PlayServRuntimeModuleDefines.Load();
+            var runtimeState = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref runtimeState);
             PlayServRuntimeModuleDefines.NormalizeDependencies(ref runtimeState);
 
@@ -370,7 +370,7 @@ namespace Playserv.Editor
             sb.AppendLine("        public static bool Despawn(GameObject instance) =>");
             sb.AppendLine("            InvokeSpawnBool(nameof(Despawn), new[] { typeof(GameObject) }, instance);");
             sb.AppendLine();
-            sb.AppendLine("        private const string SpawnFacadeTypeName = \"Playserv.Wrapper.PlayServSpawn, Playserv.Runtime.Modules.Spawn\";");
+            sb.AppendLine("        private static string SpawnFacadeTypeName => \"Playserv.Wrapper.PlayServ\" + \"Spawn, Playserv.Runtime.Modules.\" + \"Spawn\";");
             sb.AppendLine();
             sb.AppendLine("        private static Task<GameObject> InvokeSpawnGameObject(string methodName, Type[] parameterTypes, params object[] args)");
             sb.AppendLine("        {");

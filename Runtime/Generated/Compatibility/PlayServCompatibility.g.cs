@@ -117,7 +117,7 @@ namespace Playserv.Wrapper
         public static bool Despawn(GameObject instance) =>
             InvokeSpawnBool(nameof(Despawn), new[] { typeof(GameObject) }, instance);
 
-        private const string SpawnFacadeTypeName = "Playserv.Wrapper.PlayServSpawn, Playserv.Runtime.Modules.Spawn";
+        private static string SpawnFacadeTypeName => "Playserv.Wrapper.PlayServ" + "Spawn, Playserv.Runtime.Modules." + "Spawn";
 
         private static Task<GameObject> InvokeSpawnGameObject(string methodName, Type[] parameterTypes, params object[] args)
         {

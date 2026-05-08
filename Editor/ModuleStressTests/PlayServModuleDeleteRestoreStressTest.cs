@@ -11,7 +11,7 @@ namespace Playserv.Editor
     internal static class PlayServModuleDeleteRestoreStressTest
     {
         private const string PackageFolderName = "playserv-unity-sdk";
-        private const string ThisScriptSuffix = "/Editor/Modules/PlayServModuleDeleteRestoreStressTest.cs";
+        private const string ThisScriptSuffix = "/Editor/ModuleStressTests/PlayServModuleDeleteRestoreStressTest.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
         private const string CompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
         private const string ModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
@@ -74,6 +74,13 @@ namespace Playserv.Editor
                 Debug.LogError($"[PlayServ] Module delete/restore stress test failed: {ex}");
                 EditorUtility.DisplayDialog("PlayServ module stress test failed", ex.Message, "OK");
             }
+        }
+
+        [MenuItem("Tools/PlayServ/Modules/Run Delete Restore Stress Test", true)]
+        private static bool ValidateRunFromMenu()
+        {
+            return PlayServEditorModuleAvailability.EditorModuleStressTests &&
+                   EditorPrefs.GetBool(Const.PrefModuleStressTests, false);
         }
 
         public static void RunFromCli()
