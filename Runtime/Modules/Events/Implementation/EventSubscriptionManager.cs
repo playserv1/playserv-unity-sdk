@@ -8,7 +8,7 @@ namespace Playserv.Events
     {
         private readonly Dictionary<string, string> _eventTypeToSubscriptionId = new Dictionary<string, string>();
         private readonly Dictionary<string, string> _subscriptionIdToEventType = new Dictionary<string, string>();
-        private readonly HashSet<string> _pendingEventTypes = new HashSet<string>();
+        private readonly List<string> _pendingEventTypes = new List<string>();
         private readonly Dictionary<Type, List<IObserverRegistration>> _typeObservers = new Dictionary<Type, List<IObserverRegistration>>();
         private readonly object _lock = new object();
 
@@ -91,7 +91,8 @@ namespace Playserv.Events
         {
             lock (_lock)
             {
-                _pendingEventTypes.Add(eventType);
+                if (!_pendingEventTypes.Contains(eventType))
+                    _pendingEventTypes.Add(eventType);
             }
         }
 
@@ -115,7 +116,7 @@ namespace Playserv.Events
         {
             lock (_lock)
             {
-                return _pendingEventTypes.FirstOrDefault();
+                return _pendingEventTypes.Count > 0 ? _pendingEventTypes[0] : null;
             }
         }
 
