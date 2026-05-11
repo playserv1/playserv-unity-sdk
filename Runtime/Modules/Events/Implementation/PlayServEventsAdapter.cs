@@ -14,6 +14,8 @@ namespace Playserv.Events
 {
     internal sealed class PlayServEventsAdapter : IEventsAdapter
     {
+        private const string EventsModuleName = "module_events";
+
         private readonly ITransport _transport;
         private readonly IJsonCodec _jsonCodec;
         private readonly ILogger _logger;
@@ -62,7 +64,7 @@ namespace Playserv.Events
             var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new EventMessage(eventType, payload);
-            _ = _transport.Send(message, "module_events");
+            _ = _transport.Send(message, EventsModuleName);
         }
 
         public void PublishForGroup<T>(string groupName, T @event)
@@ -79,7 +81,7 @@ namespace Playserv.Events
             var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new GroupEventMessage(groupName, eventType, payload);
-            _ = _transport.Send(message);
+            _ = _transport.Send(message, EventsModuleName);
         }
 
         public void PublishForUser<T>(string userId, T @event)
@@ -96,7 +98,7 @@ namespace Playserv.Events
             var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
 
             var message = new UserEventMessage(userId, eventType, payload);
-            _ = _transport.Send(message);
+            _ = _transport.Send(message, EventsModuleName);
         }
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
@@ -313,7 +315,7 @@ namespace Playserv.Events
                 using var cancellationRegistration =
                     timeoutCts.Token.Register(() => completion.TrySetCanceled(timeoutCts.Token));
 
-                await _transport.Send(request);
+                await _transport.Send(request, EventsModuleName);
                 _logger.Log($"Sent group {operationName} request: groupName={groupName}");
 
                 var result = await completion.Task;

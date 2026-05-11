@@ -7,6 +7,8 @@ namespace Playserv.Events
 {
     internal sealed class EventObservable<T> : IObservable<T>
     {
+        private const string EventsModuleName = "module_events";
+
         private readonly ITransport _transport;
         private readonly EventSubscriptionManager _subscriptionManager;
         private readonly string _eventType;
@@ -41,7 +43,7 @@ namespace Playserv.Events
 
             _subscriptionManager.AddPendingSubscription(_eventType);
             var request = new EventSubscribeRequest(_eventType);
-            _transport.Send(request);
+            _transport.Send(request, EventsModuleName);
             _logger.Log($"Sent subscription request for event type: {_eventType}");
         }
 
@@ -55,7 +57,7 @@ namespace Playserv.Events
                 return;
 
             var request = new EventUnsubscribeRequest(subscriptionId);
-            _transport.Send(request);
+            _transport.Send(request, EventsModuleName);
             _subscriptionManager.RemoveSubscription(_eventType);
             _logger.Log($"Sent unsubscription request for event type: {_eventType}");
         }

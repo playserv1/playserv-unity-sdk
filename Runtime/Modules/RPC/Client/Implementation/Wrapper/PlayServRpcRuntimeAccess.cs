@@ -6,6 +6,8 @@ namespace Playserv.Wrapper
 {
     internal sealed class PlayServRpcRuntimeAccess : IPlayServRpcRuntimeAccess
     {
+        private static readonly ILocalRpcExecution NoOpLocalExecution = new NoOpPlayServLocalExecution();
+
         public event Action<string, object> ModuleCommandReceived
         {
             add => PlayServRuntimeHost.ModuleCommandReceived += value;
@@ -13,8 +15,7 @@ namespace Playserv.Wrapper
         }
 
         public ILocalRpcExecution LocalExecution =>
-            PlayServRuntimeHost.LocalExecution as ILocalRpcExecution ??
-            throw new InvalidOperationException("RPC local execution is not available.");
+            PlayServRuntimeHost.LocalExecution as ILocalRpcExecution ?? NoOpLocalExecution;
 
         public bool HasCurrentInstance => PlayServRuntimeHost.HasCurrentInstance;
 
