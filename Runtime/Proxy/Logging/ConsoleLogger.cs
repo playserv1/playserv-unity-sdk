@@ -28,11 +28,13 @@ namespace Playserv.Proxy.Logging
         /// <param name="message">Message text.</param>
         public void Log(string message)
         {
+#if !PLAYSERV_DISABLE_LOGS
             var formattedMessage = FormatMessage(message);
 #if UNITY_5_3_OR_NEWER
             Debug.Log(formattedMessage);
 #else
             Console.WriteLine(formattedMessage);
+#endif
 #endif
         }
 
@@ -42,11 +44,13 @@ namespace Playserv.Proxy.Logging
         /// <param name="message">Message text.</param>
         public void LogWarning(string message)
         {
+#if !PLAYSERV_DISABLE_LOGS
             var formattedMessage = FormatMessage(message);
 #if UNITY_5_3_OR_NEWER
             Debug.LogWarning(formattedMessage);
 #else
             Console.WriteLine($"[WARN] {formattedMessage}");
+#endif
 #endif
         }
 
@@ -56,11 +60,13 @@ namespace Playserv.Proxy.Logging
         /// <param name="message">Message text.</param>
         public void LogError(string message)
         {
+#if !PLAYSERV_DISABLE_LOGS
             var formattedMessage = FormatMessage(message);
 #if UNITY_5_3_OR_NEWER
             Debug.LogError(formattedMessage);
 #else
             Console.Error.WriteLine($"[ERROR] {formattedMessage}");
+#endif
 #endif
         }
 

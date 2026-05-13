@@ -8,6 +8,7 @@ namespace Playserv.Editor
 {
     internal static class PlayServRuntimeModuleDefines
     {
+        public const string SdkLogsDisabledDefine = "PLAYSERV_DISABLE_LOGS";
         private static readonly char[] DefineSeparators = { ';' };
         private static readonly string[] LegacyRuntimeModuleDisableDefines =
         {
@@ -143,6 +144,25 @@ namespace Playserv.Editor
                 changed |= defines.Remove(LegacyRuntimeModuleDisableDefines[i]);
 
             return changed;
+        }
+
+        public static bool AreSdkLogsEnabled()
+        {
+            return !ReadDefines().Contains(SdkLogsDisabledDefine);
+        }
+
+        public static bool SetSdkLogsEnabled(bool enabled)
+        {
+            var defines = ReadDefines();
+            var changed = enabled
+                ? defines.Remove(SdkLogsDisabledDefine)
+                : defines.Add(SdkLogsDisabledDefine);
+
+            if (!changed)
+                return false;
+
+            WriteDefines(defines);
+            return true;
         }
 
         public static bool RestoreDefaultEnabledModules(IEnumerable<string> moduleIds)

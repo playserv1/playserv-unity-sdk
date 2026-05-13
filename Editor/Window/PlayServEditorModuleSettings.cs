@@ -36,6 +36,7 @@ namespace Playserv.Editor
         public bool RuntimeTransportUdp { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeTransportRudp { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeTransportWebRtc { get; private set; } = DefaultOptionalModuleState;
+        public bool SdkLogs { get; private set; } = true;
 
         public void Load()
         {
@@ -47,6 +48,7 @@ namespace Playserv.Editor
                       EditorPrefs.GetBool(Const.PrefModuleCodegen, DefaultOptionalModuleState);
             ModuleStressTests = PlayServEditorModuleAvailability.EditorModuleStressTests &&
                                 EditorPrefs.GetBool(Const.PrefModuleStressTests, DefaultInternalToolState);
+            SdkLogs = PlayServRuntimeModuleDefines.AreSdkLogsEnabled();
             LoadRuntimeModuleDefines();
         }
 
@@ -65,6 +67,15 @@ namespace Playserv.Editor
         public bool SetModuleStressTests(bool enabled) =>
             PlayServEditorModuleAvailability.EditorModuleStressTests &&
             Set(Const.PrefModuleStressTests, ModuleStressTests, enabled, value => ModuleStressTests = value);
+
+        public bool SetSdkLogs(bool enabled)
+        {
+            if (SdkLogs == enabled)
+                return false;
+
+            SdkLogs = enabled;
+            return PlayServRuntimeModuleDefines.SetSdkLogsEnabled(enabled);
+        }
 
         public bool SetRuntimeEvents(bool enabled)
         {
@@ -297,6 +308,7 @@ namespace Playserv.Editor
             if (PlayServEditorModuleAvailability.EditorModuleStressTests)
                 SetModuleStressTests(DefaultInternalToolState);
 
+            SetSdkLogs(true);
             ApplyRuntimeProfile(PlayServSdkProfiles.ClientSdk);
         }
 
