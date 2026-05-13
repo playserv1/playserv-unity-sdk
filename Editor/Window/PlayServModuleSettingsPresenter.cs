@@ -48,6 +48,9 @@ namespace Playserv.Editor
             {
                 var settings = context.State.ModuleSettings;
                 var changed = false;
+                changed |= DrawLoggingToggle(settings);
+                GUILayout.Space(12f);
+
                 var hasRuntimeModules = DrawRuntimeModuleGroup(
                     "Runtime",
                     RuntimeModuleNames,
@@ -158,6 +161,17 @@ namespace Playserv.Editor
                 changed |= section.Draw(context, settings, hasRuntimeModules, hasServerRuntimeModules);
 
             return changed;
+        }
+
+        private static bool DrawLoggingToggle(PlayServEditorModuleSettings settings)
+        {
+            GUILayout.Label("Diagnostics", PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Space(8f);
+            return DrawToggleModule(
+                "SDK Logs",
+                $"Writes PlayServ runtime diagnostics to the console. Disabling adds {PlayServRuntimeModuleDefines.SdkLogsDisabledDefine} and compiles logger output out.",
+                settings.SdkLogs,
+                settings.SetSdkLogs);
         }
 
         private static bool DrawRuntimeModuleGroup(
