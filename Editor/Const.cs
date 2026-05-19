@@ -13,6 +13,7 @@ namespace Playserv.Editor
         internal const string PrefFoldConfig  = "PlayServ.Window.Fold.Config";
         internal const string PrefFoldDeployment = "PlayServ.Fold.Deployment";
         internal const string PrefFoldConnection = "PlayServ.Window.Fold.Connection";
+        internal const string PrefKeyDeploymentFolderAssetPath = "PlayServ.Deployment.FolderAssetPath";
 
         internal const string PrefModuleDeployment = "PlayServ.Window.Module.Deployment";
         internal const string PrefModuleModelSync = "PlayServ.Window.Module.ModelSync";

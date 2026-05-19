@@ -81,6 +81,7 @@ namespace Playserv.Editor
             _state.DeployProgress = 0.05f;
             _state.DeployStatus = "Preparing files...";
             _state.DeployCts = new CancellationTokenSource();
+            var deploySucceeded = false;
 
             try
             {
@@ -98,6 +99,7 @@ namespace Playserv.Editor
 
                 _state.DeployProgress = 1f;
                 _state.DeployStatus = "Done.";
+                deploySucceeded = true;
                 Debug.Log("[PlayServ] Deployment completed successfully.");
             }
             catch (OperationCanceledException)
@@ -118,9 +120,17 @@ namespace Playserv.Editor
                 _state.DeployCts = null;
                 _repaint();
             }
+
+            if (deploySucceeded)
+                await RunVersionSyncAsync(context, promptForConfirmation: false);
         }
 
         public async Task StartVersionSyncAsync(PlayServWindowContext context)
+        {
+            await RunVersionSyncAsync(context, promptForConfirmation: true);
+        }
+
+        private async Task RunVersionSyncAsync(PlayServWindowContext context, bool promptForConfirmation)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -148,7 +158,7 @@ namespace Playserv.Editor
                 return;
             }
 
-            if (!EditorUtility.DisplayDialog(
+            if (promptForConfirmation && !EditorUtility.DisplayDialog(
                     "Sync Version",
                     $"Compare RPC code hash against remote for GameId '{gameId}'?",
                     "Sync",

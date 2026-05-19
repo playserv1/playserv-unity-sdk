@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using Playserv.ModelGenerator.Editor;
@@ -161,9 +162,8 @@ namespace Playserv.Editor
                 {
                     if (PlayServWindowChrome.DrawActionButton("Check Updates", PlayServWindowButtonTone.Secondary, GUILayout.Width(138f), GUILayout.Height(32f)))
                     {
-                        state.ShowAvailableSchemaInfo = true;
-                        SchemaLoader.LoadSchema(context.GameAccessTokenProperty.stringValue);
-                        SchemaLoader.CheckNewSchema();
+                        ClearLatestSchemaInfo(state);
+                        _ = CheckSchemaUpdatesAsync(context);
                     }
 
                     GUILayout.Space(8f);
@@ -197,6 +197,42 @@ namespace Playserv.Editor
             }
 
             return DateTimeOffset.TryParse(raw, out value);
+        }
+
+        private static async Task CheckSchemaUpdatesAsync(PlayServWindowContext context)
+        {
+            try
+            {
+                var token = context.GameAccessTokenProperty == null
+                    ? string.Empty
+                    : context.GameAccessTokenProperty.stringValue;
+
+                if (await SchemaLoader.LoadSchema(token))
+                {
+                    SchemaLoader.CheckNewSchema();
+                    context.State.ShowAvailableSchemaInfo = true;
+                }
+                else
+                {
+                    ClearLatestSchemaInfo(context.State);
+                }
+            }
+            catch (Exception e)
+            {
+                ClearLatestSchemaInfo(context.State);
+                Debug.LogError($"[SchemaDownloader] Check updates failed: {e.Message}");
+            }
+            finally
+            {
+                context.Repaint();
+            }
+        }
+
+        private static void ClearLatestSchemaInfo(PlayServWindowState state)
+        {
+            state.ShowAvailableSchemaInfo = false;
+            EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestVersion);
+            EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestTimestamp);
         }
     }
 }

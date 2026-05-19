@@ -85,6 +85,7 @@ namespace Playserv.Editor
             _state.WebSocketEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
                 PlayServPackageDefaultsProvider.ResolveBackendServerAddress(null));
+            _state.DeployFolder = LoadSavedDeployFolder();
 
             EnsureConfig();
             UpdateWindowTitle();
@@ -224,6 +225,15 @@ namespace Playserv.Editor
         {
             var version = string.IsNullOrWhiteSpace(sdkVersion) ? FallbackSdkVersion : sdkVersion.Trim();
             return $"{WindowTitlePrefix} {version}";
+        }
+
+        private static DefaultAsset LoadSavedDeployFolder()
+        {
+            var assetPath = EditorPrefs.GetString(Const.PrefKeyDeploymentFolderAssetPath, string.Empty);
+            if (string.IsNullOrWhiteSpace(assetPath) || !AssetDatabase.IsValidFolder(assetPath))
+                return null;
+
+            return AssetDatabase.LoadAssetAtPath<DefaultAsset>(assetPath);
         }
 
         private void DrawWindowBackdrop()

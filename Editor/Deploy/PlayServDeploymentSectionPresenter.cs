@@ -19,47 +19,34 @@ namespace Playserv.Editor
             var controller = _getController(context);
             var expanded = PlayServWindowChrome.BeginSectionCard(
                 ref state.FoldDeployment,
-                "Release",
+                "Server Code",
                 "Deployment",
                 "Preview RPC code closure, sync deployed version, and ship the ZIP package to the active deployment endpoint.");
 
             if (expanded)
             {
-                PlayServWindowChrome.DrawNotice(
-                    "Create a ZIP from selected files and upload it to your Deployment API endpoint.",
-                    MessageType.Info);
-
-                if (context.SerializedObject != null)
-                {
-                    context.SerializedObject.Update();
-
-                    if (context.DeployTimeoutSecondsProperty != null)
-                        EditorGUILayout.PropertyField(context.DeployTimeoutSecondsProperty, new GUIContent("Timeout Seconds"));
-
-                    if (context.DeployAuthTokenProperty != null)
-                    {
-                        var updatedToken = EditorGUILayout.PasswordField("Deploy Auth Token", context.DeployAuthTokenProperty.stringValue);
-                        if (!string.Equals(updatedToken, context.DeployAuthTokenProperty.stringValue, StringComparison.Ordinal))
-                            context.DeployAuthTokenProperty.stringValue = updatedToken;
-                    }
-
-                    if (context.SerializedObject.ApplyModifiedProperties())
-                        EditorUtility.SetDirty(context.Config);
-                }
-
-                GUILayout.Space(4f);
-                state.DeployFolder = (DefaultAsset)EditorGUILayout.ObjectField(
+                var selectedFolder = (DefaultAsset)EditorGUILayout.ObjectField(
                     "Folder",
                     state.DeployFolder,
                     typeof(DefaultAsset),
                     false);
+                if (selectedFolder != state.DeployFolder)
+                {
+                    state.DeployFolder = selectedFolder;
+                    SaveDeployFolder(selectedFolder);
+                }
+                var hasDeployFolder = state.DeployFolder != null &&
+                                      AssetDatabase.IsValidFolder(AssetDatabase.GetAssetPath(state.DeployFolder));
 
                 state.DeployIncludeSubfolders = EditorGUILayout.ToggleLeft("Include subfolders", state.DeployIncludeSubfolders);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("Pattern", GUILayout.Width(EditorGUIUtility.labelWidth));
-                    state.DeployPattern = EditorGUILayout.TextField(state.DeployPattern, PlayServWindowTheme.InputStyle);
+                    state.DeployPattern = EditorGUILayout.TextField(
+                        state.DeployPattern,
+                        PlayServWindowTheme.InputStyle,
+                        GUILayout.Height(context.StyledFieldHeight));
                 }
 
                 state.DeployKeepRelativePaths = EditorGUILayout.ToggleLeft(
@@ -70,7 +57,7 @@ namespace Playserv.Editor
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning))
+                    using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning || !hasDeployFolder))
                     {
                         if (PlayServWindowChrome.DrawActionButton("Preview Files", PlayServWindowButtonTone.Secondary, GUILayout.Width(112f), GUILayout.Height(30f)))
                         {
@@ -130,29 +117,82 @@ namespace Playserv.Editor
                     }
                 }
 
-                if (state.DeployRunning || !string.IsNullOrWhiteSpace(state.DeployStatus))
-                {
-                    GUILayout.Space(6f);
-                    EditorGUILayout.LabelField("Status", PlayServWindowTheme.MiniHeadingStyle);
-                    var deployMessageType = !state.DeployRunning && state.DeployStatus.StartsWith("Failed", StringComparison.OrdinalIgnoreCase)
-                        ? MessageType.Warning
-                        : MessageType.Info;
-                    PlayServWindowChrome.DrawNotice(string.IsNullOrEmpty(state.DeployStatus) ? "Working..." : state.DeployStatus, deployMessageType);
-
-                    if (state.DeployRunning)
-                        EditorGUILayout.Slider("Progress", state.DeployProgress, 0f, 1f);
-                }
-
-                if (state.VersionSyncRunning || !string.IsNullOrWhiteSpace(state.VersionSyncStatus))
-                {
-                    GUILayout.Space(6f);
-                    EditorGUILayout.LabelField("Version Sync", PlayServWindowTheme.MiniHeadingStyle);
-                    PlayServWindowChrome.DrawNotice(state.VersionSyncStatus, state.VersionSyncRunning ? MessageType.Info : MessageType.Warning);
-                }
+                GUILayout.Space(8f);
+                DrawStatusVersionRow(context);
             }
 
             PlayServWindowChrome.EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldDeployment, state.FoldDeployment);
+        }
+
+        private static void DrawStatusVersionRow(PlayServWindowContext context)
+        {
+            var state = context.State;
+            var deployStatus = ResolveDeployStatus(state);
+            var versionStatus = ResolveVersionStatus(context, state);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField("Status", PlayServWindowTheme.MiniHeadingStyle, GUILayout.Width(46f));
+                GUILayout.Label(deployStatus, ResolveDeployStatusStyle(state), GUILayout.MinWidth(150f));
+                GUILayout.Space(8f);
+                EditorGUILayout.LabelField("Version", PlayServWindowTheme.MiniHeadingStyle, GUILayout.Width(48f));
+                GUILayout.Label(versionStatus, ResolveVersionStatusStyle(state), GUILayout.MinWidth(150f));
+            }
+        }
+
+        private static string ResolveDeployStatus(PlayServWindowState state)
+        {
+            if (state.DeployRunning)
+                return string.IsNullOrWhiteSpace(state.DeployStatus) ? "Working..." : state.DeployStatus;
+
+            return string.IsNullOrWhiteSpace(state.DeployStatus) ? "Idle" : state.DeployStatus;
+        }
+
+        private static GUIStyle ResolveDeployStatusStyle(PlayServWindowState state)
+        {
+            return !state.DeployRunning &&
+                   !string.IsNullOrWhiteSpace(state.DeployStatus) &&
+                   state.DeployStatus.StartsWith("Failed", StringComparison.OrdinalIgnoreCase)
+                ? PlayServWindowTheme.NoticeWarningStyle
+                : PlayServWindowTheme.NoticeInfoStyle;
+        }
+
+        private static string ResolveVersionStatus(PlayServWindowContext context, PlayServWindowState state)
+        {
+            if (state.VersionSyncRunning)
+                return string.IsNullOrWhiteSpace(state.VersionSyncStatus) ? "Syncing..." : state.VersionSyncStatus;
+
+            var version = context.GameVersionProperty == null ? null : context.GameVersionProperty.stringValue;
+            if (!string.IsNullOrWhiteSpace(version))
+                return version.Trim();
+
+            return string.IsNullOrWhiteSpace(state.VersionSyncStatus) ? "Not synced" : state.VersionSyncStatus;
+        }
+
+        private static GUIStyle ResolveVersionStatusStyle(PlayServWindowState state)
+        {
+            return !state.VersionSyncRunning &&
+                   !string.IsNullOrWhiteSpace(state.VersionSyncStatus) &&
+                   (state.VersionSyncStatus.StartsWith("Sync failed", StringComparison.OrdinalIgnoreCase) ||
+                    state.VersionSyncStatus.StartsWith("Hash mismatch", StringComparison.OrdinalIgnoreCase))
+                ? PlayServWindowTheme.NoticeWarningStyle
+                : PlayServWindowTheme.NoticeInfoStyle;
+        }
+
+        private static void SaveDeployFolder(DefaultAsset folder)
+        {
+            if (folder == null)
+            {
+                EditorPrefs.DeleteKey(Const.PrefKeyDeploymentFolderAssetPath);
+                return;
+            }
+
+            var assetPath = AssetDatabase.GetAssetPath(folder);
+            if (string.IsNullOrWhiteSpace(assetPath))
+                EditorPrefs.DeleteKey(Const.PrefKeyDeploymentFolderAssetPath);
+            else
+                EditorPrefs.SetString(Const.PrefKeyDeploymentFolderAssetPath, assetPath);
         }
     }
 }
