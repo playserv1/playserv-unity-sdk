@@ -11,6 +11,8 @@ namespace Playserv.DataSubscription
 {
     internal sealed class DataSubscriptionPollingCoordinator
     {
+        private const int SubscriptionRequestCoalesceMs = 1000;
+
         private readonly IPlayServCommandBus _commandBus;
         private readonly DataGetClient _dataGetClient;
         private readonly ILogger _logger;
@@ -35,6 +37,7 @@ namespace Playserv.DataSubscription
             Action<Exception> onError = null)
         {
             return StartPolling(
+                null,
                 key,
                 query,
                 variables,
@@ -55,6 +58,7 @@ namespace Playserv.DataSubscription
                 throw new ArgumentNullException(nameof(entry));
 
             return StartPolling(
+                entry,
                 entry.Key,
                 entry.Query,
                 entry.Variables,
@@ -73,6 +77,9 @@ namespace Playserv.DataSubscription
         {
             if (entry == null)
                 throw new ArgumentNullException(nameof(entry));
+
+            if (!TryBeginRequest(entry, SubscriptionRequestCoalesceMs))
+                return;
 
             try
             {
@@ -98,9 +105,14 @@ namespace Playserv.DataSubscription
 
                 throw;
             }
+            finally
+            {
+                EndRequest(entry);
+            }
         }
 
         private IDisposable StartPolling(
+            DataSubscriptionPollingEntry entry,
             string key,
             string query,
             Dictionary<string, object> variables,
@@ -122,6 +134,8 @@ namespace Playserv.DataSubscription
                 requestTimeoutMs,
                 onData,
                 onError,
+                entry,
+                ResolveInitialDelayMs(entry),
                 cts.Token);
 
             return new PollingHandle(cts, pollingTask);
@@ -135,6 +149,8 @@ namespace Playserv.DataSubscription
             int requestTimeoutMs,
             Action<DataGetResponse> onData,
             Action<Exception> onError,
+            DataSubscriptionPollingEntry entry,
+            int initialDelayMs,
             CancellationToken ct)
         {
             SafeLog($"[DataGet] Polling started. interval={intervalMs}ms, key={key}");
@@ -142,6 +158,9 @@ namespace Playserv.DataSubscription
 
             try
             {
+                if (initialDelayMs > 0)
+                    await DelayWithCancellationAsync(initialDelayMs, ct);
+
                 while (!ct.IsCancellationRequested)
                 {
                     var sdkState = _commandBus.State;
@@ -172,8 +191,16 @@ namespace Playserv.DataSubscription
                     }
 
                     var startedAt = DateTime.UtcNow;
+                    bool requestStarted = false;
                     try
                     {
+                        if (entry != null && !TryBeginRequest(entry, SubscriptionRequestCoalesceMs))
+                        {
+                            await DelayWithCancellationAsync(intervalMs, ct);
+                            continue;
+                        }
+
+                        requestStarted = entry != null;
 #if PlayServ_Logs
                         SafeLog($"[DataGet] -> poll request send. key={key}, timeout={requestTimeoutMs}ms");
 #endif
@@ -196,6 +223,11 @@ namespace Playserv.DataSubscription
                     {
                         SafeLogError($"[DataGet] Poll request failed: {ex.Message}");
                         SafeInvokeOnError(onError, ex);
+                    }
+                    finally
+                    {
+                        if (requestStarted)
+                            EndRequest(entry);
                     }
 
                     var elapsedMs = (int)(DateTime.UtcNow - startedAt).TotalMilliseconds;
@@ -230,6 +262,50 @@ namespace Playserv.DataSubscription
                 return new Dictionary<string, object>();
 
             return new Dictionary<string, object>(variables);
+        }
+
+        private static int ResolveInitialDelayMs(DataSubscriptionPollingEntry entry)
+        {
+            if (entry == null)
+                return 0;
+
+            return 250 + (int)(entry.SubscriptionId % 8) * 125;
+        }
+
+        private static bool TryBeginRequest(DataSubscriptionPollingEntry entry, int coalesceMs)
+        {
+            if (entry == null)
+                return true;
+
+            long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            lock (entry)
+            {
+                if (entry.RequestInFlight)
+                    return false;
+
+                if (coalesceMs > 0 &&
+                    entry.LastRequestCompletedAtMs > 0 &&
+                    nowMs - entry.LastRequestCompletedAtMs < coalesceMs)
+                {
+                    return false;
+                }
+
+                entry.RequestInFlight = true;
+                entry.LastRequestStartedAtMs = nowMs;
+                return true;
+            }
+        }
+
+        private static void EndRequest(DataSubscriptionPollingEntry entry)
+        {
+            if (entry == null)
+                return;
+
+            lock (entry)
+            {
+                entry.RequestInFlight = false;
+                entry.LastRequestCompletedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            }
         }
 
         private static async Task DelayWithCancellationAsync(int delayMs, CancellationToken ct)

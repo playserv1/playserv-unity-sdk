@@ -21,7 +21,7 @@ MonoBehaviour:
   deployApiServerAddress: https://playserv-deployment.test.playserv.io/
   schemaApiServerAddress: https://backoffice.playserv.io
   allowMultipleConnections: 1
-  keepAlivePingIntervalMs: 30000
+  keepAlivePingIntervalMs: 20000
   keepAlivePongTimeoutMs: 10000
   networkTransformSyncIntervalMs: 100
   timeoutSeconds: 120
