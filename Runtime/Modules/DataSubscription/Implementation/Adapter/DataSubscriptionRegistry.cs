@@ -304,5 +304,8 @@ namespace Playserv.DataSubscription
         public bool HasSnapshot { get; set; }
         public string LastSnapshotJson { get; set; } = string.Empty;
         public IDisposable PollingHandle { get; set; }
+        public bool RequestInFlight { get; set; }
+        public long LastRequestStartedAtMs { get; set; }
+        public long LastRequestCompletedAtMs { get; set; }
     }
 }
