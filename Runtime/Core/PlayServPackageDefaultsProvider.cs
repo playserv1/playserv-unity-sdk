@@ -85,5 +85,21 @@ namespace Playserv.Wrapper
 
             return PlayServSettings.DefaultSchemaApiServerAddress;
         }
+
+        public static string ResolveDashboardAddress(string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                return value.Trim();
+
+#if UNITY_5_3_OR_NEWER
+            if (TryLoadAsset(out var packageDefaults) &&
+                !string.IsNullOrWhiteSpace(packageDefaults.DashboardAddress))
+            {
+                return packageDefaults.DashboardAddress.Trim();
+            }
+#endif
+
+            return PlayServSettings.DefaultDashboardAddress;
+        }
     }
 }

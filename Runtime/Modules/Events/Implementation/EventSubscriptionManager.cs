@@ -177,13 +177,23 @@ namespace Playserv.Events
             if (eventType == null)
                 throw new ArgumentNullException(nameof(eventType));
 
-            List<IObserverRegistration> observers;
+            IObserverRegistration singleObserver = null;
+            List<IObserverRegistration> observers = null;
             lock (_lock)
             {
                 if (!_typeObservers.TryGetValue(eventType, out var observerList))
                     return;
 
-                observers = observerList.ToList();
+                if (observerList.Count == 1)
+                    singleObserver = observerList[0];
+                else
+                    observers = observerList.ToList();
+            }
+
+            if (singleObserver != null)
+            {
+                singleObserver.OnNext(eventData);
+                return;
             }
 
             foreach (var observer in observers)

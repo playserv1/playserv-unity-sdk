@@ -57,33 +57,23 @@ namespace Playserv.Editor
         public static bool DrawIconButton(Texture icon, string fallbackText, string tooltip, PlayServWindowButtonTone tone, float iconSize, params GUILayoutOption[] options)
         {
             var style = PlayServWindowTheme.GetButtonStyle(tone);
-            var rect = GUILayoutUtility.GetRect(GUIContent.none, style, options);
-            var clicked = GUI.Button(rect, new GUIContent(string.Empty, tooltip), style);
-            var contentSize = Mathf.Min(iconSize, Mathf.Min(rect.width, rect.height) - 8f);
-            var contentRect = new Rect(
-                rect.x + (rect.width - contentSize) * 0.5f,
-                rect.y + (rect.height - contentSize) * 0.5f,
-                contentSize,
-                contentSize);
+            var previousImagePosition = style.imagePosition;
+            var previousAlignment = style.alignment;
+            var previousFontSize = style.fontSize;
 
-            if (icon != null)
-            {
-                GUI.DrawTexture(contentRect, icon, ScaleMode.ScaleToFit, true);
-            }
-            else
-            {
-                var previousAlignment = GUI.skin.label.alignment;
-                var previousFontSize = GUI.skin.label.fontSize;
-                var previousColor = GUI.contentColor;
-                GUI.skin.label.alignment = TextAnchor.MiddleCenter;
-                GUI.skin.label.fontSize = Mathf.RoundToInt(contentSize);
-                GUI.contentColor = style.normal.textColor;
-                GUI.Label(rect, new GUIContent(fallbackText, tooltip));
-                GUI.contentColor = previousColor;
-                GUI.skin.label.fontSize = previousFontSize;
-                GUI.skin.label.alignment = previousAlignment;
-            }
+            style.alignment = TextAnchor.MiddleCenter;
+            style.imagePosition = icon != null ? ImagePosition.ImageOnly : ImagePosition.TextOnly;
+            if (icon == null)
+                style.fontSize = Mathf.RoundToInt(iconSize);
 
+            var content = icon != null
+                ? new GUIContent(icon, tooltip)
+                : new GUIContent(fallbackText, tooltip);
+            var clicked = GUILayout.Button(content, style, options);
+
+            style.fontSize = previousFontSize;
+            style.alignment = previousAlignment;
+            style.imagePosition = previousImagePosition;
             return clicked;
         }
 

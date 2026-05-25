@@ -34,6 +34,11 @@ namespace Playserv.Wrapper
         public const string DefaultSchemaApiServerAddress = "";
 
         /// <summary>
+        /// Default dashboard address.
+        /// </summary>
+        public const string DefaultDashboardAddress = "";
+
+        /// <summary>
         /// Access token used in handshake.
         /// </summary>
         public string GameAccessToken { get; set; } = string.Empty;
@@ -111,6 +116,11 @@ namespace Playserv.Wrapper
         public string SchemaApiServerAddress { get; set; } = DefaultSchemaApiServerAddress;
 
         /// <summary>
+        /// Dashboard URL used by editor shortcuts.
+        /// </summary>
+        public string DashboardAddress { get; set; } = DefaultDashboardAddress;
+
+        /// <summary>
         /// Backward-compatible alias for <see cref="DeployApiServerAddress"/>.
         /// </summary>
         public string DeployApiEndpoint
@@ -157,6 +167,7 @@ namespace Playserv.Wrapper
                 WebRtcIceServers = WebRtcIceServers == null ? Array.Empty<string>() : (string[])WebRtcIceServers.Clone(),
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
+                DashboardAddress = DashboardAddress,
                 DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };
@@ -181,6 +192,7 @@ namespace Playserv.Wrapper
                 WebRtcIceServers = WebRtcIceServers == null ? Array.Empty<string>() : (string[])WebRtcIceServers.Clone(),
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
+                DashboardAddress = DashboardAddress,
                 DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };

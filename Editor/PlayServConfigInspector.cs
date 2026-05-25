@@ -30,7 +30,8 @@ namespace Playserv.Editor
         {
             "backendServerAddress",
             "deployApiServerAddress",
-            "schemaApiServerAddress"
+            "schemaApiServerAddress",
+            "dashboardAddress"
         };
 
         public override void OnInspectorGUI()

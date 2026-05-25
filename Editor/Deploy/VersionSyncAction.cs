@@ -42,6 +42,11 @@ namespace Playserv.Deploy.Editor
 
             reportStatus?.Invoke("Fetching remote hash...");
             var remoteHash = await api.GetRemoteCodeHashAsync(gameId, ct);
+            if (string.IsNullOrWhiteSpace(remoteHash))
+            {
+                reportStatus?.Invoke("Remote RPC code not found. Deploy required.");
+                return VersionSyncResult.CreateRemoteMissing();
+            }
 
             if (string.Equals(localHash, remoteHash, StringComparison.OrdinalIgnoreCase))
             {
@@ -59,14 +64,17 @@ namespace Playserv.Deploy.Editor
 
     internal sealed class VersionSyncResult
     {
-        private VersionSyncResult(bool hashesMatch, string latestVersion, string archivePath)
+        private VersionSyncResult(bool hashesMatch, bool remoteCodeMissing, string latestVersion, string archivePath)
         {
             HashesMatch = hashesMatch;
+            RemoteCodeMissing = remoteCodeMissing;
             LatestVersion = latestVersion;
             ArchivePath = archivePath;
         }
 
         public bool HashesMatch { get; }
+
+        public bool RemoteCodeMissing { get; }
 
         public string LatestVersion { get; }
 
@@ -74,12 +82,17 @@ namespace Playserv.Deploy.Editor
 
         public static VersionSyncResult CreateMatched(string latestVersion)
         {
-            return new VersionSyncResult(true, latestVersion, null);
+            return new VersionSyncResult(true, false, latestVersion, null);
         }
 
         public static VersionSyncResult CreateMismatch(string archivePath)
         {
-            return new VersionSyncResult(false, null, archivePath);
+            return new VersionSyncResult(false, false, null, archivePath);
+        }
+
+        public static VersionSyncResult CreateRemoteMissing()
+        {
+            return new VersionSyncResult(false, true, null, null);
         }
     }
 }

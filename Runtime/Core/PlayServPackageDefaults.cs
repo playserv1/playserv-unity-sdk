@@ -18,6 +18,7 @@ namespace Playserv.Wrapper
         [SerializeField] private string[] webRtcIceServers = Array.Empty<string>();
         [SerializeField] private string deployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress;
         [SerializeField] private string schemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress;
+        [SerializeField] private string dashboardAddress = PlayServSettings.DefaultDashboardAddress;
         [SerializeField] private bool allowMultipleConnections = true;
         [SerializeField] private int keepAlivePingIntervalMs = 30000;
         [SerializeField] private int keepAlivePongTimeoutMs = 10000;
@@ -32,6 +33,7 @@ namespace Playserv.Wrapper
         public string[] WebRtcIceServers => webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone();
         public string DeployApiServerAddress => deployApiServerAddress;
         public string SchemaApiServerAddress => schemaApiServerAddress;
+        public string DashboardAddress => dashboardAddress;
         public bool AllowMultipleConnections => allowMultipleConnections;
         public int KeepAlivePingIntervalMs => keepAlivePingIntervalMs;
         public int KeepAlivePongTimeoutMs => keepAlivePongTimeoutMs;
@@ -50,6 +52,7 @@ namespace Playserv.Wrapper
                 WebRtcIceServers = webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone(),
                 DeployApiServerAddress = ResolveText(deployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress),
                 SchemaApiServerAddress = ResolveText(schemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress),
+                DashboardAddress = ResolveText(dashboardAddress, PlayServSettings.DefaultDashboardAddress),
                 AllowMultipleConnections = allowMultipleConnections,
                 KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
                 KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs,
@@ -71,6 +74,7 @@ namespace Playserv.Wrapper
             webRtcIceServers = settings.WebRtcIceServers == null ? Array.Empty<string>() : (string[])settings.WebRtcIceServers.Clone();
             deployApiServerAddress = ResolveText(settings.DeployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress);
             schemaApiServerAddress = ResolveText(settings.SchemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress);
+            dashboardAddress = ResolveText(settings.DashboardAddress, PlayServSettings.DefaultDashboardAddress);
             allowMultipleConnections = settings.AllowMultipleConnections;
             keepAlivePingIntervalMs = settings.KeepAlivePingIntervalMs;
             keepAlivePongTimeoutMs = settings.KeepAlivePongTimeoutMs;

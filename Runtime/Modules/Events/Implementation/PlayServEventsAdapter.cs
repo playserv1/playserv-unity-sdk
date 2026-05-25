@@ -21,7 +21,10 @@ namespace Playserv.Events
         private readonly ILogger _logger;
         private readonly EventSubscriptionManager _subscriptionManager;
         private readonly EventTypeRegistry _eventTypeRegistry = new EventTypeRegistry();
+        private readonly Dictionary<string, Func<string, object>> _eventPayloadDeserializers =
+            new Dictionary<string, Func<string, object>>(StringComparer.Ordinal);
         private readonly HashSet<string> _suppressedInfrastructureEventTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly object _eventPayloadDeserializerLock = new object();
         private readonly object _infrastructureEventLock = new object();
         private readonly SemaphoreSlim _groupCommandGate = new SemaphoreSlim(1, 1);
         private static readonly TimeSpan GroupCommandTimeout = TimeSpan.FromSeconds(10);
@@ -42,6 +45,7 @@ namespace Playserv.Events
             var eventClrType = typeof(T);
             _eventTypeRegistry.Register(eventClrType);
             var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
+            RegisterEventPayloadDeserializer<T>(eventType);
             return new EventObservable<T>(_transport, _subscriptionManager, eventType, _logger);
         }
 
@@ -189,30 +193,38 @@ namespace Playserv.Events
             if (message == null || string.IsNullOrWhiteSpace(message.EventType))
                 return;
 
-            var eventType = FindTypeByName(message.EventType);
+            HandleEventPayload(message.EventType, message.Payload);
+        }
+
+        private void HandleEventPayload(string eventTypeName, string payload)
+        {
+            if (string.IsNullOrWhiteSpace(eventTypeName))
+                return;
+
+            var eventType = FindTypeByName(eventTypeName);
             if (eventType == null)
             {
-                if (IsInfrastructureEventType(message.EventType))
+                if (IsInfrastructureEventType(eventTypeName))
                 {
                     var shouldLogOnce = false;
                     lock (_infrastructureEventLock)
                     {
-                        shouldLogOnce = _suppressedInfrastructureEventTypes.Add(message.EventType);
+                        shouldLogOnce = _suppressedInfrastructureEventTypes.Add(eventTypeName);
                     }
 
                     if (shouldLogOnce)
-                        _logger.Log($"Ignoring infrastructure event type: {message.EventType}");
+                        _logger.Log($"Ignoring infrastructure event type: {eventTypeName}");
 
                     return;
                 }
 
-                _logger.LogError($"No event type found for type name: {message.EventType}");
+                _logger.LogError($"No event type found for type name: {eventTypeName}");
                 return;
             }
 
             try
             {
-                var eventInstance = _jsonCodec.Deserialize(message.Payload, eventType, EventJsonOptions);
+                var eventInstance = DeserializeEventPayload(eventTypeName, payload, eventType);
                 if (eventInstance == null)
                 {
                     _logger.LogError($"Failed to deserialize event payload for type: {eventType.Name}");
@@ -229,6 +241,27 @@ namespace Playserv.Events
             {
                 _logger.LogError($"Error handling EventMessage type={eventType.Name}: {ex}");
             }
+        }
+
+        private void RegisterEventPayloadDeserializer<T>(string eventTypeName)
+        {
+            lock (_eventPayloadDeserializerLock)
+            {
+                _eventPayloadDeserializers[eventTypeName] = payload => _jsonCodec.Deserialize<T>(payload, EventJsonOptions);
+            }
+        }
+
+        private object DeserializeEventPayload(string eventTypeName, string payload, Type fallbackType)
+        {
+            Func<string, object> deserializer;
+            lock (_eventPayloadDeserializerLock)
+            {
+                _eventPayloadDeserializers.TryGetValue(eventTypeName, out deserializer);
+            }
+
+            return deserializer != null
+                ? deserializer(payload)
+                : _jsonCodec.Deserialize(payload, fallbackType, EventJsonOptions);
         }
 
         private Type FindTypeByName(string typeName)
@@ -279,7 +312,7 @@ namespace Playserv.Events
                 }
             }
 
-            HandleEventMessage(new EventMessage(eventType, message.Payload));
+            HandleEventPayload(eventType, message.Payload);
         }
 
         private async Task<bool> ExecuteGroupCommandAsync<TRequest, TResponse>(
