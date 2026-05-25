@@ -92,6 +92,7 @@ namespace Playserv.Wrapper
                 : (string[])packageDefaults.WebRtcIceServers.Clone();
             merged.DeployApiServerAddress = packageDefaults.DeployApiServerAddress;
             merged.SchemaApiServerAddress = packageDefaults.SchemaApiServerAddress;
+            merged.DashboardAddress = packageDefaults.DashboardAddress;
 
             return merged;
         }

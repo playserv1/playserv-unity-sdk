@@ -18,6 +18,7 @@ namespace Playserv.Wrapper
         private const string DEFAULT_BACKEND_SERVER_ADDRESS = PlayServSettings.DefaultBackendServerAddress;
         private const string DEFAULT_DEPLOY_API_SERVER_ADDRESS = PlayServSettings.DefaultDeployApiServerAddress;
         private const string DEFAULT_SCHEMA_API_SERVER_ADDRESS = PlayServSettings.DefaultSchemaApiServerAddress;
+        private const string DEFAULT_DASHBOARD_ADDRESS = PlayServSettings.DefaultDashboardAddress;
 
         [SerializeField] private string gameAccessToken;
         [SerializeField] private string gameId;
@@ -39,6 +40,7 @@ namespace Playserv.Wrapper
         [Header("Deploy")]
         [SerializeField] private string deployApiServerAddress = DEFAULT_DEPLOY_API_SERVER_ADDRESS;
         [SerializeField] private string schemaApiServerAddress = DEFAULT_SCHEMA_API_SERVER_ADDRESS;
+        [SerializeField] private string dashboardAddress = DEFAULT_DASHBOARD_ADDRESS;
         [SerializeField] private string deployAuthToken = "";
         [SerializeField] private int timeoutSeconds = 120;
         
@@ -130,6 +132,11 @@ namespace Playserv.Wrapper
         public string SchemaApiServerAddress => schemaApiServerAddress;
 
         /// <summary>
+        /// Dashboard URL used by editor shortcuts.
+        /// </summary>
+        public string DashboardAddress => dashboardAddress;
+
+        /// <summary>
         /// Optional bearer token used by editor deployment HTTP requests.
         /// </summary>
         public string DeployAuthToken => deployAuthToken;
@@ -158,6 +165,7 @@ namespace Playserv.Wrapper
                 WebRtcIceServers = webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone(),
                 DeployApiServerAddress = deployApiServerAddress,
                 SchemaApiServerAddress = schemaApiServerAddress,
+                DashboardAddress = dashboardAddress,
                 DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };
@@ -187,6 +195,7 @@ namespace Playserv.Wrapper
             changed |= AssignArrayIfDifferent(ref webRtcIceServers, settings.WebRtcIceServers);
             changed |= AssignIfDifferent(ref deployApiServerAddress, settings.DeployApiServerAddress);
             changed |= AssignIfDifferent(ref schemaApiServerAddress, settings.SchemaApiServerAddress);
+            changed |= AssignIfDifferent(ref dashboardAddress, settings.DashboardAddress);
             changed |= AssignIfDifferent(ref deployAuthToken, settings.DeployAuthToken);
             changed |= AssignIfDifferent(ref timeoutSeconds, settings.TimeoutSeconds);
 

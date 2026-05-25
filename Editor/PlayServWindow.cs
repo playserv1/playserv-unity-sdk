@@ -8,7 +8,6 @@ namespace Playserv.Editor
     public sealed class PlayServWindow : EditorWindow
     {
         private const string WindowTitlePrefix = "PlayServ";
-        private const string FallbackSdkVersion = "0.1.0";
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const string DocsUrl = "https://docs.playserv.io/";
         private const float FixedWindowWidth = 720f;
@@ -58,7 +57,7 @@ namespace Playserv.Editor
                 return;
 
             var window = GetWindow<PlayServWindow>(title: WindowTitlePrefix);
-            window.titleContent = new GUIContent(BuildWindowTitle(PlayServConfigProvider.FindExisting()?.SdkVersion));
+            window.titleContent = new GUIContent(WindowTitlePrefix);
             window.ConfigureWindowSize();
             window.Show();
             window.Focus();
@@ -102,39 +101,41 @@ namespace Playserv.Editor
 
         private void OnGUI()
         {
-            EnforceFixedWidth();
             PlayServWindowTheme.Ensure();
             DrawWindowBackdrop();
 
             var previousLabelWidth = EditorGUIUtility.labelWidth;
-            EditorGUIUtility.labelWidth = Mathf.Clamp(position.width * 0.23f, 120f, 170f);
-
-            var context = CreateContext();
-
-            using (new GUILayout.AreaScope(new Rect(0f, 0f, position.width, position.height)))
+            try
             {
-                _state.MainScrollPos = EditorGUILayout.BeginScrollView(_state.MainScrollPos, GUIStyle.none, GUI.skin.verticalScrollbar);
+                EditorGUIUtility.labelWidth = Mathf.Clamp(position.width * 0.23f, 120f, 170f);
 
-                using (new EditorGUILayout.HorizontalScope())
+                var context = CreateContext();
+
+                using (var scrollView = new EditorGUILayout.ScrollViewScope(_state.MainScrollPos, GUIStyle.none, GUI.skin.verticalScrollbar))
                 {
-                    GUILayout.Space(24f);
-                    using (new EditorGUILayout.VerticalScope())
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        GUILayout.Space(18f);
-                        if (_state.ShowModuleSettingsLayer)
-                            DrawModuleSettingsLayer(context);
-                        else
-                            DrawMainLayer(context);
+                        GUILayout.Space(24f);
+                        using (new EditorGUILayout.VerticalScope())
+                        {
+                            GUILayout.Space(18f);
+                            if (_state.ShowModuleSettingsLayer)
+                                DrawModuleSettingsLayer(context);
+                            else
+                                DrawMainLayer(context);
 
-                        GUILayout.Space(18f);
+                            GUILayout.Space(18f);
+                        }
+                        GUILayout.Space(24f);
                     }
-                    GUILayout.Space(24f);
+
+                    _state.MainScrollPos = scrollView.scrollPosition;
                 }
-
-                EditorGUILayout.EndScrollView();
             }
-
-            EditorGUIUtility.labelWidth = previousLabelWidth;
+            finally
+            {
+                EditorGUIUtility.labelWidth = previousLabelWidth;
+            }
 
             if (_state.DeployRunning)
                 Repaint();
@@ -218,13 +219,7 @@ namespace Playserv.Editor
 
         private void UpdateWindowTitle()
         {
-            titleContent = new GUIContent(BuildWindowTitle(_state.Config != null ? _state.Config.SdkVersion : null));
-        }
-
-        private static string BuildWindowTitle(string sdkVersion)
-        {
-            var version = string.IsNullOrWhiteSpace(sdkVersion) ? FallbackSdkVersion : sdkVersion.Trim();
-            return $"{WindowTitlePrefix} {version}";
+            titleContent = new GUIContent(WindowTitlePrefix);
         }
 
         private static DefaultAsset LoadSavedDeployFolder()
@@ -247,19 +242,6 @@ namespace Playserv.Editor
         {
             minSize = new Vector2(FixedWindowWidth, MinWindowHeight);
             maxSize = new Vector2(FixedWindowWidth, MaxWindowHeight);
-            EnforceFixedWidth();
-        }
-
-        private void EnforceFixedWidth()
-        {
-            if (Mathf.Approximately(position.width, FixedWindowWidth))
-                return;
-
-            position = new Rect(
-                position.x,
-                position.y,
-                FixedWindowWidth,
-                Mathf.Max(position.height, MinWindowHeight));
         }
 
         private void FocusConfigAsset()

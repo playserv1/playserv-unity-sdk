@@ -193,6 +193,11 @@ namespace Playserv.Editor
                     _state.VersionSyncStatus = $"Synced to version {result.LatestVersion}.";
                     Debug.Log($"[PlayServ] Version synchronized to {result.LatestVersion}.");
                 }
+                else if (result.RemoteCodeMissing)
+                {
+                    _state.VersionSyncStatus = "Remote RPC code not found. Deploy required.";
+                    Debug.LogWarning("[PlayServ] Remote RPC code hash was not found. Deploy RPC code before syncing version.");
+                }
                 else
                 {
                     _state.VersionSyncStatus = "Hash mismatch. Archive downloaded.";

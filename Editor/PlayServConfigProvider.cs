@@ -11,6 +11,7 @@ namespace Playserv.Editor
         private const string BackendServerAddressPropertyName = "backendServerAddress";
         private const string DeployApiServerAddressPropertyName = "deployApiServerAddress";
         private const string SchemaApiServerAddressPropertyName = "schemaApiServerAddress";
+        private const string DashboardAddressPropertyName = "dashboardAddress";
         private const string LegacyDefaultSdkVersion = "1.0.0";
         private const string CurrentDefaultSdkVersion = "0.1.0";
 
@@ -22,6 +23,7 @@ namespace Playserv.Editor
                 var changed = EnsureBackendServerAddress(config);
                 changed |= EnsureDeployApiServerAddress(config);
                 changed |= EnsureSchemaApiServerAddress(config);
+                changed |= EnsureDashboardAddress(config);
                 changed |= EnsureDefaultSdkVersion(config);
                 changed |= ApplyEnvironmentProfile(config);
                 if (changed)
@@ -41,6 +43,7 @@ namespace Playserv.Editor
             EnsureBackendServerAddress(config);
             EnsureDeployApiServerAddress(config);
             EnsureSchemaApiServerAddress(config);
+            EnsureDashboardAddress(config);
             EnsureDefaultSdkVersion(config);
             ApplyEnvironmentProfile(config);
             AssetDatabase.SaveAssets();
@@ -147,6 +150,27 @@ namespace Playserv.Editor
             return true;
         }
 
+        private static bool EnsureDashboardAddress(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var serializedObject = new SerializedObject(config);
+            var dashboardProperty = serializedObject.FindProperty(DashboardAddressPropertyName);
+            if (dashboardProperty == null)
+                return false;
+
+            var currentValue = dashboardProperty.stringValue?.Trim();
+            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
+            if (!shouldReplace)
+                return false;
+
+            dashboardProperty.stringValue = PlayServPackageDefaultsProvider.ResolveDashboardAddress(null);
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
+            return true;
+        }
+
         private static bool EnsureDefaultSdkVersion(PlayServConfig config)
         {
             if (config == null)
@@ -191,6 +215,7 @@ namespace Playserv.Editor
                 merged.BackendServerAddress = bakedSettings.BackendServerAddress;
                 merged.DeployApiServerAddress = bakedSettings.DeployApiServerAddress;
                 merged.SchemaApiServerAddress = bakedSettings.SchemaApiServerAddress;
+                merged.DashboardAddress = bakedSettings.DashboardAddress;
                 return config.ApplySettings(merged);
             }
 

@@ -99,7 +99,14 @@ namespace Playserv.Deploy.Editor
 
             using var req = UnityWebRequest.Get(url);
             AddCommonHeaders(req);
-            await SendRequestAsync(req, ct);
+            try
+            {
+                await SendRequestAsync(req, ct);
+            }
+            catch (InvalidOperationException) when (req.responseCode == 404)
+            {
+                return null;
+            }
 
             var body = req.downloadHandler?.text;
             if (string.IsNullOrWhiteSpace(body))

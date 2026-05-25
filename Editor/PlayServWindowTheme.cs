@@ -71,8 +71,8 @@ namespace Playserv.Editor
             ModuleTagDisabledStyle = CreateChipStyle("#1A1E25", "#303743", "#7D8794", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
             ModuleTagBlockedStyle = CreateChipStyle("#2C2215", "#6E4D1F", "#F2B66D", 10, FontStyle.Bold, new RectOffset(8, 8, 4, 4));
 
-            HeroTitleStyle = CreateWrappedLabelStyle(30, FontStyle.Bold, "#F3F5F8");
-            HeroAccentStyle = CreateWrappedLabelStyle(18, FontStyle.Bold, "#A8D3FF");
+            HeroTitleStyle = CreateWrappedLabelStyle(22, FontStyle.Bold, "#F3F5F8");
+            HeroAccentStyle = CreateWrappedLabelStyle(13, FontStyle.Bold, "#A8D3FF");
             HeroBodyStyle = CreateWrappedLabelStyle(13, FontStyle.Normal, "#AAB2BF");
 
             MetricLabelStyle = CreateLabelStyle(10, FontStyle.Bold, "#8892A0");

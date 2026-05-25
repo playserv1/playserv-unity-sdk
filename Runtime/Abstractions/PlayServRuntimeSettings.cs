@@ -12,6 +12,7 @@ namespace Playserv.Runtime.Abstractions
         public const string DefaultWebRtcSignalingServerAddress = "";
         public const string DefaultWebRtcDataChannelLabel = "playserv";
         public const string DefaultSchemaApiServerAddress = "";
+        public const string DefaultDashboardAddress = "";
 
         public string GameAccessToken { get; set; } = string.Empty;
         public string GameId { get; set; } = string.Empty;
@@ -28,6 +29,7 @@ namespace Playserv.Runtime.Abstractions
         public string[] WebRtcIceServers { get; set; } = Array.Empty<string>();
         public string DeployApiServerAddress { get; set; } = DefaultDeployApiServerAddress;
         public string SchemaApiServerAddress { get; set; } = DefaultSchemaApiServerAddress;
+        public string DashboardAddress { get; set; } = DefaultDashboardAddress;
         public string DeployAuthToken { get; set; } = string.Empty;
         public int TimeoutSeconds { get; set; } = 120;
 
@@ -52,6 +54,7 @@ namespace Playserv.Runtime.Abstractions
                 WebRtcIceServers = WebRtcIceServers == null ? Array.Empty<string>() : (string[])WebRtcIceServers.Clone(),
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
+                DashboardAddress = DashboardAddress,
                 DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };
