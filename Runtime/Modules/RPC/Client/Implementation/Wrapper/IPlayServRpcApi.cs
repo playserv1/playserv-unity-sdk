@@ -22,6 +22,16 @@ namespace Playserv.Wrapper
 
         void Invoke(string serviceName, string methodName, string payloadBase64);
 
+        /// <summary>
+        /// Invoke an RPC with an optional coalesce key. When the platform's
+        /// queue contains multiple invocations of the same method from the
+        /// same user with a matching <paramref name="coalesceKey"/>, only the
+        /// most recent one will be executed and older ones get a synthetic
+        /// success ack. Pass null to keep the original "execute every call"
+        /// semantics. See <see cref="Playserv.RPC.InvokeRpc.CoalesceKey"/>.
+        /// </summary>
+        void Invoke(string serviceName, string methodName, object payload, string coalesceKey);
+
         void Invoke<TService>(Expression<Action<TService>> method);
 
         void Invoke<TService>(Expression<Action<TService>> method, object payload);

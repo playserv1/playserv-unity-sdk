@@ -35,6 +35,15 @@ namespace Playserv.Wrapper
         public static void Invoke(string serviceName, string methodName, string payloadBase64) =>
             Api.Invoke(serviceName, methodName, payloadBase64);
 
+        /// <summary>
+        /// Invoke an RPC with an optional <paramref name="coalesceKey"/>.
+        /// Platform may drop superseded queued items with the same scoped
+        /// key under overload — useful for state-style RPCs like SetInput
+        /// (pass playerId as the key). See <see cref="Playserv.RPC.InvokeRpc.CoalesceKey"/>.
+        /// </summary>
+        public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey) =>
+            Api.Invoke(serviceName, methodName, payload, coalesceKey);
+
         public static void Invoke<TService>(Expression<Action<TService>> method) =>
             Api.Invoke(method);
 
