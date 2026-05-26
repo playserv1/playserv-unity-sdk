@@ -13,7 +13,11 @@ namespace Playserv.Wrapper
 
         public static IObservable<T> Subscribe<T>() => Api.Subscribe<T>();
 
+        public static IObservable<string> SubscribeRaw<T>() => Api.SubscribeRaw<T>();
+
         public static IDisposable Subscribe<T>(Action<T> onNext) => Api.Subscribe(onNext);
+
+        public static IDisposable SubscribeRaw<T>(Action<string> onNext) => Api.SubscribeRaw<T>(onNext);
 
         public static void Publish<T>(T @event) => Api.Publish(@event);
 
