@@ -49,12 +49,28 @@ namespace Playserv.Events
             return new EventObservable<T>(_transport, _subscriptionManager, eventType, _logger);
         }
 
+        public IObservable<string> SubscribeRaw<T>()
+        {
+            var eventClrType = typeof(T);
+            _eventTypeRegistry.Register(eventClrType);
+            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
+            return new RawEventObservable<T>(_transport, _subscriptionManager, eventType, _logger);
+        }
+
         public IDisposable Subscribe<T>(Action<T> onNext)
         {
             if (onNext == null)
                 throw new ArgumentNullException(nameof(onNext));
 
             return Subscribe<T>().Subscribe(onNext);
+        }
+
+        public IDisposable SubscribeRaw<T>(Action<string> onNext)
+        {
+            if (onNext == null)
+                throw new ArgumentNullException(nameof(onNext));
+
+            return SubscribeRaw<T>().Subscribe(onNext);
         }
 
         public void Publish<T>(T @event)
@@ -224,6 +240,11 @@ namespace Playserv.Events
 
             try
             {
+                _subscriptionManager.NotifyRawEvent(eventTypeName, payload);
+
+                if (!_subscriptionManager.HasTypedObservers(eventType))
+                    return;
+
                 var eventInstance = DeserializeEventPayload(eventTypeName, payload, eventType);
                 if (eventInstance == null)
                 {

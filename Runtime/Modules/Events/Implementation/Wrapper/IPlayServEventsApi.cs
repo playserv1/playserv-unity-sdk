@@ -8,7 +8,11 @@ namespace Playserv.Wrapper
     {
         IObservable<T> Subscribe<T>();
 
+        IObservable<string> SubscribeRaw<T>();
+
         IDisposable Subscribe<T>(Action<T> onNext);
+
+        IDisposable SubscribeRaw<T>(Action<string> onNext);
 
         void Publish<T>(T @event);
 

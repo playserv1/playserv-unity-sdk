@@ -16,7 +16,11 @@ namespace Playserv.Events
 
         public IObservable<T> Subscribe<T>() => EventsAdapter.Subscribe<T>();
 
+        public IObservable<string> SubscribeRaw<T>() => EventsAdapter.SubscribeRaw<T>();
+
         public IDisposable Subscribe<T>(Action<T> onNext) => EventsAdapter.Subscribe(onNext);
+
+        public IDisposable SubscribeRaw<T>(Action<string> onNext) => EventsAdapter.SubscribeRaw<T>(onNext);
 
         public void Publish<T>(T @event) => EventsAdapter.Publish(@event);
 

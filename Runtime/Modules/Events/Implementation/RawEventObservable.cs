@@ -5,7 +5,10 @@ using Playserv.Proxy.Logging;
 
 namespace Playserv.Events
 {
-    internal sealed class EventObservable<T> : IObservable<T>
+    /// <summary>
+    /// Observable that subscribes to an event topic but delivers the raw JSON payload string.
+    /// </summary>
+    internal sealed class RawEventObservable<TEvent> : IObservable<string>
     {
         private const string EventsModuleName = "module_events";
 
@@ -14,7 +17,7 @@ namespace Playserv.Events
         private readonly string _eventType;
         private readonly ILogger _logger;
 
-        public EventObservable(ITransport transport, EventSubscriptionManager subscriptionManager, string eventType, ILogger logger)
+        public RawEventObservable(ITransport transport, EventSubscriptionManager subscriptionManager, string eventType, ILogger logger)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _subscriptionManager = subscriptionManager ?? throw new ArgumentNullException(nameof(subscriptionManager));
@@ -22,15 +25,15 @@ namespace Playserv.Events
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public IDisposable Subscribe(IObserver<T> observer)
+        public IDisposable Subscribe(IObserver<string> observer)
         {
             if (observer == null)
                 throw new ArgumentNullException(nameof(observer));
 
             EnsureSubscription();
-            _subscriptionManager.AddObserver(observer);
+            _subscriptionManager.AddRawObserver(_eventType, observer);
 
-            return new Unsubscriber(_subscriptionManager, observer, TryUnsubscribe);
+            return new Unsubscriber(_subscriptionManager, _eventType, observer, TryUnsubscribe);
         }
 
         private void EnsureSubscription()
@@ -44,7 +47,7 @@ namespace Playserv.Events
             _subscriptionManager.AddPendingSubscription(_eventType);
             var request = new EventSubscribeRequest(_eventType);
             _transport.Send(request, EventsModuleName);
-            _logger.Log($"Sent subscription request for event type: {_eventType}");
+            _logger.Log($"Sent raw subscription request for event type: {_eventType}");
         }
 
         private void TryUnsubscribe()
@@ -59,19 +62,25 @@ namespace Playserv.Events
             var request = new EventUnsubscribeRequest(subscriptionId);
             _transport.Send(request, EventsModuleName);
             _subscriptionManager.RemoveSubscription(_eventType);
-            _logger.Log($"Sent unsubscription request for event type: {_eventType}");
+            _logger.Log($"Sent raw unsubscription request for event type: {_eventType}");
         }
 
         private sealed class Unsubscriber : IDisposable
         {
             private readonly EventSubscriptionManager _subscriptionManager;
-            private readonly IObserver<T> _observer;
+            private readonly string _eventType;
+            private readonly IObserver<string> _observer;
             private readonly Action _onDispose;
             private bool _disposed;
 
-            public Unsubscriber(EventSubscriptionManager subscriptionManager, IObserver<T> observer, Action onDispose)
+            public Unsubscriber(
+                EventSubscriptionManager subscriptionManager,
+                string eventType,
+                IObserver<string> observer,
+                Action onDispose)
             {
                 _subscriptionManager = subscriptionManager ?? throw new ArgumentNullException(nameof(subscriptionManager));
+                _eventType = eventType ?? throw new ArgumentNullException(nameof(eventType));
                 _observer = observer ?? throw new ArgumentNullException(nameof(observer));
                 _onDispose = onDispose;
             }
@@ -82,7 +91,7 @@ namespace Playserv.Events
                     return;
 
                 _disposed = true;
-                _subscriptionManager.RemoveObserver(_observer);
+                _subscriptionManager.RemoveRawObserver(_eventType, _observer);
                 _onDispose?.Invoke();
             }
         }

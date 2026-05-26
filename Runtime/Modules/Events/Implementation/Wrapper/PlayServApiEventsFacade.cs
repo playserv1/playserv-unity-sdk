@@ -27,11 +27,24 @@ namespace Playserv.Wrapper
                 : EventsAdapter.Subscribe(onNext);
         }
 
+        public IDisposable SubscribeRaw<T>(Action<string> onNext)
+        {
+            if (onNext == null)
+                throw new ArgumentNullException(nameof(onNext));
+
+            return EventsAdapter.SubscribeRaw<T>(onNext);
+        }
+
         public IObservable<T> Subscribe<T>()
         {
             return _runtimeAccess.LocalExecution.TrySubscribe<T>(_runtimeAccess.HasCurrentInstance, out var observable)
                 ? observable
                 : EventsAdapter.Subscribe<T>();
+        }
+
+        public IObservable<string> SubscribeRaw<T>()
+        {
+            return EventsAdapter.SubscribeRaw<T>();
         }
 
         public void Publish<T>(T @event)
