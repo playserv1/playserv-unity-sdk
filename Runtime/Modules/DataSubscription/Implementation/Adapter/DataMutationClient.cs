@@ -38,6 +38,13 @@ namespace Playserv.DataSubscription
 
         public async Task SendMutationAsync(long subscriptionId, string query, Dictionary<string, object> variables, object patch)
         {
+            if (_commandBus.State != PlayServState.Online)
+            {
+                throw new DataSubscriptionException(
+                    0,
+                    $"Data mutation skipped because SDK state is {_commandBus.State}.");
+            }
+
             var mutationRequest = new DataMutationRequest
             {
                 RequestId = _requestIds.Next(),
@@ -122,9 +129,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataMutationCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataMutationErrorResponse(request.RequestId, 0, message));
             });
@@ -137,9 +142,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataMutationCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataMutationErrorResponse(request.RequestId, 0, message));
             });
@@ -152,9 +155,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataMutationCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataMutationErrorResponse(request.RequestId, 0, message));
             });

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
 using Playserv.Modules;
+using Playserv.Proxy.Common;
 using Playserv.Serialization;
 using ILogger = Playserv.Proxy.Logging.ILogger;
 
@@ -48,6 +49,16 @@ namespace Playserv.DataSubscription
         internal IJsonCodec GetJsonCodec()
         {
             return _jsonCodec;
+        }
+
+        internal bool CanSendCommands => _commandBus.State == PlayServState.Online;
+
+        internal DataSubscriptionException CreateConnectionUnavailableException(string operationName)
+        {
+            var operation = string.IsNullOrWhiteSpace(operationName) ? "Data subscription operation" : operationName;
+            return new DataSubscriptionException(
+                0,
+                $"{operation} skipped because SDK state is {_commandBus.State}.");
         }
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
@@ -139,7 +150,7 @@ namespace Playserv.DataSubscription
 
         public void RequestFullState(long subscriptionId)
         {
-            _ = RequestFullStateAsync(subscriptionId);
+            _ = RequestFullStateFireAndForgetAsync(subscriptionId);
         }
 
         public Task RequestFullStateAsync(long subscriptionId)
@@ -158,6 +169,18 @@ namespace Playserv.DataSubscription
                 subscriptionId,
                 DataSubscriptionRefreshTimeoutMs,
                 CancellationToken.None);
+        }
+
+        private async Task RequestFullStateFireAndForgetAsync(long subscriptionId)
+        {
+            try
+            {
+                await RequestFullStateAsync(subscriptionId);
+            }
+            catch (Exception ex)
+            {
+                SafeLogWarning($"[DataSubscription] Full state refresh skipped: {ex.Message}");
+            }
         }
 
         public async Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(

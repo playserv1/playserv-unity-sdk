@@ -74,6 +74,18 @@ namespace Playserv.Serialization
                     : codePayload.ToString(Formatting.None);
             }
 
+            if (HasStringMember(type, "message") &&
+                (!payloadObject.TryGetValue("message", StringComparison.OrdinalIgnoreCase, out var existingMessage) ||
+                 existingMessage.Type == JTokenType.Null ||
+                 (existingMessage.Type == JTokenType.String && string.IsNullOrWhiteSpace(existingMessage.ToString()))) &&
+                payloadObject.TryGetValue("Message", StringComparison.OrdinalIgnoreCase, out var messagePayload) &&
+                messagePayload.Type != JTokenType.Null)
+            {
+                payloadObject["message"] = messagePayload.Type == JTokenType.String
+                    ? messagePayload.ToString()
+                    : messagePayload.ToString(Formatting.None);
+            }
+
             if (HasStringMember(type, "timestamp") &&
                 (!payloadObject.TryGetValue("timestamp", StringComparison.OrdinalIgnoreCase, out var existingTimestamp) ||
                  existingTimestamp.Type == JTokenType.Null ||
@@ -84,6 +96,33 @@ namespace Playserv.Serialization
                 payloadObject["timestamp"] = timestampPayload.Type == JTokenType.String
                     ? timestampPayload.ToString()
                     : timestampPayload.ToString(Formatting.None);
+            }
+
+            if (HasStringMember(type, "details") &&
+                payloadObject.TryGetValue("Details", StringComparison.OrdinalIgnoreCase, out var detailsPayload) &&
+                detailsPayload.Type != JTokenType.Null)
+            {
+                payloadObject["details"] = detailsPayload.Type == JTokenType.String
+                    ? detailsPayload.ToString()
+                    : detailsPayload.ToString(Formatting.None);
+            }
+
+            if (HasStringMember(type, "sourceCommand") &&
+                payloadObject.TryGetValue("SourceCommand", StringComparison.OrdinalIgnoreCase, out var sourceCommandPayload) &&
+                sourceCommandPayload.Type != JTokenType.Null)
+            {
+                payloadObject["sourceCommand"] = sourceCommandPayload.Type == JTokenType.String
+                    ? sourceCommandPayload.ToString()
+                    : sourceCommandPayload.ToString(Formatting.None);
+            }
+
+            if (HasStringMember(type, "sourceService") &&
+                payloadObject.TryGetValue("SourceService", StringComparison.OrdinalIgnoreCase, out var sourceServicePayload) &&
+                sourceServicePayload.Type != JTokenType.Null)
+            {
+                payloadObject["sourceService"] = sourceServicePayload.Type == JTokenType.String
+                    ? sourceServicePayload.ToString()
+                    : sourceServicePayload.ToString(Formatting.None);
             }
 
             return payloadObject.ToString(Formatting.None);
@@ -133,10 +172,34 @@ namespace Playserv.Serialization
             response = new CommandErrorResponse
             {
                 error = error,
-                message = payloadObject["message"]?.ToString() ?? string.Empty,
-                timestamp = payloadObject["timestamp"]?.ToString() ?? string.Empty
+                message = payloadObject["message"]?.ToString() ??
+                          payloadObject["Message"]?.ToString() ??
+                          string.Empty,
+                timestamp = payloadObject["timestamp"]?.ToString() ??
+                            payloadObject["TimestampUtc"]?.ToString() ??
+                            string.Empty,
+                details = FormatOptionalPayload(payloadObject, "Details"),
+                sourceCommand = payloadObject["SourceCommand"]?.ToString() ?? string.Empty,
+                sourceService = payloadObject["SourceService"]?.ToString() ?? string.Empty,
+                retryable = payloadObject["Retryable"] != null &&
+                            payloadObject["Retryable"].Type == JTokenType.Boolean &&
+                            payloadObject["Retryable"].Value<bool>()
             };
             return true;
+        }
+
+        private static string FormatOptionalPayload(JObject payloadObject, string propertyName)
+        {
+            if (payloadObject == null ||
+                !payloadObject.TryGetValue(propertyName, StringComparison.OrdinalIgnoreCase, out var token) ||
+                token.Type == JTokenType.Null)
+            {
+                return string.Empty;
+            }
+
+            return token.Type == JTokenType.String
+                ? token.ToString()
+                : token.ToString(Formatting.None);
         }
 
         private static bool HasStringMember(Type type, string memberName)

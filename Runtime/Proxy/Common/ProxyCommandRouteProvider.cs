@@ -13,6 +13,8 @@ namespace Playserv.Proxy.Common
 
             routes.Register("error", command => OnCommandErrorReceived(routes.Logger, command));
             routes.Register("CommandErrorResponse", command => OnCommandErrorReceived(routes.Logger, command));
+            routes.Register("RpcErrorResponse", command => OnCommandErrorReceived(routes.Logger, command));
+            routes.Register("rpc.RpcErrorResponse", command => OnCommandErrorReceived(routes.Logger, command));
             routes.Register("Disconnect", command => routes.TransportSession.HandleDisconnect());
             routes.Register("ForcedDisconnect", command => routes.TransportSession.HandleForcedDisconnect(command as ForcedDisconnectResponse));
             routes.Register("module_proxy.ForcedDisconnect", command => routes.TransportSession.HandleForcedDisconnect(command as ForcedDisconnectResponse));
@@ -65,12 +67,11 @@ namespace Playserv.Proxy.Common
                 if (IsUnsupportedDataSubscriptionRefresh(response))
                 {
                     logger.LogWarning(
-                        $"Server command warning received. Error: {response.Error}, Message: {response.Message}, Timestamp: {response.Timestamp}");
+                        FormatCommandError("Server command warning received", response));
                     return;
                 }
 
-                logger.LogError(
-                    $"Server command error received. Error: {response.Error}, Message: {response.Message}, Timestamp: {response.Timestamp}");
+                logger.LogError(FormatCommandError("Server command error received", response));
                 return;
             }
 
@@ -85,6 +86,13 @@ namespace Playserv.Proxy.Common
 
             return message.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 &&
                    message.IndexOf("not supported by this module", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string FormatCommandError(string prefix, CommandErrorResponse response)
+        {
+            return $"{prefix}. Error: {response.Error}, Message: {response.Message}, " +
+                   $"SourceCommand: {response.SourceCommand}, SourceService: {response.SourceService}, " +
+                   $"Retryable: {response.Retryable}, Details: {response.Details}, Timestamp: {response.Timestamp}";
         }
     }
 }

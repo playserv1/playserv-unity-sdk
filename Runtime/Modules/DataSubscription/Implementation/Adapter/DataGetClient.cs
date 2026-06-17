@@ -109,9 +109,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataGetCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 var set = tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataGetErrorResponse(request.RequestId, 0, message));
 #if PlayServ_Logs
@@ -127,9 +125,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataGetCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 var set = tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataGetErrorResponse(request.RequestId, 0, message));
 #if PlayServ_Logs
@@ -145,9 +141,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataGetCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 var set = tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataGetErrorResponse(request.RequestId, 0, message));
 #if PlayServ_Logs

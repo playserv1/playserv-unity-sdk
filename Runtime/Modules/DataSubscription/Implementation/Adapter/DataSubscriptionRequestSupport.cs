@@ -145,45 +145,80 @@ namespace Playserv.DataSubscription
         {
             var error = response?.Error ?? string.Empty;
             var message = response?.Message ?? string.Empty;
+            var sourceCommand = response?.SourceCommand ?? string.Empty;
 
             return message.IndexOf("DataSubscriptionRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    error.IndexOf("DataSubscriptionRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   error.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0;
+                   error.IndexOf("DataSubscription", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   sourceCommand.IndexOf("DataSubscriptionRequest", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public static bool LooksLikeDataGetCommandError(CommandErrorResponse response)
         {
             var error = response?.Error ?? string.Empty;
             var message = response?.Message ?? string.Empty;
+            var sourceCommand = response?.SourceCommand ?? string.Empty;
 
             return message.IndexOf("DataGetRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataGet", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataGetResponse", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   error.IndexOf("DataGetRequest", StringComparison.OrdinalIgnoreCase) >= 0;
+                   error.IndexOf("DataGetRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   sourceCommand.IndexOf("DataGetRequest", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public static bool LooksLikeDataMutationCommandError(CommandErrorResponse response)
         {
             var error = response?.Error ?? string.Empty;
             var message = response?.Message ?? string.Empty;
+            var sourceCommand = response?.SourceCommand ?? string.Empty;
 
             return message.IndexOf("DataMutationRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataMutationResponse", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataMutation", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    error.IndexOf("DataMutationRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   error.IndexOf("DataMutation", StringComparison.OrdinalIgnoreCase) >= 0;
+                   error.IndexOf("DataMutation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   sourceCommand.IndexOf("DataMutationRequest", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public static bool LooksLikeDataSubscriptionRefreshCommandError(CommandErrorResponse response)
         {
             var error = response?.Error ?? string.Empty;
             var message = response?.Message ?? string.Empty;
+            var sourceCommand = response?.SourceCommand ?? string.Empty;
 
             return message.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataSubscriptionRefresh", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    error.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   error.IndexOf("DataSubscriptionRefresh", StringComparison.OrdinalIgnoreCase) >= 0;
+                   error.IndexOf("DataSubscriptionRefresh", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   sourceCommand.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public static string FormatCommandErrorMessage(CommandErrorResponse response)
+        {
+            if (response == null)
+                return "Unknown server command error.";
+
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(response.Error))
+                parts.Add($"code={response.Error}");
+
+            if (!string.IsNullOrWhiteSpace(response.Message))
+                parts.Add($"message={response.Message}");
+
+            if (!string.IsNullOrWhiteSpace(response.SourceCommand))
+                parts.Add($"sourceCommand={response.SourceCommand}");
+
+            if (!string.IsNullOrWhiteSpace(response.SourceService))
+                parts.Add($"sourceService={response.SourceService}");
+
+            if (!string.IsNullOrWhiteSpace(response.Details))
+                parts.Add($"details={response.Details}");
+
+            return parts.Count == 0
+                ? "Unknown server command error."
+                : string.Join("; ", parts);
         }
 
         public static DataGetResponse CreateDataGetErrorResponse(long requestId, int errorCode, string message)

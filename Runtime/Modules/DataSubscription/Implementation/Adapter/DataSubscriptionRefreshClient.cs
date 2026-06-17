@@ -33,6 +33,13 @@ namespace Playserv.DataSubscription
             if (subscriptionId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(subscriptionId));
 
+            if (_commandBus.State != PlayServState.Online)
+            {
+                throw new DataSubscriptionException(
+                    0,
+                    $"Data subscription refresh skipped because SDK state is {_commandBus.State}.");
+            }
+
             var request = new DataSubscriptionRefreshRequest
             {
                 RequestId = _requestIds.Next(),
@@ -86,7 +93,7 @@ namespace Playserv.DataSubscription
 
                 tcs.TrySetException(new DataSubscriptionException(
                     0,
-                    string.IsNullOrWhiteSpace(errorResponse.Message) ? errorResponse.Error : errorResponse.Message));
+                    DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse)));
             });
 
             commandErrorNamedSubscription = _commandBus.OnCommand("CommandErrorResponse", command =>
@@ -99,7 +106,7 @@ namespace Playserv.DataSubscription
 
                 tcs.TrySetException(new DataSubscriptionException(
                     0,
-                    string.IsNullOrWhiteSpace(errorResponse.Message) ? errorResponse.Error : errorResponse.Message));
+                    DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse)));
             });
 
             commandErrorRpcSubscription = _commandBus.OnCommand("RpcErrorResponse", command =>
@@ -112,7 +119,7 @@ namespace Playserv.DataSubscription
 
                 tcs.TrySetException(new DataSubscriptionException(
                     0,
-                    string.IsNullOrWhiteSpace(errorResponse.Message) ? errorResponse.Error : errorResponse.Message));
+                    DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse)));
             });
 
             try

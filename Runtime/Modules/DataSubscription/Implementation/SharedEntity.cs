@@ -249,6 +249,12 @@ namespace Playserv.DataSubscription
             if (mutator == null)
                 throw new ArgumentNullException(nameof(mutator));
 
+            if (!_adapter.CanSendCommands)
+            {
+                Error?.Invoke(_adapter.CreateConnectionUnavailableException("Data mutation"));
+                return;
+            }
+
             mutator(Value);
             var patch = SharedDiffBuilder.BuildPatch(Value);
             _adapter.SendMutation(_subscriptionId, _query, _variables, patch);
@@ -258,6 +264,9 @@ namespace Playserv.DataSubscription
         {
             if (mutator == null)
                 throw new ArgumentNullException(nameof(mutator));
+
+            if (!_adapter.CanSendCommands)
+                throw _adapter.CreateConnectionUnavailableException("Data mutation");
 
             mutator(Value);
             var patch = SharedDiffBuilder.BuildPatch(Value);

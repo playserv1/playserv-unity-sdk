@@ -52,10 +52,11 @@ Single entry point for all demo scenes: configuration, connect/disconnect, and s
 ## 1_DataSubscriptionScene
 
 ### Purpose
-Shows live DTO state, local mutations, and full refresh in polling subscription mode.
+Shows live `Configuration(id: "default")` state from the tanks schema, local mutations, and full refresh in polling or transport subscription mode.
 
 ### What it demonstrates
 - `PlayServ.SelectEntity<TEntity, TDto>(...)`.
+- Query generation for the `Configuration` entity from the current schema/model shape.
 - Handling `Changed`, `Error`, and `Terminated`.
 - Local updates: `Update(...)`, `UpdateAsync(...)`.
 - Forced state refresh: `RefreshAsync()`.
@@ -66,21 +67,25 @@ Shows live DTO state, local mutations, and full refresh in polling subscription 
 
 ### How to use
 1. Connect to SDK.
-2. Click `Bind` to subscribe to an entity for `playerId`.
+2. Click `Bind Polling` or `Bind Transport` to subscribe to `Configuration(id=default)`.
 3. Try:
-   - `Rename`,
-   - `Add Level`,
-   - `Set Level Async`.
+   - `Tank Speed +0.25`,
+   - `Max HP +1`,
+   - `Heal +1`,
+   - `Boost Combat Async`,
+   - `Reset Defaults`.
 4. Watch `Current value` and `Logs`.
 5. Click `Unbind` to stop the subscription.
 
 Note: both backends are available in this SDK path:
-- transport mode uses `DataSubscriptionRequest` / `DataSubscriptionUpdate` / `DataSubscriptionRefreshRequest`
+- transport bind uses `module_dataflow.DataSubscriptionRequest` / `DataSubscriptionUpdate`
+- transport mutation buttons use `module_dataflow.DataMutationRequest` / `DataMutationResponse`
+- transport refresh uses `module_dataflow.DataSubscriptionRefreshRequest` / `DataSubscriptionUpdate`
 - polling mode keeps the compatibility path via `DataGetRequest`
 
 ### What you can build with it
-- Real-time player HUD/profile.
-- Live inventory or stats sync.
+- Live gameplay config tuning.
+- Tank movement/combat/pickup balancing UI.
 - Optimistic local updates with server reconciliation.
 
 ---

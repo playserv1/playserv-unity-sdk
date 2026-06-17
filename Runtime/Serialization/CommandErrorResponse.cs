@@ -11,6 +11,10 @@ namespace Playserv.Serialization
         public string error;
         public string message;
         public string timestamp;
+        public string details;
+        public string sourceCommand;
+        public string sourceService;
+        public bool retryable;
 
         /// <summary>
         /// Short backend error category (for example "Unknown command").
@@ -26,5 +30,25 @@ namespace Playserv.Serialization
         /// Backend timestamp in ISO format when available.
         /// </summary>
         public string Timestamp => timestamp;
+
+        /// <summary>
+        /// Serialized backend details payload when available.
+        /// </summary>
+        public string Details => details;
+
+        /// <summary>
+        /// Original command that caused the backend error.
+        /// </summary>
+        public string SourceCommand => sourceCommand;
+
+        /// <summary>
+        /// Backend service that handled the original command.
+        /// </summary>
+        public string SourceService => sourceService;
+
+        /// <summary>
+        /// True when backend marks this error as retryable.
+        /// </summary>
+        public bool Retryable => retryable;
     }
 }

@@ -133,9 +133,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataSubscriptionCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
             });
@@ -148,9 +146,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataSubscriptionCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
             });
@@ -163,9 +159,7 @@ namespace Playserv.DataSubscription
                 if (!DataSubscriptionRequestSupport.LooksLikeDataSubscriptionCommandError(errorResponse))
                     return;
 
-                var message = string.IsNullOrWhiteSpace(errorResponse.Message)
-                    ? errorResponse.Error
-                    : errorResponse.Message;
+                var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
                 tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
             });

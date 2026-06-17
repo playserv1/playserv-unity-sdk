@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameAccessToken: 
   gameId: 
-  backendServerAddress: wss://proxy.dev.playserv.io/ws
+  backendServerAddress: wss://dev.platform.playserv.io/ws
   webRtcSignalingServerAddress: 
   webRtcDataChannelLabel: playserv
   webRtcIceServers: []
