@@ -16,7 +16,7 @@ using UnityEditor.SceneManagement;
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Example of shared data subscription using in-memory registry + internal polling.
+    /// Example of shared data subscription using transport or polling backends.
     /// </summary>
     public sealed class PlayServDataSubscriptionSample : MonoBehaviour
     {
@@ -368,13 +368,53 @@ namespace Playserv.Samples
             if (!showTransportDataGetLogsInUi || string.IsNullOrWhiteSpace(condition))
                 return;
 
+            if (condition.StartsWith("Message sent: DataSubscriptionRequest", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] -> DataSubscriptionRequest requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.StartsWith("Message sent: DataSubscriptionRefreshRequest", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] -> DataSubscriptionRefreshRequest requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.StartsWith("Message sent: DataMutationRequest", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] -> DataMutationRequest requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
             if (condition.StartsWith("Message sent: DataGetRequest", StringComparison.Ordinal))
             {
                 AddLog($"[Transport] -> DataGetRequest requestId={ExtractRequestIdOrUnknown(condition)}");
                 return;
             }
 
-            if (condition.StartsWith("Received JSON: {\"Command\":\"DataGetResponse\"", StringComparison.Ordinal))
+            if (condition.StartsWith("Received JSON: {\"Command\":\"module_dataflow.DataSubscriptionResponse\"", StringComparison.Ordinal) ||
+                condition.StartsWith("Received JSON: {\"Command\":\"DataSubscriptionResponse\"", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] <- DataSubscriptionResponse requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.StartsWith("Received JSON: {\"Command\":\"module_dataflow.DataSubscriptionUpdate\"", StringComparison.Ordinal) ||
+                condition.StartsWith("Received JSON: {\"Command\":\"DataSubscriptionUpdate\"", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] <- DataSubscriptionUpdate requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.StartsWith("Received JSON: {\"Command\":\"module_dataflow.DataMutationResponse\"", StringComparison.Ordinal) ||
+                condition.StartsWith("Received JSON: {\"Command\":\"DataMutationResponse\"", StringComparison.Ordinal))
+            {
+                AddLog($"[Transport] <- DataMutationResponse requestId={ExtractRequestIdOrUnknown(condition)}");
+                return;
+            }
+
+            if (condition.StartsWith("Received JSON: {\"Command\":\"module_dataflow.DataGetResponse\"", StringComparison.Ordinal) ||
+                condition.StartsWith("Received JSON: {\"Command\":\"DataGetResponse\"", StringComparison.Ordinal))
             {
                 AddLog($"[Transport] <- DataGetResponse requestId={ExtractRequestIdOrUnknown(condition)}");
                 return;
@@ -451,7 +491,7 @@ namespace Playserv.Samples
 
             GUILayout.BeginArea(new Rect(margin, margin, areaWidth, areaHeight), GUI.skin.box);
             GUILayout.Label("PlayServ DataSubscription Sample");
-            GUILayout.Label("How to use: connect SDK, click Bind Transport or Bind Polling, then run Rename/Add Level/Set Level/Reset and watch updates.");
+            GUILayout.Label("How to use: connect SDK, bind via Transport or Polling, then run Rename/Add Level/Set Level/Reset and watch updates.");
             GUILayout.Label($"Active backend: {_activeBackend}");
             GUILayout.Label($"Backend details: {DescribeBackend(_activeBackend)}");
             GUILayout.Label($"SDK state: {PlayServ.State}");
@@ -473,12 +513,13 @@ namespace Playserv.Samples
                 GUILayout.Space(6f);
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label("Info");
-                GUILayout.Label("Purpose: Shows shared subscription with automatic query generation.");
-                GUILayout.Label("Transport flow: Bind Transport -> DataSubscriptionRequest/DataSubscriptionUpdate.");
-                GUILayout.Label("Polling flow: Bind Polling -> SDK registers local entry and polls DataGetRequest every 3s.");
+                GUILayout.Label("Purpose: Shows shared subscription with automatic query generation from the schema/model type.");
+                GUILayout.Label("Transport flow: Bind Transport -> DataSubscriptionRequest/DataSubscriptionUpdate, Refresh -> DataSubscriptionRefreshRequest.");
+                GUILayout.Label("Polling flow: Bind Polling -> SDK registry + DataGetRequest polling every 3s.");
                 GUILayout.Label("Dispose behavior: Unbind removes subscription from registry and stops polling.");
-                GUILayout.Label("Use in your game: HUD/profile sync, simple reactive state, low-risk replacement while server subscriptions are disabled.");
-                GUILayout.Label("UI transport logs: request/response DataGet lines are mirrored from Unity console.");
+                GUILayout.Label("Mutations: Update/UpdateAsync send DataMutationRequest; async path now waits for DataMutationResponse.");
+                GUILayout.Label("Use in your game: HUD/profile sync, live profile/state screens, simple reactive entity sync.");
+                GUILayout.Label("UI transport logs: DataSubscription/DataMutation/DataGet request-response lines are mirrored from Unity console.");
                 GUILayout.EndVertical();
             }
 

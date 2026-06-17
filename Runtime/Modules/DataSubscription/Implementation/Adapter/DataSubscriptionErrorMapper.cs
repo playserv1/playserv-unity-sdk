@@ -71,6 +71,24 @@ namespace Playserv.DataSubscription
                    message.IndexOf("Timed out waiting for DataSubscriptionResponse", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        public static DataSubscriptionException MapDataMutationError(DataMutationError error)
+        {
+            if (error == null)
+                return new DataSubscriptionException(0, "Unknown data mutation error.");
+
+            var code = error.Code;
+            var message = error.Message ?? "Unknown data mutation error.";
+
+            return code switch
+            {
+                31001 => new AccessDeniedException(message),
+                31002 => new TargetNotFoundException(message),
+                SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, message),
+                UpdateDataCorruptionException.Code => new UpdateDataCorruptionException(message),
+                _ => new DataSubscriptionException(code, message)
+            };
+        }
+
         public static object ExtractSubscriptionPayload(object data, string rootFieldName, IJsonCodec jsonCodec)
         {
             if (jsonCodec == null)

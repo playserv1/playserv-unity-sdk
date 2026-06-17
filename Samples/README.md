@@ -74,7 +74,9 @@ Shows live DTO state, local mutations, and full refresh in polling subscription 
 4. Watch `Current value` and `Logs`.
 5. Click `Unbind` to stop the subscription.
 
-Note: server-side `DataSubscriptionRequest` is temporarily disabled in this SDK path; the scene demonstrates the replacement behavior that keeps the same high-level shared entity API.
+Note: both backends are available in this SDK path:
+- transport mode uses `DataSubscriptionRequest` / `DataSubscriptionUpdate` / `DataSubscriptionRefreshRequest`
+- polling mode keeps the compatibility path via `DataGetRequest`
 
 ### What you can build with it
 - Real-time player HUD/profile.

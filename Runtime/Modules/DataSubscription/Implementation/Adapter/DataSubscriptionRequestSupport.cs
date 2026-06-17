@@ -81,6 +81,66 @@ namespace Playserv.DataSubscription
             }
         }
 
+        public static bool TryMapDataSubscriptionUpdate(IJsonCodec jsonCodec, object command, out DataSubscriptionUpdate update)
+        {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
+            update = null;
+            if (command == null)
+                return false;
+
+            if (command is DataSubscriptionUpdate typed)
+            {
+                update = typed;
+                return true;
+            }
+
+            try
+            {
+                var mapped = jsonCodec.Convert<DataSubscriptionUpdate>(command);
+                if (mapped == null)
+                    return false;
+
+                update = mapped;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool TryMapDataMutationResponse(IJsonCodec jsonCodec, object command, out DataMutationResponse response)
+        {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
+            response = null;
+            if (command == null)
+                return false;
+
+            if (command is DataMutationResponse typed)
+            {
+                response = typed;
+                return true;
+            }
+
+            try
+            {
+                var mapped = jsonCodec.Convert<DataMutationResponse>(command);
+                if (mapped == null)
+                    return false;
+
+                response = mapped;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static bool LooksLikeDataSubscriptionCommandError(CommandErrorResponse response)
         {
             var error = response?.Error ?? string.Empty;
@@ -101,6 +161,29 @@ namespace Playserv.DataSubscription
                    message.IndexOf("DataGet", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    message.IndexOf("DataGetResponse", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    error.IndexOf("DataGetRequest", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public static bool LooksLikeDataMutationCommandError(CommandErrorResponse response)
+        {
+            var error = response?.Error ?? string.Empty;
+            var message = response?.Message ?? string.Empty;
+
+            return message.IndexOf("DataMutationRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("DataMutationResponse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("DataMutation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataMutationRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataMutation", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        public static bool LooksLikeDataSubscriptionRefreshCommandError(CommandErrorResponse response)
+        {
+            var error = response?.Error ?? string.Empty;
+            var message = response?.Message ?? string.Empty;
+
+            return message.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   message.IndexOf("DataSubscriptionRefresh", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataSubscriptionRefresh", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public static DataGetResponse CreateDataGetErrorResponse(long requestId, int errorCode, string message)
@@ -125,6 +208,23 @@ namespace Playserv.DataSubscription
                 {
                     ErrorCode = errorCode,
                     Message = message ?? "Unknown data subscription error."
+                }
+            };
+        }
+
+        public static DataMutationResponse CreateDataMutationErrorResponse(long requestId, int errorCode, string message)
+        {
+            return new DataMutationResponse
+            {
+                RequestId = requestId,
+                Result = new DataMutationResult
+                {
+                    Success = false,
+                    Error = new DataMutationError
+                    {
+                        Code = errorCode,
+                        Message = message ?? "Unknown data mutation error."
+                    }
                 }
             };
         }

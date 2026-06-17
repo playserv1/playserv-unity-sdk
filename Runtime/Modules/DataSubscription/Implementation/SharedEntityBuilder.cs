@@ -105,7 +105,6 @@ namespace Playserv.DataSubscription
                         query,
                         variables);
 
-                    await _adapter.RequestFullStateAsync(transportSubscriptionId.Value);
                     return transportEntity;
                 }
             }

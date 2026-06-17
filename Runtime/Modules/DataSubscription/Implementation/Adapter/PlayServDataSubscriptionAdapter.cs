@@ -14,6 +14,8 @@ namespace Playserv.DataSubscription
     {
         internal const int DataGetResponseTimeoutMs = 15000;
         internal const int DataSubscriptionResponseTimeoutMs = 8000;
+        internal const int DataMutationResponseTimeoutMs = 8000;
+        internal const int DataSubscriptionRefreshTimeoutMs = 8000;
         internal const int DefaultDataGetPollIntervalMs = 4000;
         internal const int DefaultDataGetPollRequestTimeoutMs = 4000;
         internal const int SubscriptionPollIntervalMs = 3000;
@@ -24,6 +26,7 @@ namespace Playserv.DataSubscription
         private readonly IJsonCodec _jsonCodec;
         private readonly DataSubscriptionRegistry _registry;
         private readonly TransportSubscriptionClient _transportSubscriptionClient;
+        private readonly DataSubscriptionRefreshClient _transportRefreshClient;
         private readonly DataMutationClient _dataMutationClient;
         private readonly DataGetClient _dataGetClient;
         private readonly DataSubscriptionPollingCoordinator _pollingCoordinator;
@@ -36,7 +39,8 @@ namespace Playserv.DataSubscription
             _registry = new DataSubscriptionRegistry(logger, _jsonCodec);
             var requestIds = new DataSubscriptionRequestIdSource();
             _transportSubscriptionClient = new TransportSubscriptionClient(commandBus, logger, requestIds, _jsonCodec);
-            _dataMutationClient = new DataMutationClient(commandBus, requestIds);
+            _transportRefreshClient = new DataSubscriptionRefreshClient(commandBus, logger, requestIds, _jsonCodec);
+            _dataMutationClient = new DataMutationClient(commandBus, logger, requestIds, _jsonCodec);
             _dataGetClient = new DataGetClient(commandBus, logger, requestIds, _jsonCodec);
             _pollingCoordinator = new DataSubscriptionPollingCoordinator(commandBus, _dataGetClient, logger);
         }
@@ -150,9 +154,10 @@ namespace Playserv.DataSubscription
                     ex => _registry.ProcessException(subscriptionId, ex));
             }
 
-            SafeLogWarning(
-                "[DataSubscription] Transport refresh skipped. DataSubscriptionRefreshRequest is disabled for compatibility.");
-            return Task.CompletedTask;
+            return _transportRefreshClient.RefreshAsync(
+                subscriptionId,
+                DataSubscriptionRefreshTimeoutMs,
+                CancellationToken.None);
         }
 
         public async Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
