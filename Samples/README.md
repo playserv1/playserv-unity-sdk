@@ -16,7 +16,8 @@ Each sample can be launched as a standalone scene and then adapted to your game 
 
 1. Open `Samples/Samples.unity`.
 2. On the `PlayServBootstrap` object, set:
-   `gameAccessToken`, `gameId`, `userId`, `gameVersion`.
+   `gameId`, `userId`, `gameVersion`, and a runtime credential:
+   `clientToken` (`pk_*`) or `authorization` (`Bearer sk_*` / player JWT).
 3. Enable `autoConnect` if you want automatic connection on Play Mode start.
 4. Press Play.
 5. In `PlayServ Samples Hub (0_Samples)`:

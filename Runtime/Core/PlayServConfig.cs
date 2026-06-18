@@ -20,7 +20,9 @@ namespace Playserv.Wrapper
         private const string DEFAULT_SCHEMA_API_SERVER_ADDRESS = PlayServSettings.DefaultSchemaApiServerAddress;
         private const string DEFAULT_DASHBOARD_ADDRESS = PlayServSettings.DefaultDashboardAddress;
 
-        [SerializeField] private string gameAccessToken;
+        [FormerlySerializedAs("gameAccessToken")]
+        [SerializeField] private string clientToken;
+        [SerializeField] private string authorization;
         [SerializeField] private string gameId;
         [SerializeField] private string userId;
         [SerializeField] private string gameVersion = "1.0.0";
@@ -45,9 +47,14 @@ namespace Playserv.Wrapper
         [SerializeField] private int timeoutSeconds = 120;
         
         /// <summary>
-        /// Game access token used for handshake.
+        /// Optional public runtime client token (<c>pk_*</c>) used by DataFlow/runtime-auth handshake.
         /// </summary>
-        public string GameAccessToken => gameAccessToken;
+        public string ClientToken => clientToken;
+
+        /// <summary>
+        /// Optional runtime Authorization value. Use <c>Bearer sk_*</c> or a player JWT bearer token.
+        /// </summary>
+        public string Authorization => authorization;
 
         /// <summary>
         /// Game identifier.
@@ -150,7 +157,8 @@ namespace Playserv.Wrapper
         {
             return new PlayServSettings
             {
-                GameAccessToken = gameAccessToken,
+                ClientToken = clientToken,
+                Authorization = authorization,
                 GameId = gameId,
                 UserId = userId,
                 GameVersion = gameVersion,
@@ -180,7 +188,8 @@ namespace Playserv.Wrapper
                 return false;
 
             var changed = false;
-            changed |= AssignIfDifferent(ref gameAccessToken, settings.GameAccessToken);
+            changed |= AssignIfDifferent(ref clientToken, settings.ClientToken);
+            changed |= AssignIfDifferent(ref authorization, settings.Authorization);
             changed |= AssignIfDifferent(ref gameId, settings.GameId);
             changed |= AssignIfDifferent(ref userId, settings.UserId);
             changed |= AssignIfDifferent(ref gameVersion, settings.GameVersion);
@@ -214,18 +223,6 @@ namespace Playserv.Wrapper
         public void SetAllowMultipleConnections(bool value)
         {
             allowMultipleConnections = value;
-#if UNITY_EDITOR
-            EditorUtility.SetDirty(this);
-#endif
-        }
-
-        /// <summary>
-        /// Updates game access token and marks asset dirty in editor.
-        /// </summary>
-        /// <param name="value">New token value.</param>
-        public void SetGameAccessToken(string value)
-        {
-            gameAccessToken = value;
 #if UNITY_EDITOR
             EditorUtility.SetDirty(this);
 #endif

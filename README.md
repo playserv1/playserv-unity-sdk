@@ -50,7 +50,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 1. Open `Tools/PlayServ/Settings`.
 2. In `PlayServ Config`, ensure `Assets/Resources/PlayServConfig.asset` exists.
-3. Fill `GameAccessToken`, `GameId`, `UserId`, `GameVersion`.
+3. Fill `GameId`, `UserId`, `GameVersion`, and a runtime credential: `ClientToken` (`pk_*`) or `Authorization` (`Bearer sk_*` / player JWT).
 4. On runtime start, call `PlayServ.Connect()`.
 
 ### Option B: configure from code
@@ -60,7 +60,7 @@ using Playserv.Wrapper;
 
 PlayServ.Config(new PlayServSettings
 {
-    GameAccessToken = "your-token",
+    ClientToken = "pk_...",
     GameId = "game-001",
     UserId = "player-001",
     GameVersion = "1.0.0",
@@ -88,7 +88,13 @@ public sealed class PlayServBootstrap : MonoBehaviour
         PlayServ.OnKeepAlivePongReceived += OnPong;
 
         // If you already have Resources/PlayServConfig.asset, Config(...) is optional.
-        PlayServ.Config("your-token", "game-001", "player-001", "1.0.0");
+        PlayServ.Config(new PlayServSettings
+        {
+            ClientToken = "pk_...",
+            GameId = "game-001",
+            UserId = "player-001",
+            GameVersion = "1.0.0"
+        });
 
         bool connected = await PlayServ.Connect();
         if (!connected)

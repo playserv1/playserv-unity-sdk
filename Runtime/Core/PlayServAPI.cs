@@ -62,8 +62,14 @@ namespace Playserv.Wrapper
 
         public void Config(PlayServSettings settings) => _configFacade.Config(settings);
 
-        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
-            _configFacade.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
+        public void Config(
+            string clientToken,
+            string gameId,
+            string userId,
+            string gameVersion,
+            string sdkVersion = null,
+            string authorization = null) =>
+            _configFacade.Config(clientToken, gameId, userId, gameVersion, sdkVersion, authorization);
 
         public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
 

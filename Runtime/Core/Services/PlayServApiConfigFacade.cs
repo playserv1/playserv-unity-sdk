@@ -65,10 +65,19 @@ namespace Playserv.Wrapper
             ApplySettings(_settings);
         }
 
-        public void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null)
+        public void Config(
+            string clientToken,
+            string gameId,
+            string userId,
+            string gameVersion,
+            string sdkVersion = null,
+            string authorization = null)
         {
-            if (string.IsNullOrWhiteSpace(gameAccessToken))
-                throw new ArgumentException("Game access token is required.", nameof(gameAccessToken));
+            if (string.IsNullOrWhiteSpace(clientToken) &&
+                string.IsNullOrWhiteSpace(authorization))
+            {
+                throw new ArgumentException("Client token or Authorization is required.", nameof(clientToken));
+            }
 
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
@@ -80,13 +89,16 @@ namespace Playserv.Wrapper
                 throw new ArgumentException("Game version is required.", nameof(gameVersion));
 
             var settings = GetOrCreateSettings();
-            settings.GameAccessToken = gameAccessToken;
             settings.GameId = gameId;
             settings.UserId = userId;
             settings.GameVersion = gameVersion;
 
             if (!string.IsNullOrWhiteSpace(sdkVersion))
                 settings.SdkVersion = sdkVersion;
+
+            settings.ClientToken = clientToken ?? string.Empty;
+
+            settings.Authorization = authorization ?? string.Empty;
 
             ApplySettings(settings);
         }

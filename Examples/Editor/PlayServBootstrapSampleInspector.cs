@@ -44,7 +44,8 @@ namespace Playserv.Editor
         {
             var credentialProperties = new[]
             {
-                "gameAccessToken",
+                "clientToken",
+                "authorization",
                 "gameId",
                 "userId",
                 "gameVersion"

@@ -12,7 +12,8 @@ namespace Playserv.Editor
         public PlayServConfig Config;
         public SerializedObject SerializedObject;
 
-        public SerializedProperty GameAccessTokenProperty;
+        public SerializedProperty ClientTokenProperty;
+        public SerializedProperty AuthorizationProperty;
         public SerializedProperty GameIdProperty;
         public SerializedProperty GameVersionProperty;
         public SerializedProperty SdkVersionProperty;

@@ -14,7 +14,8 @@ namespace Playserv.Runtime.Abstractions
         public const string DefaultSchemaApiServerAddress = "";
         public const string DefaultDashboardAddress = "";
 
-        public string GameAccessToken { get; set; } = string.Empty;
+        public string ClientToken { get; set; } = string.Empty;
+        public string Authorization { get; set; } = string.Empty;
         public string GameId { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public string GameVersion { get; set; } = "1.0.0";
@@ -39,7 +40,8 @@ namespace Playserv.Runtime.Abstractions
         {
             return new PlayServRuntimeSettings
             {
-                GameAccessToken = GameAccessToken,
+                ClientToken = ClientToken,
+                Authorization = Authorization,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,

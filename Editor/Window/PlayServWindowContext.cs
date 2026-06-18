@@ -47,7 +47,9 @@ namespace Playserv.Editor
 
         public SerializedObject SerializedObject => State.SerializedObject;
 
-        public SerializedProperty GameAccessTokenProperty => State.GameAccessTokenProperty;
+        public SerializedProperty ClientTokenProperty => State.ClientTokenProperty;
+
+        public SerializedProperty AuthorizationProperty => State.AuthorizationProperty;
 
         public SerializedProperty GameIdProperty => State.GameIdProperty;
 

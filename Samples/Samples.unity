@@ -214,7 +214,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b99100df71b44a4987e1961c145b7bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameAccessToken: your-token
+  clientToken:
+  authorization:
   gameId: development-test-x8hh
   userId: player-001
   gameVersion: 1.0.0
