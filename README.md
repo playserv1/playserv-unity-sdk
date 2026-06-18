@@ -44,6 +44,11 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 - Release tag should match package version with `v` prefix (example: `v0.1.0`).
 - `CHANGELOG.md` must include a heading for the same package version.
 
+## Server SDK
+
+Server/shared runtime build instructions are documented in `SERVER_SDK.md`.
+Unity package export and OpenUPM export do not build the server/shared runtime assembly.
+
 ## 1) Configure SDK
 
 ### Option A: through Unity asset (recommended for editor workflow)
