@@ -263,15 +263,25 @@ namespace Playserv.Proxy.Implementation
         public void Dispose()
         {
             _cts.Cancel();
-            try
-            {
-                _receiveLoop?.Wait(1000);
-            }
-            catch { }
 
-            _socket.Dispose();
-            _connectCTS?.Dispose();
-            _cts.Dispose();
+            // Never block the Unity main thread here. The old `_receiveLoop?.Wait(1000)` was
+            // sync-over-async: the receive loop's continuations marshal back to the main thread via
+            // the captured SynchronizationContext, but that thread is parked inside Wait() — so the
+            // continuation can't run and Wait() burns the full 1000ms every teardown (a hard ~1s
+            // main-thread freeze). Disposing the socket aborts the pending ReceiveAsync so the loop
+            // unwinds on its own; the loop's resources are then cleaned up on a background task.
+            try { _socket.Dispose(); } catch { }
+
+            var loop = _receiveLoop;
+            var connectCts = _connectCTS;
+            var cts = _cts;
+            _ = Task.Run(async () =>
+            {
+                try { if (loop != null) await Task.WhenAny(loop, Task.Delay(1000)).ConfigureAwait(false); }
+                catch { }
+                connectCts?.Dispose();
+                cts.Dispose();
+            });
         }
     }
 }

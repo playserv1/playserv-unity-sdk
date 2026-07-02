@@ -146,16 +146,20 @@ namespace Playserv.Proxy.Implementation
             CloseClientUnsafe();
             OnDispose();
 
-            try
+            // Never block the Unity main thread waiting for the receive loop. `_receiveLoop?.Wait(1000)`
+            // was sync-over-async: the loop's continuation marshals back to the main thread (captured
+            // SynchronizationContext), which would be parked inside Wait() — so it can't run and Wait
+            // burns the full 1000ms (a main-thread freeze on transport teardown; same bug fixed in
+            // WebSocketTransportImplementation.Dispose). CloseClientUnsafe already aborts the receive;
+            // drain the loop + dispose the CTS on a background task.
+            var loop = _receiveLoop;
+            var cts = _disposeCts;
+            _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                _receiveLoop?.Wait(1000);
-            }
-            catch
-            {
-                // ignored
-            }
-
-            _disposeCts.Dispose();
+                try { if (loop != null) await System.Threading.Tasks.Task.WhenAny(loop, System.Threading.Tasks.Task.Delay(1000)).ConfigureAwait(false); }
+                catch { }
+                cts.Dispose();
+            });
         }
 
         protected UdpClient GetConnectedClient()

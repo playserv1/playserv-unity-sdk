@@ -97,17 +97,23 @@ namespace Playserv.Proxy.WebRtc
             Reset();
 
             _disposeCts.Cancel();
-            try
-            {
-                _receiveLoop?.Wait(1000);
-            }
-            catch
-            {
-            }
 
-            _connectCts?.Dispose();
-            _socket?.Dispose();
-            _disposeCts.Dispose();
+            // Never block the Unity main thread. `_receiveLoop?.Wait(1000)` was sync-over-async (the
+            // loop's continuation needs the main thread, which would be parked in Wait()), a ~1s
+            // main-thread freeze on teardown — same bug fixed in WebSocketTransportImplementation.
+            // Dispose the socket to abort the pending receive, then drain the loop + dispose the CTSs
+            // on a background task.
+            try { _socket?.Dispose(); } catch { }
+            var loop = _receiveLoop;
+            var connectCts = _connectCts;
+            var disposeCts = _disposeCts;
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try { if (loop != null) await System.Threading.Tasks.Task.WhenAny(loop, System.Threading.Tasks.Task.Delay(1000)).ConfigureAwait(false); }
+                catch { }
+                connectCts?.Dispose();
+                disposeCts.Dispose();
+            });
         }
 
         private async Task ReceiveLoop()
