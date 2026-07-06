@@ -22,6 +22,18 @@ namespace Playserv.Wrapper
             where TDto : class, new() =>
             Api.SelectEntity<TEntity, TDto>(playerId, map, mode);
 
+        /// <summary>
+        /// Open a live COLLECTION subscription (conventions §21.2): a no-id GraphQL-style query
+        /// (e.g. <c>Leaderboard(where: { Kills: { gte: 5 } }) { TankId Kills }</c>) reads the whole
+        /// filtered table and pushes it — plus every later row change — as a fresh collection.
+        /// Subscribe once → keep getting updates; no polling.
+        /// </summary>
+        public static Task<ISharedCollection<TItem>> SelectCollection<TItem>(
+            string query,
+            Dictionary<string, object> variables = null)
+            where TItem : class, new() =>
+            Api.SelectCollection<TItem>(query, variables);
+
         public static Task<DataGetResponse> GetDataByKeyAsync(
             string key,
             string query,

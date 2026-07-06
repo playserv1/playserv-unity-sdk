@@ -255,6 +255,46 @@ namespace Playserv.DataSubscription
                 });
         }
 
+        public async Task<ISharedCollection<TItem>> SelectCollection<TItem>(
+            string query,
+            Dictionary<string, object> variables = null)
+            where TItem : class, new()
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                throw new ArgumentException("Collection query is required.", nameof(query));
+
+            var rootField = ExtractRootField(query);
+            var vars = variables ?? new Dictionary<string, object>();
+
+            // Collections ride the transport (push) plane only — there is no polling collection mode.
+            var transportSubscriptionId = await TryOpenTransportSubscriptionAsync(
+                query,
+                vars,
+                allowFallbackToPolling: false);
+
+            if (!transportSubscriptionId.HasValue)
+                throw new DataSubscriptionException(
+                    0,
+                    "Transport collection subscription failed (no fallback for collections).");
+
+            SafeLog(
+                $"[DataSubscription] Opened transport collection. id={transportSubscriptionId.Value}, root={rootField}, query={query}");
+
+            return new SharedCollection<TItem>(this, transportSubscriptionId.Value, rootField);
+        }
+
+        /// <summary>The root field of a query is its leading identifier — the entity/table name
+        /// (e.g. <c>Leaderboard</c> in <c>Leaderboard(where: { … }) { … }</c>) — which is the key the
+        /// collection array rides under in the server's update frame.</summary>
+        private static string ExtractRootField(string query)
+        {
+            var s = query.TrimStart();
+            int i = 0;
+            while (i < s.Length && (char.IsLetterOrDigit(s[i]) || s[i] == '_'))
+                i++;
+            return i == 0 ? query.Trim() : s.Substring(0, i);
+        }
+
         public Task<DataGetResponse> GetDataByKeyAsync(
             string key,
             string query,

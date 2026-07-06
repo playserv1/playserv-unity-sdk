@@ -31,6 +31,14 @@ namespace Playserv.Wrapper
             return Adapter.SelectEntity(playerId, map, mode);
         }
 
+        public Task<ISharedCollection<TItem>> SelectCollection<TItem>(
+            string query,
+            Dictionary<string, object> variables = null)
+            where TItem : class, new()
+        {
+            return Adapter.SelectCollection<TItem>(query, variables);
+        }
+
         public Task<DataGetResponse> GetDataByKeyAsync(
             string key,
             string query,

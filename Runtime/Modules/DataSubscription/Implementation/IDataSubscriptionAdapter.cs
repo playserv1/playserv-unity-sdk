@@ -28,6 +28,22 @@ namespace Playserv.DataSubscription
             where TDto : class, new();
 
         /// <summary>
+        /// Opens a COLLECTION subscription (conventions §21.2): a no-id query reads the whole
+        /// (optionally filtered) table and pushes it — plus every later change — as a fresh
+        /// collection over the transport plane. Push-only (subscribe once → keep getting updates).
+        /// </summary>
+        /// <typeparam name="TItem">Row model the collection rows deserialize to.</typeparam>
+        /// <param name="query">
+        /// GraphQL-style collection query with NO <c>id</c> argument, e.g.
+        /// <c>Leaderboard(where: { Kills: { gte: 5 } }) { TankId Kills }</c>.
+        /// </param>
+        /// <param name="variables">Optional query variables referenced as <c>$name</c>.</param>
+        Task<ISharedCollection<TItem>> SelectCollection<TItem>(
+            string query,
+            Dictionary<string, object> variables = null)
+            where TItem : class, new();
+
+        /// <summary>
         /// Sends one simplified data retrieval request by key.
         /// </summary>
         /// <param name="key">Entity key.</param>

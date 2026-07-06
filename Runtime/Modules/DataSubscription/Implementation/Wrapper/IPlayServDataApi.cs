@@ -16,6 +16,11 @@ namespace Playserv.Wrapper
             where TEntity : class
             where TDto : class, new();
 
+        Task<ISharedCollection<TItem>> SelectCollection<TItem>(
+            string query,
+            Dictionary<string, object> variables = null)
+            where TItem : class, new();
+
         Task<DataGetResponse> GetDataByKeyAsync(
             string key,
             string query,
