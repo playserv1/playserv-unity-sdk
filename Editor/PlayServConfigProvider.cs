@@ -208,10 +208,8 @@ namespace Playserv.Editor
                 // - seed auth/game fields from baked package defaults only when currently empty
                 // - always enforce baked endpoints
                 var merged = config.ToSettings();
-                if (string.IsNullOrWhiteSpace(merged.ClientToken))
-                    merged.ClientToken = bakedSettings.ClientToken;
-                if (string.IsNullOrWhiteSpace(merged.Authorization))
-                    merged.Authorization = bakedSettings.Authorization;
+                if (string.IsNullOrWhiteSpace(merged.GameAccessToken))
+                    merged.GameAccessToken = bakedSettings.GameAccessToken;
                 if (string.IsNullOrWhiteSpace(merged.GameId))
                     merged.GameId = bakedSettings.GameId;
                 merged.BackendServerAddress = bakedSettings.BackendServerAddress;

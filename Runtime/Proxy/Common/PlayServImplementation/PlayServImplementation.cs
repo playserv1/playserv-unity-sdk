@@ -75,25 +75,23 @@ namespace Playserv.Proxy.Common
         }
 
         public void SetConfig(
-            string clientToken,
+            string gameAccessToken,
             string gameId,
             string userId,
             string gameVersion,
             string sdkVersion = null,
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
-            int keepAlivePongTimeoutMs = 10000,
-            string authorization = null)
+            int keepAlivePongTimeoutMs = 10000)
             => _transportSession.Configure(
-                clientToken,
+                gameAccessToken,
                 gameId,
                 userId,
                 gameVersion,
                 sdkVersion,
                 allowMultipleConnections,
                 keepAlivePingIntervalMs,
-                keepAlivePongTimeoutMs,
-                authorization);
+                keepAlivePongTimeoutMs);
 
         public Task<bool> Connect() => _transportSession.ConnectAsync();
 

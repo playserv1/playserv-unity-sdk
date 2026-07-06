@@ -11,12 +11,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d43cc861c6f4b2189a8f14d0c2f9dc1, type: 3}
   m_Name: PlayServPackageDefaults
-  m_EditorClassIdentifier: 
-  clientToken: 
-  authorization: 
-  gameId: 
-  backendServerAddress: wss://dev.platform.playserv.io/ws
-  webRtcSignalingServerAddress: 
+  m_EditorClassIdentifier:
+  gameAccessToken:
+  gameId:
+  backendServerAddress: wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws
+  webRtcSignalingServerAddress:
   webRtcDataChannelLabel: playserv
   webRtcIceServers: []
   deployApiServerAddress: https://deployment.dev.playserv.io

@@ -123,6 +123,54 @@ namespace Playserv.Events
             }
         }
 
+        /// <summary>
+        /// Every topic this client should be subscribed to on the CURRENT connection: topics with a
+        /// live subscription id, topics still pending a response, and topics that have observers but
+        /// lost their request (e.g. it died with the previous connection). Used to replay the
+        /// server-side (connection-scoped) subscriptions after a transparent reconnect.
+        /// </summary>
+        public IReadOnlyList<string> GetTopicsForResubscribe()
+        {
+            lock (_lock)
+            {
+                var topics = new List<string>();
+
+                foreach (var eventType in _eventTypeToSubscriptionId.Keys)
+                    AddTopicOnce(topics, eventType);
+
+                foreach (var eventType in _pendingEventTypes)
+                    AddTopicOnce(topics, eventType);
+
+                foreach (var pair in _typeObservers)
+                {
+                    if (pair.Value.Count > 0)
+                        AddTopicOnce(topics, EventTypeRegistry.GetCanonicalName(pair.Key));
+                }
+
+                foreach (var pair in _rawObserversByEventType)
+                {
+                    if (pair.Value.Count > 0)
+                        AddTopicOnce(topics, pair.Key);
+                }
+
+                return topics;
+            }
+        }
+
+        private static void AddTopicOnce(List<string> topics, string eventType)
+        {
+            if (string.IsNullOrWhiteSpace(eventType))
+                return;
+
+            for (int i = 0; i < topics.Count; i++)
+            {
+                if (string.Equals(topics[i], eventType, StringComparison.Ordinal))
+                    return;
+            }
+
+            topics.Add(eventType);
+        }
+
         public void AddObserver<T>(IObserver<T> observer)
         {
             lock (_lock)
