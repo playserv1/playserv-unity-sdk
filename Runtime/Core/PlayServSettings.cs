@@ -39,14 +39,9 @@ namespace Playserv.Wrapper
         public const string DefaultDashboardAddress = "";
 
         /// <summary>
-        /// Optional public runtime client token (<c>pk_*</c>) used by DataFlow/runtime-auth handshake.
+        /// Access token used in handshake.
         /// </summary>
-        public string ClientToken { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Optional runtime Authorization value. Use <c>Bearer sk_*</c> or a player JWT bearer token.
-        /// </summary>
-        public string Authorization { get; set; } = string.Empty;
+        public string GameAccessToken { get; set; } = string.Empty;
 
         /// <summary>
         /// Game identifier.
@@ -157,8 +152,7 @@ namespace Playserv.Wrapper
         {
             return new PlayServSettings
             {
-                ClientToken = ClientToken,
-                Authorization = Authorization,
+                GameAccessToken = GameAccessToken,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
@@ -183,8 +177,7 @@ namespace Playserv.Wrapper
         {
             return new PlayServRuntimeSettings
             {
-                ClientToken = ClientToken,
-                Authorization = Authorization,
+                GameAccessToken = GameAccessToken,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,

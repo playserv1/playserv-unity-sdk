@@ -39,14 +39,8 @@ namespace Playserv.Wrapper
 
         public static void Config(PlayServSettings settings) => Api.Config(settings);
 
-        public static void Config(
-            string clientToken,
-            string gameId,
-            string userId,
-            string gameVersion,
-            string sdkVersion = null,
-            string authorization = null) =>
-            Api.Config(clientToken, gameId, userId, gameVersion, sdkVersion, authorization);
+        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
+            Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
 
         public static Task<bool> Connect() => Api.Connect();
 

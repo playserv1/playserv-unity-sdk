@@ -1,7 +1,6 @@
 #if UNITY_5_3_OR_NEWER
 using System;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Playserv.Wrapper
 {
@@ -11,9 +10,7 @@ namespace Playserv.Wrapper
     [CreateAssetMenu(fileName = "PlayServPackageDefaults", menuName = "PlayServ/Package Defaults", order = 1)]
     public sealed class PlayServPackageDefaults : ScriptableObject
     {
-        [FormerlySerializedAs("gameAccessToken")]
-        [SerializeField] private string clientToken = string.Empty;
-        [SerializeField] private string authorization = string.Empty;
+        [SerializeField] private string gameAccessToken = string.Empty;
         [SerializeField] private string gameId = string.Empty;
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
         [SerializeField] private string webRtcSignalingServerAddress = PlayServSettings.DefaultWebRtcSignalingServerAddress;
@@ -28,8 +25,7 @@ namespace Playserv.Wrapper
         [SerializeField] private int networkTransformSyncIntervalMs = 100;
         [SerializeField] private int timeoutSeconds = 120;
 
-        public string ClientToken => clientToken;
-        public string Authorization => authorization;
+        public string GameAccessToken => gameAccessToken;
         public string GameId => gameId;
         public string BackendServerAddress => backendServerAddress;
         public string WebRtcSignalingServerAddress => webRtcSignalingServerAddress;
@@ -48,8 +44,7 @@ namespace Playserv.Wrapper
         {
             return new PlayServSettings
             {
-                ClientToken = ResolveOptionalText(clientToken),
-                Authorization = ResolveOptionalText(authorization),
+                GameAccessToken = ResolveOptionalText(gameAccessToken),
                 GameId = ResolveOptionalText(gameId),
                 BackendServerAddress = ResolveText(backendServerAddress, PlayServSettings.DefaultBackendServerAddress),
                 WebRtcSignalingServerAddress = ResolveText(webRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress),
@@ -71,8 +66,7 @@ namespace Playserv.Wrapper
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
 
-            clientToken = ResolveOptionalText(settings.ClientToken);
-            authorization = ResolveOptionalText(settings.Authorization);
+            gameAccessToken = ResolveOptionalText(settings.GameAccessToken);
             gameId = ResolveOptionalText(settings.GameId);
             backendServerAddress = ResolveText(settings.BackendServerAddress, PlayServSettings.DefaultBackendServerAddress);
             webRtcSignalingServerAddress = ResolveText(settings.WebRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress);

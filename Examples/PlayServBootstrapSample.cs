@@ -15,9 +15,7 @@ namespace Playserv.Examples
         private static PlayServBootstrapSample _instance;
 
         [Header("Credentials")]
-        [FormerlySerializedAs("gameAccessToken")]
-        [SerializeField] private string clientToken = "";
-        [SerializeField] private string authorization = "";
+        [SerializeField] private string gameAccessToken = "your-token";
         [SerializeField] private string gameId = "game-001";
         [SerializeField] private string userId = "player-001";
         [SerializeField] private string gameVersion = "1.0.0";
@@ -114,8 +112,7 @@ namespace Playserv.Examples
 
             if (overrideCredentialsFromInspector)
             {
-                settings.ClientToken = clientToken;
-                settings.Authorization = authorization;
+                settings.GameAccessToken = gameAccessToken;
                 settings.GameId = gameId;
                 settings.UserId = userId;
                 settings.GameVersion = gameVersion;

@@ -9,19 +9,9 @@ namespace Playserv.Proxy.Common
     public sealed class HandshakeRequest
     {
         /// <summary>
-        /// Wire compatibility credential. Filled from ClientToken or Authorization.
+        /// Game access token.
         /// </summary>
         public string GameAccessToken { get; set; }
-
-        /// <summary>
-        /// Optional public runtime client token (<c>pk_*</c>) used by runtime-auth.
-        /// </summary>
-        public string ClientToken { get; set; }
-
-        /// <summary>
-        /// Optional runtime Authorization value. Expected format: <c>Bearer ...</c>.
-        /// </summary>
-        public string Authorization { get; set; }
 
         /// <summary>
         /// SDK version.

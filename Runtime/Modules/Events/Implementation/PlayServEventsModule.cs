@@ -7,8 +7,10 @@ using Playserv.Serialization;
 
 namespace Playserv.Events
 {
-    public sealed class PlayServEventsModule : IPlayServModule
+    public sealed class PlayServEventsModule : IPlayServModule, IPlayServConnectionAwareModule
     {
+        private PlayServEventsAdapter _adapter;
+
         public PlayServModuleDescriptor Descriptor { get; } = new PlayServModuleDescriptor(
             PlayServModuleIds.Events,
             isCore: false,
@@ -29,6 +31,15 @@ namespace Playserv.Events
             context.Services.Register<IEventsAdapter>(adapter);
             context.Services.Register(adapter);
             context.Services.Register(this);
+            _adapter = adapter;
+        }
+
+        // Fires on every established connection, including transparent reconnects. Server-side
+        // event/group subscriptions die with the old connection while local observers live on —
+        // replay them so broadcasts survive a reconnect (first connect: nothing tracked, no-op).
+        public void OnConnected()
+        {
+            _adapter?.ResubscribeAllOnReconnect();
         }
 
         public void Shutdown()

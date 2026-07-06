@@ -21,15 +21,14 @@ namespace Playserv.Proxy.Common
         void Send<T>(T command, string moduleName = null);
 
         void SetConfig(
-            string clientToken,
+            string gameAccessToken,
             string gameId,
             string userId,
             string gameVersion,
             string sdkVersion,
             bool allowMultipleConnections,
             int keepAlivePingIntervalMs,
-            int keepAlivePongTimeoutMs,
-            string authorization = null);
+            int keepAlivePongTimeoutMs);
 
         ITransportImplementation GetTransportImplementation();
     }

@@ -2,6 +2,17 @@ using System;
 
 namespace Playserv.Wrapper
 {
+    /// <summary>
+    /// Editor-only project test knobs shared between the PlayServ window UI and game code.
+    /// Values live in EditorPrefs (not in the config asset or a scene), so flipping them never
+    /// dirties versioned files and they are inert in player builds.
+    /// </summary>
+    public static class PlayServEditorTestFlags
+    {
+        /// <summary>EditorPrefs key: when true, the game enters battles without server AI bots.</summary>
+        public const string DisableAiBotsPrefKey = "PlayServ.Project.DisableAiBots";
+    }
+
     public static class PlayServClientProjectSettingsRegistry
     {
         private static IPlayServClientProjectSettingsProvider _provider;

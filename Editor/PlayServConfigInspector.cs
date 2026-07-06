@@ -9,8 +9,7 @@ namespace Playserv.Editor
     {
         private static readonly string[] EditablePropertyOrder =
         {
-            "clientToken",
-            "authorization",
+            "gameAccessToken",
             "gameId",
             "userId",
             "gameVersion",

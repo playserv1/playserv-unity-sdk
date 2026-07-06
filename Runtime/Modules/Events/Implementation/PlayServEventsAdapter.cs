@@ -26,6 +26,11 @@ namespace Playserv.Events
         private readonly HashSet<string> _suppressedInfrastructureEventTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _eventPayloadDeserializerLock = new object();
         private readonly object _infrastructureEventLock = new object();
+        // Groups this client INTENDS to be in (added on subscribe call, removed on unsubscribe call,
+        // regardless of response outcome). Server-side group membership is connection-scoped, so a
+        // transparent reconnect silently drops it — this set is what gets replayed afterwards.
+        private readonly HashSet<string> _activeGroups = new HashSet<string>(StringComparer.Ordinal);
+        private readonly object _activeGroupsLock = new object();
         private readonly SemaphoreSlim _groupCommandGate = new SemaphoreSlim(1, 1);
         private static readonly TimeSpan GroupCommandTimeout = TimeSpan.FromSeconds(10);
         private static readonly JsonCodecOptions EventJsonOptions = UnityJsonCodecOptionsFactory.CreateDefaultEventOptions();
@@ -123,6 +128,12 @@ namespace Playserv.Events
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
+            if (!string.IsNullOrWhiteSpace(groupName))
+            {
+                lock (_activeGroupsLock)
+                    _activeGroups.Add(groupName);
+            }
+
             return ExecuteGroupCommandAsync<SubscribeGroupRequest, SubscribeGroupResponse>(
                 new SubscribeGroupRequest(groupName),
                 groupName,
@@ -133,12 +144,63 @@ namespace Playserv.Events
 
         public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
+            if (!string.IsNullOrWhiteSpace(groupName))
+            {
+                lock (_activeGroupsLock)
+                    _activeGroups.Remove(groupName);
+            }
+
             return ExecuteGroupCommandAsync<UnsubscribeGroupRequest, UnsubscribeGroupResponse>(
                 new UnsubscribeGroupRequest(groupName),
                 groupName,
                 "unsubscribe",
                 response => response.success,
                 ct);
+        }
+
+        /// <summary>
+        /// Replays every event-type and group subscription onto the CURRENT connection. Server-side
+        /// subscriptions are connection-scoped: a transparent reconnect gets a fresh connection whose
+        /// registry entries are empty, so without this replay group broadcasts stay dead forever
+        /// while RPC traffic keeps working (rpc responses never consult the group registry).
+        /// Safe to call on the first connect too — nothing is tracked yet, so it is a no-op.
+        /// </summary>
+        public void ResubscribeAllOnReconnect()
+        {
+            var topics = _subscriptionManager.GetTopicsForResubscribe();
+            foreach (var eventType in topics)
+            {
+                // The old subscription id belongs to the dead connection; re-request and let the
+                // normal EventSubscribeResponse flow bind the topic to its fresh id.
+                _subscriptionManager.RemoveSubscription(eventType);
+                _subscriptionManager.AddPendingSubscription(eventType);
+                _ = _transport.Send(new EventSubscribeRequest(eventType), EventsModuleName);
+                _logger.Log($"Replayed event subscription after reconnect: eventType={eventType}");
+            }
+
+            string[] groups;
+            lock (_activeGroupsLock)
+            {
+                groups = new string[_activeGroups.Count];
+                _activeGroups.CopyTo(groups);
+            }
+
+            foreach (var groupName in groups)
+                _ = ReplayGroupSubscriptionAsync(groupName);
+        }
+
+        private async Task ReplayGroupSubscriptionAsync(string groupName)
+        {
+            try
+            {
+                var success = await SubscribeGroupAsync(groupName).ConfigureAwait(false);
+                if (!success)
+                    _logger.LogWarning($"Group resubscribe after reconnect was rejected: groupName={groupName}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Group resubscribe after reconnect failed: groupName={groupName}, error={ex.Message}");
+            }
         }
 
         private void SetupEventHandlers()

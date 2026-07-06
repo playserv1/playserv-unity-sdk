@@ -61,15 +61,14 @@ namespace Playserv.Wrapper
             EnsureInstanceForSettings(settings, ref instance, ref instanceEndpoint, ref instanceTransportKey);
 
             instance.SetConfig(
-                settings.ClientToken,
+                settings.GameAccessToken,
                 settings.GameId,
                 settings.UserId,
                 settings.GameVersion,
                 settings.SdkVersion,
                 settings.AllowMultipleConnections,
                 settings.KeepAlivePingIntervalMs,
-                settings.KeepAlivePongTimeoutMs,
-                settings.Authorization);
+                settings.KeepAlivePongTimeoutMs);
 
             _subscribeToInstanceEvents(instance);
             currentSettings = settings;
@@ -108,8 +107,8 @@ namespace Playserv.Wrapper
 
         public static void EnsureConfigured(PlayServSettings settings)
         {
-            if (!HasHandshakeCredential(settings))
-                throw new InvalidOperationException("Client token or Authorization is required. Set ClientToken or Authorization for DataFlow/runtime-auth.");
+            if (string.IsNullOrWhiteSpace(settings.GameAccessToken))
+                throw new InvalidOperationException("Game access token is required. Call Config(...) first.");
 
             if (string.IsNullOrWhiteSpace(settings.GameId))
                 throw new InvalidOperationException("Game ID is required. Call Config(...) first.");
@@ -122,12 +121,6 @@ namespace Playserv.Wrapper
 
             if (string.IsNullOrWhiteSpace(settings.Endpoint))
                 throw new InvalidOperationException("Endpoint is required. Provide BackendServerAddress.");
-        }
-
-        private static bool HasHandshakeCredential(PlayServSettings settings)
-        {
-            return !string.IsNullOrWhiteSpace(settings.ClientToken) ||
-                   !string.IsNullOrWhiteSpace(settings.Authorization);
         }
 
         private void EnsureInstanceForSettings(
