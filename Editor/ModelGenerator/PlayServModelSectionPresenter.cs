@@ -203,11 +203,7 @@ namespace Playserv.Editor
         {
             try
             {
-                var token = context.GameAccessTokenProperty == null
-                    ? string.Empty
-                    : context.GameAccessTokenProperty.stringValue;
-
-                if (await SchemaLoader.LoadSchema(token))
+                if (await SchemaLoader.LoadSchema(ResolveSchemaCredential(context)))
                 {
                     SchemaLoader.CheckNewSchema();
                     context.State.ShowAvailableSchemaInfo = true;
@@ -226,6 +222,25 @@ namespace Playserv.Editor
             {
                 context.Repaint();
             }
+        }
+
+        private static string ResolveSchemaCredential(PlayServWindowContext context)
+        {
+            var clientToken = context.ClientTokenProperty == null
+                ? string.Empty
+                : context.ClientTokenProperty.stringValue;
+
+            if (!string.IsNullOrWhiteSpace(clientToken))
+                return clientToken;
+
+            var authorization = context.AuthorizationProperty == null
+                ? string.Empty
+                : context.AuthorizationProperty.stringValue;
+
+            const string bearerPrefix = "Bearer ";
+            return authorization != null && authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+                ? authorization.Substring(bearerPrefix.Length).Trim()
+                : authorization;
         }
 
         private static void ClearLatestSchemaInfo(PlayServWindowState state)

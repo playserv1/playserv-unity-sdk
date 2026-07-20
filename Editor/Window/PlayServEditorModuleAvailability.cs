@@ -4,15 +4,13 @@ using System.IO;
 using System.Linq;
 using Playserv.Modules;
 using UnityEditor;
-using UnityEngine;
 
 namespace Playserv.Editor
 {
     public static class PlayServEditorModuleAvailability
     {
-        private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Window/PlayServEditorModuleAvailability.cs";
-        private static string _packageRootPath;
+        private static PlayServPackageRoot _packageRoot;
 
         private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions = BuildRuntimeModuleDefinitions();
 
@@ -263,13 +261,13 @@ namespace Playserv.Editor
 
         private static bool HasAssetPath(string relativePath)
         {
-            var absolutePath = Path.Combine(PackageRootPath, relativePath);
+            var absolutePath = PackageRoot.ToAbsolutePath(relativePath);
             return Directory.Exists(absolutePath) || File.Exists(absolutePath);
         }
 
         private static bool HasFolder(string relativePath)
         {
-            return Directory.Exists(Path.Combine(PackageRootPath, relativePath));
+            return Directory.Exists(PackageRoot.ToAbsolutePath(relativePath));
         }
 
         private static PlayServRuntimeModuleDefinition FindRuntimeModule(string moduleName)
@@ -283,30 +281,10 @@ namespace Playserv.Editor
             return null;
         }
 
-        private static string PackageRootPath =>
-            _packageRootPath ?? (_packageRootPath = ResolvePackageRootPath());
-
-        private static string ResolvePackageRootPath()
-        {
-            var guids = AssetDatabase.FindAssets($"{nameof(PlayServEditorModuleAvailability)} t:MonoScript");
-            for (var i = 0; i < guids.Length; i++)
-            {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guids[i]).Replace('\\', '/');
-                if (!assetPath.EndsWith(ThisScriptSuffix, System.StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var rootAssetPath = assetPath.Substring(0, assetPath.Length - ThisScriptSuffix.Length);
-                return ToAbsoluteAssetPath(rootAssetPath);
-            }
-
-            return Path.Combine(Application.dataPath, PackageFolderName);
-        }
-
-        private static string ToAbsoluteAssetPath(string assetPath)
-        {
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
-        }
+        private static PlayServPackageRoot PackageRoot =>
+            _packageRoot ?? (_packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+                nameof(PlayServEditorModuleAvailability),
+                ThisScriptSuffix));
 
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)
         {

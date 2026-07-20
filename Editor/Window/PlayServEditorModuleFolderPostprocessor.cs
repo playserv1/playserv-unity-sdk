@@ -7,8 +7,6 @@ namespace Playserv.Editor
 {
     internal sealed class PlayServEditorModuleFolderPostprocessor : AssetPostprocessor
     {
-        private const string PackageSegment = "playserv-unity-sdk/";
-
         [InitializeOnLoadMethod]
         private static void SyncOnEditorLoad()
         {
@@ -68,14 +66,14 @@ namespace Playserv.Editor
         private static bool TouchesModuleAssetPath(string assetPath, PlayServModuleManifestEntry module)
         {
             var path = (assetPath ?? string.Empty).Replace('\\', '/');
-            if (path.Length == 0)
+            if (!PlayServPackagePathResolver.TryGetPackageRelativeAssetPath(path, out var packageRelativePath))
                 return false;
 
             for (var i = 0; i < module.AssetPaths.Length; i++)
             {
-                var modulePath = $"{PackageSegment}{module.AssetPaths[i]}".Replace('\\', '/').TrimEnd('/');
-                if (path.Equals(modulePath, StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith(modulePath + "/", StringComparison.OrdinalIgnoreCase))
+                var modulePath = (module.AssetPaths[i] ?? string.Empty).Replace('\\', '/').Trim('/').TrimEnd('/');
+                if (packageRelativePath.Equals(modulePath, StringComparison.OrdinalIgnoreCase) ||
+                    packageRelativePath.StartsWith(modulePath + "/", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
@@ -97,8 +95,11 @@ namespace Playserv.Editor
             for (var i = 0; i < assetPaths.Length; i++)
             {
                 var path = (assetPaths[i] ?? string.Empty).Replace('\\', '/');
-                if (path.IndexOf(PackageSegment + "Runtime/", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf(PackageSegment + "Editor/", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                if (!PlayServPackagePathResolver.TryGetPackageRelativeAssetPath(path, out var packageRelativePath))
+                    continue;
+
+                if (packageRelativePath.StartsWith("Runtime/", System.StringComparison.OrdinalIgnoreCase) ||
+                    packageRelativePath.StartsWith("Editor/", System.StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

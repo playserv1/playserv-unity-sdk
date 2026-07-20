@@ -65,8 +65,14 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Applies basic SDK connection settings.
         /// </summary>
-        public static void Config(string gameAccessToken, string gameId, string userId, string gameVersion, string sdkVersion = null) =>
-            ConnectionApi.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion);
+        public static void Config(
+            string gameAccessToken,
+            string gameId,
+            string userId,
+            string gameVersion,
+            string sdkVersion = null,
+            string authorization = null) =>
+            ConnectionApi.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion, authorization);
 
         /// <summary>
         /// Connects to configured PlayServ endpoint and performs handshake.

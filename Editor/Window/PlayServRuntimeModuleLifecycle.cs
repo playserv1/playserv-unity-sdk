@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using Playserv.Modules;
 using UnityEditor;
@@ -10,9 +9,8 @@ namespace Playserv.Editor
 {
     internal static class PlayServRuntimeModuleLifecycle
     {
-        private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Window/PlayServRuntimeModuleLifecycle.cs";
-        private static string _packageRootPath;
+        private static PlayServPackageRoot _packageRoot;
 
         public static bool ApplyProfile(PlayServEditorModuleSettings settings, PlayServSdkProfile profile)
         {
@@ -142,40 +140,12 @@ namespace Playserv.Editor
 
         private static string ToPackageAssetPath(string relativePath)
         {
-            var absolutePath = Path.Combine(PackageRootPath, relativePath ?? string.Empty);
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            var fullProjectRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var fullPath = Path.GetFullPath(absolutePath);
-            var assetPath = fullPath.StartsWith(fullProjectRoot, StringComparison.OrdinalIgnoreCase)
-                ? fullPath.Substring(fullProjectRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                : absolutePath;
-
-            return assetPath.Replace('\\', '/');
+            return PackageRoot.ToAssetPath(PackageRoot.ToAbsolutePath(relativePath ?? string.Empty));
         }
 
-        private static string PackageRootPath =>
-            _packageRootPath ?? (_packageRootPath = ResolvePackageRootPath());
-
-        private static string ResolvePackageRootPath()
-        {
-            var guids = AssetDatabase.FindAssets($"{nameof(PlayServRuntimeModuleLifecycle)} t:MonoScript");
-            for (var i = 0; i < guids.Length; i++)
-            {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guids[i]).Replace('\\', '/');
-                if (!assetPath.EndsWith(ThisScriptSuffix, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var rootAssetPath = assetPath.Substring(0, assetPath.Length - ThisScriptSuffix.Length);
-                return ToAbsoluteAssetPath(rootAssetPath);
-            }
-
-            return Path.Combine(Application.dataPath, PackageFolderName);
-        }
-
-        private static string ToAbsoluteAssetPath(string assetPath)
-        {
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
-        }
+        private static PlayServPackageRoot PackageRoot =>
+            _packageRoot ?? (_packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+                nameof(PlayServRuntimeModuleLifecycle),
+                ThisScriptSuffix));
     }
 }

@@ -10,7 +10,6 @@ namespace Playserv.Editor
 {
     internal static class PlayServCoreAssemblyReferenceSync
     {
-        private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Window/PlayServCoreAssemblyReferenceSync.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
         private const string EditorAsmdefRelativePath = "Editor/Playserv.Editor.Core.asmdef";
@@ -67,7 +66,7 @@ namespace Playserv.Editor
             if (!TryGetModuleAssemblyName(moduleId, out var assemblyName))
                 return false;
 
-            var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
+            var asmdefPath = PackageRoot.ToAbsolutePath(RuntimeAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
                 return false;
 
@@ -84,7 +83,7 @@ namespace Playserv.Editor
 
         private static bool SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state, bool importAssets)
         {
-            var asmdefPath = Path.Combine(PackageRootPath, RuntimeAsmdefRelativePath);
+            var asmdefPath = PackageRoot.ToAbsolutePath(RuntimeAsmdefRelativePath);
             var nextModel = CreateRuntimeAsmdefModel(BuildRuntimeReferences(state));
             var nextJson = JsonUtility.ToJson(nextModel, prettyPrint: true) + Environment.NewLine;
 
@@ -119,7 +118,7 @@ namespace Playserv.Editor
 
         private static bool SyncEditorAsmdefReferences(bool importAssets)
         {
-            var asmdefPath = Path.Combine(PackageRootPath, EditorAsmdefRelativePath);
+            var asmdefPath = PackageRoot.ToAbsolutePath(EditorAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
                 return false;
 
@@ -210,50 +209,24 @@ namespace Playserv.Editor
             return true;
         }
 
-        private static string _packageRootPath;
+        private static PlayServPackageRoot _packageRoot;
 
-        private static string PackageRootPath
+        private static PlayServPackageRoot PackageRoot
         {
             get
             {
-                if (_packageRootPath == null)
-                    _packageRootPath = ResolvePackageRootPath();
+                if (_packageRoot == null)
+                    _packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+                        nameof(PlayServCoreAssemblyReferenceSync),
+                        ThisScriptSuffix);
 
-                return _packageRootPath;
+                return _packageRoot;
             }
-        }
-
-        private static string ResolvePackageRootPath()
-        {
-            var guids = AssetDatabase.FindAssets($"{nameof(PlayServCoreAssemblyReferenceSync)} t:MonoScript");
-            for (var i = 0; i < guids.Length; i++)
-            {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guids[i]).Replace('\\', '/');
-                if (!assetPath.EndsWith(ThisScriptSuffix, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var rootAssetPath = assetPath.Substring(0, assetPath.Length - ThisScriptSuffix.Length);
-                return ToAbsoluteAssetPath(rootAssetPath);
-            }
-
-            return Path.Combine(Application.dataPath, PackageFolderName);
-        }
-
-        private static string ToAbsoluteAssetPath(string assetPath)
-        {
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
         }
 
         private static string ToAssetPath(string absolutePath)
         {
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            var root = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var fullPath = Path.GetFullPath(absolutePath);
-            var relative = fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)
-                ? fullPath.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                : absolutePath;
-            return relative.Replace('\\', '/');
+            return PackageRoot.ToAssetPath(absolutePath);
         }
 
         [Serializable]

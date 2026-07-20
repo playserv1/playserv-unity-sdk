@@ -4,20 +4,18 @@ using System.IO;
 using System.Text;
 using Playserv.Modules;
 using UnityEditor;
-using UnityEngine;
 
 namespace Playserv.Editor
 {
     internal static class PlayServGeneratedCompatibilityLayer
     {
-        private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/Modules/PlayServGeneratedCompatibilityLayer.cs";
         private const string CompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
         private const string ModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
         private const string GeneratedEventsApiExtensionsAssetPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string GeneratedEventsAdapterExtensionsAssetPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
 
-        private static string _packageRootPath;
+        private static PlayServPackageRoot _packageRoot;
 
         public static void SyncNow()
         {
@@ -288,6 +286,12 @@ namespace Playserv.Editor
             sb.AppendLine("        public static void Invoke(string serviceName, string methodName, string payloadBase64) =>");
             sb.AppendLine("            PlayServRpc.Invoke(serviceName, methodName, payloadBase64);");
             sb.AppendLine();
+            sb.AppendLine("        public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey) =>");
+            sb.AppendLine("            PlayServRpc.Invoke(serviceName, methodName, payload, coalesceKey);");
+            sb.AppendLine();
+            sb.AppendLine("        public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey, bool fireAndForget) =>");
+            sb.AppendLine("            PlayServRpc.Invoke(serviceName, methodName, payload, coalesceKey, fireAndForget);");
+            sb.AppendLine();
             sb.AppendLine("        public static void Invoke<TService>(Expression<Action<TService>> method) =>");
             sb.AppendLine("            PlayServRpc.Invoke(method);");
             sb.AppendLine();
@@ -486,13 +490,13 @@ namespace Playserv.Editor
 
         private static bool WriteIfChanged(string relativePath, string contents, bool importAsset)
         {
-            var path = Path.Combine(PackageRootPath, relativePath);
+            var path = PackageRoot.ToAbsolutePath(relativePath);
             return WriteAbsolutePathIfChanged(path, contents, importAsset);
         }
 
         private static bool WriteAssetPathIfChanged(string assetPath, string contents, bool importAsset)
         {
-            var path = ToAbsoluteAssetPath(assetPath);
+            var path = PlayServPackagePathResolver.ToAbsoluteAssetPath(assetPath);
             return WriteAbsolutePathIfChanged(path, contents, importAsset);
         }
 
@@ -517,40 +521,14 @@ namespace Playserv.Editor
             return (value ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
-        private static string PackageRootPath =>
-            _packageRootPath ?? (_packageRootPath = ResolvePackageRootPath());
-
-        private static string ResolvePackageRootPath()
-        {
-            var guids = AssetDatabase.FindAssets($"{nameof(PlayServGeneratedCompatibilityLayer)} t:MonoScript");
-            for (var i = 0; i < guids.Length; i++)
-            {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guids[i]).Replace('\\', '/');
-                if (!assetPath.EndsWith(ThisScriptSuffix, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var rootAssetPath = assetPath.Substring(0, assetPath.Length - ThisScriptSuffix.Length);
-                return ToAbsoluteAssetPath(rootAssetPath);
-            }
-
-            return Path.Combine(Application.dataPath, PackageFolderName);
-        }
-
-        private static string ToAbsoluteAssetPath(string assetPath)
-        {
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
-        }
+        private static PlayServPackageRoot PackageRoot =>
+            _packageRoot ?? (_packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+                nameof(PlayServGeneratedCompatibilityLayer),
+                ThisScriptSuffix));
 
         private static string ToAssetPath(string absolutePath)
         {
-            var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            var root = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var fullPath = Path.GetFullPath(absolutePath);
-            var relative = fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)
-                ? fullPath.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                : absolutePath;
-            return relative.Replace('\\', '/');
+            return PackageRoot.ToAssetPath(absolutePath);
         }
 
         private readonly struct PlayServGeneratedModuleState
@@ -661,12 +639,15 @@ namespace Playserv.Editor
             for (var i = 0; i < paths.Length; i++)
             {
                 var path = (paths[i] ?? string.Empty).Replace('\\', '/');
-                if (path.IndexOf("playserv-unity-sdk/Runtime/Modules/", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf("playserv-unity-sdk/Runtime/Proxy/Modules/", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf("playserv-unity-sdk/Runtime/Playserv.Runtime.asmdef", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf("playserv-unity-sdk/Editor/Events/", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf("playserv-unity-sdk/Editor/ModelGenerator/", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf("playserv-unity-sdk/Editor/CodeGenerator/", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (!PlayServPackagePathResolver.TryGetPackageRelativeAssetPath(path, out var relativePath))
+                    continue;
+
+                if (relativePath.StartsWith("Runtime/Modules/", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith("Runtime/Proxy/Modules/", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(relativePath, "Runtime/Playserv.Runtime.asmdef", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith("Editor/Events/", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith("Editor/ModelGenerator/", StringComparison.OrdinalIgnoreCase) ||
+                    relativePath.StartsWith("Editor/CodeGenerator/", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

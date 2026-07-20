@@ -28,7 +28,8 @@ namespace Playserv.Proxy.Common
             string sdkVersion,
             bool allowMultipleConnections,
             int keepAlivePingIntervalMs,
-            int keepAlivePongTimeoutMs);
+            int keepAlivePongTimeoutMs,
+            string authorization = null);
 
         ITransportImplementation GetTransportImplementation();
     }

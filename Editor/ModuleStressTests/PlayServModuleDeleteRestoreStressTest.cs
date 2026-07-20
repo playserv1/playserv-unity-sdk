@@ -10,7 +10,6 @@ namespace Playserv.Editor
 {
     internal static class PlayServModuleDeleteRestoreStressTest
     {
-        private const string PackageFolderName = "playserv-unity-sdk";
         private const string ThisScriptSuffix = "/Editor/ModuleStressTests/PlayServModuleDeleteRestoreStressTest.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
         private const string CompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
@@ -456,24 +455,10 @@ namespace Playserv.Editor
             return new string(chars);
         }
 
-        private static string PackageRootPath => ResolvePackageRootPath();
-
-        private static string ResolvePackageRootPath()
-        {
-            var guids = AssetDatabase.FindAssets($"{nameof(PlayServModuleDeleteRestoreStressTest)} t:MonoScript");
-            for (var i = 0; i < guids.Length; i++)
-            {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guids[i]).Replace('\\', '/');
-                if (!assetPath.EndsWith(ThisScriptSuffix, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var rootAssetPath = assetPath.Substring(0, assetPath.Length - ThisScriptSuffix.Length);
-                var projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-                return Path.GetFullPath(Path.Combine(projectRoot, rootAssetPath));
-            }
-
-            return Path.Combine(Application.dataPath, PackageFolderName);
-        }
+        private static string PackageRootPath =>
+            PlayServPackagePathResolver.ResolveRootForScript(
+                nameof(PlayServModuleDeleteRestoreStressTest),
+                ThisScriptSuffix).AbsolutePath;
 
         internal sealed class StressTestResult
         {
