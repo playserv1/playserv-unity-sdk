@@ -1,4 +1,5 @@
 using System;
+using Playserv.Proxy.Common;
 using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Wrapper
@@ -75,7 +76,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// SDK version sent in handshake.
         /// </summary>
-        public string SdkVersion { get; set; } = "0.1.0";
+        public string SdkVersion { get; set; } = SdkInfo.Version;
 
         /// <summary>
         /// Indicates whether server should allow multiple sessions for same user.

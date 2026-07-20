@@ -40,7 +40,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.1.0"
+    "com.playserv.sdk": "0.2.3"
   }
 }
 ```
@@ -51,6 +51,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
 - Release tag should match package version with `v` prefix (example: `v0.1.0`).
 - `CHANGELOG.md` must include a heading for the same package version.
+- The editor window displays the installed package version from Package Manager/package.json.
 
 ## Server SDK
 

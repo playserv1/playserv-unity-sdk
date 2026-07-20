@@ -49,9 +49,11 @@ namespace Playserv.Editor
 
                     GUILayout.Space(8f);
 
+                    var sdkVersion = PlayServPackageVersionProvider.ResolveInstalledVersion(
+                        context.Config != null ? context.Config.SdkVersion : null);
                     PlayServWindowChrome.DrawOverviewCard(
                         "SDK Version",
-                        string.IsNullOrWhiteSpace(context.Config != null ? context.Config.SdkVersion : null) ? "Not configured" : context.Config.SdkVersion,
+                        string.IsNullOrWhiteSpace(sdkVersion) ? "Not configured" : sdkVersion,
                         "Installed package");
                 }
             }

@@ -1,6 +1,7 @@
 #if UNITY_5_3_OR_NEWER
 using System;
 using System.Collections.Generic;
+using Playserv.Proxy.Common;
 using UnityEngine;
 using UnityEngine.Serialization;
 #if UNITY_EDITOR
@@ -26,7 +27,7 @@ namespace Playserv.Wrapper
         [SerializeField] private string gameId;
         [SerializeField] private string userId;
         [SerializeField] private string gameVersion = "1.0.0";
-        [SerializeField] private string sdkVersion = "0.1.0";
+        [SerializeField] private string sdkVersion = SdkInfo.Version;
         [SerializeField] private bool allowMultipleConnections = true;
         [SerializeField] private int keepAlivePingIntervalMs = 30000;
         [SerializeField] private int keepAlivePongTimeoutMs = 10000;
