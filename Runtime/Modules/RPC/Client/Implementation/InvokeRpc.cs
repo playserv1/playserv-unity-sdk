@@ -23,5 +23,14 @@ namespace Playserv.RPC
         /// that must always run (Shoot, EnterBattle, abilities, etc.).
         /// </summary>
         public string CoalesceKey { get; set; }
+
+        /// <summary>
+        /// When true the gateway processes this call ONE-WAY: it forwards the invocation and returns
+        /// NOTHING to the client (no InvokeRpcResponse, no game-server round-trip awaited on the read
+        /// loop). Use for the ~15 Hz hot path (SetInput) so a per-command round-trip can't starve the
+        /// connection's command stream. The gateway reads the field name verbatim ("FireAndForget");
+        /// the caller must NOT rely on a reply (reconcile off the broadcast instead).
+        /// </summary>
+        public bool FireAndForget { get; set; }
     }
 }
