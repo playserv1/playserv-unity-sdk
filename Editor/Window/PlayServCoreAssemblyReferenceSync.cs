@@ -66,7 +66,10 @@ namespace Playserv.Editor
             if (!TryGetModuleAssemblyName(moduleId, out var assemblyName))
                 return false;
 
-            var asmdefPath = PackageRoot.ToAbsolutePath(RuntimeAsmdefRelativePath);
+            if (!TryGetPackageRoot(out var packageRoot))
+                return false;
+
+            var asmdefPath = packageRoot.ToAbsolutePath(RuntimeAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
                 return false;
 
@@ -83,7 +86,10 @@ namespace Playserv.Editor
 
         private static bool SyncRuntimeAsmdefReferences(PlayServRuntimeModuleState state, bool importAssets)
         {
-            var asmdefPath = PackageRoot.ToAbsolutePath(RuntimeAsmdefRelativePath);
+            if (!TryGetPackageRoot(out var packageRoot))
+                return false;
+
+            var asmdefPath = packageRoot.ToAbsolutePath(RuntimeAsmdefRelativePath);
             var nextModel = CreateRuntimeAsmdefModel(BuildRuntimeReferences(state));
             var nextJson = JsonUtility.ToJson(nextModel, prettyPrint: true) + Environment.NewLine;
 
@@ -118,7 +124,10 @@ namespace Playserv.Editor
 
         private static bool SyncEditorAsmdefReferences(bool importAssets)
         {
-            var asmdefPath = PackageRoot.ToAbsolutePath(EditorAsmdefRelativePath);
+            if (!TryGetPackageRoot(out var packageRoot))
+                return false;
+
+            var asmdefPath = packageRoot.ToAbsolutePath(EditorAsmdefRelativePath);
             if (!File.Exists(asmdefPath))
                 return false;
 
@@ -211,22 +220,36 @@ namespace Playserv.Editor
 
         private static PlayServPackageRoot _packageRoot;
 
-        private static PlayServPackageRoot PackageRoot
+        private static bool TryGetPackageRoot(out PlayServPackageRoot packageRoot)
         {
-            get
+            if (_packageRoot != null)
             {
-                if (_packageRoot == null)
-                    _packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
-                        nameof(PlayServCoreAssemblyReferenceSync),
-                        ThisScriptSuffix);
+                if (_packageRoot.Exists)
+                {
+                    packageRoot = _packageRoot;
+                    return true;
+                }
 
-                return _packageRoot;
+                _packageRoot = null;
             }
+
+            if (!PlayServPackagePathResolver.TryResolveRootForScript(
+                nameof(PlayServCoreAssemblyReferenceSync),
+                ThisScriptSuffix,
+                out packageRoot))
+            {
+                return false;
+            }
+
+            _packageRoot = packageRoot;
+            return true;
         }
 
         private static string ToAssetPath(string absolutePath)
         {
-            return PackageRoot.ToAssetPath(absolutePath);
+            return TryGetPackageRoot(out var packageRoot)
+                ? packageRoot.ToAssetPath(absolutePath)
+                : PlayServPackagePathResolver.ToProjectAssetPath(absolutePath);
         }
 
         [Serializable]

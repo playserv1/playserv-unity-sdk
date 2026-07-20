@@ -91,6 +91,12 @@ namespace Playserv.Editor
             // Make generated compatibility and root asmdef refs safe before removing files.
             SyncGeneratedAndReferences();
 
+            if (!TryGetPackageRoot(out _))
+            {
+                error = "PlayServ package root was not found.";
+                return false;
+            }
+
             var removedAny = false;
             var failedPaths = new List<string>();
             for (var i = 0; i < manifest.AssetPaths.Length; i++)
@@ -140,12 +146,34 @@ namespace Playserv.Editor
 
         private static string ToPackageAssetPath(string relativePath)
         {
-            return PackageRoot.ToAssetPath(PackageRoot.ToAbsolutePath(relativePath ?? string.Empty));
+            return TryGetPackageRoot(out var packageRoot)
+                ? packageRoot.ToAssetPath(packageRoot.ToAbsolutePath(relativePath ?? string.Empty))
+                : string.Empty;
         }
 
-        private static PlayServPackageRoot PackageRoot =>
-            _packageRoot ?? (_packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+        private static bool TryGetPackageRoot(out PlayServPackageRoot packageRoot)
+        {
+            if (_packageRoot != null)
+            {
+                if (_packageRoot.Exists)
+                {
+                    packageRoot = _packageRoot;
+                    return true;
+                }
+
+                _packageRoot = null;
+            }
+
+            if (!PlayServPackagePathResolver.TryResolveRootForScript(
                 nameof(PlayServRuntimeModuleLifecycle),
-                ThisScriptSuffix));
+                ThisScriptSuffix,
+                out packageRoot))
+            {
+                return false;
+            }
+
+            _packageRoot = packageRoot;
+            return true;
+        }
     }
 }

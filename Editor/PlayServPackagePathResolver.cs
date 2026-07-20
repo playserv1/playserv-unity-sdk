@@ -16,8 +16,28 @@ namespace Playserv.Editor
 
         public static PlayServPackageRoot ResolveRootForScript(string scriptTypeName, string scriptSuffix)
         {
+            TryResolveRootForScript(scriptTypeName, scriptSuffix, out var root);
+            return root;
+        }
+
+        public static bool TryResolveRootForScript(
+            string scriptTypeName,
+            string scriptSuffix,
+            out PlayServPackageRoot root)
+        {
+            root = null;
             var rootAssetPath = ResolveRootAssetPathForScript(scriptTypeName, scriptSuffix);
-            return new PlayServPackageRoot(rootAssetPath, ToAbsoluteAssetPath(rootAssetPath));
+            if (string.IsNullOrEmpty(rootAssetPath))
+                return false;
+
+            root = new PlayServPackageRoot(rootAssetPath, ToAbsoluteAssetPath(rootAssetPath));
+            if (!root.Exists)
+            {
+                root = null;
+                return false;
+            }
+
+            return true;
         }
 
         public static bool TryGetPackageRelativeAssetPath(string assetPath, out string relativePath)
@@ -101,7 +121,7 @@ namespace Playserv.Editor
             if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>($"{packageRoot}/package.json") != null)
                 return packageRoot;
 
-            return $"{AssetsPrefix}{LegacyAssetsFolderName}";
+            return null;
         }
 
         private static PackageManagerPackageInfo FindPackageInfoForAssetPath(string assetPath)
@@ -161,6 +181,8 @@ namespace Playserv.Editor
         public string AssetPath { get; }
 
         public string AbsolutePath { get; }
+
+        public bool Exists => Directory.Exists(AbsolutePath) || File.Exists(AbsolutePath);
 
         public string ToAbsolutePath(string relativePath)
         {

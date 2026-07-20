@@ -455,10 +455,21 @@ namespace Playserv.Editor
             return new string(chars);
         }
 
-        private static string PackageRootPath =>
-            PlayServPackagePathResolver.ResolveRootForScript(
-                nameof(PlayServModuleDeleteRestoreStressTest),
-                ThisScriptSuffix).AbsolutePath;
+        private static string PackageRootPath
+        {
+            get
+            {
+                if (!PlayServPackagePathResolver.TryResolveRootForScript(
+                    nameof(PlayServModuleDeleteRestoreStressTest),
+                    ThisScriptSuffix,
+                    out var packageRoot))
+                {
+                    throw new InvalidOperationException("PlayServ package root was not found.");
+                }
+
+                return packageRoot.AbsolutePath;
+            }
+        }
 
         internal sealed class StressTestResult
         {

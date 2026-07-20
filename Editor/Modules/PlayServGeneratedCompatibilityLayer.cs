@@ -490,7 +490,10 @@ namespace Playserv.Editor
 
         private static bool WriteIfChanged(string relativePath, string contents, bool importAsset)
         {
-            var path = PackageRoot.ToAbsolutePath(relativePath);
+            if (!TryGetPackageRoot(out var packageRoot))
+                return false;
+
+            var path = packageRoot.ToAbsolutePath(relativePath);
             return WriteAbsolutePathIfChanged(path, contents, importAsset);
         }
 
@@ -521,14 +524,36 @@ namespace Playserv.Editor
             return (value ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
-        private static PlayServPackageRoot PackageRoot =>
-            _packageRoot ?? (_packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+        private static bool TryGetPackageRoot(out PlayServPackageRoot packageRoot)
+        {
+            if (_packageRoot != null)
+            {
+                if (_packageRoot.Exists)
+                {
+                    packageRoot = _packageRoot;
+                    return true;
+                }
+
+                _packageRoot = null;
+            }
+
+            if (!PlayServPackagePathResolver.TryResolveRootForScript(
                 nameof(PlayServGeneratedCompatibilityLayer),
-                ThisScriptSuffix));
+                ThisScriptSuffix,
+                out packageRoot))
+            {
+                return false;
+            }
+
+            _packageRoot = packageRoot;
+            return true;
+        }
 
         private static string ToAssetPath(string absolutePath)
         {
-            return PackageRoot.ToAssetPath(absolutePath);
+            return TryGetPackageRoot(out var packageRoot)
+                ? packageRoot.ToAssetPath(absolutePath)
+                : PlayServPackagePathResolver.ToProjectAssetPath(absolutePath);
         }
 
         private readonly struct PlayServGeneratedModuleState

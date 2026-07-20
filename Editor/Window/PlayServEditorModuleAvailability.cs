@@ -261,13 +261,17 @@ namespace Playserv.Editor
 
         private static bool HasAssetPath(string relativePath)
         {
-            var absolutePath = PackageRoot.ToAbsolutePath(relativePath);
+            if (!TryGetPackageRoot(out var packageRoot))
+                return false;
+
+            var absolutePath = packageRoot.ToAbsolutePath(relativePath);
             return Directory.Exists(absolutePath) || File.Exists(absolutePath);
         }
 
         private static bool HasFolder(string relativePath)
         {
-            return Directory.Exists(PackageRoot.ToAbsolutePath(relativePath));
+            return TryGetPackageRoot(out var packageRoot) &&
+                   Directory.Exists(packageRoot.ToAbsolutePath(relativePath));
         }
 
         private static PlayServRuntimeModuleDefinition FindRuntimeModule(string moduleName)
@@ -281,10 +285,30 @@ namespace Playserv.Editor
             return null;
         }
 
-        private static PlayServPackageRoot PackageRoot =>
-            _packageRoot ?? (_packageRoot = PlayServPackagePathResolver.ResolveRootForScript(
+        private static bool TryGetPackageRoot(out PlayServPackageRoot packageRoot)
+        {
+            if (_packageRoot != null)
+            {
+                if (_packageRoot.Exists)
+                {
+                    packageRoot = _packageRoot;
+                    return true;
+                }
+
+                _packageRoot = null;
+            }
+
+            if (!PlayServPackagePathResolver.TryResolveRootForScript(
                 nameof(PlayServEditorModuleAvailability),
-                ThisScriptSuffix));
+                ThisScriptSuffix,
+                out packageRoot))
+            {
+                return false;
+            }
+
+            _packageRoot = packageRoot;
+            return true;
+        }
 
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)
         {
