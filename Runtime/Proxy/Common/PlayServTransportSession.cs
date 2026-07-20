@@ -21,7 +21,9 @@ namespace Playserv.Proxy.Common
         private readonly Action<string, object> _notifyModuleCommand;
         private readonly Action _onConnected;
 
-        private string _gameAccessToken;
+        private string _handshakeCredential;
+        private string _clientToken;
+        private string _authorization;
         private string _gameId;
         private string _userId;
         private string _gameVersion;
@@ -69,17 +71,24 @@ namespace Playserv.Proxy.Common
         }
 
         public void Configure(
-            string gameAccessToken,
+            string clientToken,
             string gameId,
             string userId,
             string gameVersion,
             string sdkVersion = null,
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
-            int keepAlivePongTimeoutMs = 10000)
+            int keepAlivePongTimeoutMs = 10000,
+            string authorization = null)
         {
-            if (string.IsNullOrWhiteSpace(gameAccessToken))
-                throw new ArgumentException("Game access token cannot be null or empty.", nameof(gameAccessToken));
+            var normalizedClientToken = NormalizeOptionalCredential(clientToken);
+            var normalizedAuthorization = NormalizeOptionalCredential(authorization);
+            var handshakeCredential = ResolveHandshakeCredential(
+                normalizedClientToken,
+                normalizedAuthorization);
+
+            if (string.IsNullOrWhiteSpace(handshakeCredential))
+                throw new ArgumentException("Client token or Authorization cannot be null or empty.", nameof(clientToken));
 
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
@@ -90,7 +99,9 @@ namespace Playserv.Proxy.Common
             if (string.IsNullOrWhiteSpace(gameVersion))
                 throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
 
-            _gameAccessToken = gameAccessToken;
+            _handshakeCredential = handshakeCredential;
+            _clientToken = normalizedClientToken;
+            _authorization = normalizedAuthorization;
             _gameId = gameId;
             _userId = userId;
             _gameVersion = gameVersion;
@@ -100,7 +111,7 @@ namespace Playserv.Proxy.Common
             _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
 
             _logger.Log(
-                $"Config set: token={gameAccessToken}, gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}");
+                $"Config set: gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, clientTokenSet={!string.IsNullOrEmpty(_clientToken)}, authorizationSet={!string.IsNullOrEmpty(_authorization)}");
         }
 
         public async Task<bool> ConnectAsync()
@@ -125,11 +136,13 @@ namespace Playserv.Proxy.Common
             _logger.Log("Transport connected. Performing handshake...");
 
             var handshakeResult = await _handshakeService.PerformHandshakeAsync(
-                _gameAccessToken,
+                _handshakeCredential,
                 _gameId,
                 _userId,
                 _gameVersion,
-                _sdkVersion);
+                _sdkVersion,
+                _clientToken,
+                _authorization);
             if (!handshakeResult.Success)
             {
                 _logger.LogError($"Handshake failed: {handshakeResult.Error}");
@@ -219,11 +232,13 @@ namespace Playserv.Proxy.Common
                 return false;
 
             var handshakeResult = await _handshakeService.PerformHandshakeAsync(
-                _gameAccessToken,
+                _handshakeCredential,
                 _gameId,
                 _userId,
                 _gameVersion,
-                _sdkVersion);
+                _sdkVersion,
+                _clientToken,
+                _authorization);
             if (!handshakeResult.Success)
             {
                 _logger.LogError($"Reconnection handshake failed: {handshakeResult.Error}");
@@ -293,13 +308,39 @@ namespace Playserv.Proxy.Common
 
         private void EnsureConfigured()
         {
-            if (string.IsNullOrWhiteSpace(_gameAccessToken) ||
+            if (string.IsNullOrWhiteSpace(_handshakeCredential) ||
                 string.IsNullOrWhiteSpace(_gameId) ||
                 string.IsNullOrWhiteSpace(_userId) ||
                 string.IsNullOrWhiteSpace(_gameVersion))
             {
                 throw new InvalidOperationException("SDK is not configured. Call SetConfig() first.");
             }
+        }
+
+        private static string NormalizeOptionalCredential(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private static string ResolveHandshakeCredential(
+            string clientToken,
+            string authorization)
+        {
+            if (!string.IsNullOrEmpty(clientToken))
+                return clientToken;
+
+            return ExtractBearerCredential(authorization);
+        }
+
+        private static string ExtractBearerCredential(string authorization)
+        {
+            if (string.IsNullOrEmpty(authorization))
+                return null;
+
+            const string bearerPrefix = "Bearer ";
+            return authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+                ? NormalizeOptionalCredential(authorization.Substring(bearerPrefix.Length))
+                : authorization;
         }
 
         private Task<bool> IsReconnectEnvironmentReadyAsync()

@@ -83,6 +83,12 @@ namespace Playserv.Wrapper
         public static void Invoke(string serviceName, string methodName, string payloadBase64) =>
             PlayServRpc.Invoke(serviceName, methodName, payloadBase64);
 
+        public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey) =>
+            PlayServRpc.Invoke(serviceName, methodName, payload, coalesceKey);
+
+        public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey, bool fireAndForget) =>
+            PlayServRpc.Invoke(serviceName, methodName, payload, coalesceKey, fireAndForget);
+
         public static void Invoke<TService>(Expression<Action<TService>> method) =>
             PlayServRpc.Invoke(method);
 

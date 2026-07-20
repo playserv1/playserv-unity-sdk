@@ -8,7 +8,9 @@
     "name": "PlayServ"
   },
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.2"
+  },
   "files": [
     "Runtime",
     "Runtime.meta",

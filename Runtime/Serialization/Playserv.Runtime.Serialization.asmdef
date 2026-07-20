@@ -2,7 +2,8 @@
     "name": "Playserv.Runtime.Serialization",
     "rootNamespace": "",
     "references": [
-        "Playserv.Runtime.Abstractions"
+        "Playserv.Runtime.Abstractions",
+        "Newtonsoft.Json.dll"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
