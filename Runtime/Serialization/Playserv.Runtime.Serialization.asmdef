@@ -2,8 +2,7 @@
     "name": "Playserv.Runtime.Serialization",
     "rootNamespace": "",
     "references": [
-        "Playserv.Runtime.Abstractions",
-        "Newtonsoft.Json.dll"
+        "Playserv.Runtime.Abstractions"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -12,6 +11,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.nuget.newtonsoft-json",
+            "expression": "1.0.0",
+            "define": "PLAYSERV_HAS_NEWTONSOFT_JSON"
+        }
+    ],
     "noEngineReferences": false
 }

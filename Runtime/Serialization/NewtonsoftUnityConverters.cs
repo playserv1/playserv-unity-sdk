@@ -1,4 +1,4 @@
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && PLAYSERV_HAS_NEWTONSOFT_JSON
 using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;

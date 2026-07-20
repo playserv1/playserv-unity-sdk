@@ -3,12 +3,15 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+#if PLAYSERV_HAS_NEWTONSOFT_JSON
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
+#endif
 
 namespace Playserv.Serialization
 {
+#if PLAYSERV_HAS_NEWTONSOFT_JSON
     public sealed class NewtonsoftJsonCodec : IJsonCodec
     {
         private static readonly IContractResolver ContractResolver = new PlayServJsonNameContractResolver();
@@ -488,4 +491,65 @@ namespace Playserv.Serialization
             }
         }
     }
+#else
+    public sealed class NewtonsoftJsonCodec : IJsonCodec
+    {
+        public string Serialize(object value, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public T Deserialize<T>(string json, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public object Deserialize(string json, Type type, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public T Convert<T>(object value, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public object Convert(object value, Type type, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public string ToCanonicalJson(object value, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public object Clone(object value, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public object ToPlainValue(object value, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public object ParseToPlainValue(string json, JsonCodecOptions options = null)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public bool TryGetProperty(object value, string propertyName, bool ignoreCase, out object propertyValue)
+        {
+            propertyValue = null;
+            return false;
+        }
+
+        public bool TryGetFirstPropertyValue(object value, out object propertyValue)
+        {
+            propertyValue = null;
+            return false;
+        }
+    }
+#endif
 }

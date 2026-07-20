@@ -1,9 +1,12 @@
 using System;
+#if PLAYSERV_HAS_NEWTONSOFT_JSON
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+#endif
 
 namespace Playserv.Serialization
 {
+#if PLAYSERV_HAS_NEWTONSOFT_JSON
     public sealed class NewtonsoftCommandPayloadMapper : ICommandPayloadMapper
     {
         public string BuildKeepAlivePayloadJson(string eventType, string payloadJson)
@@ -227,4 +230,24 @@ namespace Playserv.Serialization
             }
         }
     }
+#else
+    public sealed class NewtonsoftCommandPayloadMapper : ICommandPayloadMapper
+    {
+        public string BuildKeepAlivePayloadJson(string eventType, string payloadJson)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public string NormalizePayloadForType(string payloadJson, Type type)
+        {
+            throw NewtonsoftJsonDependency.CreateMissingException();
+        }
+
+        public bool TryDeserializeAsCommandError(string payloadJson, out CommandErrorResponse response)
+        {
+            response = null;
+            return false;
+        }
+    }
+#endif
 }

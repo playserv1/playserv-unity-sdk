@@ -7,7 +7,7 @@ namespace Playserv.Serialization
         public static JsonCodecOptions CreateDefaultEventOptions()
         {
             var converters = new List<object>();
-#if UNITY_5_3_OR_NEWER
+#if UNITY_5_3_OR_NEWER && PLAYSERV_HAS_NEWTONSOFT_JSON
             converters.Add(new Vector3NewtonsoftJsonConverter());
             converters.Add(new QuaternionNewtonsoftJsonConverter());
 #endif

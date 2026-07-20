@@ -8,6 +8,14 @@ This document contains practical examples for the public runtime API exposed by:
 
 ## Installation
 
+### UnityPackage / Assets import
+
+When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read this package's `package.json` dependencies. The SDK attempts to install `com.unity.nuget.newtonsoft-json` automatically in that mode. If Package Manager cannot install it, add this dependency manually to the game project's `Packages/manifest.json`:
+
+```json
+"com.unity.nuget.newtonsoft-json": "3.2.2"
+```
+
 ### OpenUPM
 
 Install via OpenUPM CLI:
