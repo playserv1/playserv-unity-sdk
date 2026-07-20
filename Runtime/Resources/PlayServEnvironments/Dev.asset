@@ -15,7 +15,7 @@ MonoBehaviour:
   clientToken: 
   authorization: 
   gameId: 
-  backendServerAddress: wss://dev.platform.playserv.io/ws
+  backendServerAddress: wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws
   webRtcSignalingServerAddress: 
   webRtcDataChannelLabel: playserv
   webRtcIceServers: []
