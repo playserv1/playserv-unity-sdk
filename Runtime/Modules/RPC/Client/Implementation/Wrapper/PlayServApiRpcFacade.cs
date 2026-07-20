@@ -52,7 +52,13 @@ namespace Playserv.Wrapper
             InvokeCore(serviceName, methodName, payloadBase64, coalesceKey);
         }
 
-        private void InvokeCore(string serviceName, string methodName, string payloadBase64, string coalesceKey)
+        public void Invoke(string serviceName, string methodName, object payload, string coalesceKey, bool fireAndForget)
+        {
+            var payloadBase64 = RpcPayloadSerializer.SerializeToBase64(payload, _runtimeAccess.ResolveJsonCodec());
+            InvokeCore(serviceName, methodName, payloadBase64, coalesceKey, fireAndForget);
+        }
+
+        private void InvokeCore(string serviceName, string methodName, string payloadBase64, string coalesceKey, bool fireAndForget = false)
         {
             if (string.IsNullOrWhiteSpace(serviceName))
                 throw new ArgumentException("Service name is required.", nameof(serviceName));
@@ -71,7 +77,8 @@ namespace Playserv.Wrapper
                 ServiceName = serviceName,
                 MethodName = methodName,
                 Payload = payloadBase64,
-                CoalesceKey = coalesceKey
+                CoalesceKey = coalesceKey,
+                FireAndForget = fireAndForget
             };
 
             _runtimeAccess.Send(request, RpcConstants.InvokeModuleServiceName);

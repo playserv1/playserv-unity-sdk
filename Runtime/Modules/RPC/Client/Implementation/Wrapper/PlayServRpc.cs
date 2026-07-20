@@ -44,6 +44,9 @@ namespace Playserv.Wrapper
         public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey) =>
             Api.Invoke(serviceName, methodName, payload, coalesceKey);
 
+        public static void Invoke(string serviceName, string methodName, object payload, string coalesceKey, bool fireAndForget) =>
+            Api.Invoke(serviceName, methodName, payload, coalesceKey, fireAndForget);
+
         public static void Invoke<TService>(Expression<Action<TService>> method) =>
             Api.Invoke(method);
 

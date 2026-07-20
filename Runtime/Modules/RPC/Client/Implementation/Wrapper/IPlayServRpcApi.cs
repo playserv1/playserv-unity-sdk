@@ -32,6 +32,11 @@ namespace Playserv.Wrapper
         /// </summary>
         void Invoke(string serviceName, string methodName, object payload, string coalesceKey);
 
+        /// <summary>As <see cref="Invoke(string,string,object,string)"/> but, when
+        /// <paramref name="fireAndForget"/> is true, the call is sent ONE-WAY (no reply expected). Use for
+        /// the hot path (SetInput) — see <see cref="Playserv.RPC.InvokeRpc.FireAndForget"/>.</summary>
+        void Invoke(string serviceName, string methodName, object payload, string coalesceKey, bool fireAndForget);
+
         void Invoke<TService>(Expression<Action<TService>> method);
 
         void Invoke<TService>(Expression<Action<TService>> method, object payload);
