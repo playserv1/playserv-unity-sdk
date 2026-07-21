@@ -61,11 +61,74 @@ Unity package export and OpenUPM export do not build the server/shared runtime a
 
 ## Apple Sign In module
 
-Apple Sign In is an optional client module. Open `Tools/PlayServ/Settings`, enable `Apple Sign In` in runtime modules, then use `Create/Select Settings` in the Apple Sign In section to create `Assets/Resources/PlayServAppleSignInSettings.asset`.
+Apple Sign In is an optional client module for iOS builds. It uses Apple's native
+`AuthenticationServices.framework` and does not require any third-party auth SDK.
 
-The settings asset stays in the game project, so the SDK can be installed through Package Manager without writing credentials into the package folder. For iOS builds, keep `Add Sign In Capability On Build` enabled to add the Xcode Sign in with Apple capability and `AuthenticationServices.framework`.
+### 1. Configure Apple Developer
+
+1. Open the Apple Developer portal.
+2. Create or select the App ID that matches the Unity iOS Bundle Identifier.
+3. Enable the `Sign in with Apple` capability for that App ID.
+4. If the game/backend uses Apple's web or REST auth flow, also create a Services ID, register the return URL, and create a Sign in with Apple private key.
+5. Keep these values available for backend-side validation:
+   - Team ID
+   - App Bundle ID or Services ID, depending on the flow your backend validates
+   - Key ID
+   - Redirect URI, if a Services ID/web flow is used
+
+Apple setup reference: https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple
+
+### 2. Enable the PlayServ module
+
+1. In Unity, open `Tools/PlayServ/Settings`.
+2. Open `SDK module settings`.
+3. Keep `Client Execution` enabled.
+4. Enable `Apple Sign In`.
+5. Go back to the main PlayServ window.
+6. In the `Apple Sign In` section, click `Create/Select Settings`.
+
+This creates `Assets/Resources/PlayServAppleSignInSettings.asset` in the game
+project. The asset is project-side on purpose, so Package Manager installs do not
+write credentials into the SDK package folder.
+
+### 3. Fill Apple settings
+
+Open `PlayServAppleSignInSettings.asset` and configure:
+
+- `Request Email`: ask Apple for the user's email on first consent.
+- `Request Full Name`: ask Apple for the user's name on first consent.
+- `Default Nonce`: optional nonce sent with sign-in requests.
+- `Default State`: optional state value returned with sign-in responses.
+- `Client Id`: expected Apple audience for backend validation, usually the app Bundle ID for native iOS flows or the Services ID for web/service flows.
+- `Team Id`: Apple Developer Team ID.
+- `Service Id`: Services ID, only needed if your backend uses a Services ID/web flow.
+- `Key Id`: Sign in with Apple private key identifier.
+- `Redirect Uri`: return URL configured on the Services ID, only needed for web/service flows.
+- `Private Key`: development/internal tooling only. For production builds, keep Apple private keys on the backend.
+- `Add Sign In Capability On Build`: keep enabled unless you add the Xcode capability manually.
+- `Entitlements File Name`: generated entitlements file name for the Xcode project.
+
+Apple only returns `Email` and `FullName` the first time a user grants consent.
+Store them on the backend after the first successful login.
+
+### 4. Build for iOS
+
+1. Switch Unity build target to iOS.
+2. Make sure the iOS Bundle Identifier matches the Apple App ID.
+3. Build the Xcode project.
+4. If `Add Sign In Capability On Build` is enabled, PlayServ adds:
+   - `AuthenticationServices.framework`
+   - Sign in with Apple capability
+   - the configured entitlements file
+5. In Xcode, confirm the target has the Sign in with Apple capability before archiving.
+
+`PlayServAppleSignIn.IsAvailable` is expected to be `false` in the Unity Editor,
+on Android, and on unsupported iOS versions.
+
+### 5. Use Apple login at runtime
 
 ```csharp
+using System;
 using System.Threading.Tasks;
 using Playserv.Wrapper;
 
@@ -77,17 +140,96 @@ public static class AppleLoginExample
             return;
 
         var credential = await PlayServAppleSignIn.SignInAsync();
-        var identityToken = credential.IdentityToken;
+
         var appleUserId = credential.UserId;
+        var identityToken = credential.IdentityToken;
+        var authorizationCode = credential.AuthorizationCode;
+
+        // Send identityToken or authorizationCode to your backend/PlayServ auth flow.
+    }
+
+    public static async Task CheckCredentialState(string appleUserId)
+    {
+        var state = await PlayServAppleSignIn.GetCredentialStateAsync(appleUserId);
+        Console.WriteLine(state.State);
     }
 }
 ```
 
+### Apple troubleshooting
+
+- `IsAvailable` is `false`: run on an iOS device/build with the module enabled.
+- Xcode capability is missing: keep `Add Sign In Capability On Build` enabled or add the capability manually in Xcode.
+- `Email` or `FullName` is empty: Apple returns these only on first consent.
+- Backend token validation fails: check Bundle ID/Services ID, Team ID, Key ID, and the expected audience value.
+
 ## Google Sign In module
 
-Google Sign In is an optional client module. Open `Tools/PlayServ/Settings`, enable `Google Sign In` in runtime modules, then use `Create/Select Settings` in the Google Sign In section to create `Assets/Resources/PlayServGoogleSignInSettings.asset`.
+Google Sign In is an optional client module for Android and iOS builds. PlayServ
+provides the module toggle, settings asset, and runtime facade. The game project
+must also contain a Google Sign-In Unity provider plugin so native Android/iOS
+sign-in can run.
 
-The PlayServ module does not require Firebase. It wraps the Google Sign-In Unity plugin when that plugin is installed in the game project, then exposes `IdToken`, `AuthCode`, and basic profile fields to PlayServ.
+Google Unity plugin reference: https://github.com/googlesamples/google-signin-unity
+
+### 1. Configure Google Cloud credentials
+
+1. Open Google Cloud Console.
+2. Configure the OAuth consent screen for the game.
+3. Create an OAuth 2.0 `Web application` client.
+4. Copy the Web client ID. This is the value used by PlayServ `Web Client Id`.
+5. For Android builds, create an Android OAuth client with:
+   - the Unity Android package name
+   - the SHA-1 fingerprint of the same keystore used to sign the build
+6. For iOS builds, create an iOS OAuth client with:
+   - the Unity iOS Bundle Identifier
+   - the URL scheme / plist setup required by the installed Google Sign-In Unity plugin
+
+The Web client ID is required when requesting an ID token or a server auth code.
+
+### 2. Install the Google Sign-In provider plugin
+
+1. Import the Google Sign-In Unity plugin into the game project.
+2. Run the Android/iOS dependency resolver required by that plugin.
+3. For Android, confirm Unity `Player Settings > Android > Package Name` matches the Android OAuth client.
+4. For Android release builds, confirm the signing keystore matches the SHA-1 fingerprint registered in Google Cloud.
+5. For iOS, follow the plugin's iOS setup and ensure the generated Xcode project contains the required Google configuration.
+
+PlayServ does not compile against Google classes directly. If the Google plugin is
+not installed, the SDK still compiles, but `PlayServGoogleSignIn.IsAvailable`
+returns `false`.
+
+### 3. Enable the PlayServ module
+
+1. In Unity, open `Tools/PlayServ/Settings`.
+2. Open `SDK module settings`.
+3. Keep `Client Execution` enabled.
+4. Enable `Google Sign In`.
+5. Go back to the main PlayServ window.
+6. In the `Google Sign In` section, click `Create/Select Settings`.
+
+This creates `Assets/Resources/PlayServGoogleSignInSettings.asset` in the game
+project. The asset stays outside the SDK package folder, so Package Manager
+installs can be updated without overwriting game credentials.
+
+### 4. Fill Google settings
+
+Open `PlayServGoogleSignInSettings.asset` and configure:
+
+- `Web Client Id`: OAuth 2.0 Web application client ID from Google Cloud.
+- `Request Id Token`: enable when the backend needs a Google ID token.
+- `Request Auth Code`: enable when the backend exchanges a server auth code.
+- `Request Email`: include the user's email in the returned profile.
+- `Force Token Refresh`: request a fresh server auth code when supported by the provider plugin.
+- `Use Game Sign In`: enable only when using the Google Play Games profile flow supported by the provider plugin.
+- `Hosted Domain`: optional Google Workspace hosted-domain hint.
+- `Account Name`: optional preferred account hint.
+- `Additional Scopes`: optional extra Google OAuth scopes required by the game.
+
+For the common PlayServ/backend flow, keep `Request Id Token` and
+`Request Auth Code` enabled.
+
+### 5. Use Google login at runtime
 
 ```csharp
 using System.Threading.Tasks;
@@ -104,9 +246,26 @@ public static class GoogleLoginExample
         var idToken = credential.IdToken;
         var authCode = credential.AuthCode;
         var googleUserId = credential.UserId;
+
+        // Send idToken or authCode to your backend/PlayServ auth flow.
     }
 }
 ```
+
+Optional sign-out helpers:
+
+```csharp
+PlayServGoogleSignIn.SignOut();
+PlayServGoogleSignIn.Disconnect();
+```
+
+### Google troubleshooting
+
+- `IsAvailable` is `false`: the Google Sign-In Unity provider plugin is missing, not loaded, or the PlayServ module is disabled.
+- ID token is empty: enable `Request Id Token` and set `Web Client Id`.
+- Auth code is empty: enable `Request Auth Code` and set `Web Client Id`.
+- Android login fails: verify package name, SHA-1 fingerprint, keystore, and resolver output.
+- iOS login fails: verify Bundle Identifier, URL scheme/plist setup, and Xcode project configuration.
 
 ## 1) Configure SDK
 
