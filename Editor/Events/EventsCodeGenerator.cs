@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Playserv.Events;
+using Playserv.Modules;
 using UnityEditor;
 using static System.IO.File;
 
@@ -53,9 +54,10 @@ namespace Playserv.Events.Editor
         private static bool CanGenerateEvents()
         {
             var state = Playserv.Editor.PlayServRuntimeModuleDefines.Load();
-            Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
-            Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
-            return state.Events && Playserv.Editor.PlayServEditorModuleAvailability.EditorEvents;
+            Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
+            Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(state);
+            return state.IsEnabled(PlayServModuleManifest.EventsId) &&
+                   Playserv.Editor.PlayServEditorModuleAvailability.EditorEvents;
         }
 
         private static bool IsGeneratedOutputEventType(Type type)

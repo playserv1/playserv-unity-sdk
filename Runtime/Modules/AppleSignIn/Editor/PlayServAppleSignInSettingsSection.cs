@@ -1,4 +1,5 @@
 using Playserv.AppleSignIn;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,6 +13,11 @@ namespace Playserv.Editor.AppleSignIn
             PlayServEditorSectionRegistry.Register(
                 PlayServEditorSectionIds.AppleSignIn,
                 () => new PlayServAppleSignInSettingsSection());
+
+            PlayServModuleConfigSectionRegistry.Register(
+                PlayServModuleManifest.AppleSignInId,
+                PlayServEditorSectionIds.AppleSignIn,
+                order: 80);
         }
     }
 

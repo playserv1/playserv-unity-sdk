@@ -44,16 +44,16 @@ namespace Playserv.Editor
         {
             PlayServEditorModuleAvailability.SyncUnavailableModuleDefines();
             var state = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
-            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
-            PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(state);
 
             return Sync(state, importAssets);
         }
 
         internal static bool Sync(PlayServRuntimeModuleState state, bool importAssets)
         {
-            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
-            PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(state);
 
             var changed = false;
             changed |= SyncRuntimeAsmdefReferences(state, importAssets);
@@ -161,29 +161,7 @@ namespace Playserv.Editor
 
         private static bool IsRootReferencedModuleEnabled(PlayServRuntimeModuleState state, string moduleId)
         {
-            switch (moduleId)
-            {
-                case PlayServModuleManifest.EventsId:
-                    return state.Events;
-                case PlayServModuleManifest.DataSubscriptionId:
-                    return state.Data;
-                case PlayServModuleManifest.RpcCoreId:
-                    return state.Rpc || state.Server;
-                case PlayServModuleManifest.ClientRpcId:
-                    return state.Rpc;
-                case PlayServModuleManifest.ServerId:
-                    return state.Server;
-                case PlayServModuleManifest.SpawnId:
-                    return state.Spawn && state.Events;
-                case PlayServModuleManifest.PulseId:
-                    return state.Pulse;
-                case PlayServModuleManifest.AppleSignInId:
-                    return state.AppleSignIn;
-                case PlayServModuleManifest.GoogleSignInId:
-                    return state.GoogleSignIn;
-                default:
-                    return false;
-            }
+            return state.IsEnabled(moduleId);
         }
 
         private static void AddModuleReference(List<string> references, string moduleId)

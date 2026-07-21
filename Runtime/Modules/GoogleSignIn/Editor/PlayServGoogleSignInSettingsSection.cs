@@ -1,4 +1,5 @@
 using Playserv.GoogleSignIn;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,6 +13,11 @@ namespace Playserv.Editor.GoogleSignIn
             PlayServEditorSectionRegistry.Register(
                 PlayServEditorSectionIds.GoogleSignIn,
                 () => new PlayServGoogleSignInSettingsSection());
+
+            PlayServModuleConfigSectionRegistry.Register(
+                PlayServModuleManifest.GoogleSignInId,
+                PlayServEditorSectionIds.GoogleSignIn,
+                order: 90);
         }
     }
 

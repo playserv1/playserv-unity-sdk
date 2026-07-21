@@ -1,4 +1,5 @@
 using System;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
 using Playserv.Wrapper;
@@ -29,12 +30,9 @@ namespace Playserv.Editor
             new PlayServOptionalEditorSection(PlayServEditorSectionIds.Events);
         private readonly PlayServOptionalEditorSection _codegenSection =
             new PlayServOptionalEditorSection(PlayServEditorSectionIds.Codegen);
-        private readonly PlayServOptionalEditorSection _appleSignInSection =
-            new PlayServOptionalEditorSection(PlayServEditorSectionIds.AppleSignIn);
-        private readonly PlayServOptionalEditorSection _googleSignInSection =
-            new PlayServOptionalEditorSection(PlayServEditorSectionIds.GoogleSignIn);
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
+        private readonly PlayServModuleConfigSectionPresenter _moduleConfigSectionPresenter = new PlayServModuleConfigSectionPresenter();
 
         private PlayServConnectionController _connectionController;
 
@@ -105,8 +103,7 @@ namespace Playserv.Editor
             _modelSection.Dispose();
             _eventsSection.Dispose();
             _codegenSection.Dispose();
-            _appleSignInSection.Dispose();
-            _googleSignInSection.Dispose();
+            _moduleConfigSectionPresenter.Dispose();
         }
 
         private void OnGUI()
@@ -176,7 +173,7 @@ namespace Playserv.Editor
             }
 
             if (PlayServEditorModuleAvailability.EditorEvents &&
-                _state.ModuleSettings.RuntimeEvents &&
+                _state.ModuleSettings.IsRuntimeModuleEnabled(PlayServModuleManifest.EventsId) &&
                 _eventsSection.IsAvailable)
             {
                 GUILayout.Space(12f);
@@ -191,21 +188,7 @@ namespace Playserv.Editor
                 _codegenSection.Draw(context);
             }
 
-            if (PlayServEditorModuleAvailability.RuntimeAppleSignIn &&
-                _state.ModuleSettings.RuntimeAppleSignIn &&
-                _appleSignInSection.IsAvailable)
-            {
-                GUILayout.Space(12f);
-                _appleSignInSection.Draw(context);
-            }
-
-            if (PlayServEditorModuleAvailability.RuntimeGoogleSignIn &&
-                _state.ModuleSettings.RuntimeGoogleSignIn &&
-                _googleSignInSection.IsAvailable)
-            {
-                GUILayout.Space(12f);
-                _googleSignInSection.Draw(context);
-            }
+            _moduleConfigSectionPresenter.Draw(context);
 
             if (ShowWebSocketConnectionMenu)
             {

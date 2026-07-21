@@ -1,4 +1,5 @@
 using Playserv.AppleSignIn;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
@@ -20,9 +21,9 @@ namespace Playserv.Editor.AppleSignIn
                 return;
 
             var moduleState = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
-            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref moduleState);
-            PlayServRuntimeModuleDefines.NormalizeDependencies(ref moduleState);
-            if (!moduleState.AppleSignIn)
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(moduleState);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(moduleState);
+            if (!moduleState.IsEnabled(PlayServModuleManifest.AppleSignInId))
                 return;
 
             var settings = PlayServAppleSignInSettingsAssetProvider.FindExisting();

@@ -124,21 +124,36 @@ namespace Playserv.Editor
                 }
 
                 GUILayout.Space(12f);
-                using (new EditorGUILayout.HorizontalScope())
+                using (new EditorGUILayout.VerticalScope())
                 {
-                    using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
-                    {
-                        PlayServWindowChrome.DrawNotice(
-                            "Changing runtime modules updates Player Settings scripting defines and triggers a Unity script reload. If a module is disabled, its public SDK types are intentionally unavailable to gameplay code.",
-                            MessageType.Info);
-                    }
+                    PlayServWindowChrome.DrawNotice(
+                        "Changing runtime modules updates Player Settings scripting defines and triggers a Unity script reload. If a module is disabled, its public SDK types are intentionally unavailable to gameplay code.",
+                        MessageType.Info);
 
-                    GUILayout.Space(12f);
+                    GUILayout.Space(8f);
 
-                    if (PlayServWindowChrome.DrawActionButton("Reset Defaults", PlayServWindowButtonTone.Secondary, GUILayout.Width(130f), GUILayout.Height(30f)))
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        settings.ResetToDefaults();
-                        changed = true;
+                        GUILayout.FlexibleSpace();
+
+                        if (PlayServWindowChrome.DrawActionButton("Validate Modules", PlayServWindowButtonTone.Secondary, GUILayout.Width(146f), GUILayout.Height(30f)))
+                            PlayServModuleValidator.RunInteractive();
+
+                        GUILayout.Space(8f);
+
+                        using (new EditorGUI.DisabledScope(EditorApplication.isCompiling || EditorApplication.isUpdating))
+                        {
+                            if (PlayServWindowChrome.DrawActionButton("Repair Modules", PlayServWindowButtonTone.Primary, GUILayout.Width(138f), GUILayout.Height(30f)))
+                                PlayServModuleRepairer.RunInteractive();
+                        }
+
+                        GUILayout.Space(8f);
+
+                        if (PlayServWindowChrome.DrawActionButton("Reset Defaults", PlayServWindowButtonTone.Secondary, GUILayout.Width(130f), GUILayout.Height(30f)))
+                        {
+                            settings.ResetToDefaults();
+                            changed = true;
+                        }
                     }
                 }
 

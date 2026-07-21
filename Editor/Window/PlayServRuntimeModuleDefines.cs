@@ -36,81 +36,39 @@ namespace Playserv.Editor
         public static PlayServRuntimeModuleState Load()
         {
             var defines = ReadDefines();
-            var rpcCoreDisabled = IsDisabled(defines, PlayServModuleManifest.RpcCoreId);
-            var state = new PlayServRuntimeModuleState
-            {
-                Events = IsEnabled(defines, PlayServModuleManifest.EventsId),
-                Data = IsEnabled(defines, PlayServModuleManifest.DataSubscriptionId),
-                Rpc = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ClientRpcId),
-                Server = !rpcCoreDisabled && IsEnabled(defines, PlayServModuleManifest.ServerId),
-                ClientExecution = IsEnabled(defines, PlayServModuleManifest.ClientExecutionId),
-                Spawn = IsEnabled(defines, PlayServModuleManifest.SpawnId) &&
-                        IsEnabled(defines, PlayServModuleManifest.EventsId),
-                Pulse = IsEnabled(defines, PlayServModuleManifest.PulseId),
-                AppleSignIn = IsEnabled(defines, PlayServModuleManifest.AppleSignInId),
-                GoogleSignIn = IsEnabled(defines, PlayServModuleManifest.GoogleSignInId),
-                TransportWebSocket = IsEnabled(defines, PlayServModuleManifest.TransportWebSocketId),
-                TransportUdp = IsEnabled(defines, PlayServModuleManifest.TransportUdpId),
-                TransportRudp = IsEnabled(defines, PlayServModuleManifest.TransportRudpId),
-                TransportWebRtc = IsEnabled(defines, PlayServModuleManifest.TransportWebRtcId)
-            };
-            NormalizeDependencies(ref state);
-            return state;
+            return CreateRuntimeState(moduleId => IsEnabled(defines, moduleId));
         }
 
         public static PlayServRuntimeModuleState LoadUserPreferenceState()
         {
-            var rpcCoreEnabled = IsEnabledByUserPreference(PlayServModuleManifest.RpcCoreId);
-            var eventsEnabled = IsEnabledByUserPreference(PlayServModuleManifest.EventsId);
-            var state = new PlayServRuntimeModuleState
-            {
-                Events = eventsEnabled,
-                Data = IsEnabledByUserPreference(PlayServModuleManifest.DataSubscriptionId),
-                Rpc = rpcCoreEnabled && IsEnabledByUserPreference(PlayServModuleManifest.ClientRpcId),
-                Server = rpcCoreEnabled && IsEnabledByUserPreference(PlayServModuleManifest.ServerId),
-                ClientExecution = IsEnabledByUserPreference(PlayServModuleManifest.ClientExecutionId),
-                Spawn = eventsEnabled && IsEnabledByUserPreference(PlayServModuleManifest.SpawnId),
-                Pulse = IsEnabledByUserPreference(PlayServModuleManifest.PulseId),
-                AppleSignIn = IsEnabledByUserPreference(PlayServModuleManifest.AppleSignInId),
-                GoogleSignIn = IsEnabledByUserPreference(PlayServModuleManifest.GoogleSignInId),
-                TransportWebSocket = IsEnabledByUserPreference(PlayServModuleManifest.TransportWebSocketId),
-                TransportUdp = IsEnabledByUserPreference(PlayServModuleManifest.TransportUdpId),
-                TransportRudp = IsEnabledByUserPreference(PlayServModuleManifest.TransportRudpId),
-                TransportWebRtc = IsEnabledByUserPreference(PlayServModuleManifest.TransportWebRtcId)
-            };
-            NormalizeDependencies(ref state);
-            return state;
+            return CreateRuntimeState(IsEnabledByUserPreference);
         }
 
         public static bool Apply(PlayServRuntimeModuleState state)
         {
-            NormalizeDependencies(ref state);
+            return Apply(state, syncModuleGraph: true);
+        }
+
+        internal static bool Apply(PlayServRuntimeModuleState state, bool syncModuleGraph)
+        {
+            if (state == null)
+                throw new ArgumentNullException(nameof(state));
+
+            NormalizeDependencies(state);
             WriteUserDisabledPrefs(state);
 
             var defines = ReadDefines();
             var changed = RemoveLegacyRuntimeModuleDefines(defines);
-            var rpcCoreEnabled = state.Rpc || state.Server;
-
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.EventsId, !state.Events);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.DataSubscriptionId, !state.Data);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.RpcCoreId, !rpcCoreEnabled);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientRpcId, !state.Rpc);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ServerId, !state.Server);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.ClientExecutionId, !state.ClientExecution);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.SpawnId, !state.Spawn);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.PulseId, !state.Pulse);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.AppleSignInId, !state.AppleSignIn);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.GoogleSignInId, !state.GoogleSignIn);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportWebSocketId, !state.TransportWebSocket);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportUdpId, !state.TransportUdp);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportRudpId, !state.TransportRudp);
-            changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportWebRtcId, !state.TransportWebRtc);
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+                changed |= SetModuleDisabled(defines, module.Id, !state.IsEnabled(module.Id));
 
             if (!changed)
                 return false;
 
             WriteDefines(defines);
-            PlayServModuleGraphSynchronizer.SyncNow();
+            if (syncModuleGraph)
+                PlayServModuleGraphSynchronizer.SyncNow();
+
             return true;
         }
 
@@ -224,24 +182,53 @@ namespace Playserv.Editor
             return true;
         }
 
-        public static void NormalizeDependencies(ref PlayServRuntimeModuleState state)
+        public static void NormalizeDependencies(PlayServRuntimeModuleState state)
         {
-            if (!state.ClientExecution)
+            if (state == null)
+                return;
+
+            var changed = true;
+            while (changed)
             {
-                state.Events = false;
-                state.Rpc = false;
-                state.Spawn = false;
-                state.Pulse = false;
-                state.AppleSignIn = false;
-                state.GoogleSignIn = false;
-                state.TransportWebSocket = false;
-                state.TransportUdp = false;
-                state.TransportRudp = false;
-                state.TransportWebRtc = false;
+                changed = false;
+                foreach (var module in PlayServModuleManifest.RuntimeModules)
+                {
+                    if (!state.IsEnabled(module.Id))
+                        continue;
+
+                    for (var i = 0; i < module.HiddenDependencyModuleIds.Length; i++)
+                    {
+                        var dependencyId = module.HiddenDependencyModuleIds[i];
+                        if (state.IsEnabled(dependencyId))
+                            continue;
+
+                        state.SetEnabled(dependencyId, true);
+                        changed = true;
+                    }
+
+                    for (var i = 0; i < module.DependencyIds.Length; i++)
+                    {
+                        if (state.IsEnabled(module.DependencyIds[i]))
+                            continue;
+
+                        state.SetEnabled(module.Id, false);
+                        changed = true;
+                        break;
+                    }
+                }
             }
 
-            if (!state.Events)
-                state.Spawn = false;
+            NormalizeHiddenDependencyModules(state);
+        }
+
+        private static PlayServRuntimeModuleState CreateRuntimeState(Func<string, bool> isEnabled)
+        {
+            var state = new PlayServRuntimeModuleState();
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+                state.SetEnabled(module.Id, isEnabled(module.Id));
+
+            NormalizeDependencies(state);
+            return state;
         }
 
         private static bool SetDisabled(ISet<string> defines, string symbol, bool disabled)
@@ -257,22 +244,44 @@ namespace Playserv.Editor
 
         private static void WriteUserDisabledPrefs(PlayServRuntimeModuleState state)
         {
-            var rpcCoreEnabled = state.Rpc || state.Server;
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+                SetUserModulePreference(module.Id, state.IsEnabled(module.Id));
+        }
 
-            SetUserModulePreference(PlayServModuleManifest.EventsId, state.Events);
-            SetUserModulePreference(PlayServModuleManifest.DataSubscriptionId, state.Data);
-            SetUserModulePreference(PlayServModuleManifest.RpcCoreId, rpcCoreEnabled);
-            SetUserModulePreference(PlayServModuleManifest.ClientRpcId, state.Rpc);
-            SetUserModulePreference(PlayServModuleManifest.ServerId, state.Server);
-            SetUserModulePreference(PlayServModuleManifest.ClientExecutionId, state.ClientExecution);
-            SetUserModulePreference(PlayServModuleManifest.SpawnId, state.Spawn);
-            SetUserModulePreference(PlayServModuleManifest.PulseId, state.Pulse);
-            SetUserModulePreference(PlayServModuleManifest.AppleSignInId, state.AppleSignIn);
-            SetUserModulePreference(PlayServModuleManifest.GoogleSignInId, state.GoogleSignIn);
-            SetUserModulePreference(PlayServModuleManifest.TransportWebSocketId, state.TransportWebSocket);
-            SetUserModulePreference(PlayServModuleManifest.TransportUdpId, state.TransportUdp);
-            SetUserModulePreference(PlayServModuleManifest.TransportRudpId, state.TransportRudp);
-            SetUserModulePreference(PlayServModuleManifest.TransportWebRtcId, state.TransportWebRtc);
+        private static void NormalizeHiddenDependencyModules(PlayServRuntimeModuleState state)
+        {
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (module.VisibleInSettings || !IsReferencedAsHiddenDependency(module.Id))
+                    continue;
+
+                state.SetEnabled(module.Id, IsHiddenDependencyRequired(state, module.Id));
+            }
+        }
+
+        private static bool IsReferencedAsHiddenDependency(string dependencyId)
+        {
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (module.HiddenDependencyModuleIds.Contains(dependencyId, StringComparer.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsHiddenDependencyRequired(PlayServRuntimeModuleState state, string dependencyId)
+        {
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (!state.IsEnabled(module.Id))
+                    continue;
+
+                if (module.HiddenDependencyModuleIds.Contains(dependencyId, StringComparer.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
 
         private static void SetUserModulePreference(string moduleId, bool enabled)

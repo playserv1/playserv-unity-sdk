@@ -6,6 +6,7 @@ using System.Linq;
 using UnityEngine;
 using Playserv.CodeGenerator;
 using Playserv.Editor;
+using Playserv.Modules;
 
 namespace Playserv.ModelGenerator.Editor
 {
@@ -141,7 +142,7 @@ namespace Playserv.ModelGenerator.Editor
 
         private static void ResetSchemaSelectionProviderIfAvailable()
         {
-            if (!PlayServEditorModuleAvailability.RuntimeData)
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(PlayServModuleManifest.DataSubscriptionId))
                 return;
 
             PlayServSchemaSelectionRegistry.TryReset();

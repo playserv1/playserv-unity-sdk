@@ -15,29 +15,17 @@ namespace Playserv.Editor
         private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions = BuildRuntimeModuleDefinitions();
 
         internal static IEnumerable<PlayServRuntimeModuleDefinition> AvailableRuntimeModules =>
-            RuntimeModuleDefinitions.Where(module => IsRuntimeModuleAvailable(module.Name));
+            RuntimeModuleDefinitions.Where(module => IsRuntimeModuleAvailable(module.Id));
 
         public static IEnumerable<PlayServModuleManifestEntry> AvailableExportModules =>
             PlayServModuleManifest.ExportableRuntimeModules.Where(IsRuntimeModuleAvailable);
 
-        public static bool RuntimeEvents => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleEvents);
-        public static bool RuntimeData => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleData);
-        public static bool RuntimeClientRpc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleRpc);
-        public static bool RuntimeServer => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServer);
-        public static bool RuntimeClientExecution => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleClientExecution);
-        public static bool RuntimeSpawn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleSpawn);
-        public static bool RuntimePulse => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModulePulse);
-        public static bool RuntimeAppleSignIn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleAppleSignIn);
-        public static bool RuntimeGoogleSignIn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleGoogleSignIn);
-        public static bool RuntimeTransportWebSocket => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportWebSocket);
-        public static bool RuntimeTransportUdp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportUdp);
-        public static bool RuntimeTransportRudp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportRudp);
-        public static bool RuntimeTransportWebRtc => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportWebRtc);
-
         public static bool EditorDeployment => HasFolder("Editor/Deploy");
         public static bool EditorModelSync => HasFolder("Editor/ModelGenerator");
         public static bool EditorCodegen => HasFolder("Editor/CodeGenerator") && HasFolder("Runtime/CodeGenerator/Shared");
-        public static bool EditorEvents => HasFolder("Editor/Events") && RuntimeEvents;
+        public static bool EditorEvents =>
+            HasFolder("Editor/Events") &&
+            IsRuntimeModuleAvailable(PlayServModuleManifest.EventsId);
         public static bool EditorModuleStressTests => HasFolder("Editor/ModuleStressTests");
 
         public static bool HasAnyEditorTool =>
@@ -59,38 +47,10 @@ namespace Playserv.Editor
                 module.Id,
                 module.Label,
                 module.Description,
-                BuildRequiredFolderPaths(module),
                 ToLabels(module.DependencyIds),
                 BuildDependentLabels(module.Id),
-                ResolveIsEnabled(module.Id),
-                ResolveSetEnabled(module.Id));
-        }
-
-        private static string[] BuildRequiredFolderPaths(PlayServModuleManifestEntry module)
-        {
-            var paths = new List<string>();
-            AddModuleAssetPaths(module, paths, new HashSet<string>(StringComparer.Ordinal));
-            return paths
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static void AddModuleAssetPaths(
-            PlayServModuleManifestEntry module,
-            List<string> paths,
-            ISet<string> visited)
-        {
-            if (module == null || !visited.Add(module.Id))
-                return;
-
-            paths.AddRange(module.AssetPaths);
-            paths.AddRange(module.HiddenDependencyAssetPaths);
-
-            for (var i = 0; i < module.HiddenDependencyModuleIds.Length; i++)
-            {
-                if (PlayServModuleManifest.TryGet(module.HiddenDependencyModuleIds[i], out var dependency))
-                    AddModuleAssetPaths(dependency, paths, visited);
-            }
+                settings => settings.IsRuntimeModuleEnabled(module.Id),
+                (settings, enabled) => settings.SetRuntimeModuleEnabled(module.Id, enabled));
         }
 
         private static string[] ToLabels(string[] moduleIds)
@@ -111,140 +71,80 @@ namespace Playserv.Editor
                 .ToArray();
         }
 
-        private static Func<PlayServEditorModuleSettings, bool> ResolveIsEnabled(string moduleId)
+        public static bool IsRuntimeModuleAvailable(string moduleIdOrLabel)
         {
-            switch (moduleId)
-            {
-                case PlayServModuleManifest.EventsId:
-                    return settings => settings.RuntimeEvents;
-                case PlayServModuleManifest.DataSubscriptionId:
-                    return settings => settings.RuntimeData;
-                case PlayServModuleManifest.ClientRpcId:
-                    return settings => settings.RuntimeRpc;
-                case PlayServModuleManifest.ServerId:
-                    return settings => settings.RuntimeServer;
-                case PlayServModuleManifest.ClientExecutionId:
-                    return settings => settings.RuntimeClientExecution;
-                case PlayServModuleManifest.SpawnId:
-                    return settings => settings.RuntimeSpawn;
-                case PlayServModuleManifest.PulseId:
-                    return settings => settings.RuntimePulse;
-                case PlayServModuleManifest.AppleSignInId:
-                    return settings => settings.RuntimeAppleSignIn;
-                case PlayServModuleManifest.GoogleSignInId:
-                    return settings => settings.RuntimeGoogleSignIn;
-                case PlayServModuleManifest.TransportWebSocketId:
-                    return settings => settings.RuntimeTransportWebSocket;
-                case PlayServModuleManifest.TransportUdpId:
-                    return settings => settings.RuntimeTransportUdp;
-                case PlayServModuleManifest.TransportRudpId:
-                    return settings => settings.RuntimeTransportRudp;
-                case PlayServModuleManifest.TransportWebRtcId:
-                    return settings => settings.RuntimeTransportWebRtc;
-                default:
-                    return _ => false;
-            }
-        }
-
-        private static Func<PlayServEditorModuleSettings, bool, bool> ResolveSetEnabled(string moduleId)
-        {
-            switch (moduleId)
-            {
-                case PlayServModuleManifest.EventsId:
-                    return (settings, enabled) => settings.SetRuntimeEvents(enabled);
-                case PlayServModuleManifest.DataSubscriptionId:
-                    return (settings, enabled) => settings.SetRuntimeData(enabled);
-                case PlayServModuleManifest.ClientRpcId:
-                    return (settings, enabled) => settings.SetRuntimeRpc(enabled);
-                case PlayServModuleManifest.ServerId:
-                    return (settings, enabled) => settings.SetRuntimeServer(enabled);
-                case PlayServModuleManifest.ClientExecutionId:
-                    return (settings, enabled) => settings.SetRuntimeClientExecution(enabled);
-                case PlayServModuleManifest.SpawnId:
-                    return (settings, enabled) => settings.SetRuntimeSpawn(enabled);
-                case PlayServModuleManifest.PulseId:
-                    return (settings, enabled) => settings.SetRuntimePulse(enabled);
-                case PlayServModuleManifest.AppleSignInId:
-                    return (settings, enabled) => settings.SetRuntimeAppleSignIn(enabled);
-                case PlayServModuleManifest.GoogleSignInId:
-                    return (settings, enabled) => settings.SetRuntimeGoogleSignIn(enabled);
-                case PlayServModuleManifest.TransportWebSocketId:
-                    return (settings, enabled) => settings.SetRuntimeTransportWebSocket(enabled);
-                case PlayServModuleManifest.TransportUdpId:
-                    return (settings, enabled) => settings.SetRuntimeTransportUdp(enabled);
-                case PlayServModuleManifest.TransportRudpId:
-                    return (settings, enabled) => settings.SetRuntimeTransportRudp(enabled);
-                case PlayServModuleManifest.TransportWebRtcId:
-                    return (settings, enabled) => settings.SetRuntimeTransportWebRtc(enabled);
-                default:
-                    return (_, __) => false;
-            }
-        }
-
-        public static bool IsRuntimeModuleAvailable(string moduleName)
-        {
-            if (string.Equals(moduleName, PlayServEditorModuleSettings.RuntimeModuleRpcCore, StringComparison.Ordinal))
-                return RuntimeClientRpc || RuntimeServer;
-
-            return IsRuntimeModuleAvailable(moduleName, new HashSet<string>(StringComparer.Ordinal));
+            return PlayServModuleManifest.TryResolve(moduleIdOrLabel, out var module) &&
+                   IsRuntimeModuleAvailable(module, new HashSet<string>(StringComparer.Ordinal));
         }
 
         public static bool IsRuntimeModuleAvailable(PlayServModuleManifestEntry module)
         {
-            return module != null && IsRuntimeModuleAvailable(module.Label);
+            return module != null &&
+                   IsRuntimeModuleAvailable(module, new HashSet<string>(StringComparer.Ordinal));
         }
 
-        private static bool IsRuntimeModuleAvailable(string moduleName, ISet<string> visited)
+        private static bool IsRuntimeModuleAvailable(
+            PlayServModuleManifestEntry module,
+            ISet<string> visited)
         {
-            if (string.Equals(moduleName, PlayServEditorModuleSettings.RuntimeModuleRpcCore, StringComparison.Ordinal))
-                return IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleRpc, visited) ||
-                       IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleServer, visited);
-
-            var module = FindRuntimeModule(moduleName);
-            if (module == null || !module.HasRequiredFolders)
+            if (module == null)
                 return false;
 
-            if (!visited.Add(module.Name))
+            if (!visited.Add(module.Id))
                 return true;
 
-            for (var i = 0; i < module.Dependencies.Length; i++)
+            if (!HasRequiredAssets(module.AssetPaths) ||
+                !HasRequiredAssets(module.HiddenDependencyAssetPaths))
             {
-                if (!IsRuntimeModuleAvailable(module.Dependencies[i], visited))
+                return false;
+            }
+
+            if (!AreDependenciesAvailable(module.DependencyIds, visited) ||
+                !AreDependenciesAvailable(module.HiddenDependencyModuleIds, visited))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool AreDependenciesAvailable(string[] dependencyIds, ISet<string> visited)
+        {
+            for (var i = 0; i < dependencyIds.Length; i++)
+            {
+                if (!PlayServModuleManifest.TryGet(dependencyIds[i], out var dependency) ||
+                    !IsRuntimeModuleAvailable(dependency, visited))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasRequiredAssets(string[] relativePaths)
+        {
+            for (var i = 0; i < relativePaths.Length; i++)
+            {
+                if (!HasAssetPath(relativePaths[i]))
                     return false;
             }
 
             return true;
         }
 
-        internal static void NormalizeAvailableRuntimeState(ref PlayServRuntimeModuleState state)
+        internal static void NormalizeAvailableRuntimeState(PlayServRuntimeModuleState state)
         {
-            state.Events &= RuntimeEvents;
-            state.Data &= RuntimeData;
-            state.Rpc &= RuntimeClientRpc;
-            state.Server &= RuntimeServer;
-            state.ClientExecution &= RuntimeClientExecution;
-            if (!state.ClientExecution)
+            if (state == null)
+                return;
+
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
             {
-                state.Events = false;
-                state.Rpc = false;
-                state.Spawn = false;
-                state.Pulse = false;
-                state.AppleSignIn = false;
-                state.GoogleSignIn = false;
-                state.TransportWebSocket = false;
-                state.TransportUdp = false;
-                state.TransportRudp = false;
-                state.TransportWebRtc = false;
+                if (!IsRuntimeModuleAvailable(module))
+                    state.SetEnabled(module.Id, false);
             }
 
-            state.Spawn &= RuntimeSpawn;
-            state.Pulse &= RuntimePulse;
-            state.AppleSignIn &= RuntimeAppleSignIn;
-            state.GoogleSignIn &= RuntimeGoogleSignIn;
-            state.TransportWebSocket &= RuntimeTransportWebSocket;
-            state.TransportUdp &= RuntimeTransportUdp;
-            state.TransportRudp &= RuntimeTransportRudp;
-            state.TransportWebRtc &= RuntimeTransportWebRtc;
+            PlayServRuntimeModuleDefines.NormalizeDependencies(state);
         }
 
         public static void SyncUnavailableModuleDefines()
@@ -286,17 +186,6 @@ namespace Playserv.Editor
         {
             return TryGetPackageRoot(out var packageRoot) &&
                    Directory.Exists(packageRoot.ToAbsolutePath(relativePath));
-        }
-
-        private static PlayServRuntimeModuleDefinition FindRuntimeModule(string moduleName)
-        {
-            for (var i = 0; i < RuntimeModuleDefinitions.Length; i++)
-            {
-                if (string.Equals(RuntimeModuleDefinitions[i].Name, moduleName, StringComparison.Ordinal))
-                    return RuntimeModuleDefinitions[i];
-            }
-
-            return null;
         }
 
         private static bool TryGetPackageRoot(out PlayServPackageRoot packageRoot)
@@ -350,7 +239,6 @@ namespace Playserv.Editor
 
         internal sealed class PlayServRuntimeModuleDefinition
         {
-            private readonly string[] _folderPaths;
             private readonly Func<PlayServEditorModuleSettings, bool> _isEnabled;
             private readonly Func<PlayServEditorModuleSettings, bool, bool> _setEnabled;
 
@@ -358,7 +246,6 @@ namespace Playserv.Editor
                 string id,
                 string name,
                 string description,
-                string[] folderPaths,
                 string[] dependencies,
                 string[] dependents,
                 Func<PlayServEditorModuleSettings, bool> isEnabled,
@@ -369,7 +256,6 @@ namespace Playserv.Editor
                 Description = description ?? string.Empty;
                 Dependencies = dependencies ?? Array.Empty<string>();
                 Dependents = dependents ?? Array.Empty<string>();
-                _folderPaths = folderPaths ?? Array.Empty<string>();
                 _isEnabled = isEnabled ?? throw new ArgumentNullException(nameof(isEnabled));
                 _setEnabled = setEnabled ?? throw new ArgumentNullException(nameof(setEnabled));
             }
@@ -379,20 +265,6 @@ namespace Playserv.Editor
             public string Description { get; }
             public string[] Dependencies { get; }
             public string[] Dependents { get; }
-
-            public bool HasRequiredFolders
-            {
-                get
-                {
-                    for (var i = 0; i < _folderPaths.Length; i++)
-                    {
-                        if (!HasAssetPath(_folderPaths[i]))
-                            return false;
-                    }
-
-                    return true;
-                }
-            }
 
             public bool IsEnabled(PlayServEditorModuleSettings settings)
             {

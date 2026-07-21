@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Playserv.Modules;
 using UnityEditor;
 
 namespace Playserv.Events.Editor
@@ -139,9 +140,10 @@ namespace Playserv.Events.Editor
         private static bool IsEventsModuleEnabled()
         {
             var state = Playserv.Editor.PlayServRuntimeModuleDefines.Load();
-            Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
-            Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
-            return state.Events && Playserv.Editor.PlayServEditorModuleAvailability.EditorEvents;
+            Playserv.Editor.PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
+            Playserv.Editor.PlayServRuntimeModuleDefines.NormalizeDependencies(state);
+            return state.IsEnabled(PlayServModuleManifest.EventsId) &&
+                   Playserv.Editor.PlayServEditorModuleAvailability.EditorEvents;
         }
     }
 }

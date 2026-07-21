@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Playserv.Modules;
 using UnityEditor;
 
@@ -8,38 +9,12 @@ namespace Playserv.Editor
     {
         private const bool DefaultOptionalModuleState = true;
         private const bool DefaultInternalToolState = false;
-        public const string RuntimeModuleEvents = "Events";
-        public const string RuntimeModuleData = "Data Subscription";
-        public const string RuntimeModuleRpcCore = "RPC Core";
-        public const string RuntimeModuleRpc = "RPC";
-        public const string RuntimeModuleServer = "Server";
-        public const string RuntimeModuleClientExecution = "Client Execution";
-        public const string RuntimeModuleSpawn = "Spawn";
-        public const string RuntimeModulePulse = "Pulse";
-        public const string RuntimeModuleAppleSignIn = "Apple Sign In";
-        public const string RuntimeModuleGoogleSignIn = "Google Sign In";
-        public const string RuntimeModuleTransportWebSocket = "WebSocket";
-        public const string RuntimeModuleTransportUdp = "UDP";
-        public const string RuntimeModuleTransportRudp = "RUDP";
-        public const string RuntimeModuleTransportWebRtc = "WebRTC";
+        private PlayServRuntimeModuleState _runtimeState = new PlayServRuntimeModuleState();
 
         public bool Deployment { get; private set; } = DefaultOptionalModuleState;
         public bool ModelSync { get; private set; } = DefaultOptionalModuleState;
         public bool Codegen { get; private set; } = DefaultOptionalModuleState;
         public bool ModuleStressTests { get; private set; } = DefaultInternalToolState;
-        public bool RuntimeEvents { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeData { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeRpc { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeServer { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeClientExecution { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeSpawn { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimePulse { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeAppleSignIn { get; private set; } = DefaultInternalToolState;
-        public bool RuntimeGoogleSignIn { get; private set; } = DefaultInternalToolState;
-        public bool RuntimeTransportWebSocket { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeTransportUdp { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeTransportRudp { get; private set; } = DefaultOptionalModuleState;
-        public bool RuntimeTransportWebRtc { get; private set; } = DefaultOptionalModuleState;
         public bool SdkLogs { get; private set; } = true;
 
         public void Load()
@@ -81,259 +56,71 @@ namespace Playserv.Editor
             return PlayServRuntimeModuleDefines.SetSdkLogsEnabled(enabled);
         }
 
-        public bool SetRuntimeEvents(bool enabled)
+        public bool SetRuntimeModuleEnabled(string moduleId, bool enabled)
         {
-            if (!PlayServEditorModuleAvailability.RuntimeEvents)
+            if (!PlayServModuleManifest.TryGet(moduleId, out var module))
                 return false;
 
-            if (enabled && !RuntimeClientExecution)
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
                 return false;
 
-            if (!enabled && !CanDisableRuntimeEvents)
+            var state = _runtimeState.Clone();
+            if (state.IsEnabled(moduleId) == enabled)
                 return false;
 
-            var state = CreateRuntimeState();
-            state.Events = enabled;
+            if (enabled && TryBuildMissingDependencyList(module, state, out _))
+                return false;
+
+            if (!enabled && TryBuildEnabledDependentList(module.Id, state, out _))
+                return false;
+
+            state.SetEnabled(moduleId, enabled);
             return ApplyRuntimeState(state);
         }
-
-        public bool SetRuntimeData(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeData)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.Data = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeRpc(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeClientRpc)
-                return false;
-
-            if (enabled && !RuntimeClientExecution)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.Rpc = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeServer(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeServer)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.Server = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeClientExecution(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeClientExecution)
-                return false;
-
-            if (!enabled && !CanDisableRuntimeClientExecution)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.ClientExecution = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeSpawn(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeSpawn)
-                return false;
-
-            if (enabled && !RuntimeEvents)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.Spawn = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimePulse(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimePulse)
-                return false;
-
-            if (enabled && !RuntimeClientExecution)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.Pulse = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeAppleSignIn(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeAppleSignIn)
-                return false;
-
-            if (enabled && !RuntimeClientExecution)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.AppleSignIn = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeGoogleSignIn(bool enabled)
-        {
-            if (!PlayServEditorModuleAvailability.RuntimeGoogleSignIn)
-                return false;
-
-            if (enabled && !RuntimeClientExecution)
-                return false;
-
-            var state = CreateRuntimeState();
-            state.GoogleSignIn = enabled;
-            return ApplyRuntimeState(state);
-        }
-
-        public bool SetRuntimeTransportWebSocket(bool enabled) =>
-            SetRuntimeTransportModule(
-                enabled,
-                PlayServEditorModuleAvailability.RuntimeTransportWebSocket,
-                PlayServModuleManifest.TransportWebSocketId);
-
-        public bool SetRuntimeTransportUdp(bool enabled) =>
-            SetRuntimeTransportModule(
-                enabled,
-                PlayServEditorModuleAvailability.RuntimeTransportUdp,
-                PlayServModuleManifest.TransportUdpId);
-
-        public bool SetRuntimeTransportRudp(bool enabled) =>
-            SetRuntimeTransportModule(
-                enabled,
-                PlayServEditorModuleAvailability.RuntimeTransportRudp,
-                PlayServModuleManifest.TransportRudpId);
-
-        public bool SetRuntimeTransportWebRtc(bool enabled) =>
-            SetRuntimeTransportModule(
-                enabled,
-                PlayServEditorModuleAvailability.RuntimeTransportWebRtc,
-                PlayServModuleManifest.TransportWebRtcId);
 
         public bool CanChangeRuntimeModule(string moduleName)
         {
-            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+            if (!TryGetRuntimeModuleByName(moduleName, out var module))
                 return false;
 
-            switch (moduleName)
-            {
-                case RuntimeModuleClientExecution:
-                    return !RuntimeClientExecution || CanDisableRuntimeClientExecution;
-                case RuntimeModuleEvents:
-                    return RuntimeEvents ? CanDisableRuntimeEvents : RuntimeClientExecution;
-                case RuntimeModuleData:
-                    return true;
-                case RuntimeModuleRpc:
-                    return RuntimeRpc || RuntimeClientExecution;
-                case RuntimeModuleServer:
-                    return true;
-                case RuntimeModuleSpawn:
-                    return RuntimeSpawn || RuntimeEvents;
-                case RuntimeModulePulse:
-                    return RuntimePulse || RuntimeClientExecution;
-                case RuntimeModuleAppleSignIn:
-                    return RuntimeAppleSignIn || RuntimeClientExecution;
-                case RuntimeModuleGoogleSignIn:
-                    return RuntimeGoogleSignIn || RuntimeClientExecution;
-                case RuntimeModuleTransportWebSocket:
-                    return RuntimeTransportWebSocket || RuntimeClientExecution;
-                case RuntimeModuleTransportUdp:
-                    return RuntimeTransportUdp || RuntimeClientExecution;
-                case RuntimeModuleTransportRudp:
-                    return RuntimeTransportRudp || RuntimeClientExecution;
-                case RuntimeModuleTransportWebRtc:
-                    return RuntimeTransportWebRtc || RuntimeClientExecution;
-                default:
-                    return true;
-            }
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
+                return false;
+
+            return _runtimeState.IsEnabled(module.Id)
+                ? !TryBuildEnabledDependentList(module.Id, _runtimeState, out _)
+                : !TryBuildMissingDependencyList(module, _runtimeState, out _);
         }
 
         public string GetRuntimeModuleBlockReason(string moduleName)
         {
-            switch (moduleName)
+            if (!TryGetRuntimeModuleByName(moduleName, out var module))
+                return string.Empty;
+
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
+                return string.Empty;
+
+            if (_runtimeState.IsEnabled(module.Id) &&
+                TryBuildEnabledDependentList(module.Id, _runtimeState, out var dependents))
             {
-                case RuntimeModuleClientExecution:
-                    return RuntimeClientExecution && !CanDisableRuntimeClientExecution
-                        ? $"Disable dependent modules first: {BuildEnabledClientDependentsList()}."
-                        : string.Empty;
-                case RuntimeModuleEvents:
-                    return RuntimeEvents && !CanDisableRuntimeEvents
-                        ? $"Disable dependent modules first: {BuildEnabledDependentsList(RuntimeSpawn)}."
-                        : string.Empty;
-                case RuntimeModuleData:
-                    return string.Empty;
-                case RuntimeModuleRpc:
-                    return !RuntimeRpc && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleServer:
-                    return string.Empty;
-                case RuntimeModuleSpawn:
-                    return !RuntimeSpawn && !RuntimeEvents ? "Enable Events first." : string.Empty;
-                case RuntimeModulePulse:
-                    return !RuntimePulse && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleAppleSignIn:
-                    return !RuntimeAppleSignIn && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleGoogleSignIn:
-                    return !RuntimeGoogleSignIn && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleTransportWebSocket:
-                    return !RuntimeTransportWebSocket && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleTransportUdp:
-                    return !RuntimeTransportUdp && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleTransportRudp:
-                    return !RuntimeTransportRudp && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                case RuntimeModuleTransportWebRtc:
-                    return !RuntimeTransportWebRtc && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
-                default:
-                    return string.Empty;
+                return $"Disable dependent modules first: {dependents}.";
             }
+
+            if (!_runtimeState.IsEnabled(module.Id) &&
+                TryBuildMissingDependencyList(module, _runtimeState, out var dependencies))
+            {
+                return $"Enable {dependencies} first.";
+            }
+
+            return string.Empty;
         }
 
         public bool IsRuntimeModuleEnabled(string moduleName)
         {
-            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+            if (!TryGetRuntimeModuleByName(moduleName, out var module))
                 return false;
 
-            switch (moduleName)
-            {
-                case RuntimeModuleEvents:
-                    return RuntimeEvents;
-                case RuntimeModuleData:
-                    return RuntimeData;
-                case RuntimeModuleRpcCore:
-                    return RuntimeRpc || RuntimeServer;
-                case RuntimeModuleRpc:
-                    return RuntimeRpc;
-                case RuntimeModuleServer:
-                    return RuntimeServer;
-                case RuntimeModuleClientExecution:
-                    return RuntimeClientExecution;
-                case RuntimeModuleSpawn:
-                    return RuntimeSpawn;
-                case RuntimeModulePulse:
-                    return RuntimePulse;
-                case RuntimeModuleAppleSignIn:
-                    return RuntimeAppleSignIn;
-                case RuntimeModuleGoogleSignIn:
-                    return RuntimeGoogleSignIn;
-                case RuntimeModuleTransportWebSocket:
-                    return RuntimeTransportWebSocket;
-                case RuntimeModuleTransportUdp:
-                    return RuntimeTransportUdp;
-                case RuntimeModuleTransportRudp:
-                    return RuntimeTransportRudp;
-                case RuntimeModuleTransportWebRtc:
-                    return RuntimeTransportWebRtc;
-                default:
-                    return false;
-            }
+            return PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module) &&
+                   _runtimeState.IsEnabled(module.Id);
         }
 
         public void ResetToDefaults()
@@ -359,22 +146,11 @@ namespace Playserv.Editor
             if (profile == null)
                 throw new ArgumentNullException(nameof(profile));
 
-            return ApplyRuntimeState(new PlayServRuntimeModuleState
-            {
-                Events = IsProfileModuleEnabled(profile, PlayServModuleManifest.EventsId),
-                Data = IsProfileModuleEnabled(profile, PlayServModuleManifest.DataSubscriptionId),
-                Rpc = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientRpcId),
-                Server = IsProfileModuleEnabled(profile, PlayServModuleManifest.ServerId),
-                ClientExecution = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientExecutionId),
-                Spawn = IsProfileModuleEnabled(profile, PlayServModuleManifest.SpawnId),
-                Pulse = IsProfileModuleEnabled(profile, PlayServModuleManifest.PulseId),
-                AppleSignIn = IsProfileModuleEnabled(profile, PlayServModuleManifest.AppleSignInId),
-                GoogleSignIn = IsProfileModuleEnabled(profile, PlayServModuleManifest.GoogleSignInId),
-                TransportWebSocket = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportWebSocketId),
-                TransportUdp = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportUdpId),
-                TransportRudp = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportRudpId),
-                TransportWebRtc = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportWebRtcId)
-            });
+            var state = new PlayServRuntimeModuleState();
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+                state.SetEnabled(module.Id, IsProfileModuleEnabled(profile, module.Id));
+
+            return ApplyRuntimeState(state);
         }
 
         private static bool Set(string key, bool current, bool enabled, Action<bool> assign)
@@ -387,158 +163,19 @@ namespace Playserv.Editor
             return true;
         }
 
-        private bool CanDisableRuntimeEvents => !RuntimeSpawn;
-
-        private bool CanDisableRuntimeClientExecution =>
-            !RuntimeEvents &&
-            !RuntimeRpc &&
-            !RuntimePulse &&
-            !RuntimeAppleSignIn &&
-            !RuntimeGoogleSignIn &&
-            !RuntimeTransportWebSocket &&
-            !RuntimeTransportUdp &&
-            !RuntimeTransportRudp &&
-            !RuntimeTransportWebRtc;
-
-        private static string BuildEnabledDependentsList(bool spawnEnabled)
-        {
-            if (spawnEnabled)
-                return RuntimeModuleSpawn;
-
-            return string.Empty;
-        }
-
-        private string BuildEnabledClientDependentsList()
-        {
-            var result = string.Empty;
-
-            AppendEnabledModule(ref result, RuntimeEvents, RuntimeModuleEvents);
-            AppendEnabledModule(ref result, RuntimeRpc, RuntimeModuleRpc);
-            AppendEnabledModule(ref result, RuntimePulse, RuntimeModulePulse);
-            AppendEnabledModule(ref result, RuntimeAppleSignIn, RuntimeModuleAppleSignIn);
-            AppendEnabledModule(ref result, RuntimeGoogleSignIn, RuntimeModuleGoogleSignIn);
-            AppendEnabledModule(ref result, RuntimeTransportWebSocket, RuntimeModuleTransportWebSocket);
-            AppendEnabledModule(ref result, RuntimeTransportUdp, RuntimeModuleTransportUdp);
-            AppendEnabledModule(ref result, RuntimeTransportRudp, RuntimeModuleTransportRudp);
-            AppendEnabledModule(ref result, RuntimeTransportWebRtc, RuntimeModuleTransportWebRtc);
-
-            return result;
-        }
-
-        private static void AppendEnabledModule(ref string result, bool enabled, string moduleName)
-        {
-            if (!enabled)
-                return;
-
-            result = string.IsNullOrEmpty(result)
-                ? moduleName
-                : $"{result}, {moduleName}";
-        }
-
         private void LoadRuntimeModuleDefines()
         {
-            var state = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
-            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
-            RuntimeEvents = state.Events;
-            RuntimeData = state.Data;
-            RuntimeRpc = state.Rpc;
-            RuntimeServer = state.Server;
-            RuntimeClientExecution = state.ClientExecution;
-            RuntimeSpawn = state.Spawn;
-            RuntimePulse = state.Pulse;
-            RuntimeAppleSignIn = state.AppleSignIn;
-            RuntimeGoogleSignIn = state.GoogleSignIn;
-            RuntimeTransportWebSocket = state.TransportWebSocket;
-            RuntimeTransportUdp = state.TransportUdp;
-            RuntimeTransportRudp = state.TransportRudp;
-            RuntimeTransportWebRtc = state.TransportWebRtc;
-        }
-
-        private PlayServRuntimeModuleState CreateRuntimeState()
-        {
-            return new PlayServRuntimeModuleState
-            {
-                Events = RuntimeEvents,
-                Data = RuntimeData,
-                Rpc = RuntimeRpc,
-                Server = RuntimeServer,
-                ClientExecution = RuntimeClientExecution,
-                Spawn = RuntimeSpawn,
-                Pulse = RuntimePulse,
-                AppleSignIn = RuntimeAppleSignIn,
-                GoogleSignIn = RuntimeGoogleSignIn,
-                TransportWebSocket = RuntimeTransportWebSocket,
-                TransportUdp = RuntimeTransportUdp,
-                TransportRudp = RuntimeTransportRudp,
-                TransportWebRtc = RuntimeTransportWebRtc
-            };
-        }
-
-        private bool SetRuntimeTransportModule(
-            bool enabled,
-            bool available,
-            string moduleId)
-        {
-            if (!available)
-                return false;
-
-            if (enabled && !RuntimeClientExecution)
-                return false;
-
-            var state = CreateRuntimeState();
-            switch (moduleId)
-            {
-                case PlayServModuleManifest.TransportWebSocketId:
-                    state.TransportWebSocket = enabled;
-                    break;
-                case PlayServModuleManifest.TransportUdpId:
-                    state.TransportUdp = enabled;
-                    break;
-                case PlayServModuleManifest.TransportRudpId:
-                    state.TransportRudp = enabled;
-                    break;
-                case PlayServModuleManifest.TransportWebRtcId:
-                    state.TransportWebRtc = enabled;
-                    break;
-                default:
-                    return false;
-            }
-
-            return ApplyRuntimeState(state);
+            _runtimeState = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(_runtimeState);
         }
 
         private bool ApplyRuntimeState(PlayServRuntimeModuleState state)
         {
-            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(ref state);
-            PlayServRuntimeModuleDefines.NormalizeDependencies(ref state);
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(state);
 
-            var changed = RuntimeEvents != state.Events ||
-                          RuntimeData != state.Data ||
-                          RuntimeRpc != state.Rpc ||
-                          RuntimeServer != state.Server ||
-                          RuntimeClientExecution != state.ClientExecution ||
-                          RuntimeSpawn != state.Spawn ||
-                          RuntimePulse != state.Pulse ||
-                          RuntimeAppleSignIn != state.AppleSignIn ||
-                          RuntimeGoogleSignIn != state.GoogleSignIn ||
-                          RuntimeTransportWebSocket != state.TransportWebSocket ||
-                          RuntimeTransportUdp != state.TransportUdp ||
-                          RuntimeTransportRudp != state.TransportRudp ||
-                          RuntimeTransportWebRtc != state.TransportWebRtc;
-
-            RuntimeEvents = state.Events;
-            RuntimeData = state.Data;
-            RuntimeRpc = state.Rpc;
-            RuntimeServer = state.Server;
-            RuntimeClientExecution = state.ClientExecution;
-            RuntimeSpawn = state.Spawn;
-            RuntimePulse = state.Pulse;
-            RuntimeAppleSignIn = state.AppleSignIn;
-            RuntimeGoogleSignIn = state.GoogleSignIn;
-            RuntimeTransportWebSocket = state.TransportWebSocket;
-            RuntimeTransportUdp = state.TransportUdp;
-            RuntimeTransportRudp = state.TransportRudp;
-            RuntimeTransportWebRtc = state.TransportWebRtc;
+            var changed = !_runtimeState.HasSameEnabledModules(state);
+            _runtimeState = state.Clone();
 
             return PlayServRuntimeModuleDefines.Apply(state) || changed;
         }
@@ -546,6 +183,58 @@ namespace Playserv.Editor
         private static bool IsProfileModuleEnabled(PlayServSdkProfile profile, string moduleId)
         {
             return profile.EnablesModule(moduleId);
+        }
+
+        private static bool TryGetRuntimeModuleByName(string moduleName, out PlayServModuleManifestEntry module)
+        {
+            return PlayServModuleManifest.TryResolve(moduleName, out module);
+        }
+
+        private static bool TryBuildMissingDependencyList(
+            PlayServModuleManifestEntry module,
+            PlayServRuntimeModuleState state,
+            out string dependencies)
+        {
+            var labels = new List<string>();
+            for (var i = 0; i < module.DependencyIds.Length; i++)
+            {
+                if (state.IsEnabled(module.DependencyIds[i]))
+                    continue;
+
+                labels.Add(PlayServModuleManifest.GetLabel(module.DependencyIds[i]));
+            }
+
+            dependencies = string.Join(", ", labels);
+            return labels.Count > 0;
+        }
+
+        private static bool TryBuildEnabledDependentList(
+            string moduleId,
+            PlayServRuntimeModuleState state,
+            out string dependents)
+        {
+            var labels = new List<string>();
+            foreach (var module in PlayServModuleManifest.VisibleRuntimeModules)
+            {
+                if (!state.IsEnabled(module.Id) || !HasDependency(module, moduleId))
+                    continue;
+
+                labels.Add(module.Label);
+            }
+
+            dependents = string.Join(", ", labels);
+            return labels.Count > 0;
+        }
+
+        private static bool HasDependency(PlayServModuleManifestEntry module, string dependencyId)
+        {
+            for (var i = 0; i < module.DependencyIds.Length; i++)
+            {
+                if (string.Equals(module.DependencyIds[i], dependencyId, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

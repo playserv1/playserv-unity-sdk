@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Playserv.Editor;
 using Playserv.ModelGenerator.Editor;
+using Playserv.Modules;
 using Playserv.Wrapper;
 using UnityEditor;
 using UnityEngine;
@@ -383,7 +384,7 @@ public static class SchemaLoader
 
     private static void ResetSchemaSelectionProviderIfAvailable()
     {
-        if (!PlayServEditorModuleAvailability.RuntimeData)
+        if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(PlayServModuleManifest.DataSubscriptionId))
             return;
 
         PlayServSchemaSelectionRegistry.TryReset();
