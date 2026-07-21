@@ -13,7 +13,6 @@ namespace Playserv.Editor
         private const string SchemaApiServerAddressPropertyName = "schemaApiServerAddress";
         private const string DashboardAddressPropertyName = "dashboardAddress";
         private const string LegacyDefaultSdkVersion = "1.0.0";
-        private const string FallbackSdkVersion = "0.2.3";
 
         public static PlayServConfig GetOrCreate()
         {
@@ -182,7 +181,9 @@ namespace Playserv.Editor
                 return false;
 
             var currentValue = sdkVersionProperty.stringValue?.Trim();
-            var currentPackageVersion = PlayServPackageVersionProvider.ResolveInstalledVersion(FallbackSdkVersion);
+            if (!PlayServPackageVersionProvider.TryResolveInstalledVersion(out var currentPackageVersion))
+                return false;
+
             var shouldReplace = !string.Equals(currentValue, currentPackageVersion, System.StringComparison.Ordinal) ||
                                 string.Equals(currentValue, LegacyDefaultSdkVersion, System.StringComparison.Ordinal);
             if (!shouldReplace)

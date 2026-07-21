@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Editor.AppleSignIn",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Runtime.Modules.AppleSignIn"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

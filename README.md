@@ -52,11 +52,36 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 - Release tag should match package version with `v` prefix (example: `v0.1.0`).
 - `CHANGELOG.md` must include a heading for the same package version.
 - The editor window displays the installed package version from Package Manager/package.json.
+- Runtime SDK version constants are synchronized from `package.json` by `Tools/PlayServ/Internal/Sync SDK Version From package.json`.
 
 ## Server SDK
 
 Server/shared runtime build instructions are documented in `SERVER_SDK.md`.
 Unity package export and OpenUPM export do not build the server/shared runtime assembly.
+
+## Apple Sign In module
+
+Apple Sign In is an optional client module. Open `Tools/PlayServ/Settings`, enable `Apple Sign In` in runtime modules, then use `Create/Select Settings` in the Apple Sign In section to create `Assets/Resources/PlayServAppleSignInSettings.asset`.
+
+The settings asset stays in the game project, so the SDK can be installed through Package Manager without writing credentials into the package folder. For iOS builds, keep `Add Sign In Capability On Build` enabled to add the Xcode Sign in with Apple capability and `AuthenticationServices.framework`.
+
+```csharp
+using System.Threading.Tasks;
+using Playserv.Wrapper;
+
+public static class AppleLoginExample
+{
+    public static async Task Login()
+    {
+        if (!PlayServAppleSignIn.IsAvailable)
+            return;
+
+        var credential = await PlayServAppleSignIn.SignInAsync();
+        var identityToken = credential.IdentityToken;
+        var appleUserId = credential.UserId;
+    }
+}
+```
 
 ## 1) Configure SDK
 

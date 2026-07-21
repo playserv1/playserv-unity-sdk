@@ -102,7 +102,8 @@ namespace Playserv.Editor
                 server: runtimeState.Server,
                 clientExecution: runtimeState.ClientExecution,
                 spawn: spawnCompatibilityEnabled,
-                pulse: runtimeState.Pulse);
+                pulse: runtimeState.Pulse,
+                appleSignIn: runtimeState.AppleSignIn);
         }
 
         private static string GenerateCompatibility(PlayServGeneratedModuleState state)
@@ -413,6 +414,11 @@ namespace Playserv.Editor
                 sb.AppendLine("using Playserv.Pulse;");
             }
 
+            if (state.AppleSignIn)
+            {
+                sb.AppendLine("using Playserv.AppleSignIn;");
+            }
+
             if (state.RpcCore || state.ClientRpc)
             {
                 sb.AppendLine("using Playserv.RPC;");
@@ -464,6 +470,11 @@ namespace Playserv.Editor
             if (state.Pulse)
             {
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.PulseId, () => new PlayServPulseModule());");
+            }
+
+            if (state.AppleSignIn)
+            {
+                sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.AppleSignInId, () => new PlayServAppleSignInModule());");
             }
 
             if (state.Spawn)
@@ -566,7 +577,8 @@ namespace Playserv.Editor
                 bool server,
                 bool clientExecution,
                 bool spawn,
-                bool pulse)
+                bool pulse,
+                bool appleSignIn)
             {
                 Events = events;
                 Data = data;
@@ -576,6 +588,7 @@ namespace Playserv.Editor
                 ClientExecution = clientExecution;
                 Spawn = spawn;
                 Pulse = pulse;
+                AppleSignIn = appleSignIn;
             }
 
             public bool Events { get; }
@@ -586,6 +599,7 @@ namespace Playserv.Editor
             public bool ClientExecution { get; }
             public bool Spawn { get; }
             public bool Pulse { get; }
+            public bool AppleSignIn { get; }
             public bool HasLocalExecution => ClientExecution || Server;
             public bool HasPlayServFacade => true;
         }

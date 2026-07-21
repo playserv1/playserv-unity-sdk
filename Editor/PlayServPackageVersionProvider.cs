@@ -1,17 +1,13 @@
 using System;
 using System.IO;
-using System.Text.RegularExpressions;
 using UnityEditor;
+using UnityEngine;
 using PackageManagerPackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace Playserv.Editor
 {
     internal static class PlayServPackageVersionProvider
     {
-        private static readonly Regex PackageVersionRegex = new Regex(
-            "\"version\"\\s*:\\s*\"([^\"]+)\"",
-            RegexOptions.Compiled);
-
         public static string ResolveInstalledVersion(string fallback = null)
         {
             if (TryResolveInstalledVersion(out var version))
@@ -46,23 +42,35 @@ namespace Playserv.Editor
             return true;
         }
 
-        private static bool TryResolvePackageJsonVersion(out string version)
+        public static bool TryResolvePackageJsonVersion(out string version)
         {
             version = string.Empty;
 
-            var packageJsonPath = ResolvePackageJsonPath();
+            if (!TryResolvePackageJsonPath(out var packageJsonPath))
+                return false;
+
+            try
+            {
+                var manifest = JsonUtility.FromJson<PackageManifest>(File.ReadAllText(packageJsonPath));
+                var resolved = manifest?.version?.Trim();
+                if (string.IsNullOrWhiteSpace(resolved))
+                    return false;
+
+                version = resolved;
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        public static bool TryResolvePackageJsonPath(out string packageJsonPath)
+        {
+            packageJsonPath = ResolvePackageJsonPath();
             if (string.IsNullOrWhiteSpace(packageJsonPath) || !File.Exists(packageJsonPath))
                 return false;
 
-            var match = PackageVersionRegex.Match(File.ReadAllText(packageJsonPath));
-            if (!match.Success || match.Groups.Count < 2)
-                return false;
-
-            var resolved = match.Groups[1].Value?.Trim();
-            if (string.IsNullOrWhiteSpace(resolved))
-                return false;
-
-            version = resolved;
             return true;
         }
 
@@ -80,6 +88,12 @@ namespace Playserv.Editor
             return string.IsNullOrWhiteSpace(projectRoot)
                 ? null
                 : Path.Combine(projectRoot, "package.json");
+        }
+
+        [Serializable]
+        private sealed class PackageManifest
+        {
+            public string version;
         }
     }
 }

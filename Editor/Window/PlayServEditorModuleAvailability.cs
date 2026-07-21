@@ -27,6 +27,7 @@ namespace Playserv.Editor
         public static bool RuntimeClientExecution => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleClientExecution);
         public static bool RuntimeSpawn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleSpawn);
         public static bool RuntimePulse => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModulePulse);
+        public static bool RuntimeAppleSignIn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleAppleSignIn);
         public static bool RuntimeTransportWebSocket => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportWebSocket);
         public static bool RuntimeTransportUdp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportUdp);
         public static bool RuntimeTransportRudp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportRudp);
@@ -127,6 +128,8 @@ namespace Playserv.Editor
                     return settings => settings.RuntimeSpawn;
                 case PlayServModuleManifest.PulseId:
                     return settings => settings.RuntimePulse;
+                case PlayServModuleManifest.AppleSignInId:
+                    return settings => settings.RuntimeAppleSignIn;
                 case PlayServModuleManifest.TransportWebSocketId:
                     return settings => settings.RuntimeTransportWebSocket;
                 case PlayServModuleManifest.TransportUdpId:
@@ -158,6 +161,8 @@ namespace Playserv.Editor
                     return (settings, enabled) => settings.SetRuntimeSpawn(enabled);
                 case PlayServModuleManifest.PulseId:
                     return (settings, enabled) => settings.SetRuntimePulse(enabled);
+                case PlayServModuleManifest.AppleSignInId:
+                    return (settings, enabled) => settings.SetRuntimeAppleSignIn(enabled);
                 case PlayServModuleManifest.TransportWebSocketId:
                     return (settings, enabled) => settings.SetRuntimeTransportWebSocket(enabled);
                 case PlayServModuleManifest.TransportUdpId:
@@ -219,6 +224,7 @@ namespace Playserv.Editor
                 state.Rpc = false;
                 state.Spawn = false;
                 state.Pulse = false;
+                state.AppleSignIn = false;
                 state.TransportWebSocket = false;
                 state.TransportUdp = false;
                 state.TransportRudp = false;
@@ -227,6 +233,7 @@ namespace Playserv.Editor
 
             state.Spawn &= RuntimeSpawn;
             state.Pulse &= RuntimePulse;
+            state.AppleSignIn &= RuntimeAppleSignIn;
             state.TransportWebSocket &= RuntimeTransportWebSocket;
             state.TransportUdp &= RuntimeTransportUdp;
             state.TransportRudp &= RuntimeTransportRudp;

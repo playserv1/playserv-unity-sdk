@@ -177,6 +177,8 @@ namespace Playserv.Editor
                     return state.Spawn && state.Events;
                 case PlayServModuleManifest.PulseId:
                     return state.Pulse;
+                case PlayServModuleManifest.AppleSignInId:
+                    return state.AppleSignIn;
                 default:
                     return false;
             }

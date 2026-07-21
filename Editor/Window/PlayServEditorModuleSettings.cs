@@ -16,6 +16,7 @@ namespace Playserv.Editor
         public const string RuntimeModuleClientExecution = "Client Execution";
         public const string RuntimeModuleSpawn = "Spawn";
         public const string RuntimeModulePulse = "Pulse";
+        public const string RuntimeModuleAppleSignIn = "Apple Sign In";
         public const string RuntimeModuleTransportWebSocket = "WebSocket";
         public const string RuntimeModuleTransportUdp = "UDP";
         public const string RuntimeModuleTransportRudp = "RUDP";
@@ -32,6 +33,7 @@ namespace Playserv.Editor
         public bool RuntimeClientExecution { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeSpawn { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimePulse { get; private set; } = DefaultOptionalModuleState;
+        public bool RuntimeAppleSignIn { get; private set; } = DefaultInternalToolState;
         public bool RuntimeTransportWebSocket { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeTransportUdp { get; private set; } = DefaultOptionalModuleState;
         public bool RuntimeTransportRudp { get; private set; } = DefaultOptionalModuleState;
@@ -165,6 +167,19 @@ namespace Playserv.Editor
             return ApplyRuntimeState(state);
         }
 
+        public bool SetRuntimeAppleSignIn(bool enabled)
+        {
+            if (!PlayServEditorModuleAvailability.RuntimeAppleSignIn)
+                return false;
+
+            if (enabled && !RuntimeClientExecution)
+                return false;
+
+            var state = CreateRuntimeState();
+            state.AppleSignIn = enabled;
+            return ApplyRuntimeState(state);
+        }
+
         public bool SetRuntimeTransportWebSocket(bool enabled) =>
             SetRuntimeTransportModule(
                 enabled,
@@ -210,6 +225,8 @@ namespace Playserv.Editor
                     return RuntimeSpawn || RuntimeEvents;
                 case RuntimeModulePulse:
                     return RuntimePulse || RuntimeClientExecution;
+                case RuntimeModuleAppleSignIn:
+                    return RuntimeAppleSignIn || RuntimeClientExecution;
                 case RuntimeModuleTransportWebSocket:
                     return RuntimeTransportWebSocket || RuntimeClientExecution;
                 case RuntimeModuleTransportUdp:
@@ -245,6 +262,8 @@ namespace Playserv.Editor
                     return !RuntimeSpawn && !RuntimeEvents ? "Enable Events first." : string.Empty;
                 case RuntimeModulePulse:
                     return !RuntimePulse && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
+                case RuntimeModuleAppleSignIn:
+                    return !RuntimeAppleSignIn && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
                 case RuntimeModuleTransportWebSocket:
                     return !RuntimeTransportWebSocket && !RuntimeClientExecution ? "Enable Client Execution first." : string.Empty;
                 case RuntimeModuleTransportUdp:
@@ -281,6 +300,8 @@ namespace Playserv.Editor
                     return RuntimeSpawn;
                 case RuntimeModulePulse:
                     return RuntimePulse;
+                case RuntimeModuleAppleSignIn:
+                    return RuntimeAppleSignIn;
                 case RuntimeModuleTransportWebSocket:
                     return RuntimeTransportWebSocket;
                 case RuntimeModuleTransportUdp:
@@ -326,6 +347,7 @@ namespace Playserv.Editor
                 ClientExecution = IsProfileModuleEnabled(profile, PlayServModuleManifest.ClientExecutionId),
                 Spawn = IsProfileModuleEnabled(profile, PlayServModuleManifest.SpawnId),
                 Pulse = IsProfileModuleEnabled(profile, PlayServModuleManifest.PulseId),
+                AppleSignIn = IsProfileModuleEnabled(profile, PlayServModuleManifest.AppleSignInId),
                 TransportWebSocket = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportWebSocketId),
                 TransportUdp = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportUdpId),
                 TransportRudp = IsProfileModuleEnabled(profile, PlayServModuleManifest.TransportRudpId),
@@ -349,6 +371,7 @@ namespace Playserv.Editor
             !RuntimeEvents &&
             !RuntimeRpc &&
             !RuntimePulse &&
+            !RuntimeAppleSignIn &&
             !RuntimeTransportWebSocket &&
             !RuntimeTransportUdp &&
             !RuntimeTransportRudp &&
@@ -369,6 +392,7 @@ namespace Playserv.Editor
             AppendEnabledModule(ref result, RuntimeEvents, RuntimeModuleEvents);
             AppendEnabledModule(ref result, RuntimeRpc, RuntimeModuleRpc);
             AppendEnabledModule(ref result, RuntimePulse, RuntimeModulePulse);
+            AppendEnabledModule(ref result, RuntimeAppleSignIn, RuntimeModuleAppleSignIn);
             AppendEnabledModule(ref result, RuntimeTransportWebSocket, RuntimeModuleTransportWebSocket);
             AppendEnabledModule(ref result, RuntimeTransportUdp, RuntimeModuleTransportUdp);
             AppendEnabledModule(ref result, RuntimeTransportRudp, RuntimeModuleTransportRudp);
@@ -398,6 +422,7 @@ namespace Playserv.Editor
             RuntimeClientExecution = state.ClientExecution;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
+            RuntimeAppleSignIn = state.AppleSignIn;
             RuntimeTransportWebSocket = state.TransportWebSocket;
             RuntimeTransportUdp = state.TransportUdp;
             RuntimeTransportRudp = state.TransportRudp;
@@ -415,6 +440,7 @@ namespace Playserv.Editor
                 ClientExecution = RuntimeClientExecution,
                 Spawn = RuntimeSpawn,
                 Pulse = RuntimePulse,
+                AppleSignIn = RuntimeAppleSignIn,
                 TransportWebSocket = RuntimeTransportWebSocket,
                 TransportUdp = RuntimeTransportUdp,
                 TransportRudp = RuntimeTransportRudp,
@@ -467,6 +493,7 @@ namespace Playserv.Editor
                           RuntimeClientExecution != state.ClientExecution ||
                           RuntimeSpawn != state.Spawn ||
                           RuntimePulse != state.Pulse ||
+                          RuntimeAppleSignIn != state.AppleSignIn ||
                           RuntimeTransportWebSocket != state.TransportWebSocket ||
                           RuntimeTransportUdp != state.TransportUdp ||
                           RuntimeTransportRudp != state.TransportRudp ||
@@ -479,6 +506,7 @@ namespace Playserv.Editor
             RuntimeClientExecution = state.ClientExecution;
             RuntimeSpawn = state.Spawn;
             RuntimePulse = state.Pulse;
+            RuntimeAppleSignIn = state.AppleSignIn;
             RuntimeTransportWebSocket = state.TransportWebSocket;
             RuntimeTransportUdp = state.TransportUdp;
             RuntimeTransportRudp = state.TransportRudp;

@@ -13,6 +13,7 @@ namespace Playserv.Modules
         public const string ServerId = "server";
         public const string SpawnId = "spawn";
         public const string PulseId = "pulse";
+        public const string AppleSignInId = "apple-sign-in";
         public const string TransportWebSocketId = "transport-websocket";
         public const string TransportUdpId = "transport-udp";
         public const string TransportRudpId = "transport-rudp";
@@ -26,6 +27,7 @@ namespace Playserv.Modules
         public const string DefineDisableClientExecution = "PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION";
         public const string DefineDisableSpawn = "PLAYSERV_MODULE_DISABLED_SPAWN";
         public const string DefineDisablePulse = "PLAYSERV_MODULE_DISABLED_PULSE";
+        public const string DefineDisableAppleSignIn = "PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN";
         public const string DefineDisableTransportWebSocket = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET";
         public const string DefineDisableTransportUdp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP";
         public const string DefineDisableTransportRudp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP";
@@ -154,6 +156,21 @@ namespace Playserv.Modules
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null,
                 rootAssemblyReference: "Playserv.Runtime.Modules.Pulse"),
+
+            new PlayServModuleManifestEntry(
+                AppleSignInId,
+                "Apple Sign In",
+                "Native iOS Sign in with Apple facade, credential settings, Xcode capability setup, quick login, credential state, and revocation callbacks.",
+                DefineDisableAppleSignIn,
+                defaultEnabled: false,
+                isServerModule: false,
+                visibleInSettings: true,
+                visibleInExport: true,
+                assetPaths: new[] { "Runtime/Modules/AppleSignIn/Implementation", "Runtime/Modules/AppleSignIn/Editor" },
+                dependencyIds: new[] { ClientExecutionId },
+                hiddenDependencyAssetPaths: null,
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.AppleSignIn"),
 
             new PlayServModuleManifestEntry(
                 TransportWebSocketId,
