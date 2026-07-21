@@ -28,6 +28,7 @@ namespace Playserv.Editor
         public static bool RuntimeSpawn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleSpawn);
         public static bool RuntimePulse => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModulePulse);
         public static bool RuntimeAppleSignIn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleAppleSignIn);
+        public static bool RuntimeGoogleSignIn => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleGoogleSignIn);
         public static bool RuntimeTransportWebSocket => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportWebSocket);
         public static bool RuntimeTransportUdp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportUdp);
         public static bool RuntimeTransportRudp => IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleTransportRudp);
@@ -130,6 +131,8 @@ namespace Playserv.Editor
                     return settings => settings.RuntimePulse;
                 case PlayServModuleManifest.AppleSignInId:
                     return settings => settings.RuntimeAppleSignIn;
+                case PlayServModuleManifest.GoogleSignInId:
+                    return settings => settings.RuntimeGoogleSignIn;
                 case PlayServModuleManifest.TransportWebSocketId:
                     return settings => settings.RuntimeTransportWebSocket;
                 case PlayServModuleManifest.TransportUdpId:
@@ -163,6 +166,8 @@ namespace Playserv.Editor
                     return (settings, enabled) => settings.SetRuntimePulse(enabled);
                 case PlayServModuleManifest.AppleSignInId:
                     return (settings, enabled) => settings.SetRuntimeAppleSignIn(enabled);
+                case PlayServModuleManifest.GoogleSignInId:
+                    return (settings, enabled) => settings.SetRuntimeGoogleSignIn(enabled);
                 case PlayServModuleManifest.TransportWebSocketId:
                     return (settings, enabled) => settings.SetRuntimeTransportWebSocket(enabled);
                 case PlayServModuleManifest.TransportUdpId:
@@ -225,6 +230,7 @@ namespace Playserv.Editor
                 state.Spawn = false;
                 state.Pulse = false;
                 state.AppleSignIn = false;
+                state.GoogleSignIn = false;
                 state.TransportWebSocket = false;
                 state.TransportUdp = false;
                 state.TransportRudp = false;
@@ -234,6 +240,7 @@ namespace Playserv.Editor
             state.Spawn &= RuntimeSpawn;
             state.Pulse &= RuntimePulse;
             state.AppleSignIn &= RuntimeAppleSignIn;
+            state.GoogleSignIn &= RuntimeGoogleSignIn;
             state.TransportWebSocket &= RuntimeTransportWebSocket;
             state.TransportUdp &= RuntimeTransportUdp;
             state.TransportRudp &= RuntimeTransportRudp;

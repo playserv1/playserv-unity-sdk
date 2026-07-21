@@ -10,6 +10,7 @@ namespace Playserv.Editor
         public bool Spawn;
         public bool Pulse;
         public bool AppleSignIn;
+        public bool GoogleSignIn;
         public bool TransportWebSocket;
         public bool TransportUdp;
         public bool TransportRudp;

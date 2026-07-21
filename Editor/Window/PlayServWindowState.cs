@@ -28,6 +28,7 @@ namespace Playserv.Editor
         public bool FoldConnection;
         public bool FoldDeployment;
         public bool FoldAppleSignIn;
+        public bool FoldGoogleSignIn;
         public bool ShowModuleSettingsLayer;
 
         public bool ShowAvailableSchemaInfo;

@@ -53,6 +53,7 @@ namespace Playserv.Modules
                     PlayServModuleManifest.SpawnId,
                     PlayServModuleManifest.PulseId,
                     PlayServModuleManifest.AppleSignInId,
+                    PlayServModuleManifest.GoogleSignInId,
                     PlayServModuleManifest.TransportWebSocketId,
                     PlayServModuleManifest.TransportUdpId,
                     PlayServModuleManifest.TransportRudpId,

@@ -14,6 +14,7 @@ namespace Playserv.Modules
         public const string SpawnId = "spawn";
         public const string PulseId = "pulse";
         public const string AppleSignInId = "apple-sign-in";
+        public const string GoogleSignInId = "google-sign-in";
         public const string TransportWebSocketId = "transport-websocket";
         public const string TransportUdpId = "transport-udp";
         public const string TransportRudpId = "transport-rudp";
@@ -28,6 +29,7 @@ namespace Playserv.Modules
         public const string DefineDisableSpawn = "PLAYSERV_MODULE_DISABLED_SPAWN";
         public const string DefineDisablePulse = "PLAYSERV_MODULE_DISABLED_PULSE";
         public const string DefineDisableAppleSignIn = "PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN";
+        public const string DefineDisableGoogleSignIn = "PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN";
         public const string DefineDisableTransportWebSocket = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET";
         public const string DefineDisableTransportUdp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP";
         public const string DefineDisableTransportRudp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP";
@@ -171,6 +173,21 @@ namespace Playserv.Modules
                 hiddenDependencyAssetPaths: null,
                 hiddenDependencyModuleIds: null,
                 rootAssemblyReference: "Playserv.Runtime.Modules.AppleSignIn"),
+
+            new PlayServModuleManifestEntry(
+                GoogleSignInId,
+                "Google Sign In",
+                "Google Sign-In facade for OAuth ID tokens, server auth codes, profile identity, silent sign-in, sign-out, and disconnect.",
+                DefineDisableGoogleSignIn,
+                defaultEnabled: false,
+                isServerModule: false,
+                visibleInSettings: true,
+                visibleInExport: true,
+                assetPaths: new[] { "Runtime/Modules/GoogleSignIn/Implementation", "Runtime/Modules/GoogleSignIn/Editor" },
+                dependencyIds: new[] { ClientExecutionId },
+                hiddenDependencyAssetPaths: null,
+                hiddenDependencyModuleIds: null,
+                rootAssemblyReference: "Playserv.Runtime.Modules.GoogleSignIn"),
 
             new PlayServModuleManifestEntry(
                 TransportWebSocketId,

@@ -31,6 +31,8 @@ namespace Playserv.Editor
             new PlayServOptionalEditorSection(PlayServEditorSectionIds.Codegen);
         private readonly PlayServOptionalEditorSection _appleSignInSection =
             new PlayServOptionalEditorSection(PlayServEditorSectionIds.AppleSignIn);
+        private readonly PlayServOptionalEditorSection _googleSignInSection =
+            new PlayServOptionalEditorSection(PlayServEditorSectionIds.GoogleSignIn);
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
 
@@ -79,6 +81,7 @@ namespace Playserv.Editor
             _state.FoldConnection = EditorPrefs.GetBool(Const.PrefFoldConnection, false);
             _state.FoldDeployment = EditorPrefs.GetBool(Const.PrefFoldDeployment, false);
             _state.FoldAppleSignIn = EditorPrefs.GetBool(Const.PrefFoldAppleSignIn, false);
+            _state.FoldGoogleSignIn = EditorPrefs.GetBool(Const.PrefFoldGoogleSignIn, false);
             _state.ShowModuleSettingsLayer = false;
             _state.ModuleSettings.Load();
 
@@ -103,6 +106,7 @@ namespace Playserv.Editor
             _eventsSection.Dispose();
             _codegenSection.Dispose();
             _appleSignInSection.Dispose();
+            _googleSignInSection.Dispose();
         }
 
         private void OnGUI()
@@ -193,6 +197,14 @@ namespace Playserv.Editor
             {
                 GUILayout.Space(12f);
                 _appleSignInSection.Draw(context);
+            }
+
+            if (PlayServEditorModuleAvailability.RuntimeGoogleSignIn &&
+                _state.ModuleSettings.RuntimeGoogleSignIn &&
+                _googleSignInSection.IsAvailable)
+            {
+                GUILayout.Space(12f);
+                _googleSignInSection.Draw(context);
             }
 
             if (ShowWebSocketConnectionMenu)

@@ -1,0 +1,22 @@
+{
+    "name": "Playserv.Editor.GoogleSignIn",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Modules.GoogleSignIn"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

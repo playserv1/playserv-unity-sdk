@@ -14,6 +14,7 @@ namespace Playserv.Editor
         internal const string PrefFoldDeployment = "PlayServ.Fold.Deployment";
         internal const string PrefFoldConnection = "PlayServ.Window.Fold.Connection";
         internal const string PrefFoldAppleSignIn = "PlayServ.Window.Fold.AppleSignIn";
+        internal const string PrefFoldGoogleSignIn = "PlayServ.Window.Fold.GoogleSignIn";
         internal const string PrefKeyDeploymentFolderAssetPath = "PlayServ.Deployment.FolderAssetPath";
 
         internal const string PrefModuleDeployment = "PlayServ.Window.Module.Deployment";

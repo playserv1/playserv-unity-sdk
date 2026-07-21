@@ -83,6 +83,31 @@ public static class AppleLoginExample
 }
 ```
 
+## Google Sign In module
+
+Google Sign In is an optional client module. Open `Tools/PlayServ/Settings`, enable `Google Sign In` in runtime modules, then use `Create/Select Settings` in the Google Sign In section to create `Assets/Resources/PlayServGoogleSignInSettings.asset`.
+
+The PlayServ module does not require Firebase. It wraps the Google Sign-In Unity plugin when that plugin is installed in the game project, then exposes `IdToken`, `AuthCode`, and basic profile fields to PlayServ.
+
+```csharp
+using System.Threading.Tasks;
+using Playserv.Wrapper;
+
+public static class GoogleLoginExample
+{
+    public static async Task Login()
+    {
+        if (!PlayServGoogleSignIn.IsAvailable)
+            return;
+
+        var credential = await PlayServGoogleSignIn.SignInAsync();
+        var idToken = credential.IdToken;
+        var authCode = credential.AuthCode;
+        var googleUserId = credential.UserId;
+    }
+}
+```
+
 ## 1) Configure SDK
 
 ### Option A: through Unity asset (recommended for editor workflow)

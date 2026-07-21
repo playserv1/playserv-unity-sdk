@@ -7,3 +7,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Playserv.Editor.ModuleStressTests")]
 [assembly: InternalsVisibleTo("Playserv.Editor.DataSubscription")]
 [assembly: InternalsVisibleTo("Playserv.Editor.AppleSignIn")]
+[assembly: InternalsVisibleTo("Playserv.Editor.GoogleSignIn")]

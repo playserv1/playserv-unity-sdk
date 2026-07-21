@@ -179,6 +179,8 @@ namespace Playserv.Editor
                     return state.Pulse;
                 case PlayServModuleManifest.AppleSignInId:
                     return state.AppleSignIn;
+                case PlayServModuleManifest.GoogleSignInId:
+                    return state.GoogleSignIn;
                 default:
                     return false;
             }

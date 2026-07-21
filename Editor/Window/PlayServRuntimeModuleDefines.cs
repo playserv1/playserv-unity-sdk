@@ -26,6 +26,7 @@ namespace Playserv.Editor
             "PLAYSERV_DISABLE_SPAWN",
             "PLAYSERV_DISABLE_PULSE",
             "PLAYSERV_DISABLE_APPLE_SIGN_IN",
+            "PLAYSERV_DISABLE_GOOGLE_SIGN_IN",
             "PLAYSERV_DISABLE_TRANSPORT_WEBSOCKET",
             "PLAYSERV_DISABLE_TRANSPORT_UDP",
             "PLAYSERV_DISABLE_TRANSPORT_RUDP",
@@ -47,6 +48,7 @@ namespace Playserv.Editor
                         IsEnabled(defines, PlayServModuleManifest.EventsId),
                 Pulse = IsEnabled(defines, PlayServModuleManifest.PulseId),
                 AppleSignIn = IsEnabled(defines, PlayServModuleManifest.AppleSignInId),
+                GoogleSignIn = IsEnabled(defines, PlayServModuleManifest.GoogleSignInId),
                 TransportWebSocket = IsEnabled(defines, PlayServModuleManifest.TransportWebSocketId),
                 TransportUdp = IsEnabled(defines, PlayServModuleManifest.TransportUdpId),
                 TransportRudp = IsEnabled(defines, PlayServModuleManifest.TransportRudpId),
@@ -70,6 +72,7 @@ namespace Playserv.Editor
                 Spawn = eventsEnabled && IsEnabledByUserPreference(PlayServModuleManifest.SpawnId),
                 Pulse = IsEnabledByUserPreference(PlayServModuleManifest.PulseId),
                 AppleSignIn = IsEnabledByUserPreference(PlayServModuleManifest.AppleSignInId),
+                GoogleSignIn = IsEnabledByUserPreference(PlayServModuleManifest.GoogleSignInId),
                 TransportWebSocket = IsEnabledByUserPreference(PlayServModuleManifest.TransportWebSocketId),
                 TransportUdp = IsEnabledByUserPreference(PlayServModuleManifest.TransportUdpId),
                 TransportRudp = IsEnabledByUserPreference(PlayServModuleManifest.TransportRudpId),
@@ -97,6 +100,7 @@ namespace Playserv.Editor
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.SpawnId, !state.Spawn);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.PulseId, !state.Pulse);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.AppleSignInId, !state.AppleSignIn);
+            changed |= SetModuleDisabled(defines, PlayServModuleManifest.GoogleSignInId, !state.GoogleSignIn);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportWebSocketId, !state.TransportWebSocket);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportUdpId, !state.TransportUdp);
             changed |= SetModuleDisabled(defines, PlayServModuleManifest.TransportRudpId, !state.TransportRudp);
@@ -229,6 +233,7 @@ namespace Playserv.Editor
                 state.Spawn = false;
                 state.Pulse = false;
                 state.AppleSignIn = false;
+                state.GoogleSignIn = false;
                 state.TransportWebSocket = false;
                 state.TransportUdp = false;
                 state.TransportRudp = false;
@@ -263,6 +268,7 @@ namespace Playserv.Editor
             SetUserModulePreference(PlayServModuleManifest.SpawnId, state.Spawn);
             SetUserModulePreference(PlayServModuleManifest.PulseId, state.Pulse);
             SetUserModulePreference(PlayServModuleManifest.AppleSignInId, state.AppleSignIn);
+            SetUserModulePreference(PlayServModuleManifest.GoogleSignInId, state.GoogleSignIn);
             SetUserModulePreference(PlayServModuleManifest.TransportWebSocketId, state.TransportWebSocket);
             SetUserModulePreference(PlayServModuleManifest.TransportUdpId, state.TransportUdp);
             SetUserModulePreference(PlayServModuleManifest.TransportRudpId, state.TransportRudp);

@@ -7,5 +7,6 @@ namespace Playserv.Editor
         public const string Events = "editor-events";
         public const string Codegen = "editor-codegen";
         public const string AppleSignIn = "editor-apple-sign-in";
+        public const string GoogleSignIn = "editor-google-sign-in";
     }
 }

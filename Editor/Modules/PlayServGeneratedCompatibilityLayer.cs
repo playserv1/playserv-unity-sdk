@@ -103,7 +103,8 @@ namespace Playserv.Editor
                 clientExecution: runtimeState.ClientExecution,
                 spawn: spawnCompatibilityEnabled,
                 pulse: runtimeState.Pulse,
-                appleSignIn: runtimeState.AppleSignIn);
+                appleSignIn: runtimeState.AppleSignIn,
+                googleSignIn: runtimeState.GoogleSignIn);
         }
 
         private static string GenerateCompatibility(PlayServGeneratedModuleState state)
@@ -419,6 +420,11 @@ namespace Playserv.Editor
                 sb.AppendLine("using Playserv.AppleSignIn;");
             }
 
+            if (state.GoogleSignIn)
+            {
+                sb.AppendLine("using Playserv.GoogleSignIn;");
+            }
+
             if (state.RpcCore || state.ClientRpc)
             {
                 sb.AppendLine("using Playserv.RPC;");
@@ -475,6 +481,11 @@ namespace Playserv.Editor
             if (state.AppleSignIn)
             {
                 sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.AppleSignInId, () => new PlayServAppleSignInModule());");
+            }
+
+            if (state.GoogleSignIn)
+            {
+                sb.AppendLine("            RegisterManifestModule(host, PlayServModuleManifest.GoogleSignInId, () => new PlayServGoogleSignInModule());");
             }
 
             if (state.Spawn)
@@ -578,7 +589,8 @@ namespace Playserv.Editor
                 bool clientExecution,
                 bool spawn,
                 bool pulse,
-                bool appleSignIn)
+                bool appleSignIn,
+                bool googleSignIn)
             {
                 Events = events;
                 Data = data;
@@ -589,6 +601,7 @@ namespace Playserv.Editor
                 Spawn = spawn;
                 Pulse = pulse;
                 AppleSignIn = appleSignIn;
+                GoogleSignIn = googleSignIn;
             }
 
             public bool Events { get; }
@@ -600,6 +613,7 @@ namespace Playserv.Editor
             public bool Spawn { get; }
             public bool Pulse { get; }
             public bool AppleSignIn { get; }
+            public bool GoogleSignIn { get; }
             public bool HasLocalExecution => ClientExecution || Server;
             public bool HasPlayServFacade => true;
         }
