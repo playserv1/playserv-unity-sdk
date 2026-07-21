@@ -13,6 +13,8 @@ namespace Playserv.Editor
         private const float FixedWindowWidth = 720f;
         private const float MinWindowHeight = 760f;
         private const float MaxWindowHeight = 10000f;
+        private const float HorizontalWindowPadding = 24f;
+        private const float VerticalScrollbarReserve = 18f;
         private const float StyledFieldHeight = 26f;
         private static readonly bool ShowWebSocketConnectionMenu = false;
 
@@ -27,6 +29,8 @@ namespace Playserv.Editor
             new PlayServOptionalEditorSection(PlayServEditorSectionIds.Events);
         private readonly PlayServOptionalEditorSection _codegenSection =
             new PlayServOptionalEditorSection(PlayServEditorSectionIds.Codegen);
+        private readonly PlayServOptionalEditorSection _appleSignInSection =
+            new PlayServOptionalEditorSection(PlayServEditorSectionIds.AppleSignIn);
         private readonly PlayServConnectionSectionPresenter _connectionSectionPresenter = new PlayServConnectionSectionPresenter();
         private readonly PlayServModuleSettingsPresenter _moduleSettingsPresenter = new PlayServModuleSettingsPresenter();
 
@@ -74,6 +78,7 @@ namespace Playserv.Editor
             _state.FoldConfig = EditorPrefs.GetBool(Const.PrefFoldConfig, true);
             _state.FoldConnection = EditorPrefs.GetBool(Const.PrefFoldConnection, false);
             _state.FoldDeployment = EditorPrefs.GetBool(Const.PrefFoldDeployment, false);
+            _state.FoldAppleSignIn = EditorPrefs.GetBool(Const.PrefFoldAppleSignIn, false);
             _state.ShowModuleSettingsLayer = false;
             _state.ModuleSettings.Load();
 
@@ -97,6 +102,7 @@ namespace Playserv.Editor
             _modelSection.Dispose();
             _eventsSection.Dispose();
             _codegenSection.Dispose();
+            _appleSignInSection.Dispose();
         }
 
         private void OnGUI()
@@ -113,10 +119,11 @@ namespace Playserv.Editor
 
                 using (var scrollView = new EditorGUILayout.ScrollViewScope(_state.MainScrollPos, GUIStyle.none, GUI.skin.verticalScrollbar))
                 {
+                    var contentWidth = Mathf.Max(0f, position.width - (HorizontalWindowPadding * 2f) - VerticalScrollbarReserve);
                     using (new EditorGUILayout.HorizontalScope())
                     {
-                        GUILayout.Space(24f);
-                        using (new EditorGUILayout.VerticalScope())
+                        GUILayout.Space(HorizontalWindowPadding);
+                        using (new EditorGUILayout.VerticalScope(GUILayout.Width(contentWidth)))
                         {
                             GUILayout.Space(18f);
                             if (_state.ShowModuleSettingsLayer)
@@ -126,7 +133,7 @@ namespace Playserv.Editor
 
                             GUILayout.Space(18f);
                         }
-                        GUILayout.Space(24f);
+                        GUILayout.Space(HorizontalWindowPadding);
                     }
 
                     _state.MainScrollPos = scrollView.scrollPosition;
@@ -178,6 +185,14 @@ namespace Playserv.Editor
             {
                 GUILayout.Space(12f);
                 _codegenSection.Draw(context);
+            }
+
+            if (PlayServEditorModuleAvailability.RuntimeAppleSignIn &&
+                _state.ModuleSettings.RuntimeAppleSignIn &&
+                _appleSignInSection.IsAvailable)
+            {
+                GUILayout.Space(12f);
+                _appleSignInSection.Draw(context);
             }
 
             if (ShowWebSocketConnectionMenu)

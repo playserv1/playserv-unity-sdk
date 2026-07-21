@@ -27,6 +27,7 @@ namespace Playserv.Editor
         public bool FoldConfig;
         public bool FoldConnection;
         public bool FoldDeployment;
+        public bool FoldAppleSignIn;
         public bool ShowModuleSettingsLayer;
 
         public bool ShowAvailableSchemaInfo;

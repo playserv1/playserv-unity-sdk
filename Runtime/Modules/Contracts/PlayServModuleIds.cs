@@ -5,6 +5,7 @@ namespace Playserv.Modules
         public const string Core = "core";
         public const string Transport = "transport";
         public const string Serialization = "serialization";
+        public const string ClientExecution = PlayServModuleManifest.ClientExecutionId;
         public const string Events = PlayServModuleManifest.EventsId;
         public const string Data = PlayServModuleManifest.DataSubscriptionId;
         public const string RpcCore = PlayServModuleManifest.RpcCoreId;

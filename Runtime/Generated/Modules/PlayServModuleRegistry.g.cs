@@ -4,6 +4,7 @@ using Playserv.DataSubscription;
 using Playserv.Events;
 using Playserv.Modules;
 using Playserv.Pulse;
+using Playserv.AppleSignIn;
 using Playserv.RPC;
 using Playserv.Spawn;
 
@@ -18,6 +19,7 @@ namespace Playserv.Modules
             RegisterManifestModule(host, PlayServModuleManifest.RpcCoreId, () => new PlayServRpcCoreModule());
             RegisterManifestModule(host, PlayServModuleManifest.ClientRpcId, () => new PlayServClientRpcModule());
             RegisterManifestModule(host, PlayServModuleManifest.PulseId, () => new PlayServPulseModule());
+            RegisterManifestModule(host, PlayServModuleManifest.AppleSignInId, () => new PlayServAppleSignInModule());
             RegisterManifestModule(host, PlayServModuleManifest.SpawnId, () => new PlayServSpawnModule());
         }
 

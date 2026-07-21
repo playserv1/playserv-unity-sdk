@@ -7,6 +7,7 @@ namespace Playserv.Editor
 {
     internal sealed class PlayServModuleSettingsPresenter
     {
+        private const float ModuleTagMaxWidth = 260f;
         private static readonly string[] RuntimeModuleNames =
             PlayServModuleManifest.VisibleRuntimeModules
                 .Where(module => !module.IsServerModule)
@@ -245,8 +246,7 @@ namespace Playserv.Editor
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
             {
                 var canChange = settings.CanChangeRuntimeModule(title);
-                var blockReason = settings.GetRuntimeModuleBlockReason(title);
-                var canUninstall = PlayServRuntimeModuleLifecycle.CanUninstallModule(settings, module, out var uninstallBlockReason);
+                var canUninstall = PlayServRuntimeModuleLifecycle.CanUninstallModule(settings, module, out _);
                 bool nextEnabled;
 
                 using (new EditorGUILayout.HorizontalScope())
@@ -281,17 +281,6 @@ namespace Playserv.Editor
                 DrawModuleTags(settings, "Requires", module.Dependencies);
                 DrawModuleTags(settings, "Required by", module.Dependents);
 
-                if (!string.IsNullOrEmpty(blockReason))
-                {
-                    GUILayout.Space(4f);
-                    GUILayout.Label(blockReason, PlayServWindowTheme.SectionSubtitleStyle);
-                }
-                else if (!canUninstall && !string.IsNullOrEmpty(uninstallBlockReason))
-                {
-                    GUILayout.Space(4f);
-                    GUILayout.Label($"Uninstall blocked: {uninstallBlockReason}", PlayServWindowTheme.SectionSubtitleStyle);
-                }
-
                 if (canChange && nextEnabled != enabled)
                     return module.SetEnabled(settings, nextEnabled);
             }
@@ -321,27 +310,26 @@ namespace Playserv.Editor
                 return;
 
             GUILayout.Space(6f);
-            using (new EditorGUILayout.HorizontalScope())
+            GUILayout.Label(label, PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Space(2f);
+
+            for (var i = 0; i < moduleNames.Length; i++)
             {
-                GUILayout.Label(label, PlayServWindowTheme.MiniHeadingStyle, GUILayout.Width(72f));
+                var moduleName = moduleNames[i];
+                if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+                    continue;
 
-                for (var i = 0; i < moduleNames.Length; i++)
-                {
-                    var moduleName = moduleNames[i];
-                    if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
-                        continue;
+                var moduleEnabled = settings.IsRuntimeModuleEnabled(moduleName);
+                var style = ResolveModuleTagStyle(moduleEnabled, label);
+                var content = new GUIContent($"{moduleName}: {(moduleEnabled ? "On" : "Off")}");
+                var width = Mathf.Min(ModuleTagMaxWidth, Mathf.Ceil(style.CalcSize(content).x));
 
-                    var moduleEnabled = settings.IsRuntimeModuleEnabled(moduleName);
-                    var style = ResolveModuleTagStyle(moduleEnabled, label);
-                    GUILayout.Label(
-                        $"{moduleName}: {(moduleEnabled ? "On" : "Off")}",
-                        style,
-                        GUILayout.Height(22f));
-
-                    GUILayout.Space(4f);
-                }
-
-                GUILayout.FlexibleSpace();
+                GUILayout.Label(
+                    content,
+                    style,
+                    GUILayout.Width(width),
+                    GUILayout.Height(22f));
+                GUILayout.Space(3f);
             }
         }
 

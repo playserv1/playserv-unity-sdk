@@ -12,7 +12,8 @@
         "Playserv.Runtime.Modules.RPC.Core",
         "Playserv.Runtime.Modules.RPC.Client",
         "Playserv.Runtime.Modules.Spawn",
-        "Playserv.Runtime.Modules.Pulse"
+        "Playserv.Runtime.Modules.Pulse",
+        "Playserv.Runtime.Modules.AppleSignIn"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

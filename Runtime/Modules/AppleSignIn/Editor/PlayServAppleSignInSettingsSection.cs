@@ -1,5 +1,4 @@
 using Playserv.AppleSignIn;
-using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,44 +9,36 @@ namespace Playserv.Editor.AppleSignIn
     {
         static PlayServAppleSignInSettingsSectionRegistration()
         {
-            PlayServModuleSettingsSectionRegistry.Register(new PlayServAppleSignInSettingsSection());
+            PlayServEditorSectionRegistry.Register(
+                PlayServEditorSectionIds.AppleSignIn,
+                () => new PlayServAppleSignInSettingsSection());
         }
     }
 
-    internal sealed class PlayServAppleSignInSettingsSection : IPlayServModuleSettingsSection
+    internal sealed class PlayServAppleSignInSettingsSection : IPlayServEditorSection
     {
-        public int Order => 40;
-
-        public bool Draw(
-            PlayServWindowContext context,
-            PlayServEditorModuleSettings settings,
-            bool hasRuntimeModules,
-            bool hasServerRuntimeModules)
+        public void Dispose()
         {
-            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(PlayServEditorModuleSettings.RuntimeModuleAppleSignIn))
-                return false;
+        }
 
-            GUILayout.Space(12f);
-            GUILayout.Label("Apple Sign In", PlayServWindowTheme.MiniHeadingStyle);
-            GUILayout.Space(6f);
+        public void Draw(PlayServWindowContext context)
+        {
+            var state = context.State;
+            var expanded = PlayServWindowChrome.BeginSectionCard(
+                ref state.FoldAppleSignIn,
+                "Identity",
+                "Apple Sign In",
+                "Configure project-side Apple credential defaults and iOS build capability setup.");
 
-            var changed = false;
-            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
+            if (expanded)
             {
                 var asset = PlayServAppleSignInSettingsAssetProvider.FindExisting();
-                if (!settings.RuntimeAppleSignIn)
-                {
-                    PlayServWindowChrome.DrawNotice("Enable the Apple Sign In runtime module to use these credentials in builds.", MessageType.Info);
-                    GUILayout.Space(6f);
-                }
-
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     if (PlayServWindowChrome.DrawActionButton("Create/Select Settings", PlayServWindowButtonTone.Secondary, GUILayout.Height(28f), GUILayout.Width(166f)))
                     {
                         asset = PlayServAppleSignInSettingsAssetProvider.GetOrCreate();
                         Selection.activeObject = asset;
-                        changed = true;
                     }
 
                     GUILayout.Space(6f);
@@ -69,7 +60,9 @@ namespace Playserv.Editor.AppleSignIn
                 if (asset == null)
                 {
                     PlayServWindowChrome.DrawNotice("Create a settings asset to edit Apple credentials.", MessageType.Info);
-                    return changed;
+                    PlayServWindowChrome.EndSectionCard(expanded);
+                    EditorPrefs.SetBool(Const.PrefFoldAppleSignIn, state.FoldAppleSignIn);
+                    return;
                 }
 
                 var serializedObject = new SerializedObject(asset);
@@ -98,11 +91,11 @@ namespace Playserv.Editor.AppleSignIn
                 if (serializedObject.ApplyModifiedProperties())
                 {
                     EditorUtility.SetDirty(asset);
-                    changed = true;
                 }
             }
 
-            return changed;
+            PlayServWindowChrome.EndSectionCard(expanded);
+            EditorPrefs.SetBool(Const.PrefFoldAppleSignIn, state.FoldAppleSignIn);
         }
 
         private static void DrawProperty(SerializedObject serializedObject, string propertyName)

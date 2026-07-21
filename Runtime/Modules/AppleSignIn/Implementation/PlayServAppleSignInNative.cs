@@ -10,10 +10,12 @@ namespace Playserv.AppleSignIn
 {
     internal static class PlayServAppleSignInNative
     {
+#pragma warning disable 0067
         public static event Action<int, PlayServAppleSignInCredential> CredentialReceived;
         public static event Action<int, int, string> SignInFailed;
         public static event Action<int, PlayServAppleCredentialStateResult> CredentialStateReceived;
         public static event Action CredentialsRevoked;
+#pragma warning restore 0067
 
 #if UNITY_IOS && !UNITY_EDITOR
         private delegate void CredentialCallback(
