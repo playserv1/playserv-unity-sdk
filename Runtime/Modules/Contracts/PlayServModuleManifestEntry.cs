@@ -19,7 +19,11 @@ namespace Playserv.Modules
             string[] dependencyIds,
             string[] hiddenDependencyAssetPaths,
             string[] hiddenDependencyModuleIds,
-            string rootAssemblyReference = null)
+            string rootAssemblyReference = null,
+            int order = 0,
+            string sourceRootAssetPath = null,
+            string descriptorAssetPath = null,
+            string[] profileIds = null)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Module id is required.", nameof(id));
@@ -37,6 +41,10 @@ namespace Playserv.Modules
             HiddenDependencyAssetPaths = CloneOrEmpty(hiddenDependencyAssetPaths);
             HiddenDependencyModuleIds = CloneOrEmpty(hiddenDependencyModuleIds);
             RootAssemblyReference = rootAssemblyReference ?? string.Empty;
+            Order = order;
+            SourceRootAssetPath = sourceRootAssetPath ?? string.Empty;
+            DescriptorAssetPath = descriptorAssetPath ?? string.Empty;
+            ProfileIds = CloneOrEmpty(profileIds);
         }
 
         public string Id { get; }
@@ -64,6 +72,14 @@ namespace Playserv.Modules
         public string[] HiddenDependencyModuleIds { get; }
 
         public string RootAssemblyReference { get; }
+
+        public int Order { get; }
+
+        public string SourceRootAssetPath { get; }
+
+        public string DescriptorAssetPath { get; }
+
+        public string[] ProfileIds { get; }
 
         private static string[] CloneOrEmpty(string[] values)
         {

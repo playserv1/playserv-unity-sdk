@@ -66,7 +66,8 @@ namespace Playserv.Editor
         private static bool TouchesModuleAssetPath(string assetPath, PlayServModuleManifestEntry module)
         {
             var path = (assetPath ?? string.Empty).Replace('\\', '/');
-            if (!PlayServPackagePathResolver.TryGetPackageRelativeAssetPath(path, out var packageRelativePath))
+            if (!PlayServEditorModuleAvailability.TryGetModuleRoot(module, out var moduleRoot) ||
+                !moduleRoot.TryGetRelativeAssetPath(path, out var packageRelativePath))
                 return false;
 
             for (var i = 0; i < module.AssetPaths.Length; i++)
@@ -95,6 +96,12 @@ namespace Playserv.Editor
             for (var i = 0; i < assetPaths.Length; i++)
             {
                 var path = (assetPaths[i] ?? string.Empty).Replace('\\', '/');
+                foreach (var module in PlayServModuleManifest.RuntimeModules)
+                {
+                    if (TouchesModuleAssetPath(path, module))
+                        return true;
+                }
+
                 if (!PlayServPackagePathResolver.TryGetPackageRelativeAssetPath(path, out var packageRelativePath))
                     continue;
 

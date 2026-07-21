@@ -1,0 +1,22 @@
+{
+  "id": "data-subscription",
+  "order": 20,
+  "label": "Data Subscription",
+  "description": "Shared entity query, mutation, polling, and live subscription APIs.",
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_DATA",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Modules/DataSubscription/Implementation"
+  ],
+  "dependencyIds": [],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "client-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.DataSubscription"
+}

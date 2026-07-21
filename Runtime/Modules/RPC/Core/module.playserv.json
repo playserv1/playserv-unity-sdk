@@ -1,0 +1,19 @@
+{
+  "id": "rpc-core",
+  "order": 30,
+  "label": "RPC Core",
+  "description": "Shared RPC attributes, payload mapping, and codec helpers.",
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_RPC_CORE",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": false,
+  "visibleInExport": false,
+  "assetPaths": [
+    "Runtime/Modules/RPC/Core"
+  ],
+  "dependencyIds": [],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.RPC.Core"
+}

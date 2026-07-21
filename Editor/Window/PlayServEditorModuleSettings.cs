@@ -148,7 +148,7 @@ namespace Playserv.Editor
 
             var state = new PlayServRuntimeModuleState();
             foreach (var module in PlayServModuleManifest.RuntimeModules)
-                state.SetEnabled(module.Id, IsProfileModuleEnabled(profile, module.Id));
+                state.SetEnabled(module.Id, IsProfileModuleEnabled(profile, module));
 
             return ApplyRuntimeState(state);
         }
@@ -180,9 +180,20 @@ namespace Playserv.Editor
             return PlayServRuntimeModuleDefines.Apply(state) || changed;
         }
 
-        private static bool IsProfileModuleEnabled(PlayServSdkProfile profile, string moduleId)
+        private static bool IsProfileModuleEnabled(PlayServSdkProfile profile, PlayServModuleManifestEntry module)
         {
-            return profile.EnablesModule(moduleId);
+            if (module.ProfileIds.Length > 0)
+            {
+                for (var i = 0; i < module.ProfileIds.Length; i++)
+                {
+                    if (string.Equals(module.ProfileIds[i], profile.Id, StringComparison.Ordinal))
+                        return true;
+                }
+
+                return false;
+            }
+
+            return profile.EnablesModule(module.Id);
         }
 
         private static bool TryGetRuntimeModuleByName(string moduleName, out PlayServModuleManifestEntry module)

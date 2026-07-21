@@ -1,0 +1,28 @@
+{
+  "id": "client-rpc",
+  "order": 40,
+  "label": "RPC",
+  "description": "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs.",
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_CLIENT_RPC",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Modules/RPC/Client/Implementation"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [
+    "Runtime/Modules/RPC/Core"
+  ],
+  "hiddenDependencyModuleIds": [
+    "rpc-core"
+  ],
+  "profiles": [
+    "client-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.RPC.Client"
+}

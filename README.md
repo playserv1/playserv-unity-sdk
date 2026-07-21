@@ -59,6 +59,55 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 Server/shared runtime build instructions are documented in `SERVER_SDK.md`.
 Unity package export and OpenUPM export do not build the server/shared runtime assembly.
 
+## Module package manifest
+
+Every optional runtime module can declare itself with a `module.playserv.json` file.
+The file may live anywhere inside an Assets or UPM package. Asset paths in the
+descriptor are resolved relative to the nearest package root containing
+`package.json`.
+
+```json
+{
+  "id": "company-chat",
+  "order": 200,
+  "label": "Company Chat",
+  "description": "Chat runtime and PlayServ facade integration.",
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_COMPANY_CHAT",
+  "defaultEnabled": false,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "client-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Company.PlayServ.Chat"
+}
+```
+
+`id` and `disableDefine` must be unique. `dependencyIds` are user-visible
+dependencies. `hiddenDependencyModuleIds` are enabled automatically when the
+module is enabled. `rootAssemblyReference` is added to `Playserv.Runtime.asmdef`
+only while the module is active.
+
+An optional editor assembly can implement `IPlayServModuleCodegenContributor`
+to register the runtime `IPlayServModule`, add compatibility facade methods, or
+provide local command execution. Unity discovers contributors automatically;
+no PlayServ core registry changes are required.
+
+Use `Validate Modules` in `Tools/PlayServ/Settings` to check descriptor ids,
+dependencies, profiles, asset paths, asmdef names, and codegen contributors.
+Modules installed under `Packages/` are removed through Unity Package Manager;
+the SDK's `Uninstall` action is reserved for modules imported under `Assets/`.
+
 ## Apple Sign In module
 
 Apple Sign In is an optional client module for iOS builds. It uses Apple's native

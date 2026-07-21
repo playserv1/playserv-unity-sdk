@@ -14,6 +14,7 @@ namespace Playserv.Editor
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
         private const string CompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
         private const string ModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
+        private const string ModuleManifestRelativePath = "Runtime/Modules/Contracts/Generated/PlayServGeneratedModuleManifest.g.cs";
         private const string EventsApiExtensionsAssetPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string EventsAdapterExtensionsAssetPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
         private const string PackageSamplesToken = "Playserv.Samples";
@@ -75,6 +76,16 @@ namespace Playserv.Editor
                 "Playserv.Runtime.Modules.Pulse",
                 Array.Empty<string>(),
                 new[] { "PlayServPulseModule" }),
+            new ModuleExpectation(
+                PlayServModuleManifest.AppleSignInId,
+                "Playserv.Runtime.Modules.AppleSignIn",
+                Array.Empty<string>(),
+                new[] { "PlayServAppleSignInModule" }),
+            new ModuleExpectation(
+                PlayServModuleManifest.GoogleSignInId,
+                "Playserv.Runtime.Modules.GoogleSignIn",
+                Array.Empty<string>(),
+                new[] { "PlayServGoogleSignInModule" }),
             new ModuleExpectation(
                 PlayServModuleManifest.TransportWebSocketId,
                 "Playserv.Runtime.Transport.WebSocket",
@@ -154,6 +165,7 @@ namespace Playserv.Editor
                 Directory.CreateDirectory(backupRoot);
                 PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                 baseline = GeneratedSnapshot.Capture(packageRoot, projectRoot);
+                ValidateJsonManifestCatalog();
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                 ValidateUnavailableModulesDoNotLeak(packageRoot);
                 ValidateSpawnCompatibilityPath(packageRoot);
@@ -163,7 +175,13 @@ namespace Playserv.Editor
                     if (!module.VisibleInExport || module.AssetPaths.Length == 0)
                         continue;
 
-                    MoveModuleOut(packageRoot, backupRoot, module, movedPaths);
+                    if (!PlayServEditorModuleAvailability.TryGetModuleRoot(module, out var moduleRoot) ||
+                        !string.Equals(moduleRoot.AbsolutePath, packageRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    MoveModuleOut(moduleRoot.AbsolutePath, backupRoot, module, movedPaths);
                     if (movedPaths.Count == 0)
                         continue;
 
@@ -366,6 +384,38 @@ namespace Playserv.Editor
             }
         }
 
+        private static void ValidateJsonManifestCatalog()
+        {
+            PlayServModuleManifestJsonRegistry.Reload();
+            foreach (var diagnostic in PlayServModuleManifestJsonRegistry.Diagnostics)
+            {
+                if (diagnostic.IsError)
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid module manifest {diagnostic.DescriptorAssetPath}: {diagnostic.Message}");
+                }
+            }
+
+            var previousOrder = int.MinValue;
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (string.IsNullOrWhiteSpace(module.DescriptorAssetPath))
+                    throw new InvalidOperationException($"Module is missing {PlayServModuleManifestJsonRegistry.DescriptorFileName}: {module.Id}");
+
+                if (string.IsNullOrWhiteSpace(module.SourceRootAssetPath))
+                    throw new InvalidOperationException($"Module descriptor has no package root: {module.Id}");
+
+                var descriptorPath = PlayServPackagePathResolver.ToAbsoluteAssetPath(module.DescriptorAssetPath);
+                if (!File.Exists(descriptorPath))
+                    throw new InvalidOperationException($"Module descriptor file is missing: {module.DescriptorAssetPath}");
+
+                if (module.Order < previousOrder)
+                    throw new InvalidOperationException($"Module descriptor order is unstable at {module.Id}.");
+
+                previousOrder = module.Order;
+            }
+        }
+
         private static void ValidateGeneratedEventsDoNotReferenceSamples(string projectRoot)
         {
             var apiExtensions = ReadProjectFile(projectRoot, EventsApiExtensionsAssetPath);
@@ -500,6 +550,7 @@ namespace Playserv.Editor
                     [Path.Combine(packageRoot, RuntimeAsmdefRelativePath)] = ReadPackageFile(packageRoot, RuntimeAsmdefRelativePath),
                     [Path.Combine(packageRoot, CompatibilityRelativePath)] = ReadPackageFile(packageRoot, CompatibilityRelativePath),
                     [Path.Combine(packageRoot, ModuleRegistryRelativePath)] = ReadPackageFile(packageRoot, ModuleRegistryRelativePath),
+                    [Path.Combine(packageRoot, ModuleManifestRelativePath)] = ReadPackageFile(packageRoot, ModuleManifestRelativePath),
                     [Path.Combine(projectRoot, EventsApiExtensionsAssetPath)] = ReadProjectFile(projectRoot, EventsApiExtensionsAssetPath),
                     [Path.Combine(projectRoot, EventsAdapterExtensionsAssetPath)] = ReadProjectFile(projectRoot, EventsAdapterExtensionsAssetPath)
                 });

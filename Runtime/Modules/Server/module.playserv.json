@@ -1,0 +1,26 @@
+{
+  "id": "server",
+  "order": 50,
+  "label": "Server",
+  "description": "Server-side local command/event execution, in-process RPC invoker, service registry, and PlayServServerRpc API.",
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_SERVER",
+  "defaultEnabled": false,
+  "isServerModule": true,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Modules/Server/Implementation"
+  ],
+  "dependencyIds": [],
+  "hiddenDependencyAssetPaths": [
+    "Runtime/Modules/RPC/Core"
+  ],
+  "hiddenDependencyModuleIds": [
+    "rpc-core"
+  ],
+  "profiles": [
+    "server-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.Server"
+}

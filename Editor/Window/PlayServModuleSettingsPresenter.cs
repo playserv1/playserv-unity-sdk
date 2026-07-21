@@ -8,13 +8,13 @@ namespace Playserv.Editor
     internal sealed class PlayServModuleSettingsPresenter
     {
         private const float ModuleTagMaxWidth = 260f;
-        private static readonly string[] RuntimeModuleNames =
+        private static string[] RuntimeModuleNames =>
             PlayServModuleManifest.VisibleRuntimeModules
                 .Where(module => !module.IsServerModule)
                 .Select(module => module.Label)
                 .ToArray();
 
-        private static readonly string[] ServerRuntimeModuleNames =
+        private static string[] ServerRuntimeModuleNames =>
             PlayServModuleManifest.VisibleRuntimeModules
                 .Where(module => module.IsServerModule)
                 .Select(module => module.Label)

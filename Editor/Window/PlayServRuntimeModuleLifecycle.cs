@@ -9,9 +9,6 @@ namespace Playserv.Editor
 {
     internal static class PlayServRuntimeModuleLifecycle
     {
-        private const string ThisScriptSuffix = "/Editor/Window/PlayServRuntimeModuleLifecycle.cs";
-        private static PlayServPackageRoot _packageRoot;
-
         public static bool ApplyProfile(PlayServEditorModuleSettings settings, PlayServSdkProfile profile)
         {
             if (settings == null)
@@ -55,6 +52,18 @@ namespace Playserv.Editor
                 return false;
             }
 
+            if (!PlayServEditorModuleAvailability.TryGetModuleRoot(manifest, out var moduleRoot))
+            {
+                reason = "Module package root was not found.";
+                return false;
+            }
+
+            if (moduleRoot.AssetPath.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase))
+            {
+                reason = "Remove this module package through Unity Package Manager.";
+                return false;
+            }
+
             if (module.IsEnabled(settings) && !settings.CanChangeRuntimeModule(module.Name))
             {
                 reason = settings.GetRuntimeModuleBlockReason(module.Name);
@@ -91,9 +100,9 @@ namespace Playserv.Editor
             // Make generated compatibility and root asmdef refs safe before removing files.
             SyncGeneratedAndReferences();
 
-            if (!TryGetPackageRoot(out _))
+            if (!PlayServEditorModuleAvailability.TryGetModuleRoot(manifest, out var moduleRoot))
             {
-                error = "PlayServ package root was not found.";
+                error = "Module package root was not found.";
                 return false;
             }
 
@@ -101,7 +110,7 @@ namespace Playserv.Editor
             var failedPaths = new List<string>();
             for (var i = 0; i < manifest.AssetPaths.Length; i++)
             {
-                var assetPath = ToPackageAssetPath(manifest.AssetPaths[i]);
+                var assetPath = moduleRoot.ToAssetPath(moduleRoot.ToAbsolutePath(manifest.AssetPaths[i]));
                 if (!AssetDatabase.IsValidFolder(assetPath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null)
                     continue;
 
@@ -144,36 +153,5 @@ namespace Playserv.Editor
             return builder.ToString();
         }
 
-        private static string ToPackageAssetPath(string relativePath)
-        {
-            return TryGetPackageRoot(out var packageRoot)
-                ? packageRoot.ToAssetPath(packageRoot.ToAbsolutePath(relativePath ?? string.Empty))
-                : string.Empty;
-        }
-
-        private static bool TryGetPackageRoot(out PlayServPackageRoot packageRoot)
-        {
-            if (_packageRoot != null)
-            {
-                if (_packageRoot.Exists)
-                {
-                    packageRoot = _packageRoot;
-                    return true;
-                }
-
-                _packageRoot = null;
-            }
-
-            if (!PlayServPackagePathResolver.TryResolveRootForScript(
-                nameof(PlayServRuntimeModuleLifecycle),
-                ThisScriptSuffix,
-                out packageRoot))
-            {
-                return false;
-            }
-
-            _packageRoot = packageRoot;
-            return true;
-        }
     }
 }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
@@ -103,13 +102,13 @@ namespace Playserv.Editor
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
         private const string GeneratedCompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
         private const string GeneratedModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
-        private const string DescriptorAttributeTypeName = "Playserv.Modules.PlayServModuleManifestDescriptorAttribute";
-
+        private const string GeneratedModuleManifestRelativePath = "Runtime/Modules/Contracts/Generated/PlayServGeneratedModuleManifest.g.cs";
         public static PlayServModuleValidationReport Validate()
         {
+            PlayServModuleManifestJsonRegistry.Reload();
             var issues = new List<PlayServModuleValidationIssue>();
             ValidateManifestEntries(issues);
-            ValidateDescriptorMetadata(issues);
+            ValidateJsonManifestMetadata(issues);
             ValidateModuleCodegenContributors(issues);
             ValidateModuleConfigSections(issues);
             ValidateScriptingDefines(issues);
@@ -123,7 +122,7 @@ namespace Playserv.Editor
             }
 
             var asmdefs = BuildAsmdefMap(packageRoot, issues);
-            ValidateDeclaredAssetPaths(packageRoot, issues);
+            ValidateDeclaredAssetPaths(issues);
             ValidateRootAssemblyReferences(packageRoot, asmdefs, issues);
             ValidateGeneratedFiles(packageRoot, issues);
 
@@ -229,6 +228,25 @@ namespace Playserv.Editor
                 ValidateDuplicateValues(module, module.HiddenDependencyModuleIds, "hidden dependency", issues);
                 ValidateDuplicateValues(module, module.AssetPaths, "asset path", issues);
                 ValidateDuplicateValues(module, module.HiddenDependencyAssetPaths, "hidden asset path", issues);
+                ValidateDuplicateValues(module, module.ProfileIds, "SDK profile id", issues);
+                ValidateProfileIds(module, issues);
+            }
+        }
+
+        private static void ValidateProfileIds(
+            PlayServModuleManifestEntry module,
+            List<PlayServModuleValidationIssue> issues)
+        {
+            for (var i = 0; i < module.ProfileIds.Length; i++)
+            {
+                if (PlayServSdkProfiles.TryGet(module.ProfileIds[i], out _))
+                    continue;
+
+                issues.Add(new PlayServModuleValidationIssue(
+                    PlayServModuleValidationSeverity.Error,
+                    "Module references an unknown SDK profile id.",
+                    module.Id,
+                    module.ProfileIds[i]));
             }
         }
 
@@ -297,94 +315,26 @@ namespace Playserv.Editor
             }
         }
 
-        private static void ValidateDescriptorMetadata(List<PlayServModuleValidationIssue> issues)
+        private static void ValidateJsonManifestMetadata(List<PlayServModuleValidationIssue> issues)
         {
-            var descriptorTypes = FindDescriptorTypes(issues);
-            if (descriptorTypes.Count == 0)
+            var descriptorPaths = PlayServModuleManifestJsonRegistry.DescriptorAssetPaths;
+            if (descriptorPaths.Count == 0)
             {
                 issues.Add(new PlayServModuleValidationIssue(
                     PlayServModuleValidationSeverity.Error,
-                    "No module descriptor types were found."));
-                return;
+                    $"No {PlayServModuleManifestJsonRegistry.DescriptorFileName} descriptors were found."));
             }
 
-            var orders = new Dictionary<int, string>();
-            var descriptorIds = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < descriptorTypes.Count; i++)
-            {
-                var descriptor = descriptorTypes[i];
-                if (!orders.ContainsKey(descriptor.Order))
-                {
-                    orders.Add(descriptor.Order, descriptor.TypeName);
-                }
-                else
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Warning,
-                        "Duplicate module descriptor order.",
-                        detail: $"{descriptor.Order}: {orders[descriptor.Order]} and {descriptor.TypeName}"));
-                }
-
-                if (!descriptorIds.Add(descriptor.ModuleId))
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Error,
-                        "Duplicate module id emitted by descriptors.",
-                        descriptor.ModuleId,
-                        descriptor.TypeName));
-                }
-            }
-
-            if (descriptorTypes.Count != PlayServModuleManifest.RuntimeModules.Count)
+            foreach (var diagnostic in PlayServModuleManifestJsonRegistry.Diagnostics)
             {
                 issues.Add(new PlayServModuleValidationIssue(
-                    PlayServModuleValidationSeverity.Warning,
-                    "Descriptor count does not match manifest module count.",
-                    detail: $"{descriptorTypes.Count} descriptor(s), {PlayServModuleManifest.RuntimeModules.Count} manifest module(s)."));
+                    diagnostic.IsError
+                        ? PlayServModuleValidationSeverity.Error
+                        : PlayServModuleValidationSeverity.Warning,
+                    diagnostic.Message,
+                    diagnostic.ModuleId,
+                    diagnostic.DescriptorAssetPath));
             }
-        }
-
-        private static List<DescriptorInfo> FindDescriptorTypes(List<PlayServModuleValidationIssue> issues)
-        {
-            var descriptors = new List<DescriptorInfo>();
-            Type[] types;
-            try
-            {
-                types = typeof(PlayServModuleManifest).Assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                types = ex.Types.Where(type => type != null).ToArray();
-                issues.Add(new PlayServModuleValidationIssue(
-                    PlayServModuleValidationSeverity.Warning,
-                    "Some runtime module assembly types could not be loaded while validating descriptors.",
-                    detail: ex.Message));
-            }
-
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                var attribute = FindDescriptorAttribute(type);
-                if (attribute == null)
-                    continue;
-
-                if (!TryReadDescriptorOrder(attribute, out var order))
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Error,
-                        "Module descriptor attribute does not expose an order.",
-                        detail: type.FullName));
-                    continue;
-                }
-
-                var module = TryCreateDescriptorEntry(type, issues);
-                if (module == null)
-                    continue;
-
-                descriptors.Add(new DescriptorInfo(order, type.FullName, module.Id));
-            }
-
-            return descriptors;
         }
 
         private static void ValidateModuleCodegenContributors(List<PlayServModuleValidationIssue> issues)
@@ -471,61 +421,22 @@ namespace Playserv.Editor
             }
         }
 
-        private static Attribute FindDescriptorAttribute(MemberInfo type)
-        {
-            var attributes = Attribute.GetCustomAttributes(type, inherit: false);
-            for (var i = 0; i < attributes.Length; i++)
-            {
-                if (string.Equals(attributes[i].GetType().FullName, DescriptorAttributeTypeName, StringComparison.Ordinal))
-                    return attributes[i];
-            }
-
-            return null;
-        }
-
-        private static bool TryReadDescriptorOrder(Attribute attribute, out int order)
-        {
-            order = 0;
-            var property = attribute.GetType().GetProperty("Order", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (property == null || property.PropertyType != typeof(int))
-                return false;
-
-            order = (int)property.GetValue(attribute, null);
-            return true;
-        }
-
-        private static PlayServModuleManifestEntry TryCreateDescriptorEntry(Type type, List<PlayServModuleValidationIssue> issues)
-        {
-            try
-            {
-                var instance = Activator.CreateInstance(type, nonPublic: true);
-                var method = type.GetMethod("CreateEntry", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                var module = method?.Invoke(instance, null) as PlayServModuleManifestEntry;
-                if (module != null)
-                    return module;
-
-                issues.Add(new PlayServModuleValidationIssue(
-                    PlayServModuleValidationSeverity.Error,
-                    "Module descriptor did not return a manifest entry.",
-                    detail: type.FullName));
-            }
-            catch (Exception ex)
-            {
-                issues.Add(new PlayServModuleValidationIssue(
-                    PlayServModuleValidationSeverity.Error,
-                    "Module descriptor failed to create a manifest entry.",
-                    detail: $"{type.FullName}: {ex.GetBaseException().Message}"));
-            }
-
-            return null;
-        }
-
-        private static void ValidateDeclaredAssetPaths(PlayServPackageRoot packageRoot, List<PlayServModuleValidationIssue> issues)
+        private static void ValidateDeclaredAssetPaths(List<PlayServModuleValidationIssue> issues)
         {
             foreach (var module in PlayServModuleManifest.RuntimeModules)
             {
-                ValidateDeclaredAssetPaths(packageRoot, module, module.AssetPaths, "asset path", issues);
-                ValidateDeclaredAssetPaths(packageRoot, module, module.HiddenDependencyAssetPaths, "hidden asset path", issues);
+                if (!PlayServEditorModuleAvailability.TryGetModuleRoot(module, out var moduleRoot))
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Module package root was not found.",
+                        module.Id,
+                        module.SourceRootAssetPath));
+                    continue;
+                }
+
+                ValidateDeclaredAssetPaths(moduleRoot, module, module.AssetPaths, "asset path", issues);
+                ValidateDeclaredAssetPaths(moduleRoot, module, module.HiddenDependencyAssetPaths, "hidden asset path", issues);
             }
         }
 
@@ -588,34 +499,48 @@ namespace Playserv.Editor
             List<PlayServModuleValidationIssue> issues)
         {
             var asmdefs = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-            string[] files;
-            try
+            var roots = new Dictionary<string, PlayServPackageRoot>(StringComparer.OrdinalIgnoreCase)
             {
-                files = Directory.GetFiles(packageRoot.AbsolutePath, "*.asmdef", SearchOption.AllDirectories);
-            }
-            catch (Exception ex)
+                [packageRoot.AbsolutePath] = packageRoot
+            };
+
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
             {
-                issues.Add(new PlayServModuleValidationIssue(
-                    PlayServModuleValidationSeverity.Error,
-                    "Failed to scan package asmdef files.",
-                    detail: ex.Message));
-                return asmdefs;
+                if (PlayServEditorModuleAvailability.TryGetModuleRoot(module, out var moduleRoot))
+                    roots[moduleRoot.AbsolutePath] = moduleRoot;
             }
 
-            for (var i = 0; i < files.Length; i++)
+            foreach (var root in roots.Values)
             {
-                var path = files[i];
-                var model = ReadAsmdef(path, issues);
-                if (model == null || string.IsNullOrWhiteSpace(model.name))
-                    continue;
-
-                if (!asmdefs.TryGetValue(model.name, out var paths))
+                string[] files;
+                try
                 {
-                    paths = new List<string>();
-                    asmdefs.Add(model.name, paths);
+                    files = Directory.GetFiles(root.AbsolutePath, "*.asmdef", SearchOption.AllDirectories);
+                }
+                catch (Exception ex)
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Failed to scan module package asmdef files.",
+                        detail: $"{root.AssetPath}: {ex.Message}"));
+                    continue;
                 }
 
-                paths.Add(ToPackageRelativePath(packageRoot, path));
+                for (var i = 0; i < files.Length; i++)
+                {
+                    var path = files[i];
+                    var model = ReadAsmdef(path, issues);
+                    if (model == null || string.IsNullOrWhiteSpace(model.name))
+                        continue;
+
+                    if (!asmdefs.TryGetValue(model.name, out var paths))
+                    {
+                        paths = new List<string>();
+                        asmdefs.Add(model.name, paths);
+                    }
+
+                    paths.Add(root.ToAssetPath(path));
+                }
             }
 
             foreach (var pair in asmdefs)
@@ -694,6 +619,7 @@ namespace Playserv.Editor
         {
             ValidateGeneratedFile(packageRoot, GeneratedCompatibilityRelativePath, issues);
             ValidateGeneratedFile(packageRoot, GeneratedModuleRegistryRelativePath, issues);
+            ValidateGeneratedFile(packageRoot, GeneratedModuleManifestRelativePath, issues);
         }
 
         private static void ValidateGeneratedFile(
@@ -712,12 +638,11 @@ namespace Playserv.Editor
             }
 
             var text = File.ReadAllText(absolutePath);
-            if (text.IndexOf("partial void", StringComparison.Ordinal) < 0 &&
-                text.IndexOf("partial class", StringComparison.Ordinal) < 0)
+            if (text.IndexOf("// <auto-generated />", StringComparison.Ordinal) < 0)
             {
                 issues.Add(new PlayServModuleValidationIssue(
                     PlayServModuleValidationSeverity.Warning,
-                    "Generated module file does not look like a PlayServ generated partial.",
+                    "Generated module file does not contain the PlayServ auto-generated marker.",
                     detail: relativePath));
             }
         }
@@ -846,30 +771,6 @@ namespace Playserv.Editor
             return string.Equals(fullPath, root, StringComparison.OrdinalIgnoreCase) ||
                    fullPath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
                    fullPath.StartsWith(root + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string ToPackageRelativePath(PlayServPackageRoot packageRoot, string absolutePath)
-        {
-            var assetPath = packageRoot.ToAssetPath(absolutePath);
-            return packageRoot.TryGetRelativeAssetPath(assetPath, out var relativePath)
-                ? relativePath
-                : assetPath;
-        }
-
-        private sealed class DescriptorInfo
-        {
-            public DescriptorInfo(int order, string typeName, string moduleId)
-            {
-                Order = order;
-                TypeName = typeName ?? string.Empty;
-                ModuleId = moduleId ?? string.Empty;
-            }
-
-            public int Order { get; }
-
-            public string TypeName { get; }
-
-            public string ModuleId { get; }
         }
 
         [Serializable]

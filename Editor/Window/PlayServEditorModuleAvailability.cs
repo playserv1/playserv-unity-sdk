@@ -12,10 +12,8 @@ namespace Playserv.Editor
         private const string ThisScriptSuffix = "/Editor/Window/PlayServEditorModuleAvailability.cs";
         private static PlayServPackageRoot _packageRoot;
 
-        private static readonly PlayServRuntimeModuleDefinition[] RuntimeModuleDefinitions = BuildRuntimeModuleDefinitions();
-
         internal static IEnumerable<PlayServRuntimeModuleDefinition> AvailableRuntimeModules =>
-            RuntimeModuleDefinitions.Where(module => IsRuntimeModuleAvailable(module.Id));
+            BuildRuntimeModuleDefinitions().Where(module => IsRuntimeModuleAvailable(module.Id));
 
         public static IEnumerable<PlayServModuleManifestEntry> AvailableExportModules =>
             PlayServModuleManifest.ExportableRuntimeModules.Where(IsRuntimeModuleAvailable);
@@ -93,8 +91,8 @@ namespace Playserv.Editor
             if (!visited.Add(module.Id))
                 return true;
 
-            if (!HasRequiredAssets(module.AssetPaths) ||
-                !HasRequiredAssets(module.HiddenDependencyAssetPaths))
+            if (!HasRequiredAssets(module, module.AssetPaths) ||
+                !HasRequiredAssets(module, module.HiddenDependencyAssetPaths))
             {
                 return false;
             }
@@ -122,11 +120,11 @@ namespace Playserv.Editor
             return true;
         }
 
-        private static bool HasRequiredAssets(string[] relativePaths)
+        private static bool HasRequiredAssets(PlayServModuleManifestEntry module, string[] relativePaths)
         {
             for (var i = 0; i < relativePaths.Length; i++)
             {
-                if (!HasAssetPath(relativePaths[i]))
+                if (!HasAssetPath(module, relativePaths[i]))
                     return false;
             }
 
@@ -173,13 +171,27 @@ namespace Playserv.Editor
             }
         }
 
-        private static bool HasAssetPath(string relativePath)
+        private static bool HasAssetPath(PlayServModuleManifestEntry module, string relativePath)
         {
-            if (!TryGetPackageRoot(out var packageRoot))
+            if (!TryGetModuleRoot(module, out var moduleRoot))
                 return false;
 
-            var absolutePath = packageRoot.ToAbsolutePath(relativePath);
+            var absolutePath = moduleRoot.ToAbsolutePath(relativePath);
             return Directory.Exists(absolutePath) || File.Exists(absolutePath);
+        }
+
+        internal static bool TryGetModuleRoot(PlayServModuleManifestEntry module, out PlayServPackageRoot moduleRoot)
+        {
+            moduleRoot = null;
+            if (module != null && !string.IsNullOrWhiteSpace(module.SourceRootAssetPath))
+            {
+                moduleRoot = new PlayServPackageRoot(
+                    module.SourceRootAssetPath,
+                    PlayServPackagePathResolver.ToAbsoluteAssetPath(module.SourceRootAssetPath));
+                return moduleRoot.Exists;
+            }
+
+            return TryGetPackageRoot(out moduleRoot);
         }
 
         private static bool HasFolder(string relativePath)

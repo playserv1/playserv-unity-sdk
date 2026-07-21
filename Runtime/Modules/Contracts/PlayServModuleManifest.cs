@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Playserv.Modules
 {
@@ -35,18 +36,20 @@ namespace Playserv.Modules
         public const string DefineDisableTransportRudp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP";
         public const string DefineDisableTransportWebRtc = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBRTC";
 
-        private static readonly PlayServModuleManifestEntry[] Modules = PlayServModuleManifestDescriptors.Build();
+        private static readonly PlayServModuleManifestEntry[] BuiltInModules = PlayServGeneratedModuleManifest.Build();
+        private static PlayServModuleManifestEntry[] _modules = BuiltInModules;
 
-        public static IReadOnlyList<PlayServModuleManifestEntry> RuntimeModules => Modules;
+        public static IReadOnlyList<PlayServModuleManifestEntry> RuntimeModules => _modules;
 
         public static IEnumerable<PlayServModuleManifestEntry> VisibleRuntimeModules
         {
             get
             {
-                for (var i = 0; i < Modules.Length; i++)
+                var modules = _modules;
+                for (var i = 0; i < modules.Length; i++)
                 {
-                    if (Modules[i].VisibleInSettings)
-                        yield return Modules[i];
+                    if (modules[i].VisibleInSettings)
+                        yield return modules[i];
                 }
             }
         }
@@ -55,12 +58,31 @@ namespace Playserv.Modules
         {
             get
             {
-                for (var i = 0; i < Modules.Length; i++)
+                var modules = _modules;
+                for (var i = 0; i < modules.Length; i++)
                 {
-                    if (Modules[i].VisibleInExport)
-                        yield return Modules[i];
+                    if (modules[i].VisibleInExport)
+                        yield return modules[i];
                 }
             }
+        }
+
+        public static void SetDiscoveredModules(IEnumerable<PlayServModuleManifestEntry> discoveredModules)
+        {
+            var discovered = (discoveredModules ?? Array.Empty<PlayServModuleManifestEntry>())
+                .Where(module => module != null)
+                .ToArray();
+
+            if (discovered.Length == 0)
+            {
+                _modules = BuiltInModules;
+                return;
+            }
+
+            _modules = discovered
+                .OrderBy(module => module.Order)
+                .ThenBy(module => module.Id, StringComparer.Ordinal)
+                .ToArray();
         }
 
         public static bool TryGet(string moduleId, out PlayServModuleManifestEntry module)
@@ -69,12 +91,13 @@ namespace Playserv.Modules
             if (string.IsNullOrWhiteSpace(moduleId))
                 return false;
 
-            for (var i = 0; i < Modules.Length; i++)
+            var modules = _modules;
+            for (var i = 0; i < modules.Length; i++)
             {
-                if (!string.Equals(Modules[i].Id, moduleId, StringComparison.Ordinal))
+                if (!string.Equals(modules[i].Id, moduleId, StringComparison.Ordinal))
                     continue;
 
-                module = Modules[i];
+                module = modules[i];
                 return true;
             }
 
@@ -90,12 +113,13 @@ namespace Playserv.Modules
             if (string.IsNullOrWhiteSpace(moduleIdOrLabel))
                 return false;
 
-            for (var i = 0; i < Modules.Length; i++)
+            var modules = _modules;
+            for (var i = 0; i < modules.Length; i++)
             {
-                if (!string.Equals(Modules[i].Label, moduleIdOrLabel, StringComparison.Ordinal))
+                if (!string.Equals(modules[i].Label, moduleIdOrLabel, StringComparison.Ordinal))
                     continue;
 
-                module = Modules[i];
+                module = modules[i];
                 return true;
             }
 

@@ -1,0 +1,24 @@
+{
+  "id": "transport-udp",
+  "order": 110,
+  "label": "UDP",
+  "description": "UDP protocol implementation for native/editor builds.",
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Proxy/Modules/Udp"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "client-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": ""
+}
