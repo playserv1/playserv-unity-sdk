@@ -20,20 +20,34 @@ namespace Playserv.AppleSignIn
         private readonly Dictionary<int, CredentialStateRequestState> _credentialStateRequests =
             new Dictionary<int, CredentialStateRequestState>();
 
+        private readonly IPlayServAppleSignInProvider _provider;
+        private readonly Func<PlayServAppleSignInSettings> _loadSettings;
+
         public PlayServAppleSignInApi()
+            : this(
+                new PlayServAppleSignInNativeProvider(),
+                PlayServAppleSignInSettingsProvider.LoadOrDefault)
         {
-            PlayServAppleSignInNative.CredentialReceived += CompleteSignIn;
-            PlayServAppleSignInNative.SignInFailed += FailSignIn;
-            PlayServAppleSignInNative.CredentialStateReceived += CompleteCredentialState;
-            PlayServAppleSignInNative.CredentialsRevoked += OnCredentialsRevoked;
-            PlayServAppleSignInNative.SetCredentialsRevokedCallbackEnabled(true);
+        }
+
+        internal PlayServAppleSignInApi(
+            IPlayServAppleSignInProvider provider,
+            Func<PlayServAppleSignInSettings> loadSettings)
+        {
+            _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+            _loadSettings = loadSettings ?? throw new ArgumentNullException(nameof(loadSettings));
+            _provider.CredentialReceived += CompleteSignIn;
+            _provider.SignInFailed += FailSignIn;
+            _provider.CredentialStateReceived += CompleteCredentialState;
+            _provider.CredentialsRevoked += OnCredentialsRevoked;
+            _provider.SetCredentialsRevokedCallbackEnabled(true);
         }
 
         public event Action CredentialsRevoked;
 
-        public bool IsAvailable => PlayServAppleSignInNative.IsSupported();
+        public bool IsAvailable => _provider.IsAvailable;
 
-        public PlayServAppleSignInSettings Settings => PlayServAppleSignInSettingsProvider.LoadOrDefault();
+        public PlayServAppleSignInSettings Settings => _loadSettings();
 
         public Task<PlayServAppleSignInCredential> SignInAsync(
             PlayServAppleSignInRequest request = null,
@@ -64,7 +78,7 @@ namespace Playserv.AppleSignIn
             AddCredentialStateRequest(requestId, state);
             RegisterCancellation(requestId, state, ct);
 
-            PlayServAppleSignInNative.GetCredentialState(requestId, userId.Trim());
+            _provider.GetCredentialState(requestId, userId.Trim());
             return state.Completion.Task;
         }
 
@@ -85,9 +99,9 @@ namespace Playserv.AppleSignIn
 
             var scopes = (int)request.Scopes;
             if (quickLogin)
-                PlayServAppleSignInNative.QuickLogin(requestId, scopes, request.Nonce, request.State);
+                _provider.QuickLogin(requestId, scopes, request.Nonce, request.State);
             else
-                PlayServAppleSignInNative.SignIn(requestId, scopes, request.Nonce, request.State);
+                _provider.SignIn(requestId, scopes, request.Nonce, request.State);
 
             return state.Completion.Task;
         }

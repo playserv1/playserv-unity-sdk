@@ -79,10 +79,7 @@ namespace Playserv.Modules
                 return;
             }
 
-            _modules = discovered
-                .OrderBy(module => module.Order)
-                .ThenBy(module => module.Id, StringComparer.Ordinal)
-                .ToArray();
+            _modules = discovered;
         }
 
         public static bool TryGet(string moduleId, out PlayServModuleManifestEntry module)

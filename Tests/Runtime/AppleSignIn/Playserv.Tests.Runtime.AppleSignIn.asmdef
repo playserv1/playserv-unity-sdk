@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Tests.Runtime.AppleSignIn",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.AppleSignIn"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

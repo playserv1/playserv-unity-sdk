@@ -44,7 +44,7 @@ namespace Playserv.Editor
             return changed;
         }
 
-        private static string GenerateProjectAssemblyDefinition()
+        internal static string GenerateProjectAssemblyDefinition()
         {
             return
                 "{\n" +
@@ -65,12 +65,11 @@ namespace Playserv.Editor
                 "}\n";
         }
 
-        private static string GenerateProjectModuleSelection(PlayServRuntimeModuleState runtimeState)
+        internal static string GenerateProjectModuleSelection(PlayServRuntimeModuleState runtimeState)
         {
             var enabledModuleIds = PlayServModuleManifest.RuntimeModules
                 .Where(module => runtimeState.IsEnabled(module.Id))
                 .Select(module => module.Id)
-                .OrderBy(moduleId => moduleId, StringComparer.Ordinal)
                 .ToArray();
 
             var sb = new StringBuilder();

@@ -1,8 +1,20 @@
 {
+  "schemaVersion": 1,
   "id": "google-sign-in",
   "order": 90,
   "label": "Google Sign In",
   "description": "Google Sign-In facade for OAuth ID tokens, server auth codes, profile identity, silent sign-in, sign-out, and disconnect.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Android",
+    "iOS"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "identity.google"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN",
   "defaultEnabled": false,
   "isServerModule": false,

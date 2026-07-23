@@ -1,0 +1,22 @@
+{
+    "name": "Playserv.Tests.Editor",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Runtime.Modules"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

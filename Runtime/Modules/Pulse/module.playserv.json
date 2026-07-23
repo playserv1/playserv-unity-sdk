@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "pulse",
   "order": 70,
   "label": "Pulse",
   "description": "Realtime config placeholder module and future feature flag surface.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "config.realtime"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_PULSE",
   "defaultEnabled": true,
   "isServerModule": false,

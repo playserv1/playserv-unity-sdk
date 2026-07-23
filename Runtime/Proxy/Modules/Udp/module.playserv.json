@@ -1,8 +1,21 @@
 {
+  "schemaVersion": 1,
   "id": "transport-udp",
   "order": 110,
   "label": "UDP",
   "description": "UDP protocol implementation for native/editor builds.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "transport.udp"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP",
   "defaultEnabled": true,
   "isServerModule": false,

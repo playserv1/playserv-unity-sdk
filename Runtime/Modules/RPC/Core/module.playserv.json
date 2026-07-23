@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "rpc-core",
   "order": 30,
   "label": "RPC Core",
   "description": "Shared RPC attributes, payload mapping, and codec helpers.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "rpc.core"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_RPC_CORE",
   "defaultEnabled": true,
   "isServerModule": false,

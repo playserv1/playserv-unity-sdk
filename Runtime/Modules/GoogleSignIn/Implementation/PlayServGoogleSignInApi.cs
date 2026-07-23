@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -5,55 +6,61 @@ namespace Playserv.GoogleSignIn
 {
     public sealed class PlayServGoogleSignInApi : IPlayServGoogleSignInApi
     {
-        public bool IsAvailable => PlayServGoogleSignInPluginBridge.IsAvailable;
+        private readonly IPlayServGoogleSignInProvider _provider;
+        private readonly Func<PlayServGoogleSignInSettings> _loadSettings;
 
-        public PlayServGoogleSignInSettings Settings => PlayServGoogleSignInSettingsProvider.LoadOrDefault();
+        public PlayServGoogleSignInApi()
+            : this(
+                new PlayServGoogleSignInPluginProvider(),
+                PlayServGoogleSignInSettingsProvider.LoadOrDefault)
+        {
+        }
+
+        internal PlayServGoogleSignInApi(
+            IPlayServGoogleSignInProvider provider,
+            Func<PlayServGoogleSignInSettings> loadSettings)
+        {
+            _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+            _loadSettings = loadSettings ?? throw new ArgumentNullException(nameof(loadSettings));
+        }
+
+        public bool IsAvailable => _provider.IsAvailable;
+
+        public PlayServGoogleSignInSettings Settings => _loadSettings();
 
         public Task<PlayServGoogleSignInCredential> SignInAsync(
             PlayServGoogleSignInRequest request = null,
             CancellationToken ct = default)
         {
-            return ExecuteAsync("sign in", request, silent: false, ct);
+            return ExecuteAsync(request, silent: false, ct);
         }
 
         public Task<PlayServGoogleSignInCredential> SignInSilentlyAsync(
             PlayServGoogleSignInRequest request = null,
             CancellationToken ct = default)
         {
-            return ExecuteAsync("silent sign in", request, silent: true, ct);
+            return ExecuteAsync(request, silent: true, ct);
         }
 
         public void SignOut()
         {
-            var bridge = RequireBridge("sign out");
-            bridge.SignOut();
+            _provider.SignOut();
         }
 
         public void Disconnect()
         {
-            var bridge = RequireBridge("disconnect");
-            bridge.Disconnect();
+            _provider.Disconnect();
         }
 
         private async Task<PlayServGoogleSignInCredential> ExecuteAsync(
-            string operation,
             PlayServGoogleSignInRequest request,
             bool silent,
             CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            var bridge = RequireBridge(operation);
             return silent
-                ? await bridge.SignInSilentlyAsync(Settings, request, ct).ConfigureAwait(false)
-                : await bridge.SignInAsync(Settings, request, ct).ConfigureAwait(false);
-        }
-
-        private static PlayServGoogleSignInPluginBridge RequireBridge(string operation)
-        {
-            if (PlayServGoogleSignInPluginBridge.TryCreate(out var bridge))
-                return bridge;
-
-            throw new PlayServGoogleSignInException(operation, PlayServGoogleSignInPluginBridge.ProviderMissingMessage);
+                ? await _provider.SignInSilentlyAsync(Settings, request, ct).ConfigureAwait(false)
+                : await _provider.SignInAsync(Settings, request, ct).ConfigureAwait(false);
         }
     }
 }

@@ -1,15 +1,10 @@
 using Playserv.Modules;
-using Playserv.Wrapper;
 using UnityEngine;
 
 [assembly: PlayServModule(
     PlayServModuleManifest.DataSubscriptionId,
     typeof(Playserv.DataSubscription.PlayServDataSubscriptionModule),
     20)]
-[assembly: PlayServLegacyApi(
-    PlayServModuleManifest.DataSubscriptionId,
-    typeof(IPlayServDataApi),
-    typeof(Playserv.Wrapper.PlayServApiDataFacade))]
 
 namespace Playserv.DataSubscription
 {
@@ -21,9 +16,6 @@ namespace Playserv.DataSubscription
             PlayServModuleRegistry.Register<PlayServDataSubscriptionModule>(
                 PlayServModuleManifest.DataSubscriptionId,
                 20);
-            PlayServLegacyApiRegistry.Register<IPlayServDataApi, PlayServApiDataFacade>(
-                PlayServModuleManifest.DataSubscriptionId,
-                () => new PlayServApiDataFacade());
         }
     }
 }

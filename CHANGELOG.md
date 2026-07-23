@@ -8,10 +8,21 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Added
 
+- Extended `module.playserv.json` schema v1 with minimum SDK version,
+  supported platforms, module conflicts, capabilities, and required UPM
+  packages.
+- Added deterministic topological module ordering and explicit cyclic
+  dependency diagnostics.
+- Added Unity package tests under `Tests/Editor` and `Tests/Runtime` for module
+  descriptor discovery, dependency normalization, generated project selection,
+  runtime registry filtering, reconnect behavior, timeout and cancellation,
+  Newtonsoft serialization, and Apple/Google provider mocks.
+- Added an opt-in IL2CPP player build smoke test enabled with
+  `PLAYSERV_RUN_IL2CPP_TESTS=1`.
 - Added `PlayServExternalIdentityProof` as an explicitly unverified Apple/Google
   credential handoff for the future PlayServ authentication backend.
-- Added assembly-owned runtime module, legacy facade, and local execution
-  registration discovered without generated package registries.
+- Added assembly-owned runtime module and local execution registration discovered
+  without generated package registries.
 - Added the project-owned `Playserv.Project.Generated` assembly under
   `Assets/PlayServ/Generated/Runtime` for the selected runtime module set.
 - Added project-scoped module configuration in
@@ -22,6 +33,13 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Changed
 
+- Reorganized the package to Unity's recommended UPM layout: importable examples
+  now live under `Samples~/PlayServSDK`, long-form guides under
+  `Documentation~`, and the root README is intentionally concise.
+- Declared the PlayServ examples through the documented `samples` package
+  manifest property and removed the npm-specific `files` allowlist.
+- Moved the former always-compiled `Examples` assembly into the optional sample,
+  so installing the SDK no longer compiles example code.
 - Runtime module and editor-tool selection now migrates from `EditorPrefs` to
   version-controlled project settings. Module selection no longer depends on
   machine-local preferences.
@@ -29,19 +47,20 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
   while `Playserv.Runtime.asmdef` and all other package source remain immutable.
 - Declared the built-in IMGUI and Unity Web Request modules required by editor,
   sample, and runtime HTTP code.
-- Included the `Examples` assembly in registry package contents so bundled
-  samples do not reference an omitted assembly.
 - Included `package.json.meta` in registry package contents so Unity can import
   read-only package installations without attempting to modify the package.
-- The stable `Playserv.Wrapper.PlayServ` surface now acts only as a legacy facade
-  over compatibility providers owned by enabled module assemblies.
+- `Playserv.Wrapper.PlayServ` now exposes only core connection and runtime
+  operations; optional features use their module-specific API surfaces.
 - Module validation and repair now include the project module settings schema,
   profiles, module IDs, platform overrides, and assembly registrations.
 
 ### Removed
 
+- Removed macOS `.DS_Store` files from the package working tree.
 - Removed project-specific compatibility, module registry, and manifest
   generation from the SDK package directory.
+- Removed the legacy `PlayServ.*` optional-module forwarders, compatibility
+  registry, assembly attributes, and facade contracts.
 
 ### Security
 

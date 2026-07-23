@@ -81,6 +81,9 @@ namespace Playserv.Editor
             if (enabled && TryBuildMissingDependencyList(module, state, out _))
                 return false;
 
+            if (enabled && TryBuildEnabledConflictList(module, state, out _))
+                return false;
+
             if (!enabled && TryBuildEnabledDependentList(module.Id, state, out _))
                 return false;
 
@@ -98,7 +101,8 @@ namespace Playserv.Editor
 
             return _runtimeState.IsEnabled(module.Id)
                 ? !TryBuildEnabledDependentList(module.Id, _runtimeState, out _)
-                : !TryBuildMissingDependencyList(module, _runtimeState, out _);
+                : !TryBuildMissingDependencyList(module, _runtimeState, out _) &&
+                  !TryBuildEnabledConflictList(module, _runtimeState, out _);
         }
 
         public string GetRuntimeModuleBlockReason(string moduleName)
@@ -119,6 +123,12 @@ namespace Playserv.Editor
                 TryBuildMissingDependencyList(module, _runtimeState, out var dependencies))
             {
                 return $"Enable {dependencies} first.";
+            }
+
+            if (!_runtimeState.IsEnabled(module.Id) &&
+                TryBuildEnabledConflictList(module, _runtimeState, out var conflicts))
+            {
+                return $"Disable conflicting modules first: {conflicts}.";
             }
 
             return string.Empty;
@@ -268,6 +278,46 @@ namespace Playserv.Editor
 
             dependents = string.Join(", ", labels);
             return labels.Count > 0;
+        }
+
+        private static bool TryBuildEnabledConflictList(
+            PlayServModuleManifestEntry module,
+            PlayServRuntimeModuleState state,
+            out string conflicts)
+        {
+            var labels = new List<string>();
+            foreach (var candidate in PlayServModuleManifest.VisibleRuntimeModules)
+            {
+                if (!state.IsEnabled(candidate.Id) ||
+                    !ModulesConflict(module, candidate))
+                {
+                    continue;
+                }
+
+                labels.Add(candidate.Label);
+            }
+
+            conflicts = string.Join(", ", labels);
+            return labels.Count > 0;
+        }
+
+        private static bool ModulesConflict(
+            PlayServModuleManifestEntry left,
+            PlayServModuleManifestEntry right)
+        {
+            return Contains(left.ConflictsWith, right.Id) ||
+                   Contains(right.ConflictsWith, left.Id);
+        }
+
+        private static bool Contains(string[] values, string expected)
+        {
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (string.Equals(values[i], expected, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
         }
 
         private static bool HasDependency(PlayServModuleManifestEntry module, string dependencyId)

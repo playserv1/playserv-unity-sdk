@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.sdk",
   "displayName": "PlayServ SDK",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "unity": "2021.3",
   "description": "PlayServ multiplayer SDK for Unity (runtime, editor tooling, and samples).",
   "author": {
@@ -13,23 +13,11 @@
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.unitywebrequest": "1.0.0"
   },
-  "files": [
-    "Runtime",
-    "Runtime.meta",
-    "Editor",
-    "Editor.meta",
-    "Examples",
-    "Examples.meta",
-    "Samples",
-    "Samples.meta",
-    "README.md",
-    "README.md.meta",
-    "SERVER_SDK.md",
-    "SERVER_SDK.md.meta",
-    "CHANGELOG.md",
-    "CHANGELOG.md.meta",
-    "LICENSE.md",
-    "LICENSE.md.meta",
-    "package.json.meta"
+  "samples": [
+    {
+      "displayName": "PlayServ SDK Examples",
+      "description": "Ready-to-run scenes for connection setup, data subscriptions, events, RPC, and network spawning.",
+      "path": "Samples~/PlayServSDK"
+    }
   ]
 }

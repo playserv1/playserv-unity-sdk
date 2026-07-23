@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "client-rpc",
   "order": 40,
   "label": "RPC",
   "description": "Client-side remote RPC commands, generated RPC helpers, and Invoke* wrapper APIs.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "rpc.client"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_CLIENT_RPC",
   "defaultEnabled": true,
   "isServerModule": false,

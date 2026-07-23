@@ -23,7 +23,13 @@ namespace Playserv.Modules
             int order = 0,
             string sourceRootAssetPath = null,
             string descriptorAssetPath = null,
-            string[] profileIds = null)
+            string[] profileIds = null,
+            int schemaVersion = 1,
+            string minSdkVersion = null,
+            string[] supportedPlatforms = null,
+            string[] conflictsWith = null,
+            string[] capabilities = null,
+            string[] requiresPackages = null)
         {
             if (string.IsNullOrWhiteSpace(id))
                 throw new ArgumentException("Module id is required.", nameof(id));
@@ -45,6 +51,12 @@ namespace Playserv.Modules
             SourceRootAssetPath = sourceRootAssetPath ?? string.Empty;
             DescriptorAssetPath = descriptorAssetPath ?? string.Empty;
             ProfileIds = CloneOrEmpty(profileIds);
+            SchemaVersion = schemaVersion;
+            MinSdkVersion = minSdkVersion ?? string.Empty;
+            SupportedPlatforms = CloneOrEmpty(supportedPlatforms);
+            ConflictsWith = CloneOrEmpty(conflictsWith);
+            Capabilities = CloneOrEmpty(capabilities);
+            RequiresPackages = CloneOrEmpty(requiresPackages);
         }
 
         public string Id { get; }
@@ -80,6 +92,18 @@ namespace Playserv.Modules
         public string DescriptorAssetPath { get; }
 
         public string[] ProfileIds { get; }
+
+        public int SchemaVersion { get; }
+
+        public string MinSdkVersion { get; }
+
+        public string[] SupportedPlatforms { get; }
+
+        public string[] ConflictsWith { get; }
+
+        public string[] Capabilities { get; }
+
+        public string[] RequiresPackages { get; }
 
         private static string[] CloneOrEmpty(string[] values)
         {

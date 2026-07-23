@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "events",
   "order": 10,
   "label": "Events",
   "description": "Typed publish/subscribe runtime and typed event API generation controls. Cannot be disabled while dependent modules are enabled.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "messaging.events"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_EVENTS",
   "defaultEnabled": true,
   "isServerModule": false,

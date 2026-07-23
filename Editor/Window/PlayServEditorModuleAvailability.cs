@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Playserv.Modules;
 using UnityEditor;
+using PackageManagerPackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace Playserv.Editor
 {
@@ -92,7 +93,8 @@ namespace Playserv.Editor
                 return true;
 
             if (!HasRequiredAssets(module, module.AssetPaths) ||
-                !HasRequiredAssets(module, module.HiddenDependencyAssetPaths))
+                !HasRequiredAssets(module, module.HiddenDependencyAssetPaths) ||
+                !HasRequiredPackages(module))
             {
                 return false;
             }
@@ -101,6 +103,22 @@ namespace Playserv.Editor
                 !AreDependenciesAvailable(module.HiddenDependencyModuleIds, visited))
             {
                 return false;
+            }
+
+            return true;
+        }
+
+        private static bool HasRequiredPackages(PlayServModuleManifestEntry module)
+        {
+            for (var i = 0; i < module.RequiresPackages.Length; i++)
+            {
+                var packageId = module.RequiresPackages[i];
+                var packageInfo = PackageManagerPackageInfo.FindForAssetPath(
+                    $"Packages/{packageId}/package.json");
+                if (packageInfo == null)
+                    packageInfo = PackageManagerPackageInfo.FindForAssetPath($"Packages/{packageId}");
+                if (packageInfo == null)
+                    return false;
             }
 
             return true;

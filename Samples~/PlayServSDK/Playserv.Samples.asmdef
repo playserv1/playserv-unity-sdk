@@ -1,0 +1,31 @@
+{
+    "name": "Playserv.Samples",
+    "rootNamespace": "Playserv.Samples",
+    "references": [
+        "Playserv.Runtime",
+        "Playserv.Runtime.Abstractions",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Modules.DataSubscription",
+        "Playserv.Runtime.Modules.Events",
+        "Playserv.Runtime.Modules.RPC.Core",
+        "Playserv.Runtime.Modules.RPC.Client",
+        "Playserv.Runtime.Modules.Spawn"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_EVENTS",
+        "!PLAYSERV_MODULE_DISABLED_DATA",
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC",
+        "!PLAYSERV_MODULE_DISABLED_SPAWN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "spawn",
   "order": 60,
   "label": "Spawn",
   "description": "NetworkObject/NetworkTransform helpers and Resources-based spawn facade. Depends on Events.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "network.spawn"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_SPAWN",
   "defaultEnabled": true,
   "isServerModule": false,

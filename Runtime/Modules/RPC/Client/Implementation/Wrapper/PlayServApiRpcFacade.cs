@@ -5,7 +5,7 @@ using Playserv.RPC;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApiRpcFacade : IPlayServRpcApi
+    internal sealed class PlayServApiRpcFacade
     {
         private readonly IPlayServRpcRuntimeAccess _runtimeAccess;
 

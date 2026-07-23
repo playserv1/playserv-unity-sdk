@@ -12,7 +12,7 @@ namespace Playserv.Editor
     {
         private const string ThisScriptSuffix = "/Editor/ModuleStressTests/PlayServModuleDeleteRestoreStressTest.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
-        private const string StableFacadeRelativePath = "Runtime/Core/PlayServ.cs";
+        private const string CoreEntryPointRelativePath = "Runtime/Core/PlayServ.cs";
         private const string ModuleRegistryRelativePath = "Runtime/Modules/Contracts/PlayServModuleRegistry.cs";
         private const string ModuleManifestRelativePath = "Runtime/Modules/Contracts/PlayServBuiltInModuleManifest.cs";
         private const string ProjectGeneratedAsmdefAssetPath =
@@ -174,7 +174,7 @@ namespace Playserv.Editor
                 ValidateJsonManifestCatalog();
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                 ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
-                ValidateSpawnCompatibilityPath(packageRoot);
+                ValidateCoreEntryPointHasNoModuleForwarders(packageRoot);
 
                 foreach (var module in PlayServModuleManifest.RuntimeModules)
                 {
@@ -194,7 +194,7 @@ namespace Playserv.Editor
                     PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                     ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                     ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
-                    ValidateSpawnCompatibilityPath(packageRoot);
+                    ValidateCoreEntryPointHasNoModuleForwarders(packageRoot);
                     GeneratedSnapshot.Capture(packageRoot, projectRoot)
                         .AssertPackageEquals(baseline, packageRoot, $"delete of {module.Label}");
 
@@ -202,7 +202,7 @@ namespace Playserv.Editor
                     PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                     ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                     ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
-                    ValidateSpawnCompatibilityPath(packageRoot);
+                    ValidateCoreEntryPointHasNoModuleForwarders(packageRoot);
                     GeneratedSnapshot.Capture(packageRoot, projectRoot)
                         .AssertEquals(baseline, $"restore after {module.Label}");
 
@@ -292,7 +292,7 @@ namespace Playserv.Editor
                 ValidateProtocolFolderUnavailable(packageRoot, module, expectation);
                 ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
-                ValidateSpawnCompatibilityPath(packageRoot);
+                ValidateCoreEntryPointHasNoModuleForwarders(packageRoot);
                 GeneratedSnapshot.Capture(packageRoot, projectRoot)
                     .AssertPackageEquals(baseline, packageRoot, $"delete of {module.Label} protocol folder");
 
@@ -300,7 +300,7 @@ namespace Playserv.Editor
                 PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                 ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
-                ValidateSpawnCompatibilityPath(packageRoot);
+                ValidateCoreEntryPointHasNoModuleForwarders(packageRoot);
                 GeneratedSnapshot.Capture(packageRoot, projectRoot)
                     .AssertEquals(baseline, $"explicit restore after {module.Label} folder");
 
@@ -443,20 +443,32 @@ namespace Playserv.Editor
             AssertDoesNotContain(runtimeAsmdef, expectation.AssemblyName, RuntimeAsmdefRelativePath, module.Label);
         }
 
-        private static void ValidateSpawnCompatibilityPath(string packageRoot)
+        private static void ValidateCoreEntryPointHasNoModuleForwarders(string packageRoot)
         {
-            var compatibility = ReadPackageFile(packageRoot, StableFacadeRelativePath);
-
-            AssertDoesNotContain(compatibility, "Type.GetType", StableFacadeRelativePath, "Spawn compatibility");
-            AssertDoesNotContain(compatibility, ".GetMethod(", StableFacadeRelativePath, "Spawn compatibility");
-            AssertDoesNotContain(compatibility, ".Invoke(null", StableFacadeRelativePath, "Spawn compatibility");
-            AssertDoesNotContain(compatibility, ".Invoke(new object", StableFacadeRelativePath, "Spawn compatibility");
-
-            if (compatibility.IndexOf("SpawnApi.Spawn", StringComparison.Ordinal) < 0 ||
-                compatibility.IndexOf("SpawnApi.Despawn", StringComparison.Ordinal) < 0)
+            var coreEntryPoint = ReadPackageFile(packageRoot, CoreEntryPointRelativePath);
+            var forbiddenTokens = new[]
             {
-                throw new InvalidOperationException(
-                    "Spawn compatibility must use the typed assembly-owned legacy API provider.");
+                "PlayServLegacyApiRegistry",
+                "IPlayServDataApi",
+                "IPlayServEventsApi",
+                "IPlayServRpcApi",
+                "IPlayServServerRpcApi",
+                "IPlayServSpawnApi",
+                "public static void Publish",
+                "public static void Invoke",
+                "public static void Send<",
+                "public static void SetRpcInvoker",
+                "public static Task<GameObject> Spawn",
+                "public static Task<ISharedEntity"
+            };
+
+            for (var i = 0; i < forbiddenTokens.Length; i++)
+            {
+                AssertDoesNotContain(
+                    coreEntryPoint,
+                    forbiddenTokens[i],
+                    CoreEntryPointRelativePath,
+                    "Core entry point");
             }
         }
 
@@ -547,7 +559,7 @@ namespace Playserv.Editor
                 return new GeneratedSnapshot(new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     [Path.Combine(packageRoot, RuntimeAsmdefRelativePath)] = ReadPackageFile(packageRoot, RuntimeAsmdefRelativePath),
-                    [Path.Combine(packageRoot, StableFacadeRelativePath)] = ReadPackageFile(packageRoot, StableFacadeRelativePath),
+                    [Path.Combine(packageRoot, CoreEntryPointRelativePath)] = ReadPackageFile(packageRoot, CoreEntryPointRelativePath),
                     [Path.Combine(packageRoot, ModuleRegistryRelativePath)] = ReadPackageFile(packageRoot, ModuleRegistryRelativePath),
                     [Path.Combine(packageRoot, ModuleManifestRelativePath)] = ReadPackageFile(packageRoot, ModuleManifestRelativePath),
                     [Path.Combine(projectRoot, ProjectGeneratedAsmdefAssetPath)] = ReadProjectFile(projectRoot, ProjectGeneratedAsmdefAssetPath),

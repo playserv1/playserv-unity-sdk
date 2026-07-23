@@ -1,8 +1,20 @@
 {
+  "schemaVersion": 1,
   "id": "server",
   "order": 50,
   "label": "Server",
   "description": "Server-side local command/event execution, in-process RPC invoker, service registry, and PlayServServerRpc API.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "runtime.server",
+    "rpc.server"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_SERVER",
   "defaultEnabled": false,
   "isServerModule": true,

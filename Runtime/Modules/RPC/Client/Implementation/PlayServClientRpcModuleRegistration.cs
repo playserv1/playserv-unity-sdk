@@ -1,15 +1,10 @@
 using Playserv.Modules;
-using Playserv.Wrapper;
 using UnityEngine;
 
 [assembly: PlayServModule(
     PlayServModuleManifest.ClientRpcId,
     typeof(Playserv.RPC.PlayServClientRpcModule),
     40)]
-[assembly: PlayServLegacyApi(
-    PlayServModuleManifest.ClientRpcId,
-    typeof(IPlayServRpcApi),
-    typeof(Playserv.Wrapper.PlayServApiRpcFacade))]
 
 namespace Playserv.RPC
 {
@@ -21,9 +16,6 @@ namespace Playserv.RPC
             PlayServModuleRegistry.Register<PlayServClientRpcModule>(
                 PlayServModuleManifest.ClientRpcId,
                 40);
-            PlayServLegacyApiRegistry.Register<IPlayServRpcApi, PlayServApiRpcFacade>(
-                PlayServModuleManifest.ClientRpcId,
-                () => new PlayServApiRpcFacade());
         }
     }
 }

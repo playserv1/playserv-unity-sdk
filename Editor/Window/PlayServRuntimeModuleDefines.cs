@@ -225,7 +225,73 @@ namespace Playserv.Editor
                 }
             }
 
+            NormalizeConflicts(state);
+            DisableModulesWithMissingDependencies(state);
             NormalizeHiddenDependencyModules(state);
+        }
+
+        private static void NormalizeConflicts(PlayServRuntimeModuleState state)
+        {
+            var modules = PlayServModuleManifest.RuntimeModules;
+            var moduleIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (var i = 0; i < modules.Count; i++)
+                moduleIndexes[modules[i].Id] = i;
+
+            for (var i = 0; i < modules.Count; i++)
+            {
+                var module = modules[i];
+                if (!state.IsEnabled(module.Id))
+                    continue;
+
+                for (var conflictIndex = 0; conflictIndex < module.ConflictsWith.Length; conflictIndex++)
+                {
+                    var conflictId = module.ConflictsWith[conflictIndex];
+                    if (!state.IsEnabled(conflictId) ||
+                        !moduleIndexes.TryGetValue(conflictId, out var conflictingModuleIndex))
+                    {
+                        continue;
+                    }
+
+                    if (i <= conflictingModuleIndex)
+                        state.SetEnabled(conflictId, false);
+                    else
+                        state.SetEnabled(module.Id, false);
+                }
+            }
+        }
+
+        private static void DisableModulesWithMissingDependencies(PlayServRuntimeModuleState state)
+        {
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var module in PlayServModuleManifest.RuntimeModules)
+                {
+                    if (!state.IsEnabled(module.Id) ||
+                        HasAllEnabledDependencies(module.DependencyIds, state) &&
+                        HasAllEnabledDependencies(module.HiddenDependencyModuleIds, state))
+                    {
+                        continue;
+                    }
+
+                    state.SetEnabled(module.Id, false);
+                    changed = true;
+                }
+            }
+        }
+
+        private static bool HasAllEnabledDependencies(
+            string[] dependencyIds,
+            PlayServRuntimeModuleState state)
+        {
+            for (var i = 0; i < dependencyIds.Length; i++)
+            {
+                if (!state.IsEnabled(dependencyIds[i]))
+                    return false;
+            }
+
+            return true;
         }
 
         private static PlayServRuntimeModuleState CreateRuntimeState(Func<string, bool> isEnabled)

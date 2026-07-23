@@ -7,7 +7,7 @@ using Playserv.DataSubscription.Responses;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApiDataFacade : IPlayServDataApi
+    internal sealed class PlayServApiDataFacade
     {
         private readonly IPlayServDataRuntimeAccess _runtimeAccess;
 

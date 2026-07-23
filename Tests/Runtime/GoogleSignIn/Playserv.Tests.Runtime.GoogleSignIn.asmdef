@@ -1,0 +1,21 @@
+{
+    "name": "Playserv.Tests.Runtime.GoogleSignIn",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.GoogleSignIn"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

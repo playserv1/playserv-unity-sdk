@@ -14,6 +14,7 @@ namespace Playserv.Modules
         private static readonly HashSet<Assembly> ScannedAssemblies = new HashSet<Assembly>();
 
         private static HashSet<string> _projectSelection;
+        private static Dictionary<string, int> _projectOrder;
 
         public static void Register<TModule>(string moduleId, int order)
             where TModule : IPlayServModule, new()
@@ -30,10 +31,15 @@ namespace Playserv.Modules
 
             ModuleRegistration[] registrations;
             HashSet<string> projectSelection;
+            Dictionary<string, int> projectOrder;
             lock (Gate)
             {
+                projectOrder = _projectOrder == null
+                    ? null
+                    : new Dictionary<string, int>(_projectOrder, StringComparer.Ordinal);
                 registrations = Registrations.Values
-                    .OrderBy(registration => registration.Order)
+                    .OrderBy(registration => GetProjectOrder(registration.ModuleId, projectOrder))
+                    .ThenBy(registration => registration.Order)
                     .ThenBy(registration => registration.ModuleId, StringComparer.Ordinal)
                     .ToArray();
                 projectSelection = _projectSelection == null
@@ -59,11 +65,26 @@ namespace Playserv.Modules
         {
             lock (Gate)
             {
-                _projectSelection = enabledModuleIds == null
-                    ? null
-                    : new HashSet<string>(
-                        enabledModuleIds.Where(moduleId => !string.IsNullOrWhiteSpace(moduleId)),
-                        StringComparer.Ordinal);
+                if (enabledModuleIds == null)
+                {
+                    _projectSelection = null;
+                    _projectOrder = null;
+                    return;
+                }
+
+                _projectSelection = new HashSet<string>(StringComparer.Ordinal);
+                _projectOrder = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (var moduleId in enabledModuleIds)
+                {
+                    if (string.IsNullOrWhiteSpace(moduleId))
+                        continue;
+
+                    var normalizedModuleId = moduleId.Trim();
+                    if (!_projectSelection.Add(normalizedModuleId))
+                        continue;
+
+                    _projectOrder.Add(normalizedModuleId, _projectOrder.Count);
+                }
             }
         }
 
@@ -119,6 +140,15 @@ namespace Playserv.Modules
                     normalizedModuleId,
                     new ModuleRegistration(normalizedModuleId, order, moduleType, factory));
             }
+        }
+
+        private static int GetProjectOrder(
+            string moduleId,
+            IReadOnlyDictionary<string, int> projectOrder)
+        {
+            return projectOrder != null && projectOrder.TryGetValue(moduleId, out var order)
+                ? order
+                : int.MaxValue;
         }
 
         private static void DiscoverLoadedAssemblies()

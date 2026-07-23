@@ -221,6 +221,31 @@ namespace Playserv.Editor
                     issues.Add(new PlayServModuleValidationIssue(PlayServModuleValidationSeverity.Warning, "Module disable define is empty.", module.Id));
                 else if (!defines.Add(module.DisableDefine))
                     issues.Add(new PlayServModuleValidationIssue(PlayServModuleValidationSeverity.Error, "Duplicate module disable define.", module.Id, module.DisableDefine));
+
+                if (module.SchemaVersion != PlayServModuleManifestJsonRegistry.CurrentSchemaVersion)
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Module descriptor schema version does not match the supported version.",
+                        module.Id,
+                        module.SchemaVersion.ToString()));
+                }
+
+                if (string.IsNullOrWhiteSpace(module.MinSdkVersion))
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Warning,
+                        "Module descriptor does not declare minSdkVersion.",
+                        module.Id));
+                }
+
+                if (module.SupportedPlatforms.Length == 0)
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Warning,
+                        "Module descriptor does not declare supportedPlatforms.",
+                        module.Id));
+                }
             }
 
             for (var i = 0; i < modules.Count; i++)
@@ -231,13 +256,20 @@ namespace Playserv.Editor
 
                 ValidateDependencyIds(module, module.DependencyIds, ids, "dependency", issues);
                 ValidateDependencyIds(module, module.HiddenDependencyModuleIds, ids, "hidden dependency", issues);
+                ValidateDependencyIds(module, module.ConflictsWith, ids, "conflict", issues);
                 ValidateDuplicateValues(module, module.DependencyIds, "dependency", issues);
                 ValidateDuplicateValues(module, module.HiddenDependencyModuleIds, "hidden dependency", issues);
                 ValidateDuplicateValues(module, module.AssetPaths, "asset path", issues);
                 ValidateDuplicateValues(module, module.HiddenDependencyAssetPaths, "hidden asset path", issues);
                 ValidateDuplicateValues(module, module.ProfileIds, "SDK profile id", issues);
+                ValidateDuplicateValues(module, module.SupportedPlatforms, "supported platform", issues);
+                ValidateDuplicateValues(module, module.ConflictsWith, "conflict", issues);
+                ValidateDuplicateValues(module, module.Capabilities, "capability", issues);
+                ValidateDuplicateValues(module, module.RequiresPackages, "required package", issues);
                 ValidateProfileIds(module, issues);
             }
+
+            ValidateTopologicalOrder(modules, issues);
         }
 
         private static void ValidateProfileIds(
@@ -283,7 +315,7 @@ namespace Playserv.Editor
                 {
                     issues.Add(new PlayServModuleValidationIssue(
                         PlayServModuleValidationSeverity.Error,
-                        $"Module depends on itself as a {label}.",
+                        $"Module references itself as a {label}.",
                         module.Id));
                 }
 
@@ -294,6 +326,37 @@ namespace Playserv.Editor
                         $"Module references an unknown {label} id.",
                         module.Id,
                         dependencyId));
+                }
+            }
+        }
+
+        private static void ValidateTopologicalOrder(
+            IReadOnlyList<PlayServModuleManifestEntry> modules,
+            List<PlayServModuleValidationIssue> issues)
+        {
+            var indexes = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (var i = 0; i < modules.Count; i++)
+                indexes[modules[i].Id] = i;
+
+            for (var i = 0; i < modules.Count; i++)
+            {
+                var module = modules[i];
+                var dependencyIds = module.DependencyIds
+                    .Concat(module.HiddenDependencyModuleIds)
+                    .Distinct(StringComparer.Ordinal);
+                foreach (var dependencyId in dependencyIds)
+                {
+                    if (!indexes.TryGetValue(dependencyId, out var dependencyIndex) ||
+                        dependencyIndex < i)
+                    {
+                        continue;
+                    }
+
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Module graph is not in topological order.",
+                        module.Id,
+                        $"{dependencyId} must appear before {module.Id}."));
                 }
             }
         }
@@ -360,7 +423,6 @@ namespace Playserv.Editor
         private static void ValidateAssemblyModuleRegistrations(List<PlayServModuleValidationIssue> issues)
         {
             var moduleRegistrations = new Dictionary<string, Type>(StringComparer.Ordinal);
-            var legacyRegistrations = new Dictionary<Type, string>();
             var loadedAssemblies = new Dictionary<string, Assembly>(StringComparer.Ordinal);
 
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -368,16 +430,11 @@ namespace Playserv.Editor
                 loadedAssemblies[assembly.GetName().Name] = assembly;
 
                 PlayServModuleAttribute[] moduleAttributes;
-                PlayServLegacyApiAttribute[] legacyAttributes;
                 try
                 {
                     moduleAttributes = assembly
                         .GetCustomAttributes(typeof(PlayServModuleAttribute), inherit: false)
                         .OfType<PlayServModuleAttribute>()
-                        .ToArray();
-                    legacyAttributes = assembly
-                        .GetCustomAttributes(typeof(PlayServLegacyApiAttribute), inherit: false)
-                        .OfType<PlayServLegacyApiAttribute>()
                         .ToArray();
                 }
                 catch (Exception ex)
@@ -448,41 +505,6 @@ namespace Playserv.Editor
                     }
                 }
 
-                for (var i = 0; i < legacyAttributes.Length; i++)
-                {
-                    var registration = legacyAttributes[i];
-                    if (!PlayServModuleManifest.TryGet(registration.ModuleId, out _))
-                    {
-                        issues.Add(new PlayServModuleValidationIssue(
-                            PlayServModuleValidationSeverity.Error,
-                            "Legacy API registration references an unknown module id.",
-                            registration.ModuleId,
-                            assembly.GetName().Name));
-                    }
-
-                    if (!registration.ContractType.IsAssignableFrom(registration.ImplementationType))
-                    {
-                        issues.Add(new PlayServModuleValidationIssue(
-                            PlayServModuleValidationSeverity.Error,
-                            "Legacy API implementation does not implement its contract.",
-                            registration.ModuleId,
-                            $"{registration.ImplementationType.FullName} -> {registration.ContractType.FullName}"));
-                    }
-
-                    if (legacyRegistrations.TryGetValue(registration.ContractType, out var registeredModuleId) &&
-                        !string.Equals(registeredModuleId, registration.ModuleId, StringComparison.Ordinal))
-                    {
-                        issues.Add(new PlayServModuleValidationIssue(
-                            PlayServModuleValidationSeverity.Error,
-                            "Legacy API contract is registered by multiple modules.",
-                            registration.ModuleId,
-                            registration.ContractType.FullName));
-                    }
-                    else
-                    {
-                        legacyRegistrations[registration.ContractType] = registration.ModuleId;
-                    }
-                }
             }
 
             var activeState = PlayServRuntimeModuleDefines.Load();

@@ -1,0 +1,23 @@
+{
+    "name": "Playserv.Tests.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Serialization",
+        "Playserv.Runtime.Abstractions"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

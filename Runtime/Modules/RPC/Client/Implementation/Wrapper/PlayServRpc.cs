@@ -11,7 +11,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static partial class PlayServRpc
     {
-        private static readonly IPlayServRpcApi Api = new PlayServApiRpcFacade();
+        private static readonly PlayServApiRpcFacade Api = new PlayServApiRpcFacade();
 
         public static event Action<InvokeRpcResponse> OnRpcInvokeResponse
         {

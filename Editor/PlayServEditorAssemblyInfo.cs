@@ -8,3 +8,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Playserv.Editor.DataSubscription")]
 [assembly: InternalsVisibleTo("Playserv.Editor.AppleSignIn")]
 [assembly: InternalsVisibleTo("Playserv.Editor.GoogleSignIn")]
+[assembly: InternalsVisibleTo("Playserv.Tests.Editor")]

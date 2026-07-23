@@ -127,13 +127,13 @@ namespace Playserv.Events.Editor
             sb.AppendLine("#nullable enable");
             sb.AppendLine("using System;");
             sb.AppendLine("using Playserv.Events;");
-            sb.AppendLine("using Playserv.Wrapper;"); // IPlayServEventsApi lives here in your setup
+            sb.AppendLine("using Playserv.Wrapper;");
             sb.AppendLine();
             sb.AppendLine("namespace Playserv.Wrapper");
             sb.AppendLine("{");
             sb.AppendLine("    /// <summary>");
             sb.AppendLine("    /// Generated convenience methods for events based on [Event] types.");
-            sb.AppendLine("    /// Extensions on IPlayServEventsApi.");
+            sb.AppendLine("    /// Extensions on the module API exposed by PlayServEvents.Api.");
             sb.AppendLine("    /// </summary>");
             sb.AppendLine("    public static class PlayServEventsApiExtensions");
             sb.AppendLine("    {");
@@ -224,7 +224,7 @@ namespace Playserv.Events.Editor
         }
 
         // ----------------------------
-        // IPlayServEventsApi extensions
+        // Module event API extensions
         // ----------------------------
 
         private static void AppendApiGlobalEventMethods(StringBuilder sb, Type type, string methodSuffix)

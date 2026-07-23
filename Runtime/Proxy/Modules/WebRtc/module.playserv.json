@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "transport-webrtc",
   "order": 130,
   "label": "WebRTC",
   "description": "WebRTC data channel and signaling implementation.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "transport.webrtc"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBRTC",
   "defaultEnabled": true,
   "isServerModule": false,

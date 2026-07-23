@@ -12,7 +12,7 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServData
     {
-        private static readonly IPlayServDataApi Api = new PlayServApiDataFacade();
+        private static readonly PlayServApiDataFacade Api = new PlayServApiDataFacade();
 
         public static Task<ISharedEntity<TDto>> SelectEntity<TEntity, TDto>(
             string playerId,

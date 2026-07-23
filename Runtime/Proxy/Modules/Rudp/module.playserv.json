@@ -1,8 +1,21 @@
 {
+  "schemaVersion": 1,
   "id": "transport-rudp",
   "order": 120,
   "label": "RUDP",
   "description": "Reliable UDP protocol implementation for native/editor builds.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "transport.rudp"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP",
   "defaultEnabled": true,
   "isServerModule": false,

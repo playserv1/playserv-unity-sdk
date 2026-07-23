@@ -1,6 +1,6 @@
 # PlayServ Editor Deployment, Analyzer, and Versioning
 
-This document describes the Unity Editor tooling under `Assets/playserv-unity-sdk/Editor/Deploy`.
+This document describes the Unity Editor tooling under `Editor/Deploy`.
 
 ## Scope
 
@@ -104,8 +104,8 @@ Important:
 
 Use sample folders:
 
-- `Assets/playserv-unity-sdk/Samples/RPC/TestCode` (valid)
-- `Assets/playserv-unity-sdk/Samples/RPC/TestCodeWrong` (invalid)
+- `<imported PlayServ sample>/RPC/TestCode` (valid)
+- `<imported PlayServ sample>/RPC/TestCodeWrong` (invalid)
 
 To test:
 

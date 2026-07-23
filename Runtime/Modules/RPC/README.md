@@ -2,10 +2,10 @@
 
 This folder contains runtime RPC helpers for calling server services via:
 
-- `PlayServ.Invoke(serviceName, methodName, payload)`
-- `PlayServ.Invoke(serviceName, methodName, payloadBase64)`
-- `PlayServ.Invoke<TService>(x => x.SomeMethod("arg"))`
-- `PlayServ.Invoke<TService>(x => x.SomeMethod(default), payload)`
+- `PlayServRpc.Invoke(serviceName, methodName, payload)`
+- `PlayServRpc.Invoke(serviceName, methodName, payloadBase64)`
+- `PlayServRpc.Invoke<TService>(x => x.SomeMethod("arg"))`
+- `PlayServRpc.Invoke<TService>(x => x.SomeMethod(default), payload)`
 
 Internally, PlayServ sends `RpcInvokeRequest` through module:
 
@@ -13,9 +13,9 @@ Internally, PlayServ sends `RpcInvokeRequest` through module:
 
 RPC is split into `Runtime/Modules/RPC/Core` and `Runtime/Modules/RPC/Client`.
 Server-side in-process RPC lives in the optional `Server` module under `Runtime/Modules/Server`.
-If server RPC invoker is configured (`PlayServServerRpc.SetRpcInvoker(...)` or `PlayServ.SetRpcInvoker(...)`), invocation is executed in-process and websocket transport is skipped.
+If a server RPC invoker is configured with `PlayServServerRpc.SetRpcInvoker(...)`, invocation is executed in-process and websocket transport is skipped.
 If invoker is configured but service is not registered, SDK falls back to transport (or throws if transport is not connected).
-When the Server module is disabled, `Playserv.Server.ServerRpcInvoker` and `PlayServ.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled. `IRpcInvoker` remains the RPC contract in `Playserv.RPC`.
+When the Server module is disabled, `Playserv.Server.ServerRpcInvoker` and `PlayServServerRpc.SetRpcInvoker(...)` are intentionally unavailable while client RPC stays enabled. `IRpcInvoker` remains the RPC contract in `Playserv.RPC`.
 
 ## Payload format
 
@@ -32,7 +32,7 @@ This matches the RPC example from `Assets/Tests/RPC`.
 ```csharp
 using Playserv.Wrapper;
 
-PlayServ.Invoke(
+PlayServRpc.Invoke(
     serviceName: "NotificationService",
     methodName: "BroadcastToAll",
     payload: new { message = "Hello" });
@@ -41,7 +41,7 @@ PlayServ.Invoke(
 Equivalent base64 variant:
 
 ```csharp
-PlayServ.Invoke(
+PlayServRpc.Invoke(
     "NotificationService",
     "BroadcastToAll",
     "eyJtZXNzYWdlIjoiSGVsbG8ifQ==");
@@ -50,7 +50,7 @@ PlayServ.Invoke(
 Expression-based variant:
 
 ```csharp
-PlayServ.Invoke<NotificationService>(
+PlayServRpc.Invoke<NotificationService>(
     x => x.BroadcastToAll(default),
     new { message = "Hello" });
 ```
@@ -58,7 +58,7 @@ PlayServ.Invoke<NotificationService>(
 Function-call variant (auto payload from function arguments):
 
 ```csharp
-PlayServ.Invoke<NotificationService>(
+PlayServRpc.Invoke<NotificationService>(
     x => x.BroadcastToAll("Hello"));
 ```
 
@@ -94,5 +94,5 @@ var invoker = new Playserv.Server.ServerRpcInvoker()
 PlayServServerRpc.SetRpcInvoker(invoker);
 
 // Executes local method directly, does not send command over websocket.
-PlayServ.Invoke<NotificationService>(x => x.BroadcastToAll("Hello from server"));
+PlayServRpc.Invoke<NotificationService>(x => x.BroadcastToAll("Hello from server"));
 ```

@@ -1,8 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "transport-websocket",
   "order": 100,
   "label": "WebSocket",
   "description": "HTTP/WebSocket protocol implementation for ws, wss, http, and https endpoints.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "transport.websocket"
+  ],
+  "requiresPackages": [],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET",
   "defaultEnabled": true,
   "isServerModule": false,

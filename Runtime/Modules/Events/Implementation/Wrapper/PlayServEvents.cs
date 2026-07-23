@@ -9,7 +9,10 @@ namespace Playserv.Wrapper
     /// </summary>
     public static partial class PlayServEvents
     {
-        private static readonly IPlayServEventsApi Api = new PlayServApiEventsFacade();
+        /// <summary>
+        /// Gets the event module API used by generated event extension methods.
+        /// </summary>
+        public static IPlayServEventsApi Api { get; } = new PlayServApiEventsFacade();
 
         public static IObservable<T> Subscribe<T>() => Api.Subscribe<T>();
 
