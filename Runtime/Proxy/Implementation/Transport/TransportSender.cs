@@ -57,6 +57,10 @@ namespace Playserv.Proxy.Implementation
                     var json = _envelopeCodec.Serialize(envelope);
                     var data = Encoding.UTF8.GetBytes(json);
 
+#if !PLAYSERV_DISABLE_LOGS
+                    var packetName = OutboundPacketDiagnostics.Register(envelope, command, data);
+                    _logger.LogWarning($"[PKT-OUT] {packetName}");
+#endif
                     await _implementation.Send(data);
                     LogTransportJson($"Message sent: {typeof(T).Name} with payload: {json}", json);
                 }

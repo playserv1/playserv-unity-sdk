@@ -128,6 +128,7 @@ namespace Playserv.Proxy.Implementation
                 throw new InvalidOperationException("WebSocket is not connected.");
             }
 
+            var isRespawnFrame = OutboundPacketDiagnostics.BeginSocketWrite(data, _logger);
             try
             {
                 var segment = new ArraySegment<byte>(data);
@@ -136,6 +137,7 @@ namespace Playserv.Proxy.Implementation
                     WebSocketMessageType.Text,
                     endOfMessage: true,
                     cancellationToken: CancellationToken.None);
+                OutboundPacketDiagnostics.CompleteSocketWrite(isRespawnFrame, _logger);
             }
             catch (Exception ex)
             {

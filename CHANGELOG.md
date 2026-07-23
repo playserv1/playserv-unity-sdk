@@ -8,6 +8,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Added
 
+- Added outbound packet diagnostics with per-packet `[PKT-OUT]` names,
+  once-per-second WebSocket packet counts, and `[RESP-WIRE]` timing around
+  Respawn socket writes.
 - Extended `module.playserv.json` schema v1 with minimum SDK version,
   supported platforms, module conflicts, capabilities, and required UPM
   packages.
