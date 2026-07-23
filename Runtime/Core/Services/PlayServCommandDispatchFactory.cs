@@ -1,3 +1,6 @@
+using System;
+using Playserv.Proxy.Common;
+
 namespace Playserv.Wrapper
 {
     internal interface IPlayServCommandDispatch
@@ -7,16 +10,14 @@ namespace Playserv.Wrapper
         bool TryHandleCommand<T>(T command, string moduleName, bool hasRuntimeInstance);
     }
 
-    internal static partial class PlayServCommandDispatchFactory
+    internal static class PlayServCommandDispatchFactory
     {
         public static IPlayServCommandDispatch Create()
         {
-            IPlayServCommandDispatch dispatch = null;
-            TryCreateModuleDispatch(ref dispatch);
-            return dispatch ?? PlayServCommandDispatch.None;
+            var localExecution = PlayServLocalExecutionFactoryRegistry.Create() ??
+                                 new NoOpPlayServLocalExecution();
+            return new PlayServLocalExecutionCommandDispatch(localExecution);
         }
-
-        static partial void TryCreateModuleDispatch(ref IPlayServCommandDispatch dispatch);
     }
 
     internal sealed class PlayServCommandDispatch : IPlayServCommandDispatch
@@ -26,5 +27,22 @@ namespace Playserv.Wrapper
         public object LocalExecution => null;
 
         public bool TryHandleCommand<T>(T command, string moduleName, bool hasRuntimeInstance) => false;
+    }
+
+    internal sealed class PlayServLocalExecutionCommandDispatch : IPlayServCommandDispatch
+    {
+        private readonly ILocalCommandExecution _localExecution;
+
+        public PlayServLocalExecutionCommandDispatch(ILocalCommandExecution localExecution)
+        {
+            _localExecution = localExecution ?? throw new ArgumentNullException(nameof(localExecution));
+        }
+
+        public object LocalExecution => _localExecution;
+
+        public bool TryHandleCommand<T>(T command, string moduleName, bool hasRuntimeInstance)
+        {
+            return _localExecution.TryHandleCommand(command, moduleName, hasRuntimeInstance);
+        }
     }
 }

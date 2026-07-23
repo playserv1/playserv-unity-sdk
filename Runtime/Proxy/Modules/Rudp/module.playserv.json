@@ -20,5 +20,5 @@
     "client-sdk",
     "full-sdk"
   ],
-  "rootAssemblyReference": ""
+  "rootAssemblyReference": "Playserv.Runtime.Transport.Rudp"
 }

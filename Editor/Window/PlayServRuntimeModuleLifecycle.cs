@@ -18,7 +18,7 @@ namespace Playserv.Editor
                 throw new ArgumentNullException(nameof(profile));
 
             settings.ApplyRuntimeProfile(profile);
-            SyncGeneratedAndReferences();
+            SyncProjectModuleGraph();
             return true;
         }
 
@@ -97,8 +97,8 @@ namespace Playserv.Editor
                 return false;
             }
 
-            // Make generated compatibility and root asmdef refs safe before removing files.
-            SyncGeneratedAndReferences();
+            // Remove the module from the project selection before deleting its assets.
+            SyncProjectModuleGraph();
 
             if (!PlayServEditorModuleAvailability.TryGetModuleRoot(manifest, out var moduleRoot))
             {
@@ -123,7 +123,7 @@ namespace Playserv.Editor
                 failedPaths.Add(assetPath);
             }
 
-            SyncGeneratedAndReferences();
+            SyncProjectModuleGraph();
             AssetDatabase.Refresh();
 
             if (failedPaths.Count > 0)
@@ -135,7 +135,7 @@ namespace Playserv.Editor
             return removedAny;
         }
 
-        private static void SyncGeneratedAndReferences()
+        private static void SyncProjectModuleGraph()
         {
             PlayServModuleGraphSynchronizer.SyncNow();
         }

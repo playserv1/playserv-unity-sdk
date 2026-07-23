@@ -21,7 +21,7 @@ namespace Playserv.Editor
         {
             var restoredModules = GetRestoredRuntimeModuleIds(importedAssets, movedAssets);
             if (restoredModules.Count > 0)
-                PlayServRuntimeModuleDefines.RestoreDefaultEnabledModules(restoredModules);
+                PlayServRuntimeModuleDefines.RestoreConfiguredModules(restoredModules);
 
             if (TouchesPlayServModuleFolders(importedAssets) ||
                 TouchesPlayServModuleFolders(deletedAssets) ||

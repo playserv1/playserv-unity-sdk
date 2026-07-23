@@ -20,6 +20,7 @@ namespace Playserv.Editor
             try
             {
                 var before = PlayServModuleValidator.Validate();
+                PlayServProjectModuleSettings.Repair();
                 var state = PlayServModuleGraphSynchronizer.LoadActiveState();
                 PlayServRuntimeModuleDefines.Apply(state, syncModuleGraph: false);
 
@@ -57,7 +58,7 @@ namespace Playserv.Editor
             {
                 EditorUtility.DisplayDialog(
                     "PlayServ module repair",
-                    "Module defines, assembly references, and generated files are synchronized. Validation passed.",
+                    "Module defines and project-generated files are synchronized. Validation passed.",
                     "OK");
                 return;
             }

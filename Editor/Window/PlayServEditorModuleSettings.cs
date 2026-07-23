@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Playserv.Modules;
-using UnityEditor;
 
 namespace Playserv.Editor
 {
@@ -16,36 +15,47 @@ namespace Playserv.Editor
         public bool Codegen { get; private set; } = DefaultOptionalModuleState;
         public bool ModuleStressTests { get; private set; } = DefaultInternalToolState;
         public bool SdkLogs { get; private set; } = true;
+        public string ActiveRuntimeProfileId => PlayServProjectModuleSettings.CurrentProfileId;
+        public string CurrentBuildTargetGroupId => PlayServProjectModuleSettings.CurrentBuildTargetGroupId;
+        public bool HasCurrentPlatformOverride => PlayServProjectModuleSettings.HasCurrentPlatformOverride;
 
         public void Load()
         {
             Deployment = PlayServEditorModuleAvailability.EditorDeployment &&
-                         EditorPrefs.GetBool(Const.PrefModuleDeployment, DefaultOptionalModuleState);
+                         PlayServProjectModuleSettings.IsEditorToolEnabled(
+                             PlayServProjectModuleSettings.DeploymentEditorToolId,
+                             DefaultOptionalModuleState);
             ModelSync = PlayServEditorModuleAvailability.EditorModelSync &&
-                        EditorPrefs.GetBool(Const.PrefModuleModelSync, DefaultOptionalModuleState);
+                        PlayServProjectModuleSettings.IsEditorToolEnabled(
+                            PlayServProjectModuleSettings.ModelSyncEditorToolId,
+                            DefaultOptionalModuleState);
             Codegen = PlayServEditorModuleAvailability.EditorCodegen &&
-                      EditorPrefs.GetBool(Const.PrefModuleCodegen, DefaultOptionalModuleState);
+                      PlayServProjectModuleSettings.IsEditorToolEnabled(
+                          PlayServProjectModuleSettings.CodegenEditorToolId,
+                          DefaultOptionalModuleState);
             ModuleStressTests = PlayServEditorModuleAvailability.EditorModuleStressTests &&
-                                EditorPrefs.GetBool(Const.PrefModuleStressTests, DefaultInternalToolState);
+                                PlayServProjectModuleSettings.IsEditorToolEnabled(
+                                    PlayServProjectModuleSettings.ModuleStressTestsEditorToolId,
+                                    DefaultInternalToolState);
             SdkLogs = PlayServRuntimeModuleDefines.AreSdkLogsEnabled();
             LoadRuntimeModuleDefines();
         }
 
         public bool SetDeployment(bool enabled) =>
             PlayServEditorModuleAvailability.EditorDeployment &&
-            Set(Const.PrefModuleDeployment, Deployment, enabled, value => Deployment = value);
+            Set(PlayServProjectModuleSettings.DeploymentEditorToolId, Deployment, enabled, value => Deployment = value);
 
         public bool SetModelSync(bool enabled) =>
             PlayServEditorModuleAvailability.EditorModelSync &&
-            Set(Const.PrefModuleModelSync, ModelSync, enabled, value => ModelSync = value);
+            Set(PlayServProjectModuleSettings.ModelSyncEditorToolId, ModelSync, enabled, value => ModelSync = value);
 
         public bool SetCodegen(bool enabled) =>
             PlayServEditorModuleAvailability.EditorCodegen &&
-            Set(Const.PrefModuleCodegen, Codegen, enabled, value => Codegen = value);
+            Set(PlayServProjectModuleSettings.CodegenEditorToolId, Codegen, enabled, value => Codegen = value);
 
         public bool SetModuleStressTests(bool enabled) =>
             PlayServEditorModuleAvailability.EditorModuleStressTests &&
-            Set(Const.PrefModuleStressTests, ModuleStressTests, enabled, value => ModuleStressTests = value);
+            Set(PlayServProjectModuleSettings.ModuleStressTestsEditorToolId, ModuleStressTests, enabled, value => ModuleStressTests = value);
 
         public bool SetSdkLogs(bool enabled)
         {
@@ -75,7 +85,7 @@ namespace Playserv.Editor
                 return false;
 
             state.SetEnabled(moduleId, enabled);
-            return ApplyRuntimeState(state);
+            return ApplyRuntimeState(state, PlayServProjectModuleSettings.CustomProfileId);
         }
 
         public bool CanChangeRuntimeModule(string moduleName)
@@ -150,26 +160,45 @@ namespace Playserv.Editor
             foreach (var module in PlayServModuleManifest.RuntimeModules)
                 state.SetEnabled(module.Id, IsProfileModuleEnabled(profile, module));
 
-            return ApplyRuntimeState(state);
+            return ApplyRuntimeState(state, profile.Id);
         }
 
-        private static bool Set(string key, bool current, bool enabled, Action<bool> assign)
+        public bool CreateCurrentPlatformOverride()
+        {
+            if (!PlayServProjectModuleSettings.CreateCurrentPlatformOverride())
+                return false;
+
+            LoadRuntimeModuleDefines();
+            PlayServRuntimeModuleDefines.Apply(_runtimeState);
+            return true;
+        }
+
+        public bool ClearCurrentPlatformOverride()
+        {
+            if (!PlayServProjectModuleSettings.ClearCurrentPlatformOverride())
+                return false;
+
+            LoadRuntimeModuleDefines();
+            PlayServRuntimeModuleDefines.Apply(_runtimeState);
+            return true;
+        }
+
+        private static bool Set(string editorToolId, bool current, bool enabled, Action<bool> assign)
         {
             if (current == enabled)
                 return false;
 
             assign(enabled);
-            EditorPrefs.SetBool(key, enabled);
-            return true;
+            return PlayServProjectModuleSettings.SetEditorToolEnabled(editorToolId, enabled);
         }
 
         private void LoadRuntimeModuleDefines()
         {
-            _runtimeState = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
+            _runtimeState = PlayServRuntimeModuleDefines.LoadProjectState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(_runtimeState);
         }
 
-        private bool ApplyRuntimeState(PlayServRuntimeModuleState state)
+        private bool ApplyRuntimeState(PlayServRuntimeModuleState state, string profileId)
         {
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
             PlayServRuntimeModuleDefines.NormalizeDependencies(state);
@@ -177,7 +206,11 @@ namespace Playserv.Editor
             var changed = !_runtimeState.HasSameEnabledModules(state);
             _runtimeState = state.Clone();
 
-            return PlayServRuntimeModuleDefines.Apply(state) || changed;
+            return PlayServRuntimeModuleDefines.Apply(
+                       state,
+                       syncModuleGraph: true,
+                       profileId: profileId) ||
+                   changed;
         }
 
         private static bool IsProfileModuleEnabled(PlayServSdkProfile profile, PlayServModuleManifestEntry module)

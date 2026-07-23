@@ -12,9 +12,13 @@ namespace Playserv.Editor
     {
         private const string ThisScriptSuffix = "/Editor/ModuleStressTests/PlayServModuleDeleteRestoreStressTest.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
-        private const string CompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
-        private const string ModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
-        private const string ModuleManifestRelativePath = "Runtime/Modules/Contracts/Generated/PlayServGeneratedModuleManifest.g.cs";
+        private const string StableFacadeRelativePath = "Runtime/Core/PlayServ.cs";
+        private const string ModuleRegistryRelativePath = "Runtime/Modules/Contracts/PlayServModuleRegistry.cs";
+        private const string ModuleManifestRelativePath = "Runtime/Modules/Contracts/PlayServBuiltInModuleManifest.cs";
+        private const string ProjectGeneratedAsmdefAssetPath =
+            PlayServGeneratedCompatibilityLayer.ProjectGeneratedAsmdefAssetPath;
+        private const string ProjectModuleSelectionAssetPath =
+            PlayServGeneratedCompatibilityLayer.ProjectModuleSelectionAssetPath;
         private const string EventsApiExtensionsAssetPath = "Assets/Shared/Generated/Events/PlayServ.EventsApiExtensions.g.cs";
         private const string EventsAdapterExtensionsAssetPath = "Assets/Shared/Generated/Events/EventsAdapterExtensions.g.cs";
         private const string PackageSamplesToken = "Playserv.Samples";
@@ -130,7 +134,9 @@ namespace Playserv.Editor
         private static bool ValidateRunFromMenu()
         {
             return PlayServEditorModuleAvailability.EditorModuleStressTests &&
-                   EditorPrefs.GetBool(Const.PrefModuleStressTests, false);
+                   PlayServProjectModuleSettings.IsEditorToolEnabled(
+                       PlayServProjectModuleSettings.ModuleStressTestsEditorToolId,
+                       defaultEnabled: false);
         }
 
         public static void RunFromCli()
@@ -167,7 +173,7 @@ namespace Playserv.Editor
                 baseline = GeneratedSnapshot.Capture(packageRoot, projectRoot);
                 ValidateJsonManifestCatalog();
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
-                ValidateUnavailableModulesDoNotLeak(packageRoot);
+                ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                 ValidateSpawnCompatibilityPath(packageRoot);
 
                 foreach (var module in PlayServModuleManifest.RuntimeModules)
@@ -186,13 +192,15 @@ namespace Playserv.Editor
                         continue;
 
                     PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
-                    ValidateUnavailableModulesDoNotLeak(packageRoot);
+                    ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                     ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                     ValidateSpawnCompatibilityPath(packageRoot);
+                    GeneratedSnapshot.Capture(packageRoot, projectRoot)
+                        .AssertPackageEquals(baseline, packageRoot, $"delete of {module.Label}");
 
                     RestoreMovedPaths(movedPaths);
                     PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
-                    ValidateUnavailableModulesDoNotLeak(packageRoot);
+                    ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                     ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                     ValidateSpawnCompatibilityPath(packageRoot);
                     GeneratedSnapshot.Capture(packageRoot, projectRoot)
@@ -217,7 +225,7 @@ namespace Playserv.Editor
                 PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
 
                 if (baseline != null)
-                    baseline.WriteBack(packageRoot, projectRoot);
+                    baseline.WriteProjectFilesBack(packageRoot, projectRoot);
 
                 if (Directory.Exists(backupRoot))
                     Directory.Delete(backupRoot, recursive: true);
@@ -282,13 +290,15 @@ namespace Playserv.Editor
 
                 PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
                 ValidateProtocolFolderUnavailable(packageRoot, module, expectation);
-                ValidateUnavailableModulesDoNotLeak(packageRoot);
+                ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                 ValidateSpawnCompatibilityPath(packageRoot);
+                GeneratedSnapshot.Capture(packageRoot, projectRoot)
+                    .AssertPackageEquals(baseline, packageRoot, $"delete of {module.Label} protocol folder");
 
                 RestoreMovedPaths(movedPaths);
                 PlayServModuleGraphSynchronizer.SyncNow(refreshAssetDatabase: false);
-                ValidateUnavailableModulesDoNotLeak(packageRoot);
+                ValidateUnavailableModulesDoNotLeak(packageRoot, projectRoot);
                 ValidateGeneratedEventsDoNotReferenceSamples(projectRoot);
                 ValidateSpawnCompatibilityPath(packageRoot);
                 GeneratedSnapshot.Capture(packageRoot, projectRoot)
@@ -359,11 +369,10 @@ namespace Playserv.Editor
             movedPaths.Clear();
         }
 
-        private static void ValidateUnavailableModulesDoNotLeak(string packageRoot)
+        private static void ValidateUnavailableModulesDoNotLeak(string packageRoot, string projectRoot)
         {
             var runtimeAsmdef = ReadPackageFile(packageRoot, RuntimeAsmdefRelativePath);
-            var compatibility = ReadPackageFile(packageRoot, CompatibilityRelativePath);
-            var registry = ReadPackageFile(packageRoot, ModuleRegistryRelativePath);
+            var projectSelection = ReadProjectFile(projectRoot, ProjectModuleSelectionAssetPath);
 
             for (var i = 0; i < Expectations.Length; i++)
             {
@@ -371,16 +380,14 @@ namespace Playserv.Editor
                 if (!PlayServModuleManifest.TryGet(expectation.ModuleId, out var module))
                     continue;
 
-                if (PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module.Label))
-                    continue;
-
                 AssertDoesNotContain(runtimeAsmdef, expectation.AssemblyName, RuntimeAsmdefRelativePath, module.Label);
 
-                for (var j = 0; j < expectation.CompatibilityTokens.Length; j++)
-                    AssertDoesNotContain(compatibility, expectation.CompatibilityTokens[j], CompatibilityRelativePath, module.Label);
-
-                for (var j = 0; j < expectation.RegistryTokens.Length; j++)
-                    AssertDoesNotContain(registry, expectation.RegistryTokens[j], ModuleRegistryRelativePath, module.Label);
+                if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module.Label))
+                    AssertDoesNotContain(
+                        projectSelection,
+                        $"\"{module.Id}\"",
+                        ProjectModuleSelectionAssetPath,
+                        module.Label);
             }
         }
 
@@ -432,32 +439,24 @@ namespace Playserv.Editor
             if (PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module.Label))
                 throw new InvalidOperationException($"{module.Label} remained available after deleting {expectation.RelativePath}.");
 
-            if (PlayServCoreAssemblyReferenceSync.HasRuntimeModuleReference(module.Id))
-                throw new InvalidOperationException($"{module.Label} leaked runtime asmdef reference after deleting {expectation.RelativePath}.");
-
             var runtimeAsmdef = ReadPackageFile(packageRoot, RuntimeAsmdefRelativePath);
             AssertDoesNotContain(runtimeAsmdef, expectation.AssemblyName, RuntimeAsmdefRelativePath, module.Label);
         }
 
         private static void ValidateSpawnCompatibilityPath(string packageRoot)
         {
-            var compatibility = ReadPackageFile(packageRoot, CompatibilityRelativePath);
-            var spawnAvailable = PlayServEditorModuleAvailability.IsRuntimeModuleAvailable("Spawn") &&
-                                 PlayServCoreAssemblyReferenceSync.HasRuntimeModuleReference(PlayServModuleManifest.SpawnId);
+            var compatibility = ReadPackageFile(packageRoot, StableFacadeRelativePath);
 
-            AssertDoesNotContain(compatibility, "Type.GetType", CompatibilityRelativePath, "Spawn compatibility");
-            AssertDoesNotContain(compatibility, ".GetMethod(", CompatibilityRelativePath, "Spawn compatibility");
-            AssertDoesNotContain(compatibility, ".Invoke(null", CompatibilityRelativePath, "Spawn compatibility");
-            AssertDoesNotContain(compatibility, ".Invoke(new object", CompatibilityRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, "Type.GetType", StableFacadeRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, ".GetMethod(", StableFacadeRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, ".Invoke(null", StableFacadeRelativePath, "Spawn compatibility");
+            AssertDoesNotContain(compatibility, ".Invoke(new object", StableFacadeRelativePath, "Spawn compatibility");
 
-            if (!spawnAvailable)
-                return;
-
-            if (compatibility.IndexOf("PlayServSpawn.Spawn", StringComparison.Ordinal) < 0 ||
-                compatibility.IndexOf("PlayServSpawn.Despawn", StringComparison.Ordinal) < 0)
+            if (compatibility.IndexOf("SpawnApi.Spawn", StringComparison.Ordinal) < 0 ||
+                compatibility.IndexOf("SpawnApi.Despawn", StringComparison.Ordinal) < 0)
             {
                 throw new InvalidOperationException(
-                    "Spawn compatibility must use typed direct PlayServSpawn calls when the Spawn assembly reference is enabled.");
+                    "Spawn compatibility must use the typed assembly-owned legacy API provider.");
             }
         }
 
@@ -548,12 +547,29 @@ namespace Playserv.Editor
                 return new GeneratedSnapshot(new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     [Path.Combine(packageRoot, RuntimeAsmdefRelativePath)] = ReadPackageFile(packageRoot, RuntimeAsmdefRelativePath),
-                    [Path.Combine(packageRoot, CompatibilityRelativePath)] = ReadPackageFile(packageRoot, CompatibilityRelativePath),
+                    [Path.Combine(packageRoot, StableFacadeRelativePath)] = ReadPackageFile(packageRoot, StableFacadeRelativePath),
                     [Path.Combine(packageRoot, ModuleRegistryRelativePath)] = ReadPackageFile(packageRoot, ModuleRegistryRelativePath),
                     [Path.Combine(packageRoot, ModuleManifestRelativePath)] = ReadPackageFile(packageRoot, ModuleManifestRelativePath),
+                    [Path.Combine(projectRoot, ProjectGeneratedAsmdefAssetPath)] = ReadProjectFile(projectRoot, ProjectGeneratedAsmdefAssetPath),
+                    [Path.Combine(projectRoot, ProjectModuleSelectionAssetPath)] = ReadProjectFile(projectRoot, ProjectModuleSelectionAssetPath),
                     [Path.Combine(projectRoot, EventsApiExtensionsAssetPath)] = ReadProjectFile(projectRoot, EventsApiExtensionsAssetPath),
                     [Path.Combine(projectRoot, EventsAdapterExtensionsAssetPath)] = ReadProjectFile(projectRoot, EventsAdapterExtensionsAssetPath)
                 });
+            }
+
+            public void AssertPackageEquals(GeneratedSnapshot expected, string packageRoot, string context)
+            {
+                foreach (var pair in expected._files)
+                {
+                    if (!IsSameOrChildPath(pair.Key, packageRoot))
+                        continue;
+
+                    if (!_files.TryGetValue(pair.Key, out var actual))
+                        actual = string.Empty;
+
+                    if (!string.Equals(actual, pair.Value, StringComparison.Ordinal))
+                        throw new InvalidOperationException($"SDK package file changed during {context}: {pair.Key}");
+                }
             }
 
             public void AssertEquals(GeneratedSnapshot expected, string context)
@@ -568,16 +584,32 @@ namespace Playserv.Editor
                 }
             }
 
-            public void WriteBack(string packageRoot, string projectRoot)
+            public void WriteProjectFilesBack(string packageRoot, string projectRoot)
             {
                 foreach (var pair in _files)
                 {
+                    if (!IsSameOrChildPath(pair.Key, projectRoot) ||
+                        IsSameOrChildPath(pair.Key, packageRoot))
+                        continue;
+
                     var directory = Path.GetDirectoryName(pair.Key);
                     if (!string.IsNullOrEmpty(directory))
                         Directory.CreateDirectory(directory);
 
                     File.WriteAllText(pair.Key, pair.Value);
                 }
+            }
+
+            private static bool IsSameOrChildPath(string path, string root)
+            {
+                var normalizedPath = Path.GetFullPath(path)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var normalizedRoot = Path.GetFullPath(root)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return string.Equals(normalizedPath, normalizedRoot, StringComparison.OrdinalIgnoreCase) ||
+                       normalizedPath.StartsWith(
+                           normalizedRoot + Path.DirectorySeparatorChar,
+                           StringComparison.OrdinalIgnoreCase);
             }
         }
 

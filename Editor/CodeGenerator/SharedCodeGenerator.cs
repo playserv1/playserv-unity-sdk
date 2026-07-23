@@ -149,7 +149,9 @@ namespace Playserv.CodeGenerator.Editor
         private static bool IsAutoGenerationEnabled()
         {
             return EditorPrefs.GetBool(AutoGenPrefKey, true) &&
-                   EditorPrefs.GetBool(Const.PrefModuleCodegen, true);
+                   PlayServProjectModuleSettings.IsEditorToolEnabled(
+                       PlayServProjectModuleSettings.CodegenEditorToolId,
+                       defaultEnabled: true);
         }
 
         private static void GenerateAll(

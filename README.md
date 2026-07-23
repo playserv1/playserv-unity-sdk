@@ -95,18 +95,133 @@ descriptor are resolved relative to the nearest package root containing
 
 `id` and `disableDefine` must be unique. `dependencyIds` are user-visible
 dependencies. `hiddenDependencyModuleIds` are enabled automatically when the
-module is enabled. `rootAssemblyReference` is added to `Playserv.Runtime.asmdef`
-only while the module is active.
+module is enabled. `rootAssemblyReference` identifies the module's runtime
+assembly for validation and dependency diagnostics. The package's
+`Playserv.Runtime.asmdef` is stable and is never rewritten for a project.
 
-An optional editor assembly can implement `IPlayServModuleCodegenContributor`
-to register the runtime `IPlayServModule`, add compatibility facade methods, or
-provide local command execution. Unity discovers contributors automatically;
-no PlayServ core registry changes are required.
+Each runtime assembly registers its module with a `PlayServModuleAttribute`.
+Optional compatibility implementations use `PlayServLegacyApiAttribute`, and
+server-side local execution uses `PlayServLocalExecutionFactoryAttribute`.
+PlayServ discovers these assembly attributes at runtime, so a new module does
+not require generated package code or changes to a central runtime registry.
+
+Each optional runtime asmdef uses its module's disable define as a negative
+`defineConstraint`. Disabling a module therefore excludes that assembly from
+compilation. The stable `Playserv.Wrapper.PlayServ` API remains available as a
+legacy facade and resolves enabled module implementations through the
+compatibility registry. New integrations should prefer module-specific APIs.
 
 Use `Validate Modules` in `Tools/PlayServ/Settings` to check descriptor ids,
-dependencies, profiles, asset paths, asmdef names, and codegen contributors.
+dependencies, profiles, asset paths, asmdef names, assembly registrations, and
+legacy compatibility providers.
 Modules installed under `Packages/` are removed through Unity Package Manager;
 the SDK's `Uninstall` action is reserved for modules imported under `Assets/`.
+
+### Project module state
+
+PlayServ stores the authoritative module selection in the consuming Unity
+project:
+
+```text
+ProjectSettings/PlayServModules.json
+```
+
+Commit this file with the game project. It makes local editor imports, CI builds,
+and other developers use the same SDK profile and module set.
+
+```json
+{
+  "schemaVersion": 1,
+  "activeProfileId": "client-sdk",
+  "enabledModuleIds": [
+    "client-execution",
+    "data-subscription",
+    "events",
+    "pulse",
+    "spawn",
+    "transport-websocket"
+  ],
+  "enabledEditorToolIds": [
+    "codegen",
+    "deployment",
+    "model-sync"
+  ],
+  "knownModuleIds": [
+    "apple-sign-in",
+    "client-execution",
+    "client-rpc",
+    "data-subscription",
+    "events",
+    "google-sign-in",
+    "pulse",
+    "rpc-core",
+    "server",
+    "spawn",
+    "transport-rudp",
+    "transport-udp",
+    "transport-webrtc",
+    "transport-websocket"
+  ],
+  "platformOverrides": [
+    {
+      "buildTargetGroup": "iOS",
+      "profileId": "custom",
+      "enabledModuleIds": [
+        "apple-sign-in",
+        "client-execution",
+        "events",
+        "transport-websocket"
+      ]
+    }
+  ]
+}
+```
+
+The base `enabledModuleIds` list is used when the current Unity
+`BuildTargetGroup` has no override. A platform override is a complete module
+selection for that target group. Create or clear the current platform override
+from `SDK module settings > SDK profiles`.
+
+Applying an SDK profile records its profile id. Manually changing a module marks
+the current scope as `custom`. When a newly installed module is discovered,
+PlayServ uses the recorded profile, or the module's `defaultEnabled` value for a
+custom scope, to choose its initial state.
+
+Module IDs that belong to a temporarily missing external package remain in the
+project settings, so reinstalling that package restores its previous selection.
+
+On the first SDK import, PlayServ migrates existing runtime module and editor-tool
+preferences from `EditorPrefs`, writes `PlayServModules.json`, and removes the
+legacy module preference keys. Module selection no longer depends on
+`EditorPrefs`; per-user editor workflow and window preferences can still use it.
+
+Changing the selected build target or pulling a modified
+`PlayServModules.json` automatically synchronizes scripting defines, generated
+project module selection, and assembly compilation. Use `Validate Modules` to
+report an invalid schema, unknown profile, missing module package, duplicate
+platform override, stale define state, or invalid assembly registration.
+
+Project-specific module composition is generated only in the consuming project:
+
+```text
+Assets/PlayServ/Generated/Runtime/Playserv.Project.Generated.asmdef
+Assets/PlayServ/Generated/Runtime/PlayServProjectModules.g.cs
+```
+
+`Playserv.Project.Generated` applies the selected module IDs during runtime
+startup. Commit this generated directory together with
+`ProjectSettings/PlayServModules.json` so CI and all developers compile the same
+SDK composition.
+
+No project-specific source is generated under the SDK package root. This applies
+to packages installed from Git, a registry, or Unity's package cache, and also
+keeps an SDK copied under `Assets/` immutable. Package reinstall or cache cleanup
+cannot remove the project's generated module selection.
+
+Schema DTOs and typed event extensions remain project-owned under
+`Assets/Shared/Generated`. They may reference game types compiled into
+`Assembly-CSharp`, so they intentionally remain outside the named module
+composition assembly unless the game moves those types into its own asmdef.
 
 ## Apple Sign In module
 
@@ -119,11 +234,17 @@ Apple Sign In is an optional client module for iOS builds. It uses Apple's nativ
 2. Create or select the App ID that matches the Unity iOS Bundle Identifier.
 3. Enable the `Sign in with Apple` capability for that App ID.
 4. If the game/backend uses Apple's web or REST auth flow, also create a Services ID, register the return URL, and create a Sign in with Apple private key.
-5. Keep these values available for backend-side validation:
+5. Store these values only in backend secret storage:
    - Team ID
    - App Bundle ID or Services ID, depending on the flow your backend validates
    - Key ID
    - Redirect URI, if a Services ID/web flow is used
+   - Sign in with Apple `.p8` private key
+
+The PlayServ SDK does not currently provide the backend endpoint that exchanges
+or validates Apple credentials. Never place the `.p8` private key or a generated
+Apple client secret in a Unity asset, game build, source repository, or client-side
+environment variable.
 
 Apple setup reference: https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple
 
@@ -149,16 +270,17 @@ Open `PlayServAppleSignInSettings.asset` and configure:
 - `Default Nonce`: optional nonce sent with sign-in requests.
 - `Default State`: optional state value returned with sign-in responses.
 - `Client Id`: expected Apple audience for backend validation, usually the app Bundle ID for native iOS flows or the Services ID for web/service flows.
-- `Team Id`: Apple Developer Team ID.
-- `Service Id`: Services ID, only needed if your backend uses a Services ID/web flow.
-- `Key Id`: Sign in with Apple private key identifier.
-- `Redirect Uri`: return URL configured on the Services ID, only needed for web/service flows.
-- `Private Key`: development/internal tooling only. For production builds, keep Apple private keys on the backend.
 - `Add Sign In Capability On Build`: keep enabled unless you add the Xcode capability manually.
 - `Entitlements File Name`: generated entitlements file name for the Xcode project.
 
+Team ID, Services ID, Key ID, redirect URI, and private keys are intentionally
+not part of `PlayServAppleSignInSettings`. They belong to the future PlayServ
+authentication backend. When upgrading from an older SDK, the editor
+re-serializes existing Apple settings assets to remove those legacy fields.
+
 Apple only returns `Email` and `FullName` the first time a user grants consent.
-Store them on the backend after the first successful login.
+Do not treat those fields or `UserId` as a trusted PlayServ identity before
+backend verification.
 
 ### 4. Build for iOS
 
@@ -194,7 +316,14 @@ public static class AppleLoginExample
         var identityToken = credential.IdentityToken;
         var authorizationCode = credential.AuthorizationCode;
 
-        // Send identityToken or authorizationCode to your backend/PlayServ auth flow.
+        if (credential.TryCreateBackendProof(out var proof))
+        {
+            // proof is still unverified. Send it to the PlayServ auth backend
+            // when that endpoint is available.
+        }
+
+        // Until backend verification exists, do not use appleUserId, email,
+        // identityToken, or authorizationCode to create a trusted PlayServ session.
     }
 
     public static async Task CheckCredentialState(string appleUserId)
@@ -210,7 +339,7 @@ public static class AppleLoginExample
 - `IsAvailable` is `false`: run on an iOS device/build with the module enabled.
 - Xcode capability is missing: keep `Add Sign In Capability On Build` enabled or add the capability manually in Xcode.
 - `Email` or `FullName` is empty: Apple returns these only on first consent.
-- Backend token validation fails: check Bundle ID/Services ID, Team ID, Key ID, and the expected audience value.
+- Backend token validation fails after server auth is introduced: check Bundle ID/Services ID, Team ID, Key ID, nonce, and the expected audience value.
 
 ## Google Sign In module
 
@@ -276,7 +405,8 @@ Open `PlayServGoogleSignInSettings.asset` and configure:
 - `Additional Scopes`: optional extra Google OAuth scopes required by the game.
 
 For the common PlayServ/backend flow, keep `Request Id Token` and
-`Request Auth Code` enabled.
+`Request Auth Code` enabled. The current SDK returns these provider credentials
+but does not yet exchange them for a verified PlayServ session.
 
 ### 5. Use Google login at runtime
 
@@ -296,7 +426,14 @@ public static class GoogleLoginExample
         var authCode = credential.AuthCode;
         var googleUserId = credential.UserId;
 
-        // Send idToken or authCode to your backend/PlayServ auth flow.
+        if (credential.TryCreateBackendProof(out var proof))
+        {
+            // proof is still unverified. Send it to the PlayServ auth backend
+            // when that endpoint is available.
+        }
+
+        // Until backend verification exists, do not use googleUserId, email,
+        // idToken, or authCode to create a trusted PlayServ session.
     }
 }
 ```
@@ -315,6 +452,12 @@ PlayServGoogleSignIn.Disconnect();
 - Auth code is empty: enable `Request Auth Code` and set `Web Client Id`.
 - Android login fails: verify package name, SHA-1 fingerprint, keystore, and resolver output.
 - iOS login fails: verify Bundle Identifier, URL scheme/plist setup, and Xcode project configuration.
+
+`PlayServExternalIdentityProof` deliberately contains only the provider ID,
+ID token, and authorization code. It does not contain email or provider user ID,
+because client profile values must not be accepted as proof of identity. A proof
+remains unverified until a future PlayServ backend endpoint validates its
+signature, audience, issuer, expiry, and nonce where applicable.
 
 ## 1) Configure SDK
 

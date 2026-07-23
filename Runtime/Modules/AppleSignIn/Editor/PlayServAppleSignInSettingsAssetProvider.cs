@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using Playserv.AppleSignIn;
 using UnityEditor;
@@ -58,6 +60,60 @@ namespace Playserv.Editor.AppleSignIn
                     AssetDatabase.CreateFolder(current, parts[i]);
                 current = next;
             }
+        }
+    }
+
+    [InitializeOnLoad]
+    internal static class PlayServAppleSignInSettingsSecurityMigration
+    {
+        private const string SessionKey = "PlayServ.AppleSignIn.SanitizeLegacyServerCredentials.v1";
+
+        static PlayServAppleSignInSettingsSecurityMigration()
+        {
+            EditorApplication.delayCall += Run;
+        }
+
+        private static void Run()
+        {
+            if (SessionState.GetBool(SessionKey, false))
+                return;
+
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorApplication.delayCall += Run;
+                return;
+            }
+
+            var assetPaths = FindProjectSettingsAssets();
+            try
+            {
+                if (assetPaths.Count > 0)
+                    AssetDatabase.ForceReserializeAssets(assetPaths);
+
+                SessionState.SetBool(SessionKey, true);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(
+                    $"[PlayServ] Could not sanitize legacy Apple Sign In settings assets: {ex.GetBaseException().Message}");
+            }
+        }
+
+        private static List<string> FindProjectSettingsAssets()
+        {
+            var paths = new List<string>();
+            var guids = AssetDatabase.FindAssets("t:PlayServAppleSignInSettings", new[] { "Assets" });
+            for (var i = 0; i < guids.Length; i++)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (!string.IsNullOrWhiteSpace(path) &&
+                    path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                {
+                    paths.Add(path);
+                }
+            }
+
+            return paths;
         }
     }
 }

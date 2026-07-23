@@ -36,7 +36,7 @@ namespace Playserv.Modules
         public const string DefineDisableTransportRudp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP";
         public const string DefineDisableTransportWebRtc = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBRTC";
 
-        private static readonly PlayServModuleManifestEntry[] BuiltInModules = PlayServGeneratedModuleManifest.Build();
+        private static readonly PlayServModuleManifestEntry[] BuiltInModules = PlayServBuiltInModuleManifest.Build();
         private static PlayServModuleManifestEntry[] _modules = BuiltInModules;
 
         public static IReadOnlyList<PlayServModuleManifestEntry> RuntimeModules => _modules;

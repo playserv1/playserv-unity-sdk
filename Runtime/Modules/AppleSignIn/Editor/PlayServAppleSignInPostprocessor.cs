@@ -20,7 +20,7 @@ namespace Playserv.Editor.AppleSignIn
             if (target != BuildTarget.iOS)
                 return;
 
-            var moduleState = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
+            var moduleState = PlayServRuntimeModuleDefines.LoadProjectState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(moduleState);
             PlayServRuntimeModuleDefines.NormalizeDependencies(moduleState);
             if (!moduleState.IsEnabled(PlayServModuleManifest.AppleSignInId))

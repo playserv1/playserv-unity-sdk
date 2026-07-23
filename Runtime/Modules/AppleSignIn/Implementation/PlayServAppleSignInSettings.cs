@@ -11,12 +11,6 @@ namespace Playserv.AppleSignIn
         [SerializeField] private string defaultNonce = "";
         [SerializeField] private string defaultState = "";
         [SerializeField] private string clientId = "";
-        [SerializeField] private string teamId = "";
-        [SerializeField] private string serviceId = "";
-        [SerializeField] private string keyId = "";
-        [SerializeField] private string redirectUri = "";
-        [TextArea(4, 8)]
-        [SerializeField] private string privateKey = "";
         [SerializeField] private bool addSignInCapabilityOnBuild = true;
         [SerializeField] private string entitlementsFileName = "PlayServAppleSignIn.entitlements";
 
@@ -29,16 +23,6 @@ namespace Playserv.AppleSignIn
         public string DefaultState => defaultState;
 
         public string ClientId => clientId;
-
-        public string TeamId => teamId;
-
-        public string ServiceId => serviceId;
-
-        public string KeyId => keyId;
-
-        public string RedirectUri => redirectUri;
-
-        public string PrivateKey => privateKey;
 
         public bool AddSignInCapabilityOnBuild => addSignInCapabilityOnBuild;
 

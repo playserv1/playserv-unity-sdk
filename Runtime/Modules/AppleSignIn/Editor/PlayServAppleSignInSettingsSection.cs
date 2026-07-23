@@ -81,13 +81,11 @@ namespace Playserv.Editor.AppleSignIn
                 DrawProperty(serializedObject, "defaultState");
 
                 GUILayout.Space(8f);
-                GUILayout.Label("Credentials", PlayServWindowTheme.MiniHeadingStyle);
+                GUILayout.Label("Client configuration", PlayServWindowTheme.MiniHeadingStyle);
                 DrawProperty(serializedObject, "clientId");
-                DrawProperty(serializedObject, "teamId");
-                DrawProperty(serializedObject, "serviceId");
-                DrawProperty(serializedObject, "keyId");
-                DrawProperty(serializedObject, "redirectUri");
-                DrawProperty(serializedObject, "privateKey");
+                PlayServWindowChrome.DrawNotice(
+                    "Apple Team ID, Services ID, Key ID, redirect URI, and private key are server-side settings and are never stored in the Unity project.",
+                    MessageType.Info);
 
                 GUILayout.Space(8f);
                 GUILayout.Label("Xcode", PlayServWindowTheme.MiniHeadingStyle);

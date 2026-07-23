@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Playserv.Modules;
 using UnityEditor;
 using UnityEngine;
@@ -100,16 +101,15 @@ namespace Playserv.Editor
     {
         private const string ThisScriptSuffix = "/Editor/Window/PlayServModuleValidator.cs";
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
-        private const string GeneratedCompatibilityRelativePath = "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs";
-        private const string GeneratedModuleRegistryRelativePath = "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs";
-        private const string GeneratedModuleManifestRelativePath = "Runtime/Modules/Contracts/Generated/PlayServGeneratedModuleManifest.g.cs";
+
         public static PlayServModuleValidationReport Validate()
         {
             PlayServModuleManifestJsonRegistry.Reload();
             var issues = new List<PlayServModuleValidationIssue>();
             ValidateManifestEntries(issues);
             ValidateJsonManifestMetadata(issues);
-            ValidateModuleCodegenContributors(issues);
+            ValidateProjectModuleSettings(issues);
+            ValidateAssemblyModuleRegistrations(issues);
             ValidateModuleConfigSections(issues);
             ValidateScriptingDefines(issues);
 
@@ -124,7 +124,7 @@ namespace Playserv.Editor
             var asmdefs = BuildAsmdefMap(packageRoot, issues);
             ValidateDeclaredAssetPaths(issues);
             ValidateRootAssemblyReferences(packageRoot, asmdefs, issues);
-            ValidateGeneratedFiles(packageRoot, issues);
+            ValidateProjectGeneratedFiles(issues);
 
             return new PlayServModuleValidationReport(issues);
         }
@@ -143,6 +143,13 @@ namespace Playserv.Editor
 
             EditorUtility.DisplayDialog(title, message, "OK");
             return report;
+        }
+
+        public static void RunFromCli()
+        {
+            var report = Validate();
+            LogReport(report);
+            EditorApplication.Exit(report.HasErrors ? 1 : 0);
         }
 
         public static void LogReport(PlayServModuleValidationReport report)
@@ -337,87 +344,234 @@ namespace Playserv.Editor
             }
         }
 
-        private static void ValidateModuleCodegenContributors(List<PlayServModuleValidationIssue> issues)
+        private static void ValidateProjectModuleSettings(List<PlayServModuleValidationIssue> issues)
         {
-            IReadOnlyList<IPlayServModuleCodegenContributor> contributors;
-            try
-            {
-                contributors = PlayServModuleCodegenRegistry.DiscoverContributors();
-            }
-            catch (Exception ex)
+            foreach (var diagnostic in PlayServProjectModuleSettings.Validate())
             {
                 issues.Add(new PlayServModuleValidationIssue(
-                    PlayServModuleValidationSeverity.Error,
-                    "Failed to discover module codegen contributors.",
-                    detail: ex.GetBaseException().Message));
-                return;
+                    diagnostic.IsError
+                        ? PlayServModuleValidationSeverity.Error
+                        : PlayServModuleValidationSeverity.Warning,
+                    diagnostic.Message,
+                    detail: PlayServProjectModuleSettings.ProjectRelativePath));
             }
+        }
 
-            var moduleIds = new Dictionary<string, string>(StringComparer.Ordinal);
-            var orders = new Dictionary<int, string>();
-            for (var i = 0; i < contributors.Count; i++)
+        private static void ValidateAssemblyModuleRegistrations(List<PlayServModuleValidationIssue> issues)
+        {
+            var moduleRegistrations = new Dictionary<string, Type>(StringComparer.Ordinal);
+            var legacyRegistrations = new Dictionary<Type, string>();
+            var loadedAssemblies = new Dictionary<string, Assembly>(StringComparer.Ordinal);
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                var contributor = contributors[i];
-                var typeName = contributor.GetType().FullName ?? contributor.GetType().Name;
-                string moduleId;
-                int order;
+                loadedAssemblies[assembly.GetName().Name] = assembly;
+
+                PlayServModuleAttribute[] moduleAttributes;
+                PlayServLegacyApiAttribute[] legacyAttributes;
                 try
                 {
-                    moduleId = contributor.ModuleId;
-                    order = contributor.Order;
+                    moduleAttributes = assembly
+                        .GetCustomAttributes(typeof(PlayServModuleAttribute), inherit: false)
+                        .OfType<PlayServModuleAttribute>()
+                        .ToArray();
+                    legacyAttributes = assembly
+                        .GetCustomAttributes(typeof(PlayServLegacyApiAttribute), inherit: false)
+                        .OfType<PlayServLegacyApiAttribute>()
+                        .ToArray();
                 }
                 catch (Exception ex)
                 {
                     issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Error,
-                        "Module codegen contributor metadata could not be read.",
-                        detail: $"{typeName}: {ex.GetBaseException().Message}"));
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(moduleId))
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Error,
-                        "Module codegen contributor has an empty module id.",
-                        detail: typeName));
-                    continue;
-                }
-
-                if (!PlayServModuleManifest.TryGet(moduleId, out var module))
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Error,
-                        "Module codegen contributor references an unknown module id.",
-                        moduleId,
-                        typeName));
-                }
-
-                if (moduleIds.TryGetValue(moduleId, out var existingType))
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Error,
-                        "Duplicate module codegen contributor.",
-                        moduleId,
-                        $"{existingType} and {typeName}"));
-                }
-                else
-                {
-                    moduleIds.Add(moduleId, typeName);
-                }
-
-                if (orders.TryGetValue(order, out var existingOrderType))
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
                         PlayServModuleValidationSeverity.Warning,
-                        "Duplicate module codegen contributor order.",
-                        module?.Id ?? moduleId,
-                        $"{order}: {existingOrderType} and {typeName}"));
+                        "Could not inspect assembly module registrations.",
+                        detail: $"{assembly.GetName().Name}: {ex.Message}"));
+                    continue;
                 }
-                else
+
+                for (var i = 0; i < moduleAttributes.Length; i++)
                 {
-                    orders.Add(order, typeName);
+                    var registration = moduleAttributes[i];
+                    if (!PlayServModuleManifest.TryGet(registration.ModuleId, out var module))
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Assembly registration references an unknown module id.",
+                            registration.ModuleId,
+                            assembly.GetName().Name));
+                        continue;
+                    }
+
+                    if (!typeof(IPlayServModule).IsAssignableFrom(registration.ModuleType))
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Assembly registration type does not implement IPlayServModule.",
+                            registration.ModuleId,
+                            registration.ModuleType.FullName));
+                    }
+
+                    if (module.Order != registration.Order)
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Warning,
+                            "Assembly registration order differs from the module descriptor.",
+                            registration.ModuleId,
+                            $"{registration.Order} != {module.Order}"));
+                    }
+
+                    if (moduleRegistrations.TryGetValue(registration.ModuleId, out var registeredType) &&
+                        registeredType != registration.ModuleType)
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Multiple runtime module types register the same module id.",
+                            registration.ModuleId,
+                            $"{registeredType.FullName}, {registration.ModuleType.FullName}"));
+                    }
+                    else
+                    {
+                        moduleRegistrations[registration.ModuleId] = registration.ModuleType;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(module.RootAssemblyReference) &&
+                        !string.Equals(
+                            registration.ModuleType.Assembly.GetName().Name,
+                            module.RootAssemblyReference,
+                            StringComparison.Ordinal))
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Assembly registration is declared by a different assembly than the module descriptor.",
+                            registration.ModuleId,
+                            $"{registration.ModuleType.Assembly.GetName().Name} != {module.RootAssemblyReference}"));
+                    }
                 }
+
+                for (var i = 0; i < legacyAttributes.Length; i++)
+                {
+                    var registration = legacyAttributes[i];
+                    if (!PlayServModuleManifest.TryGet(registration.ModuleId, out _))
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Legacy API registration references an unknown module id.",
+                            registration.ModuleId,
+                            assembly.GetName().Name));
+                    }
+
+                    if (!registration.ContractType.IsAssignableFrom(registration.ImplementationType))
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Legacy API implementation does not implement its contract.",
+                            registration.ModuleId,
+                            $"{registration.ImplementationType.FullName} -> {registration.ContractType.FullName}"));
+                    }
+
+                    if (legacyRegistrations.TryGetValue(registration.ContractType, out var registeredModuleId) &&
+                        !string.Equals(registeredModuleId, registration.ModuleId, StringComparison.Ordinal))
+                    {
+                        issues.Add(new PlayServModuleValidationIssue(
+                            PlayServModuleValidationSeverity.Error,
+                            "Legacy API contract is registered by multiple modules.",
+                            registration.ModuleId,
+                            registration.ContractType.FullName));
+                    }
+                    else
+                    {
+                        legacyRegistrations[registration.ContractType] = registration.ModuleId;
+                    }
+                }
+            }
+
+            var activeState = PlayServRuntimeModuleDefines.Load();
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+            {
+                if (!activeState.IsEnabled(module.Id) ||
+                    !PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
+                {
+                    continue;
+                }
+
+                if (IsTransportModule(module))
+                {
+                    ValidateTransportModuleBootstrap(module, loadedAssemblies, issues);
+                    continue;
+                }
+
+                if (RequiresPlayServModuleRegistration(module) &&
+                    !moduleRegistrations.ContainsKey(module.Id))
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Enabled module assembly does not register an IPlayServModule.",
+                        module.Id,
+                        module.RootAssemblyReference));
+                }
+            }
+        }
+
+        private static bool RequiresPlayServModuleRegistration(PlayServModuleManifestEntry module)
+        {
+            if (module == null || string.IsNullOrWhiteSpace(module.RootAssemblyReference))
+                return false;
+
+            return !IsTransportModule(module);
+        }
+
+        private static bool IsTransportModule(PlayServModuleManifestEntry module)
+        {
+            return module != null &&
+                   (string.Equals(module.Id, PlayServModuleManifest.TransportWebSocketId, StringComparison.Ordinal) ||
+                    string.Equals(module.Id, PlayServModuleManifest.TransportUdpId, StringComparison.Ordinal) ||
+                    string.Equals(module.Id, PlayServModuleManifest.TransportRudpId, StringComparison.Ordinal) ||
+                    string.Equals(module.Id, PlayServModuleManifest.TransportWebRtcId, StringComparison.Ordinal));
+        }
+
+        private static void ValidateTransportModuleBootstrap(
+            PlayServModuleManifestEntry module,
+            IReadOnlyDictionary<string, Assembly> loadedAssemblies,
+            List<PlayServModuleValidationIssue> issues)
+        {
+            if (string.IsNullOrWhiteSpace(module.RootAssemblyReference) ||
+                !loadedAssemblies.TryGetValue(module.RootAssemblyReference, out var assembly))
+            {
+                issues.Add(new PlayServModuleValidationIssue(
+                    PlayServModuleValidationSeverity.Error,
+                    "Enabled transport module assembly is not loaded.",
+                    module.Id,
+                    module.RootAssemblyReference));
+                return;
+            }
+
+            try
+            {
+                var hasRuntimeBootstrap = assembly.GetTypes()
+                    .SelectMany(type => type.GetMethods(
+                        BindingFlags.Static |
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic))
+                    .Any(method => method.GetCustomAttributes(
+                        typeof(RuntimeInitializeOnLoadMethodAttribute),
+                        inherit: false).Length > 0);
+
+                if (!hasRuntimeBootstrap)
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Enabled transport module assembly has no runtime registration bootstrap.",
+                        module.Id,
+                        module.RootAssemblyReference));
+                }
+            }
+            catch (Exception ex)
+            {
+                issues.Add(new PlayServModuleValidationIssue(
+                    PlayServModuleValidationSeverity.Warning,
+                    "Could not inspect transport module runtime registration.",
+                    module.Id,
+                    $"{module.RootAssemblyReference}: {ex.GetBaseException().Message}"));
             }
         }
 
@@ -574,10 +728,6 @@ namespace Playserv.Editor
             }
 
             var runtimeReferences = new HashSet<string>(runtimeAsmdef.references ?? Array.Empty<string>(), StringComparer.Ordinal);
-            var state = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
-            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
-            PlayServRuntimeModuleDefines.NormalizeDependencies(state);
-
             foreach (var module in PlayServModuleManifest.RuntimeModules)
             {
                 if (string.IsNullOrWhiteSpace(module.RootAssemblyReference))
@@ -594,48 +744,70 @@ namespace Playserv.Editor
                         module.RootAssemblyReference));
                 }
 
-                var shouldReference = moduleAvailable && asmdefExists && state.IsEnabled(module.Id);
                 var hasReference = runtimeReferences.Contains(module.RootAssemblyReference);
-                if (shouldReference && !hasReference)
-                {
-                    issues.Add(new PlayServModuleValidationIssue(
-                        PlayServModuleValidationSeverity.Warning,
-                        "Runtime root asmdef is missing an enabled module reference. Run module graph sync.",
-                        module.Id,
-                        module.RootAssemblyReference));
-                }
-                else if (!shouldReference && hasReference)
+                if (hasReference)
                 {
                     issues.Add(new PlayServModuleValidationIssue(
                         PlayServModuleValidationSeverity.Error,
-                        "Runtime root asmdef has a stale module reference. Run module graph sync.",
+                        "Runtime root asmdef references an optional module. Package assemblies must remain immutable.",
                         module.Id,
                         module.RootAssemblyReference));
+                }
+
+                if (!moduleAvailable ||
+                    !asmdefs.TryGetValue(module.RootAssemblyReference, out var moduleAsmdefPaths) ||
+                    moduleAsmdefPaths.Count != 1)
+                {
+                    continue;
+                }
+
+                var moduleAsmdefPath = PlayServPackagePathResolver.ToAbsoluteAssetPath(moduleAsmdefPaths[0]);
+                var moduleAsmdef = ReadAsmdef(moduleAsmdefPath, issues);
+                if (moduleAsmdef == null)
+                    continue;
+
+                var requiredConstraint = "!" + module.DisableDefine;
+                if (!(moduleAsmdef.defineConstraints ?? Array.Empty<string>())
+                    .Contains(requiredConstraint, StringComparer.Ordinal))
+                {
+                    issues.Add(new PlayServModuleValidationIssue(
+                        PlayServModuleValidationSeverity.Error,
+                        "Module asmdef does not exclude the assembly when the module is disabled.",
+                        module.Id,
+                        $"{module.RootAssemblyReference}: missing {requiredConstraint}"));
                 }
             }
         }
 
-        private static void ValidateGeneratedFiles(PlayServPackageRoot packageRoot, List<PlayServModuleValidationIssue> issues)
+        private static void ValidateProjectGeneratedFiles(List<PlayServModuleValidationIssue> issues)
         {
-            ValidateGeneratedFile(packageRoot, GeneratedCompatibilityRelativePath, issues);
-            ValidateGeneratedFile(packageRoot, GeneratedModuleRegistryRelativePath, issues);
-            ValidateGeneratedFile(packageRoot, GeneratedModuleManifestRelativePath, issues);
+            ValidateProjectGeneratedFile(
+                PlayServGeneratedCompatibilityLayer.ProjectGeneratedAsmdefAssetPath,
+                requireGeneratedMarker: false,
+                issues);
+            ValidateProjectGeneratedFile(
+                PlayServGeneratedCompatibilityLayer.ProjectModuleSelectionAssetPath,
+                requireGeneratedMarker: true,
+                issues);
         }
 
-        private static void ValidateGeneratedFile(
-            PlayServPackageRoot packageRoot,
-            string relativePath,
+        private static void ValidateProjectGeneratedFile(
+            string assetPath,
+            bool requireGeneratedMarker,
             List<PlayServModuleValidationIssue> issues)
         {
-            var absolutePath = packageRoot.ToAbsolutePath(relativePath);
+            var absolutePath = PlayServPackagePathResolver.ToAbsoluteAssetPath(assetPath);
             if (!File.Exists(absolutePath))
             {
                 issues.Add(new PlayServModuleValidationIssue(
                     PlayServModuleValidationSeverity.Error,
-                    "Generated module file is missing. Run module graph sync.",
-                    detail: relativePath));
+                    "Project-generated module file is missing. Run module graph sync.",
+                    detail: assetPath));
                 return;
             }
+
+            if (!requireGeneratedMarker)
+                return;
 
             var text = File.ReadAllText(absolutePath);
             if (text.IndexOf("// <auto-generated />", StringComparison.Ordinal) < 0)
@@ -643,7 +815,7 @@ namespace Playserv.Editor
                 issues.Add(new PlayServModuleValidationIssue(
                     PlayServModuleValidationSeverity.Warning,
                     "Generated module file does not contain the PlayServ auto-generated marker.",
-                    detail: relativePath));
+                    detail: assetPath));
             }
         }
 
@@ -695,7 +867,7 @@ namespace Playserv.Editor
         private static void ValidateScriptingDefines(List<PlayServModuleValidationIssue> issues)
         {
             var actualState = PlayServRuntimeModuleDefines.Load();
-            var expectedState = PlayServRuntimeModuleDefines.LoadUserPreferenceState();
+            var expectedState = PlayServRuntimeModuleDefines.LoadProjectState();
             PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(expectedState);
             PlayServRuntimeModuleDefines.NormalizeDependencies(expectedState);
 
@@ -778,6 +950,7 @@ namespace Playserv.Editor
         {
             public string name;
             public string[] references;
+            public string[] defineConstraints;
         }
     }
 

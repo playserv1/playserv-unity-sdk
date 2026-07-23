@@ -1,5 +1,11 @@
+using Playserv.Identity;
+
 namespace Playserv.GoogleSignIn
 {
+    /// <summary>
+    /// Credential returned by the Google provider. User and profile fields are
+    /// untrusted until a backend validates the ID token or authorization code.
+    /// </summary>
     public sealed class PlayServGoogleSignInCredential
     {
         internal PlayServGoogleSignInCredential(
@@ -39,5 +45,21 @@ namespace Playserv.GoogleSignIn
         public string AuthCode { get; }
 
         public string ServerAuthCode => AuthCode;
+
+        public bool TryCreateBackendProof(out PlayServExternalIdentityProof proof)
+        {
+            if (string.IsNullOrWhiteSpace(IdToken) &&
+                string.IsNullOrWhiteSpace(AuthCode))
+            {
+                proof = null;
+                return false;
+            }
+
+            proof = new PlayServExternalIdentityProof(
+                PlayServIdentityProviderIds.Google,
+                IdToken,
+                AuthCode);
+            return true;
+        }
     }
 }

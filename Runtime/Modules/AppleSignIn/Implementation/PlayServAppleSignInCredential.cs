@@ -1,5 +1,11 @@
+using Playserv.Identity;
+
 namespace Playserv.AppleSignIn
 {
+    /// <summary>
+    /// Credential returned by the Apple provider. User and profile fields are
+    /// untrusted until a backend validates the identity token or authorization code.
+    /// </summary>
     public sealed class PlayServAppleSignInCredential
     {
         internal PlayServAppleSignInCredential(
@@ -49,5 +55,21 @@ namespace Playserv.AppleSignIn
         public bool IsAppleIdCredential => CredentialType == PlayServAppleCredentialType.AppleId;
 
         public bool IsPasswordCredential => CredentialType == PlayServAppleCredentialType.Password;
+
+        public bool TryCreateBackendProof(out PlayServExternalIdentityProof proof)
+        {
+            if (string.IsNullOrWhiteSpace(IdentityToken) &&
+                string.IsNullOrWhiteSpace(AuthorizationCode))
+            {
+                proof = null;
+                return false;
+            }
+
+            proof = new PlayServExternalIdentityProof(
+                PlayServIdentityProviderIds.Apple,
+                IdentityToken,
+                AuthorizationCode);
+            return true;
+        }
     }
 }

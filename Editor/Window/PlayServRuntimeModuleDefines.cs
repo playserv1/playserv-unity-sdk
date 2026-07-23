@@ -39,65 +39,65 @@ namespace Playserv.Editor
             return CreateRuntimeState(moduleId => IsEnabled(defines, moduleId));
         }
 
-        public static PlayServRuntimeModuleState LoadUserPreferenceState()
+        public static PlayServRuntimeModuleState LoadProjectState()
         {
-            return CreateRuntimeState(IsEnabledByUserPreference);
+            return PlayServProjectModuleSettings.LoadEffectiveState();
         }
 
         public static bool Apply(PlayServRuntimeModuleState state)
         {
-            return Apply(state, syncModuleGraph: true);
+            return Apply(state, syncModuleGraph: true, profileId: null);
         }
 
         internal static bool Apply(PlayServRuntimeModuleState state, bool syncModuleGraph)
+        {
+            return Apply(state, syncModuleGraph, profileId: null);
+        }
+
+        internal static bool Apply(
+            PlayServRuntimeModuleState state,
+            bool syncModuleGraph,
+            string profileId)
         {
             if (state == null)
                 throw new ArgumentNullException(nameof(state));
 
             NormalizeDependencies(state);
-            WriteUserDisabledPrefs(state);
+            var projectSettingsChanged = PlayServProjectModuleSettings.SaveEffectiveState(state, profileId);
+            var definesChanged = SyncScriptingDefines(state);
 
+            var changed = projectSettingsChanged || definesChanged;
+            if (changed && syncModuleGraph)
+                PlayServModuleGraphSynchronizer.SyncNow();
+
+            return changed;
+        }
+
+        internal static bool SyncScriptingDefines(PlayServRuntimeModuleState state)
+        {
+            if (state == null)
+                throw new ArgumentNullException(nameof(state));
+
+            NormalizeDependencies(state);
             var defines = ReadDefines();
             var changed = RemoveLegacyRuntimeModuleDefines(defines);
             foreach (var module in PlayServModuleManifest.RuntimeModules)
                 changed |= SetModuleDisabled(defines, module.Id, !state.IsEnabled(module.Id));
 
-            if (!changed)
-                return false;
+            if (changed)
+                WriteDefines(defines);
 
-            WriteDefines(defines);
-            if (syncModuleGraph)
-                PlayServModuleGraphSynchronizer.SyncNow();
-
-            return true;
+            return changed;
         }
 
-        public static bool IsUserDisabled(string moduleId)
+        internal static PlayServRuntimeModuleState LoadLegacyUserPreferenceState()
         {
-            if (string.IsNullOrEmpty(moduleId))
-                return false;
-
-            return EditorPrefs.GetBool(BuildUserDisabledPrefKey(moduleId), false);
+            return CreateRuntimeState(IsEnabledByLegacyUserPreference);
         }
 
         public static bool IsModuleEnabled(ISet<string> defines, string moduleId)
         {
             return IsEnabled(defines, moduleId);
-        }
-
-        public static bool IsEnabledByUserPreference(string moduleId)
-        {
-            if (string.IsNullOrEmpty(moduleId))
-                return false;
-
-            var module = PlayServModuleManifest.GetRequired(moduleId);
-            if (EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false))
-                return true;
-
-            if (IsUserDisabled(moduleId))
-                return false;
-
-            return module.DefaultEnabled;
         }
 
         public static bool RemoveLegacyRuntimeModuleDefines(ISet<string> defines)
@@ -131,11 +131,34 @@ namespace Playserv.Editor
             return true;
         }
 
-        public static bool RestoreDefaultEnabledModules(IEnumerable<string> moduleIds)
+        public static bool RestoreConfiguredModules(IEnumerable<string> moduleIds)
         {
             if (moduleIds == null)
                 return false;
 
+            var state = LoadProjectState();
+            var defines = ReadDefines();
+            var changed = RemoveLegacyRuntimeModuleDefines(defines);
+            foreach (var moduleId in moduleIds)
+            {
+                if (!PlayServModuleManifest.TryGet(moduleId, out _))
+                    continue;
+
+                changed |= SetModuleDisabled(defines, moduleId, !state.IsEnabled(moduleId));
+            }
+
+            if (changed)
+                WriteDefines(defines);
+
+            return changed;
+        }
+
+        public static bool RemoveStaleDefaultDisableDefines(IEnumerable<string> moduleIds)
+        {
+            if (moduleIds == null)
+                return false;
+
+            var state = LoadProjectState();
             var defines = ReadDefines();
             var changed = false;
 
@@ -144,8 +167,9 @@ namespace Playserv.Editor
                 if (!PlayServModuleManifest.TryGet(moduleId, out var module) || !module.DefaultEnabled)
                     continue;
 
-                EditorPrefs.DeleteKey(BuildUserDisabledPrefKey(moduleId));
-                EditorPrefs.DeleteKey(BuildUserEnabledPrefKey(moduleId));
+                if (!state.IsEnabled(moduleId))
+                    continue;
+
                 changed |= defines.Remove(module.DisableDefine);
             }
 
@@ -156,30 +180,13 @@ namespace Playserv.Editor
             return true;
         }
 
-        public static bool RemoveStaleDefaultDisableDefines(IEnumerable<string> moduleIds)
+        internal static void ClearLegacyUserPreferences()
         {
-            if (moduleIds == null)
-                return false;
-
-            var defines = ReadDefines();
-            var changed = false;
-
-            foreach (var moduleId in moduleIds)
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
             {
-                if (!PlayServModuleManifest.TryGet(moduleId, out var module) || !module.DefaultEnabled)
-                    continue;
-
-                if (IsUserDisabled(moduleId))
-                    continue;
-
-                changed |= defines.Remove(module.DisableDefine);
+                EditorPrefs.DeleteKey(BuildUserDisabledPrefKey(module.Id));
+                EditorPrefs.DeleteKey(BuildUserEnabledPrefKey(module.Id));
             }
-
-            if (!changed)
-                return false;
-
-            WriteDefines(defines);
-            return true;
         }
 
         public static void NormalizeDependencies(PlayServRuntimeModuleState state)
@@ -242,12 +249,6 @@ namespace Playserv.Editor
             return SetDisabled(defines, module.DisableDefine, disabled);
         }
 
-        private static void WriteUserDisabledPrefs(PlayServRuntimeModuleState state)
-        {
-            foreach (var module in PlayServModuleManifest.RuntimeModules)
-                SetUserModulePreference(module.Id, state.IsEnabled(module.Id));
-        }
-
         private static void NormalizeHiddenDependencyModules(PlayServRuntimeModuleState state)
         {
             foreach (var module in PlayServModuleManifest.RuntimeModules)
@@ -284,21 +285,6 @@ namespace Playserv.Editor
             return false;
         }
 
-        private static void SetUserModulePreference(string moduleId, bool enabled)
-        {
-            var module = PlayServModuleManifest.GetRequired(moduleId);
-            var disabledKey = BuildUserDisabledPrefKey(moduleId);
-            var enabledKey = BuildUserEnabledPrefKey(moduleId);
-
-            EditorPrefs.DeleteKey(disabledKey);
-            EditorPrefs.DeleteKey(enabledKey);
-
-            if (enabled == module.DefaultEnabled)
-                return;
-
-            EditorPrefs.SetBool(enabled ? enabledKey : disabledKey, true);
-        }
-
         private static string BuildUserDisabledPrefKey(string moduleId)
         {
             return Const.PrefRuntimeModuleUserDisabledPrefix + moduleId;
@@ -311,14 +297,22 @@ namespace Playserv.Editor
 
         private static bool IsEnabled(ISet<string> defines, string moduleId)
         {
-            if (IsDisabled(defines, moduleId))
+            return !IsDisabled(defines, moduleId);
+        }
+
+        private static bool IsEnabledByLegacyUserPreference(string moduleId)
+        {
+            if (string.IsNullOrEmpty(moduleId))
                 return false;
 
             var module = PlayServModuleManifest.GetRequired(moduleId);
-            if (module.DefaultEnabled)
+            if (EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false))
                 return true;
 
-            return EditorPrefs.GetBool(BuildUserEnabledPrefKey(moduleId), false);
+            if (EditorPrefs.GetBool(BuildUserDisabledPrefKey(moduleId), false))
+                return false;
+
+            return module.DefaultEnabled;
         }
 
         private static bool IsDisabled(ISet<string> defines, string moduleId)

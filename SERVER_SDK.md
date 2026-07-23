@@ -26,7 +26,7 @@ Important server-related folders:
 - `Runtime/Serialization` - JSON abstraction and Newtonsoft implementation.
 - `Runtime/Proxy/Common` - shared transport envelopes, handshake contracts, keepalive/reconnect types.
 
-Unity-only files are excluded by the server/shared runtime `.csproj`, including Unity config assets, Unity HTTP module, generated compatibility files, and Spawn module code.
+Unity-only files are excluded by the server/shared runtime `.csproj`, including Unity config assets, Unity HTTP module, the project-generated Unity module selection, and Spawn module code.
 
 ## Build Server/Shared Runtime
 

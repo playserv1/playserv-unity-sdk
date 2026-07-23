@@ -6,15 +6,7 @@
         "Playserv.Runtime.Serialization",
         "Playserv.Runtime.Core",
         "Playserv.Runtime.Http",
-        "Playserv.Runtime.Modules",
-        "Playserv.Runtime.Modules.Events",
-        "Playserv.Runtime.Modules.DataSubscription",
-        "Playserv.Runtime.Modules.RPC.Core",
-        "Playserv.Runtime.Modules.RPC.Client",
-        "Playserv.Runtime.Modules.Spawn",
-        "Playserv.Runtime.Modules.Pulse",
-        "Playserv.Runtime.Modules.AppleSignIn",
-        "Playserv.Runtime.Modules.GoogleSignIn"
+        "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

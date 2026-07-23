@@ -5,6 +5,7 @@
         "Playserv.Runtime",
         "Playserv.Runtime.Abstractions",
         "Playserv.Runtime.Core",
+        "Playserv.Runtime.Modules",
         "Playserv.Runtime.Modules.DataSubscription",
         "Playserv.Runtime.Modules.Events",
         "Playserv.Runtime.Modules.RPC.Core",
