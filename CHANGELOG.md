@@ -36,6 +36,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Changed
 
+- Replaced fire-and-forget `async void` spawn timeout and keepalive reply
+  handlers with tracked tasks that are cancelled with their module or
+  connection lifetime.
 - Reorganized the package to Unity's recommended UPM layout: importable examples
   now live under `Samples~/PlayServSDK`, long-form guides under
   `Documentation~`, and the root README is intentionally concise.
@@ -56,6 +59,12 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
   operations; optional features use their module-specific API surfaces.
 - Module validation and repair now include the project module settings schema,
   profiles, module IDs, platform overrides, and assembly registrations.
+
+### Fixed
+
+- Added an idempotent upgrade cleanup for legacy package-generated compatibility
+  files and runtime assembly references that an older SDK editor process could
+  write into the immutable UPM cache while upgrading to the modular SDK.
 
 ### Removed
 

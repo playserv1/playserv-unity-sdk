@@ -1,0 +1,23 @@
+{
+    "name": "Playserv.Tests.Runtime.Spawn",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.Events",
+        "Playserv.Runtime.Modules.Spawn"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_EVENTS",
+        "!PLAYSERV_MODULE_DISABLED_SPAWN"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

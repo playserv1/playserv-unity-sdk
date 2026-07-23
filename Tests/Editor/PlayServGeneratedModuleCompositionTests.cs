@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using Playserv.Editor;
@@ -66,6 +67,75 @@ namespace Playserv.Tests.Editor
             Assert.That(source.IndexOf("\"" + expectedIds[1] + "\"", StringComparison.Ordinal),
                 Is.LessThan(source.IndexOf("\"" + expectedIds[2] + "\"", StringComparison.Ordinal)));
             StringAssert.Contains("PlayServModuleRegistry.SetProjectSelection(EnabledIds);", source);
+        }
+
+        [Test]
+        public void LegacyPackageGenerationCleanup_RemovesOnlyLegacyOutputsAndRestoresRuntimeAsmdef()
+        {
+            var packageRoot = Path.Combine(
+                Path.GetTempPath(),
+                "PlayServLegacyPackageGenerationCleanupTests",
+                Guid.NewGuid().ToString("N"));
+            var compatibilityPath = Path.Combine(
+                packageRoot,
+                "Runtime/Generated/Compatibility/PlayServCompatibility.g.cs");
+            var registryPath = Path.Combine(
+                packageRoot,
+                "Runtime/Generated/Modules/PlayServModuleRegistry.g.cs");
+            var unrelatedPath = Path.Combine(
+                packageRoot,
+                "Runtime/Generated/keep.txt");
+            var asmdefPath = Path.Combine(packageRoot, "Runtime/Playserv.Runtime.asmdef");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(compatibilityPath));
+                Directory.CreateDirectory(Path.GetDirectoryName(registryPath));
+                File.WriteAllText(compatibilityPath, "// legacy");
+                File.WriteAllText(registryPath, "// legacy");
+                File.WriteAllText(unrelatedPath, "keep");
+                File.WriteAllText(
+                    asmdefPath,
+                    "{\n" +
+                    "    \"name\": \"Playserv.Runtime\",\n" +
+                    "    \"references\": [\n" +
+                    "        \"Playserv.Runtime.Modules\",\n" +
+                    "        \"Playserv.Runtime.Modules.Events\",\n" +
+                    "        \"External.Unrelated\"\n" +
+                    "    ]\n" +
+                    "}\n");
+
+                Assert.That(
+                    PlayServLegacyPackageGenerationCleanup.CleanupPackageRoot(packageRoot),
+                    Is.True);
+                Assert.That(File.Exists(compatibilityPath), Is.False);
+                Assert.That(File.Exists(registryPath), Is.False);
+                Assert.That(File.Exists(unrelatedPath), Is.True);
+
+                var asmdef = JsonUtility.FromJson<RuntimeAssemblyDefinitionModel>(
+                    File.ReadAllText(asmdefPath));
+                Assert.That(
+                    asmdef.references,
+                    Is.EqualTo(new[]
+                    {
+                        "Playserv.Runtime.Modules",
+                        "External.Unrelated"
+                    }));
+                Assert.That(
+                    PlayServLegacyPackageGenerationCleanup.CleanupPackageRoot(packageRoot),
+                    Is.False);
+            }
+            finally
+            {
+                if (Directory.Exists(packageRoot))
+                    Directory.Delete(packageRoot, recursive: true);
+            }
+        }
+
+        [Serializable]
+        private sealed class RuntimeAssemblyDefinitionModel
+        {
+            public string[] references;
         }
     }
 }

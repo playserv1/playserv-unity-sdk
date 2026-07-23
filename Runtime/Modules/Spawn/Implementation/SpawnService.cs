@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Events;
 using Playserv.Proxy.Logging;
@@ -16,19 +18,42 @@ namespace Playserv.Spawn
         private readonly SpawnLifecycleStore _lifecycleStore = new SpawnLifecycleStore();
         private readonly SpawnEventPublisher _eventPublisher = new SpawnEventPublisher();
         private readonly LateJoinReplayService _lateJoinReplayService;
+        private readonly object _lifecycleGate = new object();
+        private readonly object _backgroundTaskGate = new object();
+        private readonly HashSet<Task> _backgroundTasks = new HashSet<Task>();
+        private readonly CancellationTokenSource _lifetimeCancellation = new CancellationTokenSource();
+        private readonly int _spawnCompletionTimeoutMs;
+        private readonly Func<int, CancellationToken, Task> _delayAsync;
 
         private Func<string> _ownerIdProvider;
         private IDisposable _spawnSubscription;
         private IDisposable _despawnSubscription;
         private IDisposable _scopeJoinSubscription;
+        private bool _disposed;
 
         public SpawnService()
+            : this(
+                SpawnCompletionTimeoutMs,
+                (delayMs, cancellationToken) => Task.Delay(delayMs, cancellationToken))
         {
+        }
+
+        internal SpawnService(
+            int spawnCompletionTimeoutMs,
+            Func<int, CancellationToken, Task> delayAsync)
+        {
+            if (spawnCompletionTimeoutMs <= 0)
+                throw new ArgumentOutOfRangeException(nameof(spawnCompletionTimeoutMs));
+
+            _spawnCompletionTimeoutMs = spawnCompletionTimeoutMs;
+            _delayAsync = delayAsync ?? throw new ArgumentNullException(nameof(delayAsync));
             _lateJoinReplayService = new LateJoinReplayService(_lifecycleStore, _eventPublisher);
         }
 
         public void Initialize(IEventsAdapter eventsAdapter, Func<string> ownerIdProvider)
         {
+            ThrowIfDisposed();
+
             _spawnSubscription?.Dispose();
             _despawnSubscription?.Dispose();
             _scopeJoinSubscription?.Dispose();
@@ -57,6 +82,8 @@ namespace Playserv.Spawn
 
         public Task<GameObject> SpawnAsync(string assetName, Vector3 position, Quaternion rotation)
         {
+            ThrowIfDisposed();
+
             if (!_prefabResolver.TryResolveNetworkPrefab(assetName, out var prefabId, out _))
                 return Task.FromResult<GameObject>(null);
 
@@ -68,8 +95,17 @@ namespace Playserv.Spawn
                 _lifecycleStore.NextLifecycleSeq());
             var tcs = new TaskCompletionSource<GameObject>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            _lifecycleStore.AddPendingSpawn(spawnEvent.SpawnId, tcs);
-            StartSpawnCompletionTimeout(spawnEvent.SpawnId, tcs);
+            lock (_lifecycleGate)
+            {
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(SpawnService));
+
+                _lifecycleStore.AddPendingSpawn(spawnEvent.SpawnId, tcs);
+                TrackBackgroundTask(WaitForSpawnCompletionTimeoutAsync(
+                    spawnEvent.SpawnId,
+                    tcs,
+                    _lifetimeCancellation.Token));
+            }
 
             try
             {
@@ -131,21 +167,84 @@ namespace Playserv.Spawn
             OnSpawnEventReceived(spawnEvent);
         }
 
-        private async void StartSpawnCompletionTimeout(string spawnId, TaskCompletionSource<GameObject> tcs)
+        private async Task WaitForSpawnCompletionTimeoutAsync(
+            string spawnId,
+            TaskCompletionSource<GameObject> tcs,
+            CancellationToken cancellationToken)
         {
             try
             {
-                await Task.Delay(SpawnCompletionTimeoutMs);
+                await _delayAsync(_spawnCompletionTimeoutMs, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
 
-                if (tcs.Task.IsCompleted || !_lifecycleStore.TryRemovePendingSpawn(spawnId, out var pendingSpawn))
-                    return;
+                lock (_lifecycleGate)
+                {
+                    if (_disposed ||
+                        cancellationToken.IsCancellationRequested ||
+                        tcs.Task.IsCompleted ||
+                        !_lifecycleStore.TryRemovePendingSpawn(spawnId, out var pendingSpawn))
+                    {
+                        return;
+                    }
 
-                Logger.LogWarning($"Spawn timed out waiting for local completion: spawnId={spawnId}");
-                pendingSpawn.TrySetResult(null);
+                    Logger.LogWarning($"Spawn timed out waiting for local completion: spawnId={spawnId}");
+                    pendingSpawn.TrySetResult(null);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
             }
             catch (Exception ex)
             {
                 Logger.LogWarning($"Spawn timeout guard failed: {ex.Message}");
+            }
+        }
+
+        internal int BackgroundTaskCount
+        {
+            get
+            {
+                lock (_backgroundTaskGate)
+                    return _backgroundTasks.Count;
+            }
+        }
+
+        internal Task WaitForBackgroundTasksAsync()
+        {
+            lock (_backgroundTaskGate)
+            {
+                return _backgroundTasks.Count == 0
+                    ? Task.CompletedTask
+                    : Task.WhenAll(new List<Task>(_backgroundTasks));
+            }
+        }
+
+        private void TrackBackgroundTask(Task task)
+        {
+            if (task == null)
+                return;
+
+            lock (_backgroundTaskGate)
+                _backgroundTasks.Add(task);
+
+            _ = task.ContinueWith(
+                completedTask =>
+                {
+                    _ = completedTask.Exception;
+                    lock (_backgroundTaskGate)
+                        _backgroundTasks.Remove(completedTask);
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
+        private void ThrowIfDisposed()
+        {
+            lock (_lifecycleGate)
+            {
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(SpawnService));
             }
         }
 
@@ -274,6 +373,15 @@ namespace Playserv.Spawn
 
         public void Dispose()
         {
+            lock (_lifecycleGate)
+            {
+                if (_disposed)
+                    return;
+
+                _disposed = true;
+                _lifetimeCancellation.Cancel();
+            }
+
             _spawnSubscription?.Dispose();
             _despawnSubscription?.Dispose();
             _scopeJoinSubscription?.Dispose();
@@ -284,6 +392,7 @@ namespace Playserv.Spawn
             _lifecycleStore.Clear();
             _eventPublisher.Clear();
             _ownerIdProvider = null;
+            _lifetimeCancellation.Dispose();
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,6 +18,7 @@ namespace Playserv.Proxy.Common
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly object _lock = new();
+        private readonly HashSet<Task> _backgroundTasks = new HashSet<Task>();
 
         private CancellationTokenSource _cts;
         private IDisposable _legacyPingSubscription;
@@ -24,6 +26,7 @@ namespace Playserv.Proxy.Common
         private Task _sendLoop;
         private Task _monitorLoop;
         private bool _isRunning;
+        private bool _isDisposed;
         private int _timeoutRaised;
         private int _heartbeatSequence;
         private long _startedAtMs;
@@ -47,11 +50,15 @@ namespace Playserv.Proxy.Common
         {
             lock (_lock)
             {
+                if (_isDisposed)
+                    throw new ObjectDisposedException(nameof(KeepAliveManager));
+
                 if (_isRunning)
                     return;
 
                 _isRunning = true;
                 _cts = new CancellationTokenSource();
+                var cancellationToken = _cts.Token;
                 _timeoutRaised = 0;
                 _heartbeatSequence = 0;
                 Interlocked.Exchange(ref _lastClientKeepAliveAtMs, 0);
@@ -69,12 +76,14 @@ namespace Playserv.Proxy.Common
                 // the Unity SynchronizationContext and _transport.Send (which ends up in a
                 // [DllImport("__Internal")] call) must run on the main thread. Keep loops
                 // on the main thread scheduler via direct invocation + Task.Yield-based delays.
-                _sendLoop = SendLoopAsync(_cts.Token);
-                _monitorLoop = MonitorLoopAsync(_cts.Token);
+                _sendLoop = SendLoopAsync(cancellationToken);
+                _monitorLoop = MonitorLoopAsync(cancellationToken);
 #else
-                _sendLoop = Task.Run(() => SendLoopAsync(_cts.Token));
-                _monitorLoop = Task.Run(() => MonitorLoopAsync(_cts.Token));
+                _sendLoop = Task.Run(() => SendLoopAsync(cancellationToken));
+                _monitorLoop = Task.Run(() => MonitorLoopAsync(cancellationToken));
 #endif
+                TrackBackgroundTaskLocked(_sendLoop);
+                TrackBackgroundTaskLocked(_monitorLoop);
                 LogKeepAlive(
                     $"{KeepAliveLogPrefix} manager started. twait={ResolveKeepAliveIntervalMs()}ms, " +
                     $"waitWindow={ResolveKeepAliveWaitWindowMs()}ms");
@@ -83,23 +92,34 @@ namespace Playserv.Proxy.Common
 
         public void Stop()
         {
+            CancellationTokenSource cancellation;
+            IDisposable legacyPingSubscription;
+            IDisposable eventKeepAliveSubscription;
+
             lock (_lock)
             {
                 if (!_isRunning)
                     return;
 
                 _isRunning = false;
-                _cts?.Cancel();
-                _legacyPingSubscription?.Dispose();
-                _eventKeepAliveSubscription?.Dispose();
-
+                cancellation = _cts;
+                legacyPingSubscription = _legacyPingSubscription;
+                eventKeepAliveSubscription = _eventKeepAliveSubscription;
+                _cts = null;
                 _legacyPingSubscription = null;
                 _eventKeepAliveSubscription = null;
-
-                LogKeepAlive(
-                    $"{KeepAliveLogPrefix} manager stopped. lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
-                    $"lastServerKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastServerKeepAliveAtMs))}");
+                _sendLoop = null;
+                _monitorLoop = null;
             }
+
+            cancellation?.Cancel();
+            legacyPingSubscription?.Dispose();
+            eventKeepAliveSubscription?.Dispose();
+            cancellation?.Dispose();
+
+            LogKeepAlive(
+                $"{KeepAliveLogPrefix} manager stopped. lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
+                $"lastServerKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastServerKeepAliveAtMs))}");
         }
 
         private async Task SendLoopAsync(CancellationToken cancellationToken)
@@ -134,8 +154,11 @@ namespace Playserv.Proxy.Common
                 }
                 catch (Exception ex)
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
                     LogKeepAliveError($"{KeepAliveLogPrefix} send loop error: {ex.Message}");
-                    TriggerTimeout("send loop failed");
+                    TriggerTimeout("send loop failed", cancellationToken);
                     break;
                 }
             }
@@ -172,7 +195,7 @@ namespace Playserv.Proxy.Common
                         $"silence={sinceLastServerKeepAliveMs}ms, " +
                         $"lastClientKeepAliveAt={FormatTimestamp(Interlocked.Read(ref _lastClientKeepAliveAtMs))}, " +
                         $"lastServerKeepAliveAt={FormatTimestamp(lastServerKeepAliveAtMs)}");
-                    TriggerTimeout("server keepalive timeout");
+                    TriggerTimeout("server keepalive timeout", cancellationToken);
                     break;
                 }
                 catch (OperationCanceledException)
@@ -182,8 +205,11 @@ namespace Playserv.Proxy.Common
                 }
                 catch (Exception ex)
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
                     LogKeepAliveError($"{KeepAliveLogPrefix} watchdog loop error: {ex.Message}");
-                    TriggerTimeout("watchdog loop failed");
+                    TriggerTimeout("watchdog loop failed", cancellationToken);
                     break;
                 }
             }
@@ -206,13 +232,20 @@ namespace Playserv.Proxy.Common
             {
                 await _transport.Send(keepAliveCommand);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 LogKeepAliveWarning($"{KeepAliveLogPrefix} heartbeat#{sequence} send failed. source={source}, error={ex.Message}");
                 if (triggerTimeoutOnFailure)
-                    TriggerTimeout("failed to send keepalive");
+                    TriggerTimeout("failed to send keepalive", cancellationToken);
                 return false;
             }
+
+            if (!IsCurrentRun(cancellationToken))
+                return false;
 
             OnPingSent?.Invoke();
             LogKeepAlive(
@@ -228,11 +261,17 @@ namespace Playserv.Proxy.Common
             if (!IsKeepAliveEventType(message.EventType))
                 return;
 
+            if (!TryGetRunningToken(out var cancellationToken))
+                return;
+
             var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var previousServerKeepAliveAtMs = Interlocked.Exchange(ref _lastServerKeepAliveAtMs, nowMs);
             var elapsedMs = previousServerKeepAliveAtMs > 0
                 ? Math.Max(0, nowMs - previousServerKeepAliveAtMs)
                 : -1;
+
+            if (!IsCurrentRun(cancellationToken))
+                return;
 
             PongReceived?.Invoke();
             if (elapsedMs >= 0)
@@ -246,7 +285,7 @@ namespace Playserv.Proxy.Common
                     $"{KeepAliveLogPrefix} <- first server event '{message.EventType}' received. at={FormatTimestamp(nowMs)}");
             }
 
-            _ = RespondToServerKeepAliveAsync();
+            TrackBackgroundTask(RespondToServerKeepAliveAsync(cancellationToken));
         }
 
         private static bool IsKeepAliveEventType(string eventTypeName)
@@ -284,8 +323,11 @@ namespace Playserv.Proxy.Common
             return Math.Max(tickMs, 500);
         }
 
-        private void TriggerTimeout(string reason)
+        private void TriggerTimeout(string reason, CancellationToken cancellationToken)
         {
+            if (!IsCurrentRun(cancellationToken))
+                return;
+
             if (Interlocked.Exchange(ref _timeoutRaised, 1) != 0)
                 return;
 
@@ -293,10 +335,24 @@ namespace Playserv.Proxy.Common
             OnTimeout?.Invoke();
         }
 
-        private async void OnLegacyPingReceived(KeepAliveRequest request)
+        private void OnLegacyPingReceived(KeepAliveRequest request)
+        {
+            lock (_lock)
+            {
+                if (!_isRunning || _cts == null || _cts.IsCancellationRequested)
+                    return;
+
+                TrackBackgroundTaskLocked(RespondToLegacyPingAsync(request, _cts.Token));
+            }
+        }
+
+        private async Task RespondToLegacyPingAsync(
+            KeepAliveRequest request,
+            CancellationToken cancellationToken)
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 LogKeepAlive(
                     $"{KeepAliveLogPrefix} <- legacy KeepAliveRequest received. requestTs={FormatTimestamp(request?.Timestamp ?? 0)}, at={FormatTimestamp(nowMs)}");
@@ -306,31 +362,103 @@ namespace Playserv.Proxy.Common
                     Timestamp = nowMs
                 };
                 await _transport.Send(response);
+
+                if (!IsCurrentRun(cancellationToken))
+                    return;
+
                 LogKeepAlive($"{KeepAliveLogPrefix} -> legacy KeepAliveResponse sent. ts={FormatTimestamp(response.Timestamp)}");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
             }
             catch (Exception ex)
             {
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
                 LogKeepAliveError($"{KeepAliveLogPrefix} failed to reply legacy KeepAliveResponse: {ex.Message}");
             }
         }
 
-        private async Task RespondToServerKeepAliveAsync()
+        private async Task RespondToServerKeepAliveAsync(CancellationToken cancellationToken)
         {
-            CancellationToken cancellationToken;
-
-            lock (_lock)
-            {
-                if (!_isRunning || _cts == null || _cts.IsCancellationRequested)
-                    return;
-
-                cancellationToken = _cts.Token;
-            }
+            if (!IsCurrentRun(cancellationToken))
+                return;
 
             var success = await SendKeepAliveAsync("reply", cancellationToken, triggerTimeoutOnFailure: false);
-            if (!success)
+            if (!success && IsCurrentRun(cancellationToken))
             {
                 LogKeepAliveWarning($"{KeepAliveLogPrefix} reply KeepAlive was not sent. Connection may already be closing.");
             }
+        }
+
+        internal int BackgroundTaskCount
+        {
+            get
+            {
+                lock (_lock)
+                    return _backgroundTasks.Count;
+            }
+        }
+
+        internal Task WaitForBackgroundTasksAsync()
+        {
+            lock (_lock)
+            {
+                return _backgroundTasks.Count == 0
+                    ? Task.CompletedTask
+                    : Task.WhenAll(new List<Task>(_backgroundTasks));
+            }
+        }
+
+        private bool TryGetRunningToken(out CancellationToken cancellationToken)
+        {
+            lock (_lock)
+            {
+                if (!_isRunning || _cts == null || _cts.IsCancellationRequested)
+                {
+                    cancellationToken = default;
+                    return false;
+                }
+
+                cancellationToken = _cts.Token;
+                return true;
+            }
+        }
+
+        private bool IsCurrentRun(CancellationToken cancellationToken)
+        {
+            lock (_lock)
+            {
+                return _isRunning &&
+                       _cts != null &&
+                       !cancellationToken.IsCancellationRequested &&
+                       _cts.Token == cancellationToken;
+            }
+        }
+
+        private void TrackBackgroundTask(Task task)
+        {
+            if (task == null)
+                return;
+
+            lock (_lock)
+                TrackBackgroundTaskLocked(task);
+        }
+
+        private void TrackBackgroundTaskLocked(Task task)
+        {
+            _backgroundTasks.Add(task);
+            _ = task.ContinueWith(
+                completedTask =>
+                {
+                    _ = completedTask.Exception;
+                    lock (_lock)
+                        _backgroundTasks.Remove(completedTask);
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
         }
 
         private void LogKeepAlive(string message)
@@ -394,8 +522,15 @@ namespace Playserv.Proxy.Common
 
         public void Dispose()
         {
+            lock (_lock)
+            {
+                if (_isDisposed)
+                    return;
+
+                _isDisposed = true;
+            }
+
             Stop();
-            _cts?.Dispose();
         }
     }
 }
