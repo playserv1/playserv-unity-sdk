@@ -6,6 +6,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-24
+
 - Removed serialized runtime authorization and deployment tokens from
   `PlayServConfig`; player JWTs now come from
   `IPlayServRuntimeTokenProvider`, while deploy credentials use
