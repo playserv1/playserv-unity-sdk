@@ -35,7 +35,7 @@ namespace Playserv.Wrapper
         /// <returns>Transport error instance.</returns>
         public static TransportError FromCode(TransportErrorCode code) => code switch
         {
-            TransportErrorCode.InvalidHandshakePayload => new TransportError(code, "Invalid handshake payload. Check that ClientToken or Authorization, SDKVersion, and GameVersion are provided."),
+            TransportErrorCode.InvalidHandshakePayload => new TransportError(code, "Invalid handshake payload. Check the public ClientToken or runtime player JWT, SDKVersion, and GameVersion."),
             TransportErrorCode.SdkVersionUnsupported => new TransportError(code, "SDK version is not supported. Please update your SDK."),
             TransportErrorCode.GameVersionMismatch => new TransportError(code, "Game version mismatch. Please update your game client."),
             TransportErrorCode.ConnectionLimitReached => new TransportError(code, "Connection limit reached. Please try again later."),

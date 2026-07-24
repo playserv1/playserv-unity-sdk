@@ -161,7 +161,7 @@ namespace Playserv.Proxy.WebRtc
         {
             try
             {
-                var hello = _helloBuilder.Build();
+                var hello = await _helloBuilder.BuildAsync(CancellationToken.None);
                 await _connection.SendAsync(hello, CancellationToken.None);
 
                 lock (_connectGate)

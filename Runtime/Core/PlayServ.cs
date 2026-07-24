@@ -66,13 +66,18 @@ namespace Playserv.Wrapper
         /// Applies basic SDK connection settings.
         /// </summary>
         public static void Config(
-            string gameAccessToken,
+            string clientToken,
             string gameId,
             string userId,
             string gameVersion,
-            string sdkVersion = null,
-            string authorization = null) =>
-            ConnectionApi.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion, authorization);
+            string sdkVersion = null) =>
+            ConnectionApi.Config(clientToken, gameId, userId, gameVersion, sdkVersion);
+
+        /// <summary>
+        /// Sets the runtime-only provider used to obtain the current player JWT.
+        /// </summary>
+        public static void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider) =>
+            ConnectionApi.SetRuntimeTokenProvider(tokenProvider);
 
         /// <summary>
         /// Connects to configured PlayServ endpoint and performs handshake.

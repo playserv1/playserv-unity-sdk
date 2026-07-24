@@ -19,7 +19,8 @@ namespace Playserv.Editor
             var config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (config != null)
             {
-                var changed = EnsureBackendServerAddress(config);
+                var changed = PlayServDeployCredentialStore.MigrateLegacySecrets(config);
+                changed |= EnsureBackendServerAddress(config);
                 changed |= EnsureDeployApiServerAddress(config);
                 changed |= EnsureSchemaApiServerAddress(config);
                 changed |= EnsureDashboardAddress(config);
@@ -55,7 +56,11 @@ namespace Playserv.Editor
             // Fast-path: direct path
             var atPath = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (atPath != null)
+            {
+                if (PlayServDeployCredentialStore.MigrateLegacySecrets(atPath))
+                    AssetDatabase.SaveAssets();
                 return atPath;
+            }
 
             // Scan project
             var guids = AssetDatabase.FindAssets("t:PlayServConfig");
@@ -64,7 +69,11 @@ namespace Playserv.Editor
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var asset = AssetDatabase.LoadAssetAtPath<PlayServConfig>(path);
                 if (asset != null)
+                {
+                    if (PlayServDeployCredentialStore.MigrateLegacySecrets(asset))
+                        AssetDatabase.SaveAssets();
                     return asset;
+                }
             }
 
             return null;
@@ -207,13 +216,11 @@ namespace Playserv.Editor
             {
                 // Distributed package mode:
                 // - keep user-entered values once set
-                // - seed auth/game fields from baked package defaults only when currently empty
+                // - seed public client/game fields from baked package defaults only when currently empty
                 // - always enforce baked endpoints
                 var merged = config.ToSettings();
                 if (string.IsNullOrWhiteSpace(merged.ClientToken))
                     merged.ClientToken = bakedSettings.ClientToken;
-                if (string.IsNullOrWhiteSpace(merged.Authorization))
-                    merged.Authorization = bakedSettings.Authorization;
                 if (string.IsNullOrWhiteSpace(merged.GameId))
                     merged.GameId = bakedSettings.GameId;
                 merged.BackendServerAddress = bakedSettings.BackendServerAddress;

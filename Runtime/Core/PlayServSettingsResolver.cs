@@ -81,8 +81,6 @@ namespace Playserv.Wrapper
             var merged = settings.Clone();
             if (string.IsNullOrWhiteSpace(merged.ClientToken))
                 merged.ClientToken = packageDefaults.ClientToken;
-            if (string.IsNullOrWhiteSpace(merged.Authorization))
-                merged.Authorization = packageDefaults.Authorization;
             if (string.IsNullOrWhiteSpace(merged.GameId))
                 merged.GameId = packageDefaults.GameId;
 

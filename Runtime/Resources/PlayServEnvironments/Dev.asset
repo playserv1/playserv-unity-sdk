@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: Dev
   m_EditorClassIdentifier: 
   clientToken: 
-  authorization: 
   gameId: 
   backendServerAddress: wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws
   webRtcSignalingServerAddress: 

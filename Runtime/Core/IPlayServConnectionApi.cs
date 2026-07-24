@@ -23,12 +23,13 @@ namespace Playserv.Wrapper
         void Config(PlayServSettings settings);
 
         void Config(
-            string gameAccessToken,
+            string clientToken,
             string gameId,
             string userId,
             string gameVersion,
-            string sdkVersion = null,
-            string authorization = null);
+            string sdkVersion = null);
+
+        void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider);
 
         Task<bool> Connect();
 

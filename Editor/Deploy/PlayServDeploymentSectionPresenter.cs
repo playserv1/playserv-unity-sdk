@@ -25,6 +25,9 @@ namespace Playserv.Editor
 
             if (expanded)
             {
+                DrawDeployCredential(state);
+                GUILayout.Space(6f);
+
                 var selectedFolder = (DefaultAsset)EditorGUILayout.ObjectField(
                     "Folder",
                     state.DeployFolder,
@@ -123,6 +126,56 @@ namespace Playserv.Editor
 
             PlayServWindowChrome.EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldDeployment, state.FoldDeployment);
+        }
+
+        private static void DrawDeployCredential(PlayServWindowState state)
+        {
+            if (PlayServDeployCredentialStore.HasEnvironmentToken)
+            {
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUILayout.TextField("Deploy Token", PlayServDeployCredentialStore.EnvironmentVariableName);
+                return;
+            }
+
+            if (!state.DeployTokenInitialized)
+            {
+                state.DeployTokenDraft = PlayServDeployCredentialStore.GetLocalToken();
+                state.DeployTokenInitialized = true;
+            }
+
+            state.DeployTokenDraft = EditorGUILayout.PasswordField(
+                "Deploy Token",
+                state.DeployTokenDraft ?? string.Empty);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Space(EditorGUIUtility.labelWidth);
+                if (PlayServWindowChrome.DrawActionButton(
+                        "Save",
+                        PlayServWindowButtonTone.Secondary,
+                        GUILayout.Width(72f),
+                        GUILayout.Height(26f)))
+                {
+                    PlayServDeployCredentialStore.SetLocalToken(state.DeployTokenDraft);
+                    state.DeployTokenDraft = PlayServDeployCredentialStore.GetLocalToken();
+                }
+
+                GUILayout.Space(6f);
+                using (new EditorGUI.DisabledScope(
+                           string.IsNullOrWhiteSpace(state.DeployTokenDraft) &&
+                           string.IsNullOrWhiteSpace(PlayServDeployCredentialStore.GetLocalToken())))
+                {
+                    if (PlayServWindowChrome.DrawActionButton(
+                            "Clear",
+                            PlayServWindowButtonTone.Ghost,
+                            GUILayout.Width(72f),
+                            GUILayout.Height(26f)))
+                    {
+                        PlayServDeployCredentialStore.ClearLocalToken();
+                        state.DeployTokenDraft = string.Empty;
+                    }
+                }
+            }
         }
 
         private static void DrawStatusVersionRow(PlayServWindowContext context)

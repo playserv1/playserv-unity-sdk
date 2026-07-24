@@ -23,7 +23,10 @@ namespace Playserv.Wrapper
 
         [FormerlySerializedAs("gameAccessToken")]
         [SerializeField] private string clientToken;
-        [SerializeField] private string authorization;
+#if UNITY_EDITOR
+        [FormerlySerializedAs("authorization")]
+        [SerializeField, HideInInspector] private string legacyAuthorizationForMigration;
+#endif
         [SerializeField] private string gameId;
         [SerializeField] private string userId;
         [SerializeField] private string gameVersion = "1.0.0";
@@ -44,18 +47,16 @@ namespace Playserv.Wrapper
         [SerializeField] private string deployApiServerAddress = DEFAULT_DEPLOY_API_SERVER_ADDRESS;
         [SerializeField] private string schemaApiServerAddress = DEFAULT_SCHEMA_API_SERVER_ADDRESS;
         [SerializeField] private string dashboardAddress = DEFAULT_DASHBOARD_ADDRESS;
-        [SerializeField] private string deployAuthToken = "";
+#if UNITY_EDITOR
+        [FormerlySerializedAs("deployAuthToken")]
+        [SerializeField, HideInInspector] private string legacyDeployAuthTokenForMigration;
+#endif
         [SerializeField] private int timeoutSeconds = 120;
         
         /// <summary>
         /// Optional public runtime client token (<c>pk_*</c>) used by DataFlow/runtime-auth handshake.
         /// </summary>
         public string ClientToken => clientToken;
-
-        /// <summary>
-        /// Optional runtime Authorization value. Use <c>Bearer sk_*</c> or a player JWT bearer token.
-        /// </summary>
-        public string Authorization => authorization;
 
         /// <summary>
         /// Backward-compatible alias for <see cref="ClientToken"/>.
@@ -150,11 +151,6 @@ namespace Playserv.Wrapper
         public string DashboardAddress => dashboardAddress;
 
         /// <summary>
-        /// Optional bearer token used by editor deployment HTTP requests.
-        /// </summary>
-        public string DeployAuthToken => deployAuthToken;
-
-        /// <summary>
         /// Timeout in seconds for deployment HTTP requests.
         /// </summary>
         public int TimeoutSeconds => timeoutSeconds;
@@ -164,7 +160,6 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 ClientToken = clientToken,
-                Authorization = authorization,
                 GameId = gameId,
                 UserId = userId,
                 GameVersion = gameVersion,
@@ -180,7 +175,6 @@ namespace Playserv.Wrapper
                 DeployApiServerAddress = deployApiServerAddress,
                 SchemaApiServerAddress = schemaApiServerAddress,
                 DashboardAddress = dashboardAddress,
-                DeployAuthToken = deployAuthToken,
                 TimeoutSeconds = timeoutSeconds
             };
         }
@@ -195,7 +189,6 @@ namespace Playserv.Wrapper
 
             var changed = false;
             changed |= AssignIfDifferent(ref clientToken, settings.ClientToken);
-            changed |= AssignIfDifferent(ref authorization, settings.Authorization);
             changed |= AssignIfDifferent(ref gameId, settings.GameId);
             changed |= AssignIfDifferent(ref userId, settings.UserId);
             changed |= AssignIfDifferent(ref gameVersion, settings.GameVersion);
@@ -211,7 +204,6 @@ namespace Playserv.Wrapper
             changed |= AssignIfDifferent(ref deployApiServerAddress, settings.DeployApiServerAddress);
             changed |= AssignIfDifferent(ref schemaApiServerAddress, settings.SchemaApiServerAddress);
             changed |= AssignIfDifferent(ref dashboardAddress, settings.DashboardAddress);
-            changed |= AssignIfDifferent(ref deployAuthToken, settings.DeployAuthToken);
             changed |= AssignIfDifferent(ref timeoutSeconds, settings.TimeoutSeconds);
 
 #if UNITY_EDITOR
@@ -247,18 +239,6 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
-        /// Updates runtime Authorization and marks asset dirty in editor.
-        /// </summary>
-        /// <param name="value">New Authorization value.</param>
-        public void SetAuthorization(string value)
-        {
-            authorization = value;
-#if UNITY_EDITOR
-            EditorUtility.SetDirty(this);
-#endif
-        }
-
-        /// <summary>
         /// Backward-compatible setter for <see cref="ClientToken"/>.
         /// </summary>
         /// <param name="value">New token value.</param>
@@ -287,6 +267,28 @@ namespace Playserv.Wrapper
             EditorUtility.SetDirty(this);
 #endif
         }
+
+#if UNITY_EDITOR
+        internal bool ConsumeLegacySecrets(
+            out string authorization,
+            out string deployAuthToken)
+        {
+            authorization = legacyAuthorizationForMigration;
+            deployAuthToken = legacyDeployAuthTokenForMigration;
+
+            if (string.IsNullOrEmpty(authorization) && string.IsNullOrEmpty(deployAuthToken))
+                return false;
+
+            legacyAuthorizationForMigration = string.Empty;
+            legacyDeployAuthTokenForMigration = string.Empty;
+            EditorUtility.SetDirty(this);
+            return true;
+        }
+
+        internal bool HasLegacySecrets =>
+            !string.IsNullOrWhiteSpace(legacyAuthorizationForMigration) ||
+            !string.IsNullOrWhiteSpace(legacyDeployAuthTokenForMigration);
+#endif
 
         private static bool AssignIfDifferent<T>(ref T field, T value)
         {

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Editor;
 using Playserv.Serialization;
 using Playserv.Wrapper;
 using UnityEngine;
@@ -180,7 +181,7 @@ namespace Playserv.Deploy.Editor
         {
             var details = ExtractErrorDetails(responseBody);
             var authHint = responseCode == 401
-                ? " Configure a valid deploy bearer token in PlayServ config field 'deployAuthToken'."
+                ? $" Configure {PlayServDeployCredentialStore.EnvironmentVariableName} or a local deploy token in the PlayServ window."
                 : string.Empty;
 
             var nativeAotHint = details.Any(line =>
@@ -471,10 +472,7 @@ namespace Playserv.Deploy.Editor
 
         private string ResolveDeployAuthToken()
         {
-            if (!string.IsNullOrWhiteSpace(_settings.DeployAuthToken))
-                return _settings.DeployAuthToken.Trim();
-
-            return string.Empty;
+            return PlayServDeployCredentialStore.ResolveToken();
         }
     }
 }

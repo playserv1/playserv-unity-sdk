@@ -217,12 +217,10 @@ namespace Playserv.Editor
             _state.SerializedObject = new SerializedObject(_state.Config);
 
             _state.ClientTokenProperty = _state.SerializedObject.FindProperty("clientToken");
-            _state.AuthorizationProperty = _state.SerializedObject.FindProperty("authorization");
             _state.GameIdProperty = _state.SerializedObject.FindProperty("gameId");
             _state.GameVersionProperty = _state.SerializedObject.FindProperty("gameVersion");
             _state.SdkVersionProperty = _state.SerializedObject.FindProperty("sdkVersion");
             _state.AllowMultipleConnectionsProperty = _state.SerializedObject.FindProperty("allowMultipleConnections");
-            _state.DeployAuthTokenProperty = _state.SerializedObject.FindProperty("deployAuthToken");
             _state.DeployTimeoutSecondsProperty = _state.SerializedObject.FindProperty("timeoutSeconds");
 
             UpdateWindowTitle();

@@ -15,7 +15,7 @@ namespace Playserv.Runtime.Abstractions
         public const string DefaultDashboardAddress = "";
 
         public string ClientToken { get; set; } = string.Empty;
-        public string Authorization { get; set; } = string.Empty;
+        public IPlayServRuntimeTokenProvider RuntimeTokenProvider { get; set; }
 
         public string GameAccessToken
         {
@@ -38,7 +38,6 @@ namespace Playserv.Runtime.Abstractions
         public string DeployApiServerAddress { get; set; } = DefaultDeployApiServerAddress;
         public string SchemaApiServerAddress { get; set; } = DefaultSchemaApiServerAddress;
         public string DashboardAddress { get; set; } = DefaultDashboardAddress;
-        public string DeployAuthToken { get; set; } = string.Empty;
         public int TimeoutSeconds { get; set; } = 120;
 
         public string Endpoint => BackendServerAddress;
@@ -48,7 +47,7 @@ namespace Playserv.Runtime.Abstractions
             return new PlayServRuntimeSettings
             {
                 ClientToken = ClientToken,
-                Authorization = Authorization,
+                RuntimeTokenProvider = RuntimeTokenProvider,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
@@ -64,7 +63,6 @@ namespace Playserv.Runtime.Abstractions
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
                 DashboardAddress = DashboardAddress,
-                DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };
         }

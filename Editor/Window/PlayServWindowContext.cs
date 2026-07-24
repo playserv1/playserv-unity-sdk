@@ -49,8 +49,6 @@ namespace Playserv.Editor
 
         public SerializedProperty ClientTokenProperty => State.ClientTokenProperty;
 
-        public SerializedProperty AuthorizationProperty => State.AuthorizationProperty;
-
         public SerializedProperty GameIdProperty => State.GameIdProperty;
 
         public SerializedProperty GameVersionProperty => State.GameVersionProperty;
@@ -58,8 +56,6 @@ namespace Playserv.Editor
         public SerializedProperty SdkVersionProperty => State.SdkVersionProperty;
 
         public SerializedProperty AllowMultipleConnectionsProperty => State.AllowMultipleConnectionsProperty;
-
-        public SerializedProperty DeployAuthTokenProperty => State.DeployAuthTokenProperty;
 
         public SerializedProperty DeployTimeoutSecondsProperty => State.DeployTimeoutSecondsProperty;
 

@@ -121,7 +121,6 @@ namespace Playserv.Editor
                 return;
 
             AssignIfSet(value => target.ClientToken = value, defaults.ClientToken);
-            AssignIfSet(value => target.Authorization = value, defaults.Authorization);
             AssignIfSet(value => target.GameId = value, defaults.GameId);
             AssignIfSet(value => target.BackendServerAddress = value, defaults.BackendServerAddress);
             AssignIfSet(value => target.WebRtcSignalingServerAddress = value, defaults.WebRtcSignalingServerAddress);

@@ -13,7 +13,6 @@ namespace Playserv.Wrapper
     {
         [FormerlySerializedAs("gameAccessToken")]
         [SerializeField] private string clientToken = string.Empty;
-        [SerializeField] private string authorization = string.Empty;
         [SerializeField] private string gameId = string.Empty;
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
         [SerializeField] private string webRtcSignalingServerAddress = PlayServSettings.DefaultWebRtcSignalingServerAddress;
@@ -29,7 +28,6 @@ namespace Playserv.Wrapper
         [SerializeField] private int timeoutSeconds = 120;
 
         public string ClientToken => clientToken;
-        public string Authorization => authorization;
         public string GameAccessToken => clientToken;
         public string GameId => gameId;
         public string BackendServerAddress => backendServerAddress;
@@ -50,7 +48,6 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 ClientToken = ResolveOptionalText(clientToken),
-                Authorization = ResolveOptionalText(authorization),
                 GameId = ResolveOptionalText(gameId),
                 BackendServerAddress = ResolveText(backendServerAddress, PlayServSettings.DefaultBackendServerAddress),
                 WebRtcSignalingServerAddress = ResolveText(webRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress),
@@ -73,7 +70,6 @@ namespace Playserv.Wrapper
                 throw new ArgumentNullException(nameof(settings));
 
             clientToken = ResolveOptionalText(settings.ClientToken);
-            authorization = ResolveOptionalText(settings.Authorization);
             gameId = ResolveOptionalText(settings.GameId);
             backendServerAddress = ResolveText(settings.BackendServerAddress, PlayServSettings.DefaultBackendServerAddress);
             webRtcSignalingServerAddress = ResolveText(settings.WebRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress);

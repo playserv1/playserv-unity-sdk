@@ -43,6 +43,19 @@ PlayServ.Config(new PlayServSettings
 bool connected = await PlayServ.Connect();
 ```
 
+For authenticated players, provide the JWT only at runtime:
+
+```csharp
+using Playserv.Runtime.Abstractions;
+
+PlayServ.SetRuntimeTokenProvider(
+    new PlayServDelegateRuntimeTokenProvider(ct => sessionService.GetPlayServJwtAsync(ct)));
+```
+
+Never put `sk_*` keys or player JWTs in `PlayServConfig`. Deployment credentials
+are read by Editor tools from `PLAYSERV_DEPLOY_AUTH_TOKEN` or project-scoped local
+Editor storage.
+
 Optional modules are enabled per project and stored in
 `ProjectSettings/PlayServModules.json`.
 

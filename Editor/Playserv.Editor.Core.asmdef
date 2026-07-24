@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Playserv.Runtime",
+        "Playserv.Runtime.Abstractions",
         "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [

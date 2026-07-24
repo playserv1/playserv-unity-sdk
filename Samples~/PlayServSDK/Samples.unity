@@ -215,7 +215,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   clientToken:
-  authorization:
   gameId: development-test-x8hh
   userId: player-001
   gameVersion: 1.0.0

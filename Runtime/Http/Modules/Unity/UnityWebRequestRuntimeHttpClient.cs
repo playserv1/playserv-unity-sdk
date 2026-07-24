@@ -38,7 +38,6 @@ namespace Playserv.Http.Modules.Unity
             PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting latest game version. url={url}");
 
             using var req = UnityWebRequest.Get(url);
-            AddCommonHeaders(req);
             await SendRequestAsync(req, ct);
 
             var body = req.downloadHandler?.text;
@@ -92,13 +91,6 @@ namespace Playserv.Http.Modules.Unity
         private static string BuildPath(string template, string gameId)
         {
             return string.Format(template, gameId);
-        }
-
-        private void AddCommonHeaders(UnityWebRequest req)
-        {
-            var authToken = ResolveDeployAuthToken();
-            if (!string.IsNullOrWhiteSpace(authToken))
-                req.SetRequestHeader("Authorization", $"Bearer {authToken}");
         }
 
         private async Task SendRequestAsync(UnityWebRequest req, CancellationToken ct)
@@ -160,12 +152,6 @@ namespace Playserv.Http.Modules.Unity
             return endpoint?.Trim() ?? string.Empty;
         }
 
-        private string ResolveDeployAuthToken()
-        {
-            return string.IsNullOrWhiteSpace(_settings.DeployAuthToken)
-                ? string.Empty
-                : _settings.DeployAuthToken.Trim();
-        }
     }
 }
 #endif

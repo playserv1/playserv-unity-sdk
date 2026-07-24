@@ -528,7 +528,7 @@ signature, audience, issuer, expiry, and nonce where applicable.
 
 1. Open `Tools/PlayServ/Settings`.
 2. In `PlayServ Config`, ensure `Assets/Resources/PlayServConfig.asset` exists.
-3. Fill `GameId`, `UserId`, `GameVersion`, and a runtime credential: `ClientToken` (`pk_*`) or `Authorization` (`Bearer sk_*` / player JWT).
+3. Fill `GameId`, `UserId`, `GameVersion`, and the public `ClientToken` (`pk_*`).
 4. On runtime start, call `PlayServ.Connect()`.
 
 ### Option B: configure from code
@@ -549,6 +549,42 @@ PlayServ.Config(new PlayServSettings
     KeepAlivePongTimeoutMs = 10000
 });
 ```
+
+### Runtime player JWT
+
+Player JWTs are never stored in `PlayServConfig`. Register a runtime provider
+before connecting:
+
+```csharp
+using Playserv.Runtime.Abstractions;
+using Playserv.Wrapper;
+
+PlayServ.SetRuntimeTokenProvider(
+    new PlayServDelegateRuntimeTokenProvider(async cancellationToken =>
+    {
+        return await sessionService.GetPlayServJwtAsync(cancellationToken);
+    }));
+
+await PlayServ.Connect();
+```
+
+The provider may return a raw JWT or `Bearer <jwt>`. It is queried before the
+initial handshake and automatic reconnects. Runtime code rejects `sk_*` keys,
+and `ClientToken` accepts only public `pk_*` values.
+
+### Deployment credential
+
+Deployment credentials are Editor-only and are not serialized into
+`PlayServConfig`:
+
+- CI: set `PLAYSERV_DEPLOY_AUTH_TOKEN`.
+- Local development: enter the token in the `Deployment` section of the
+  PlayServ window and click `Save`.
+- The environment variable has priority over local Editor storage.
+
+When an older config is opened, the SDK moves its legacy `deployAuthToken` to
+project-scoped local Editor storage and removes serialized `authorization`.
+Rotate any `sk_*` key that was previously committed to Git.
 
 ## 2) Connection lifecycle (MonoBehaviour)
 

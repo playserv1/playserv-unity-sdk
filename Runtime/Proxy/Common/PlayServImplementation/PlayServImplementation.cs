@@ -5,6 +5,7 @@ using Playserv.Modules;
 using Playserv.Proxy.Implementation;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Runtime.Abstractions;
 using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Common
@@ -83,7 +84,7 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
             int keepAlivePongTimeoutMs = 10000,
-            string authorization = null)
+            IPlayServRuntimeTokenProvider runtimeTokenProvider = null)
             => _transportSession.Configure(
                 gameAccessToken,
                 gameId,
@@ -93,7 +94,7 @@ namespace Playserv.Proxy.Common
                 allowMultipleConnections,
                 keepAlivePingIntervalMs,
                 keepAlivePongTimeoutMs,
-                authorization);
+                runtimeTokenProvider);
 
         public Task<bool> Connect() => _transportSession.ConnectAsync();
 

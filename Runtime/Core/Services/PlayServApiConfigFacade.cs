@@ -66,19 +66,12 @@ namespace Playserv.Wrapper
         }
 
         public void Config(
-            string gameAccessToken,
+            string clientToken,
             string gameId,
             string userId,
             string gameVersion,
-            string sdkVersion = null,
-            string authorization = null)
+            string sdkVersion = null)
         {
-            if (string.IsNullOrWhiteSpace(gameAccessToken) &&
-                string.IsNullOrWhiteSpace(authorization))
-            {
-                throw new ArgumentException("Client token or Authorization is required.", nameof(gameAccessToken));
-            }
-
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID is required.", nameof(gameId));
 
@@ -89,8 +82,7 @@ namespace Playserv.Wrapper
                 throw new ArgumentException("Game version is required.", nameof(gameVersion));
 
             var settings = GetOrCreateSettings();
-            settings.ClientToken = gameAccessToken ?? string.Empty;
-            settings.Authorization = authorization ?? string.Empty;
+            settings.ClientToken = clientToken ?? string.Empty;
             settings.GameId = gameId;
             settings.UserId = userId;
             settings.GameVersion = gameVersion;
@@ -99,6 +91,15 @@ namespace Playserv.Wrapper
                 settings.SdkVersion = sdkVersion;
 
             ApplySettings(settings);
+        }
+
+        public void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider)
+        {
+            var settings = GetOrCreateSettings();
+            settings.RuntimeTokenProvider = tokenProvider;
+
+            if (_instance != null)
+                ApplySettings(settings);
         }
 
         public void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory)

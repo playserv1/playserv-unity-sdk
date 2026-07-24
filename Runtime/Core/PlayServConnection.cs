@@ -40,13 +40,15 @@ namespace Playserv.Wrapper
         public static void Config(PlayServSettings settings) => Api.Config(settings);
 
         public static void Config(
-            string gameAccessToken,
+            string clientToken,
             string gameId,
             string userId,
             string gameVersion,
-            string sdkVersion = null,
-            string authorization = null) =>
-            Api.Config(gameAccessToken, gameId, userId, gameVersion, sdkVersion, authorization);
+            string sdkVersion = null) =>
+            Api.Config(clientToken, gameId, userId, gameVersion, sdkVersion);
+
+        public static void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider) =>
+            Api.SetRuntimeTokenProvider(tokenProvider);
 
         public static Task<bool> Connect() => Api.Connect();
 

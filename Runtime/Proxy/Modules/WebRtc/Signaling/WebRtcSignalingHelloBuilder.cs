@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Playserv.Runtime.Abstractions;
 using Playserv.Serialization;
 
@@ -17,13 +19,17 @@ namespace Playserv.Proxy.WebRtc
             _sessionId = sessionId ?? string.Empty;
         }
 
-        public string Build()
+        public async Task<string> BuildAsync(CancellationToken cancellationToken = default)
         {
+            var runtimeAuthorization = _settings.RuntimeTokenProvider == null
+                ? null
+                : PlayServCredentialPolicy.NormalizePlayerAuthorization(
+                    await _settings.RuntimeTokenProvider.GetTokenAsync(cancellationToken));
             var hello = new WebRtcSignalingHelloMessage
             {
                 MessageType = WebRtcSignalMessageTypes.Hello,
                 SessionId = _sessionId,
-                GameAccessToken = ResolveWireCredential(_settings.ClientToken, _settings.Authorization),
+                GameAccessToken = ResolveWireCredential(_settings.ClientToken, runtimeAuthorization),
                 GameId = _settings.GameId ?? string.Empty,
                 UserId = _settings.UserId ?? string.Empty,
                 GameVersion = _settings.GameVersion ?? string.Empty,
@@ -37,17 +43,12 @@ namespace Playserv.Proxy.WebRtc
 
         private static string ResolveWireCredential(string clientToken, string authorization)
         {
-            if (!string.IsNullOrWhiteSpace(clientToken))
-                return clientToken.Trim();
+            if (!string.IsNullOrWhiteSpace(authorization))
+                return PlayServCredentialPolicy.ExtractBearerToken(authorization);
 
-            if (string.IsNullOrWhiteSpace(authorization))
-                return string.Empty;
-
-            const string bearerPrefix = "Bearer ";
-            var trimmed = authorization.Trim();
-            return trimmed.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
-                ? trimmed.Substring(bearerPrefix.Length).Trim()
-                : trimmed;
+            return string.IsNullOrWhiteSpace(clientToken)
+                ? string.Empty
+                : PlayServCredentialPolicy.NormalizeClientToken(clientToken);
         }
 
         private sealed class WebRtcSignalingHelloMessage

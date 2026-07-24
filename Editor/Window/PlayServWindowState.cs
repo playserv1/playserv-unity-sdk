@@ -13,12 +13,10 @@ namespace Playserv.Editor
         public SerializedObject SerializedObject;
 
         public SerializedProperty ClientTokenProperty;
-        public SerializedProperty AuthorizationProperty;
         public SerializedProperty GameIdProperty;
         public SerializedProperty GameVersionProperty;
         public SerializedProperty SdkVersionProperty;
         public SerializedProperty AllowMultipleConnectionsProperty;
-        public SerializedProperty DeployAuthTokenProperty;
         public SerializedProperty DeployTimeoutSecondsProperty;
 
         public bool FoldCodegen;
@@ -44,6 +42,8 @@ namespace Playserv.Editor
         public bool DeployIncludeSubfolders = true;
         public string DeployPattern = "*";
         public bool DeployKeepRelativePaths = true;
+        public bool DeployTokenInitialized;
+        public string DeployTokenDraft = string.Empty;
         public bool DeployShowFileList;
         public Vector2 DeployFilesScroll;
         public List<string> DeployFilesPreview = new List<string>();

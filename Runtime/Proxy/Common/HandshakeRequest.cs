@@ -9,7 +9,7 @@ namespace Playserv.Proxy.Common
     public sealed class HandshakeRequest
     {
         /// <summary>
-        /// Wire compatibility credential. Filled from ClientToken or Authorization.
+        /// Wire compatibility credential. Filled from the public client token or runtime player JWT.
         /// </summary>
         public string GameAccessToken { get; set; }
 
@@ -19,7 +19,7 @@ namespace Playserv.Proxy.Common
         public string ClientToken { get; set; }
 
         /// <summary>
-        /// Optional runtime Authorization value. Expected format: <c>Bearer ...</c>.
+        /// Optional runtime player JWT authorization value. Expected format: <c>Bearer ...</c>.
         /// </summary>
         public string Authorization { get; set; }
 

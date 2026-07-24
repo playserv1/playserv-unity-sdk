@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Removed serialized runtime authorization and deployment tokens from
+  `PlayServConfig`; player JWTs now come from
+  `IPlayServRuntimeTokenProvider`, while deploy credentials use
+  `PLAYSERV_DEPLOY_AUTH_TOKEN` or project-scoped local Editor storage.
+- Added runtime credential validation that accepts only public `pk_*` client
+  tokens and rejects `Bearer sk_*` before player connections.
 ### Added
 
 - Added `Tools > PlayServ > Migrate Project`, a Roslyn-based preview and

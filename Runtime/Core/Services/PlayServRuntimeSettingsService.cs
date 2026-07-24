@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Wrapper
 {
@@ -69,7 +70,7 @@ namespace Playserv.Wrapper
                 settings.AllowMultipleConnections,
                 settings.KeepAlivePingIntervalMs,
                 settings.KeepAlivePongTimeoutMs,
-                settings.Authorization);
+                settings.RuntimeTokenProvider);
 
             _subscribeToInstanceEvents(instance);
             currentSettings = settings;
@@ -109,7 +110,12 @@ namespace Playserv.Wrapper
         public static void EnsureConfigured(PlayServSettings settings)
         {
             if (!HasHandshakeCredential(settings))
-                throw new InvalidOperationException("Client token or Authorization is required. Set ClientToken or Authorization for DataFlow/runtime-auth.");
+            {
+                throw new InvalidOperationException(
+                    "A public ClientToken or IPlayServRuntimeTokenProvider is required for DataFlow/runtime-auth.");
+            }
+
+            PlayServCredentialPolicy.NormalizeClientToken(settings.ClientToken);
 
             if (string.IsNullOrWhiteSpace(settings.GameId))
                 throw new InvalidOperationException("Game ID is required. Call Config(...) first.");
@@ -127,7 +133,7 @@ namespace Playserv.Wrapper
         private static bool HasHandshakeCredential(PlayServSettings settings)
         {
             return !string.IsNullOrWhiteSpace(settings.ClientToken) ||
-                   !string.IsNullOrWhiteSpace(settings.Authorization);
+                   settings.RuntimeTokenProvider != null;
         }
 
         private void EnsureInstanceForSettings(

@@ -45,9 +45,9 @@ namespace Playserv.Wrapper
         public string ClientToken { get; set; } = string.Empty;
 
         /// <summary>
-        /// Optional runtime Authorization value. Use <c>Bearer sk_*</c> or a player JWT bearer token.
+        /// Runtime-only player JWT source. The provider is queried before connect and reconnect.
         /// </summary>
-        public string Authorization { get; set; } = string.Empty;
+        public IPlayServRuntimeTokenProvider RuntimeTokenProvider { get; set; }
 
         /// <summary>
         /// Backward-compatible alias for <see cref="ClientToken"/>.
@@ -145,11 +145,6 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
-        /// Optional bearer token used by editor deployment HTTP requests.
-        /// </summary>
-        public string DeployAuthToken { get; set; } = string.Empty;
-
-        /// <summary>
         /// Timeout in seconds for deployment API requests.
         /// </summary>
         public int TimeoutSeconds { get; set; } = 120;
@@ -168,7 +163,7 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 ClientToken = ClientToken,
-                Authorization = Authorization,
+                RuntimeTokenProvider = RuntimeTokenProvider,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
@@ -184,7 +179,6 @@ namespace Playserv.Wrapper
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
                 DashboardAddress = DashboardAddress,
-                DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };
         }
@@ -194,7 +188,7 @@ namespace Playserv.Wrapper
             return new PlayServRuntimeSettings
             {
                 ClientToken = ClientToken,
-                Authorization = Authorization,
+                RuntimeTokenProvider = RuntimeTokenProvider,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
@@ -210,7 +204,6 @@ namespace Playserv.Wrapper
                 DeployApiServerAddress = DeployApiServerAddress,
                 SchemaApiServerAddress = SchemaApiServerAddress,
                 DashboardAddress = DashboardAddress,
-                DeployAuthToken = DeployAuthToken,
                 TimeoutSeconds = TimeoutSeconds
             };
         }

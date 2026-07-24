@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Playserv.Modules;
 using Playserv.Proxy.Interfaces;
+using Playserv.Runtime.Abstractions;
 using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Common
@@ -29,7 +30,7 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections,
             int keepAlivePingIntervalMs,
             int keepAlivePongTimeoutMs,
-            string authorization = null);
+            IPlayServRuntimeTokenProvider runtimeTokenProvider = null);
 
         ITransportImplementation GetTransportImplementation();
     }

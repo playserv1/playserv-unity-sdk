@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Runtime.Abstractions;
 using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Common
@@ -24,6 +25,7 @@ namespace Playserv.Proxy.Common
         private string _handshakeCredential;
         private string _clientToken;
         private string _authorization;
+        private IPlayServRuntimeTokenProvider _runtimeTokenProvider;
         private string _gameId;
         private string _userId;
         private string _gameVersion;
@@ -79,16 +81,15 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
             int keepAlivePongTimeoutMs = 10000,
-            string authorization = null)
+            IPlayServRuntimeTokenProvider runtimeTokenProvider = null)
         {
-            var normalizedClientToken = NormalizeOptionalCredential(clientToken);
-            var normalizedAuthorization = NormalizeOptionalCredential(authorization);
-            var handshakeCredential = ResolveHandshakeCredential(
-                normalizedClientToken,
-                normalizedAuthorization);
-
-            if (string.IsNullOrWhiteSpace(handshakeCredential))
-                throw new ArgumentException("Client token or Authorization cannot be null or empty.", nameof(clientToken));
+            var normalizedClientToken = PlayServCredentialPolicy.NormalizeClientToken(clientToken);
+            if (normalizedClientToken == null && runtimeTokenProvider == null)
+            {
+                throw new ArgumentException(
+                    "A public pk_* client token or runtime token provider is required.",
+                    nameof(clientToken));
+            }
 
             if (string.IsNullOrWhiteSpace(gameId))
                 throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
@@ -99,9 +100,9 @@ namespace Playserv.Proxy.Common
             if (string.IsNullOrWhiteSpace(gameVersion))
                 throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
 
-            _handshakeCredential = handshakeCredential;
             _clientToken = normalizedClientToken;
-            _authorization = normalizedAuthorization;
+            _authorization = null;
+            _runtimeTokenProvider = runtimeTokenProvider;
             _gameId = gameId;
             _userId = userId;
             _gameVersion = gameVersion;
@@ -111,7 +112,7 @@ namespace Playserv.Proxy.Common
             _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
 
             _logger.Log(
-                $"Config set: gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, clientTokenSet={!string.IsNullOrEmpty(_clientToken)}, authorizationSet={!string.IsNullOrEmpty(_authorization)}");
+                $"Config set: gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, clientTokenSet={!string.IsNullOrEmpty(_clientToken)}, runtimeTokenProviderSet={_runtimeTokenProvider != null}");
         }
 
         public async Task<bool> ConnectAsync()
@@ -119,10 +120,19 @@ namespace Playserv.Proxy.Common
             EnsureConfigured();
 
             _disconnectedByServer = false;
-            _reconnectionManager.Start();
-
             State = PlayServState.Connecting;
             _logger.Log("Connecting to SDK...");
+            try
+            {
+                await RefreshRuntimeCredentialAsync();
+            }
+            catch
+            {
+                State = PlayServState.Offline;
+                throw;
+            }
+
+            _reconnectionManager.Start();
 
             var connected = await _transport.Connect();
             if (!connected)
@@ -226,6 +236,7 @@ namespace Playserv.Proxy.Common
         {
             _keepAliveManager.Stop();
             _transport.ResetConnection();
+            await RefreshRuntimeCredentialAsync();
 
             var connected = await _transport.Connect();
             if (!connected)
@@ -308,7 +319,7 @@ namespace Playserv.Proxy.Common
 
         private void EnsureConfigured()
         {
-            if (string.IsNullOrWhiteSpace(_handshakeCredential) ||
+            if ((_runtimeTokenProvider == null && string.IsNullOrWhiteSpace(_clientToken)) ||
                 string.IsNullOrWhiteSpace(_gameId) ||
                 string.IsNullOrWhiteSpace(_userId) ||
                 string.IsNullOrWhiteSpace(_gameVersion))
@@ -317,9 +328,19 @@ namespace Playserv.Proxy.Common
             }
         }
 
-        private static string NormalizeOptionalCredential(string value)
+        private async Task RefreshRuntimeCredentialAsync()
         {
-            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            _authorization = _runtimeTokenProvider == null
+                ? null
+                : PlayServCredentialPolicy.NormalizePlayerAuthorization(
+                    await _runtimeTokenProvider.GetTokenAsync(CancellationToken.None));
+            _handshakeCredential = ResolveHandshakeCredential(_clientToken, _authorization);
+
+            if (string.IsNullOrWhiteSpace(_handshakeCredential))
+            {
+                throw new InvalidOperationException(
+                    "The runtime token provider returned an empty player JWT and no public client token is configured.");
+            }
         }
 
         private static string ResolveHandshakeCredential(
@@ -329,18 +350,7 @@ namespace Playserv.Proxy.Common
             if (!string.IsNullOrEmpty(clientToken))
                 return clientToken;
 
-            return ExtractBearerCredential(authorization);
-        }
-
-        private static string ExtractBearerCredential(string authorization)
-        {
-            if (string.IsNullOrEmpty(authorization))
-                return null;
-
-            const string bearerPrefix = "Bearer ";
-            return authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
-                ? NormalizeOptionalCredential(authorization.Substring(bearerPrefix.Length))
-                : authorization;
+            return PlayServCredentialPolicy.ExtractBearerToken(authorization);
         }
 
         private Task<bool> IsReconnectEnvironmentReadyAsync()
