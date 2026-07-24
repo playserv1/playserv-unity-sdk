@@ -10,6 +10,7 @@ namespace Playserv.Editor
     {
         private const string WindowTitlePrefix = "PlayServ";
         private const string MenuPath = "Tools/PlayServ/Settings";
+        private const int MenuPriority = 2000;
         private const string DocsUrl = "https://docs.playserv.io/";
         private const float FixedWindowWidth = 720f;
         private const float MinWindowHeight = 760f;
@@ -36,7 +37,7 @@ namespace Playserv.Editor
 
         private PlayServConnectionController _connectionController;
 
-        [MenuItem(MenuPath)]
+        [MenuItem(MenuPath, false, MenuPriority)]
         public static void ShowFromMenu() => ShowWindow();
 
         [InitializeOnLoadMethod]

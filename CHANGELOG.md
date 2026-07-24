@@ -50,6 +50,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Changed
 
+- Moved the source-only SDK version synchronization command and asset
+  postprocessor into the development repository, so release tooling is no
+  longer shipped in UPM or `.unitypackage` artifacts.
 - Made built-in `module.playserv.json` descriptors the single source of truth
   and replaced the hand-maintained runtime fallback with a deterministic,
   committed `PlayServBuiltInModuleManifest.g.cs` plus CI drift verification.
