@@ -9,6 +9,11 @@ namespace Playserv.RPC
     [Serializable]
     public sealed class InvokeRpc
     {
+        /// <summary>
+        /// Client-generated identifier used to correlate an InvokeRpcResponse.
+        /// </summary>
+        public string RequestId { get; set; } = string.Empty;
+
         public string ServiceName { get; set; } = string.Empty;
         public string MethodName { get; set; } = string.Empty;
         public string Payload { get; set; } = string.Empty;

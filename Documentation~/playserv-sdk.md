@@ -885,45 +885,55 @@ Open `Tools/PlayServ/Settings` and use:
 - Always dispose subscriptions and disconnect in object teardown.
 - `PlayServSpawn.Spawn(...)` returns `null` when prefab path is invalid or missing `NetworkObject`.
 
-## 9) RPC-style call (pattern from `Assets/Tests/RPC`)
+## 9) Typed awaitable RPC
 
-`Assets/Tests/RPC/RPCTest.cs` uses the following style:
-- request DTO in payload
-- module path passed as `"rpc.InvokeRpc"`
-- payload body encoded as base64 string
+Use `PlayServRpc.InvokeAsync<TRequest, TResponse>` for business operations that
+need a response. The SDK serializes the request, assigns a request ID, awaits
+the matching response, and deserializes its JSON result.
 
 ```csharp
 using System;
-using System.Text;
-using Newtonsoft.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Playserv.RPC;
 using Playserv.Wrapper;
 
-[Serializable]
-public sealed class RpcInvokeRequest
+public sealed class FindMatchRequest
 {
-    public string ServiceName { get; set; }
-    public string MethodName { get; set; }
-    public string Payload { get; set; } // base64 JSON body
+    public string Mode { get; set; }
 }
 
-public static class RpcUsageExample
+public sealed class FindMatchResponse
 {
-    public static void BroadcastMessage()
-    {
-        var jsonBody = JsonConvert.SerializeObject(new { message = "Hello from RPC" });
-        var payloadBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(jsonBody));
+    public string MatchId { get; set; }
+}
 
-        var request = new RpcInvokeRequest
-        {
-            ServiceName = "NotificationService",
-            MethodName = "BroadcastToAll",
-            Payload = payloadBase64
-        };
+public static async Task<FindMatchResponse> FindMatchAsync(
+    CancellationToken cancellationToken)
+{
+    PlayServRpcResult<FindMatchResponse> result =
+        await PlayServRpc.InvokeAsync<FindMatchRequest, FindMatchResponse>(
+            "RoomService",
+            "FindMatch",
+            new FindMatchRequest { Mode = "duo" },
+            cancellationToken);
 
-        PlayServRpc.Send(request, "rpc.InvokeRpc");
-    }
+    if (!result.IsSuccess)
+        throw new InvalidOperationException(result.Error.ToString());
+
+    return result.Value;
 }
 ```
+
+`PlayServRpcResult<T>` exposes the generated `RequestId`, typed `Value`, raw JSON
+result, server status/message, timestamp, and a structured `Error`. Timeout and
+cancellation are returned as `PlayServRpcErrorCode.Timeout` and
+`PlayServRpcErrorCode.Canceled`.
+
+The default timeout is 30 seconds. `PlayServRpcInvokeOptions` can override the
+timeout, request ID, and coalescing key. New gateways correlate by request ID;
+older gateways fall back to oldest-first matching for the same service and
+method.
 
 You can pair this with event subscription for side effects from RPC handlers:
 

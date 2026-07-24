@@ -14,7 +14,7 @@ namespace Playserv.Editor
         private const string RuntimeAsmdefRelativePath = "Runtime/Playserv.Runtime.asmdef";
         private const string CoreEntryPointRelativePath = "Runtime/Core/PlayServ.cs";
         private const string ModuleRegistryRelativePath = "Runtime/Modules/Contracts/PlayServModuleRegistry.cs";
-        private const string ModuleManifestRelativePath = "Runtime/Modules/Contracts/PlayServBuiltInModuleManifest.cs";
+        private const string ModuleManifestRelativePath = "Runtime/Modules/Contracts/PlayServBuiltInModuleManifest.g.cs";
         private const string ProjectGeneratedAsmdefAssetPath =
             PlayServGeneratedCompatibilityLayer.ProjectGeneratedAsmdefAssetPath;
         private const string ProjectModuleSelectionAssetPath =

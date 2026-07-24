@@ -18,7 +18,8 @@ namespace Playserv.RPC
             {
                 var requestInfo = response.Request == null
                     ? "n/a"
-                    : $"{response.Request.ServiceName}.{response.Request.MethodName}";
+                    : $"{response.Request.ServiceName}.{response.Request.MethodName} " +
+                      $"requestId={ResolveRequestId(response)}";
                 var resultInfo = string.IsNullOrWhiteSpace(response.Result) ? "<empty>" : response.Result;
                 routes.Logger.Log(
                     $"InvokeRpcResponse received. status={response.Status}, message={response.Message}, request={requestInfo}, result={resultInfo}");
@@ -27,6 +28,16 @@ namespace Playserv.RPC
             }
 
             routes.Logger.LogWarning($"[PlayServ][RPC] Received InvokeRpcResponse with unexpected payload type: {command?.GetType().Name ?? "null"}");
+        }
+
+        private static string ResolveRequestId(InvokeRpcResponse response)
+        {
+            if (!string.IsNullOrWhiteSpace(response.RequestId))
+                return response.RequestId;
+
+            return string.IsNullOrWhiteSpace(response.Request?.RequestId)
+                ? "n/a"
+                : response.Request.RequestId;
         }
     }
 }

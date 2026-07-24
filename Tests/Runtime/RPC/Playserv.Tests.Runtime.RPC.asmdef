@@ -1,0 +1,24 @@
+{
+    "name": "Playserv.Tests.Runtime.RPC",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Modules.RPC.Client",
+        "Playserv.Runtime.Serialization"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

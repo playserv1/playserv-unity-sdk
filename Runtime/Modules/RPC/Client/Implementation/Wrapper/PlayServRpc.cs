@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 using Playserv.Proxy.Common;
 using Playserv.RPC;
 
@@ -25,6 +27,42 @@ namespace Playserv.Wrapper
 
         public static void Invoke(string serviceName, string methodName, object payload) =>
             Api.Invoke(serviceName, methodName, payload);
+
+        /// <summary>
+        /// Invokes an RPC and awaits a typed response using the default timeout.
+        /// Operational failures are returned through PlayServRpcResult.Error.
+        /// </summary>
+        public static Task<PlayServRpcResult<TResponse>> InvokeAsync<TRequest, TResponse>(
+            string serviceName,
+            string methodName,
+            TRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            return Api.InvokeAsync<TRequest, TResponse>(
+                serviceName,
+                methodName,
+                request,
+                options: null,
+                cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Invokes an RPC and awaits a typed response with explicit timeout and correlation options.
+        /// </summary>
+        public static Task<PlayServRpcResult<TResponse>> InvokeAsync<TRequest, TResponse>(
+            string serviceName,
+            string methodName,
+            TRequest request,
+            PlayServRpcInvokeOptions options,
+            CancellationToken cancellationToken = default)
+        {
+            return Api.InvokeAsync<TRequest, TResponse>(
+                serviceName,
+                methodName,
+                request,
+                options,
+                cancellationToken);
+        }
 
         public static void InvokeArgs(string serviceName, string methodName, params object[] args) =>
             Api.InvokeArgs(serviceName, methodName, args);

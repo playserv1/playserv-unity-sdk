@@ -9,6 +9,11 @@ namespace Playserv.RPC
     public sealed class RpcInvokeRequest
     {
         /// <summary>
+        /// Client-generated request identifier.
+        /// </summary>
+        public string RequestId { get; set; } = string.Empty;
+
+        /// <summary>
         /// RPC service name on server side.
         /// </summary>
         public string ServiceName { get; set; } = string.Empty;
