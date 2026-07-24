@@ -59,6 +59,32 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 - The editor window displays the installed package version from Package Manager/package.json.
 - Runtime SDK version constants are synchronized from `package.json` by `Tools/PlayServ/Internal/Sync SDK Version From package.json`.
 
+## Migrating legacy module APIs
+
+SDK versions that predate the module-specific facades exposed optional
+functionality through `PlayServ.*`. Open:
+
+`Tools > PlayServ > Migrate Project`
+
+The migration window scans project scripts under `Assets`, previews every
+syntax-level replacement, and lets you apply all or only selected changes.
+Generated scripts, comments, string literals, package source, and unrelated
+types named `PlayServ` are not modified.
+
+Typical replacements include:
+
+```csharp
+PlayServ.Invoke(...)       -> PlayServRpc.Invoke(...)
+PlayServ.Subscribe<T>()    -> PlayServEvents.Subscribe<T>()
+PlayServ.Spawn(...)        -> PlayServSpawn.Spawn(...)
+PlayServ.SelectEntity(...) -> PlayServData.SelectEntity(...)
+```
+
+Before changing a script, the tool verifies that it still matches the scanned
+version. Originals are backed up under `Library/PlayServ/ApiMigrationBackups`,
+and the latest Markdown report is written to
+`Library/PlayServ/Reports/PlayServApiMigrationReport.md`.
+
 ## Server SDK
 
 Server/shared runtime build instructions are documented in

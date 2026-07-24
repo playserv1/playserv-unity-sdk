@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Playserv.Editor.Core",
+        "Playserv.Editor.Migration",
         "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [

@@ -8,6 +8,10 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Added
 
+- Added `Tools > PlayServ > Migrate Project`, a Roslyn-based preview and
+  migration tool for replacing removed `PlayServ.*` optional APIs with their
+  module-specific facades. Applying changes creates project-local backups and a
+  Markdown migration report.
 - Added outbound packet diagnostics with per-packet `[PKT-OUT]` names,
   once-per-second WebSocket packet counts, and `[RESP-WIRE]` timing around
   Respawn socket writes.
