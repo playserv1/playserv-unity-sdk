@@ -14,6 +14,10 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
   tokens and rejects `Bearer sk_*` before player connections.
 ### Added
 
+- Added typed awaitable RPC through
+  `PlayServRpc.InvokeAsync<TRequest, TResponse>`, including client request IDs,
+  configurable timeout, cancellation, structured errors, typed JSON response
+  deserialization, and compatibility correlation for older gateways.
 - Added `Tools > PlayServ > Migrate Project`, a Roslyn-based preview and
   migration tool for replacing removed `PlayServ.*` optional APIs with their
   module-specific facades. Applying changes creates project-local backups and a
@@ -46,6 +50,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ### Changed
 
+- Made built-in `module.playserv.json` descriptors the single source of truth
+  and replaced the hand-maintained runtime fallback with a deterministic,
+  committed `PlayServBuiltInModuleManifest.g.cs` plus CI drift verification.
 - Replaced fire-and-forget `async void` spawn timeout and keepalive reply
   handlers with tracked tasks that are cancelled with their module or
   connection lifetime.
