@@ -6,7 +6,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
-## [0.3.2] - 2026-07-25
+## [0.3.3] - 2026-07-25
 
 - Added the optional `com.playserv.schema-tool` companion package, delivered by
   UPM and executed as an external process through Unity's bundled .NET runtime.
@@ -17,6 +17,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
   and `doctor` CLI commands plus a project-local Rider/IDE launcher.
 - Added Schema Tool install/remove, analysis, generation, validation, and
   watcher controls to the main SDK window.
+
+## [0.3.2] - 2026-07-25
+
 - Added an optional provider-based Analytics module with typed event parameters,
   explicit user properties, PlayServ user/session/app context, bounded
   in-memory queueing, batched delivery, reconnect flushing, and collection
