@@ -11,6 +11,7 @@ namespace Playserv.Proxy.Logging
         Rpc,
         Spawn,
         Events,
-        Data
+        Data,
+        Analytics
     }
 }

@@ -2,7 +2,7 @@
 
 PlayServ is a modular multiplayer SDK for Unity. The core package provides
 runtime connection management, data subscriptions, typed events, RPC, spawning,
-and the built-in WebSocket, UDP, and RUDP transports.
+gameplay analytics, and the built-in WebSocket, UDP, and RUDP transports.
 
 ## Requirements
 
@@ -99,6 +99,31 @@ Editor storage.
 Optional modules are enabled per project and stored in
 `ProjectSettings/PlayServModules.json`.
 
+## Analytics
+
+Enable `Analytics` in `Tools` -> `PlayServ` -> `Settings` ->
+`SDK module settings`, connect PlayServ, and track explicit gameplay events:
+
+```csharp
+using System.Collections.Generic;
+using Playserv.Wrapper;
+
+PlayServAnalytics.SetUserProperty("role", "parent");
+PlayServAnalytics.Track(
+    "login_sso_success",
+    new Dictionary<string, object>
+    {
+        { "provider", "google" },
+        { "attempt", 1 },
+        { "new_user", true }
+    });
+```
+
+Events are queued in memory, enriched with PlayServ user/session/app context,
+and sent in bounded batches. The default provider requires a backend handler for
+`module_analytics.TrackAnalyticsBatch`; applications can install a custom
+`IPlayServAnalyticsProvider` while PlayServ ingestion is being deployed.
+
 ## Samples
 
 Select PlayServ SDK in Package Manager and import **PlayServ SDK Examples**.
@@ -109,6 +134,7 @@ scenes without compiling example code into projects that do not import it.
 
 - [Complete Unity SDK guide](Documentation~/playserv-sdk.md)
 - [Server/shared runtime guide](Documentation~/server-sdk.md)
+- [Analytics setup](Documentation~/playserv-sdk.md#analytics-module)
 - [Apple Sign In setup](Documentation~/playserv-sdk.md#apple-sign-in-module)
 - [Google Sign In setup](Documentation~/playserv-sdk.md#google-sign-in-module)
 - [Changelog](CHANGELOG.md)

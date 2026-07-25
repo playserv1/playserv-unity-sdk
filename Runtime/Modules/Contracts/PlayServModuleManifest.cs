@@ -14,6 +14,7 @@ namespace Playserv.Modules
         public const string ServerId = "server";
         public const string SpawnId = "spawn";
         public const string PulseId = "pulse";
+        public const string AnalyticsId = "analytics";
         public const string AppleSignInId = "apple-sign-in";
         public const string GoogleSignInId = "google-sign-in";
         public const string TransportWebSocketId = "transport-websocket";
@@ -29,6 +30,7 @@ namespace Playserv.Modules
         public const string DefineDisableClientExecution = "PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION";
         public const string DefineDisableSpawn = "PLAYSERV_MODULE_DISABLED_SPAWN";
         public const string DefineDisablePulse = "PLAYSERV_MODULE_DISABLED_PULSE";
+        public const string DefineDisableAnalytics = "PLAYSERV_MODULE_DISABLED_ANALYTICS";
         public const string DefineDisableAppleSignIn = "PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN";
         public const string DefineDisableGoogleSignIn = "PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN";
         public const string DefineDisableTransportWebSocket = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET";

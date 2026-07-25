@@ -54,6 +54,33 @@ namespace Playserv.Tests.Editor
         }
 
         [Test]
+        public void Reload_DiscoversBuiltInAnalyticsDescriptor()
+        {
+            PlayServModuleManifestJsonRegistry.Reload();
+
+            Assert.That(
+                PlayServModuleManifest.TryGet(
+                    PlayServModuleManifest.AnalyticsId,
+                    out var analytics),
+                Is.True);
+            Assert.That(analytics.DefaultEnabled, Is.True);
+            Assert.That(
+                analytics.DependencyIds,
+                Is.EqualTo(new[] { PlayServModuleManifest.ClientExecutionId }));
+            Assert.That(
+                analytics.ProfileIds,
+                Is.EqualTo(new[]
+                {
+                    PlayServSdkProfiles.ClientSdkId,
+                    PlayServSdkProfiles.FullSdkId
+                }));
+            Assert.That(analytics.Capabilities, Contains.Item("analytics.events"));
+            Assert.That(
+                analytics.RootAssemblyReference,
+                Is.EqualTo("Playserv.Runtime.Modules.Analytics"));
+        }
+
+        [Test]
         public void Reload_DiscoversAndNormalizesExternalDescriptor()
         {
             var absolutePath = Path.Combine(

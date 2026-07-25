@@ -4,6 +4,7 @@ This document contains practical examples for the public runtime API exposed by:
 - `Playserv.Wrapper.PlayServ`
 - `Playserv.Wrapper.PlayServData`
 - `Playserv.Wrapper.PlayServEvents`
+- `Playserv.Wrapper.PlayServAnalytics`
 - `Playserv.Wrapper.PlayServRpc`
 - `Playserv.Wrapper.PlayServSpawn`
 - `Playserv.Wrapper.PlayServServerRpc`
@@ -45,7 +46,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.3.1"
+    "com.playserv.sdk": "0.3.2"
   }
 }
 ```
@@ -324,6 +325,146 @@ The current package cache and unrelated Unity caches are preserved. Use
 manually. Use `Rebuild Project Library...` only when Unity's broader cache is
 corrupted; it requires confirmation, closes Unity, deletes `Library`, and
 reopens the project.
+
+## Analytics module
+
+The optional built-in Analytics module records explicit gameplay events without
+Firebase or another analytics SDK. Enable `Analytics` in
+`Tools > PlayServ > Settings > SDK module settings`. It depends on
+`Client Execution` and is included in the client and full SDK profiles.
+
+Track events after `PlayServ.Connect()` succeeds:
+
+```csharp
+using System.Collections.Generic;
+using Playserv.Wrapper;
+
+PlayServAnalytics.SetUserProperty("role", "parent");
+PlayServAnalytics.Track("auto_login");
+PlayServAnalytics.Track("login_sso_success", "provider", "google");
+PlayServAnalytics.Track(
+    "match_finished",
+    new Dictionary<string, object>
+    {
+        { "mode", "duo" },
+        { "duration_seconds", 92.5f },
+        { "score", 1250 },
+        { "won", true }
+    });
+```
+
+Supported parameter values are strings, booleans, integer numeric types, and
+finite floating-point or decimal numbers. An event can contain up to 50
+parameters. Event names are limited to 128 characters; parameter and user
+property keys are limited to 64 characters.
+
+Each event receives:
+
+- a unique event ID and monotonically increasing session sequence;
+- UTC timestamp;
+- PlayServ user ID, or an explicit ID set with `SetUserId`;
+- a per-connection-module session ID;
+- SDK version, application version, and Unity platform;
+- a snapshot of the current user properties.
+
+Use an explicit user ID only when it is the same verified identity used by the
+PlayServ connection:
+
+```csharp
+PlayServAnalytics.SetUserId(playerId);
+PlayServAnalytics.SetUserProperty("subscription", "premium");
+PlayServAnalytics.RemoveUserProperty("subscription");
+PlayServAnalytics.ClearUserProperties();
+```
+
+### Queue and delivery
+
+The client keeps at most 500 events in memory, sends batches of up to 20, and
+attempts a flush every 10 seconds, when a batch fills, and after reconnect.
+Failed batches remain queued for a later attempt. When the queue is full, the
+oldest event is dropped and a warning is logged.
+
+Use `FlushAsync` before a controlled logout or scene/application shutdown:
+
+```csharp
+await PlayServAnalytics.FlushAsync(cancellationToken);
+```
+
+The queue is currently memory-only. A process crash or forced application exit
+can therefore lose pending events. Durable disk-backed delivery can be added
+later without changing the public tracking API.
+
+Collection can be disabled for consent or privacy settings:
+
+```csharp
+PlayServAnalytics.SetCollectionEnabled(false);
+```
+
+Disabling collection immediately clears pending events and ignores new events
+until it is enabled again. The module does not automatically collect device
+identifiers, advertising IDs, email addresses, or arbitrary object fields.
+
+### Migrating eggie-crush from Firebase Analytics
+
+The existing eggie-crush `AnalyticService` maps directly:
+
+```csharp
+// Firebase wrapper
+analyticService.SentEvent("auto_login");
+analyticService.SentEvent("login_sso_success", "provider", providerName);
+
+// PlayServ
+PlayServAnalytics.Track("auto_login");
+PlayServAnalytics.Track("login_sso_success", "provider", providerName);
+```
+
+Dictionary calls use the same string/object shape, but unsupported values now
+fail early instead of being silently ignored:
+
+```csharp
+PlayServAnalytics.Track(eventName, eventParameters);
+```
+
+Remove the Firebase Analytics package only after all direct
+`FirebaseAnalytics.LogEvent` calls have been migrated and the PlayServ backend
+handler is available.
+
+### Provider and backend contract
+
+By default, the module sends the serializable `PlayServAnalyticsBatch` command
+as `TrackAnalyticsBatch` to `module_analytics`. The PlayServ backend still needs
+an ingestion handler that authenticates the session, validates and
+deduplicates `EventId`, stores events, and exposes reporting or export.
+
+Until that handler is deployed, route events to another destination by
+implementing `IPlayServAnalyticsProvider`:
+
+```csharp
+using System.Threading;
+using System.Threading.Tasks;
+using Playserv.Analytics;
+
+public sealed class ProjectAnalyticsProvider : IPlayServAnalyticsProvider
+{
+    public bool IsReady => true;
+
+    public Task SendAsync(
+        PlayServAnalyticsBatch batch,
+        CancellationToken cancellationToken = default)
+    {
+        return analyticsApi.SendAsync(batch, cancellationToken);
+    }
+}
+```
+
+Install it after the PlayServ connection creates module services:
+
+```csharp
+PlayServAnalytics.SetProvider(new ProjectAnalyticsProvider());
+```
+
+Provider failures are propagated by manual `FlushAsync` calls and logged by
+background flushes. In both cases the unsent events remain queued.
 
 ## Apple Sign In module
 

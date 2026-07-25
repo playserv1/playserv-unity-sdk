@@ -1,0 +1,20 @@
+{
+    "name": "Playserv.Runtime.Modules.Analytics",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Abstractions"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_ANALYTICS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

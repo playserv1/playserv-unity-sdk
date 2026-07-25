@@ -6,6 +6,19 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-25
+
+- Added an optional provider-based Analytics module with typed event parameters,
+  explicit user properties, PlayServ user/session/app context, bounded
+  in-memory queueing, batched delivery, reconnect flushing, and collection
+  consent controls.
+- Added the `PlayServAnalytics` facade, replaceable
+  `IPlayServAnalyticsProvider`, and the default
+  `module_analytics.TrackAnalyticsBatch` transport contract.
+- Added Analytics runtime tests for typed batches, queue overflow, failed-send
+  retention, collection disabling, custom providers, and unsupported values.
+- Documented migration from the Firebase-backed eggie-crush analytics wrapper
+  and the remaining PlayServ backend ingestion requirements.
 - Split Apple Sign In, Google Sign In, and WebRTC into standalone companion UPM
   packages under `CompanionPackages~`; the core package no longer imports their
   runtime, editor, test, native, or WebGL plugin assets.

@@ -1,0 +1,22 @@
+{
+    "name": "Playserv.Tests.Runtime.Analytics",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.Analytics",
+        "Playserv.Runtime.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_ANALYTICS"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

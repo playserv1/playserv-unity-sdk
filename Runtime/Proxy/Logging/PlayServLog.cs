@@ -14,6 +14,7 @@ namespace Playserv.Proxy.Logging
         private static readonly ILogger SpawnLogger = new ConsoleLogger(PlayServLogCategory.Spawn);
         private static readonly ILogger EventsLogger = new ConsoleLogger(PlayServLogCategory.Events);
         private static readonly ILogger DataLogger = new ConsoleLogger(PlayServLogCategory.Data);
+        private static readonly ILogger AnalyticsLogger = new ConsoleLogger(PlayServLogCategory.Analytics);
 
         public static ILogger ForCategory(PlayServLogCategory category)
         {
@@ -31,6 +32,8 @@ namespace Playserv.Proxy.Logging
                     return EventsLogger;
                 case PlayServLogCategory.Data:
                     return DataLogger;
+                case PlayServLogCategory.Analytics:
+                    return AnalyticsLogger;
                 default:
                     return GeneralLogger;
             }

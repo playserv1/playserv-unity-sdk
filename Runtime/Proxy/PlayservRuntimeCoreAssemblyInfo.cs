@@ -10,4 +10,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Playserv.Runtime.Transport.Udp")]
 [assembly: InternalsVisibleTo("Playserv.Runtime.Transport.Rudp")]
 [assembly: InternalsVisibleTo("Playserv.Runtime.Transport.WebRtc")]
+[assembly: InternalsVisibleTo("Playserv.Runtime.Modules.Analytics")]
 [assembly: InternalsVisibleTo("Playserv.Tests.Runtime")]
