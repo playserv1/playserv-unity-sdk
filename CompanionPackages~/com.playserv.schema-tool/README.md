@@ -4,6 +4,11 @@ External schema analysis and generation companion for `com.playserv.sdk`.
 Unity downloads the tool through UPM, but runs it as a separate process on the
 Unity-bundled .NET runtime.
 
+The shipped tool supports Unity 2021.3 through Unity 6.6 on macOS, Windows, and
+Linux. It targets .NET 6, used by older supported editors, and permits runtime
+roll-forward to the .NET 8 host bundled with Unity 6.x. No system-wide .NET
+installation is required to use the published tool.
+
 The package provides:
 
 - `init`, `status`, `analyze`, `generate`, `validate`, `sync`, `watch`, and
@@ -30,6 +35,11 @@ then run:
 Tools~/SchemaTool/build.sh
 ```
 
-Set `DOTNET` to an explicit SDK executable when necessary. The resulting
-framework-dependent assembly is launched with the .NET runtime bundled in the
-active Unity editor.
+Set `DOTNET` to an explicit SDK executable when necessary. When building with a
+newer SDK, set `PLAYSERV_ROSLYN_PATH` to a Roslyn directory compatible with the
+.NET 6 target, for example Unity 2021.3's `DotNetSdkRoslyn` directory. This is a
+maintainer-only build input; consuming projects use the Roslyn assemblies and
+tool binary already published in the package.
+
+The resulting framework-dependent assembly is launched with the .NET runtime
+bundled in the active Unity editor.

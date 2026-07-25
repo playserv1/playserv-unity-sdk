@@ -7,9 +7,17 @@ OUTPUT="$SCRIPT_DIR/runtime"
 
 : "${DOTNET:=dotnet}"
 
-"$DOTNET" publish "$SOURCE" \
-  --configuration Release \
-  --no-self-contained \
-  --output "$OUTPUT"
+if [ -n "${PLAYSERV_ROSLYN_PATH:-}" ]; then
+  "$DOTNET" publish "$SOURCE" \
+    --configuration Release \
+    --no-self-contained \
+    --output "$OUTPUT" \
+    -p:PlayServRoslynPath="$PLAYSERV_ROSLYN_PATH"
+else
+  "$DOTNET" publish "$SOURCE" \
+    --configuration Release \
+    --no-self-contained \
+    --output "$OUTPUT"
+fi
 
 echo "PlayServ Schema Tool published to $OUTPUT"

@@ -309,16 +309,21 @@ namespace Playserv.Editor
 
         internal static string ResolveBundledDotNet()
         {
-            var contents = EditorApplication.applicationContentsPath;
-            var fileName = Application.platform == RuntimePlatform.WindowsEditor
+            return ResolveBundledDotNet(
+                EditorApplication.applicationContentsPath,
+                Application.platform);
+        }
+
+        internal static string ResolveBundledDotNet(
+            string applicationContentsPath,
+            RuntimePlatform platform)
+        {
+            var fileName = platform == RuntimePlatform.WindowsEditor
                 ? "dotnet.exe"
                 : "dotnet";
-            var candidates = new[]
-            {
-                Path.Combine(contents, "NetCoreRuntime", fileName),
-                Path.Combine(contents, "Resources", "Scripting", "NetCoreRuntime", fileName),
-                Path.Combine(contents, "Resources", "Scripting", "DotNetSdk", fileName)
-            };
+            var candidates = BuildBundledDotNetCandidates(
+                applicationContentsPath,
+                fileName);
             foreach (var candidate in candidates)
             {
                 if (File.Exists(candidate))
@@ -326,6 +331,19 @@ namespace Playserv.Editor
             }
 
             return string.Empty;
+        }
+
+        internal static string[] BuildBundledDotNetCandidates(
+            string applicationContentsPath,
+            string fileName)
+        {
+            var contents = applicationContentsPath ?? string.Empty;
+            return new[]
+            {
+                Path.Combine(contents, "NetCoreRuntime", fileName),
+                Path.Combine(contents, "Resources", "Scripting", "NetCoreRuntime", fileName),
+                Path.Combine(contents, "Resources", "Scripting", "DotNetSdk", fileName)
+            };
         }
 
         internal static string ResolveToolPath(PackageManagerPackageInfo packageInfo)

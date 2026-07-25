@@ -3,7 +3,9 @@ using System.IO;
 using NUnit.Framework;
 using Playserv.Editor;
 using Playserv.Schema;
-using UnityEditor.PackageManager;
+using UnityEditor;
+using UnityEngine;
+using PackageManagerPackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace Playserv.Tests.Editor
 {
@@ -47,10 +49,10 @@ namespace Playserv.Tests.Editor
             var dotnetPath = PlayServSchemaToolRunner.ResolveBundledDotNet();
             Assert.That(File.Exists(dotnetPath), Is.True, dotnetPath);
 
-            var corePackage = PackageInfo.FindForAssetPath(
+            var corePackage = PackageManagerPackageInfo.FindForAssetPath(
                 "Packages/com.playserv.sdk/package.json");
             Assert.That(corePackage, Is.Not.Null);
-            var companionPackage = PackageInfo.FindForAssetPath(
+            var companionPackage = PackageManagerPackageInfo.FindForAssetPath(
                 "Packages/com.playserv.schema-tool/package.json");
             var toolPath = companionPackage != null
                 ? Path.Combine(
@@ -81,9 +83,45 @@ namespace Playserv.Tests.Editor
                 var error = process.StandardError.ReadToEnd();
                 Assert.That(process.WaitForExit(15000), Is.True, "Schema Tool timed out.");
                 Assert.That(process.ExitCode, Is.EqualTo(0), error);
-                StringAssert.Contains("\"version\": \"0.3.3\"", output);
+                StringAssert.Contains("\"version\": \"0.3.4\"", output);
                 StringAssert.Contains("\"protocolVersion\": 1", output);
             }
+        }
+
+        [Test]
+        public void BundledDotNetCandidates_CoverUnity2021ThroughUnity66Layouts()
+        {
+            var macCandidates = PlayServSchemaToolRunner.BuildBundledDotNetCandidates(
+                "/Applications/Unity/Unity.app/Contents",
+                "dotnet");
+            CollectionAssert.Contains(
+                macCandidates,
+                "/Applications/Unity/Unity.app/Contents/NetCoreRuntime/dotnet");
+            CollectionAssert.Contains(
+                macCandidates,
+                "/Applications/Unity/Unity.app/Contents/Resources/Scripting/NetCoreRuntime/dotnet");
+
+            var windowsCandidates = PlayServSchemaToolRunner.BuildBundledDotNetCandidates(
+                @"C:\Unity\Editor\Data",
+                "dotnet.exe");
+            Assert.That(
+                windowsCandidates,
+                Has.Some.EndsWith(
+                    Path.Combine("NetCoreRuntime", "dotnet.exe")));
+            Assert.That(
+                windowsCandidates,
+                Has.Some.EndsWith(
+                    Path.Combine(
+                        "Resources",
+                        "Scripting",
+                        "NetCoreRuntime",
+                        "dotnet.exe")));
+
+            Assert.That(
+                PlayServSchemaToolRunner.ResolveBundledDotNet(
+                    EditorApplication.applicationContentsPath,
+                    Application.platform),
+                Is.EqualTo(PlayServSchemaToolRunner.ResolveBundledDotNet()));
         }
     }
 }

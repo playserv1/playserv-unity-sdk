@@ -208,13 +208,6 @@ namespace Playserv.Editor
                         package.PackageId,
                         out var packageInfo);
                     var busy = PlayServCompanionPackageManager.IsBusyFor(package.PackageId);
-                    var moduleAvailable =
-                        installed &&
-                        PlayServModuleManifest.TryGet(package.ModuleId, out var module) &&
-                        PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module);
-                    var enabled =
-                        moduleAvailable &&
-                        settings.IsRuntimeModuleEnabled(package.ModuleId);
 
                     using (new EditorGUILayout.HorizontalScope())
                     {
@@ -250,32 +243,73 @@ namespace Playserv.Editor
                     GUILayout.Space(6f);
                     if (installed)
                     {
-                        var canChange =
-                            moduleAvailable &&
-                            settings.CanChangeRuntimeModule(package.ModuleId);
                         var canRemove =
                             PlayServCompanionPackageManager.CanRemove(
                                 package,
                                 settings,
                                 out var removeBlockReason);
 
-                        using (new EditorGUILayout.HorizontalScope())
+                        for (var i = 0; i < package.ModuleIds.Count; i++)
                         {
-                            bool nextEnabled;
-                            using (new EditorGUI.DisabledScope(
-                                       PlayServCompanionPackageManager.IsBusy ||
-                                       EditorApplication.isCompiling ||
-                                       EditorApplication.isUpdating ||
-                                       !canChange))
+                            var moduleId = package.ModuleIds[i];
+                            var moduleAvailable =
+                                PlayServModuleManifest.TryGet(moduleId, out var module) &&
+                                PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module);
+                            var enabled =
+                                moduleAvailable &&
+                                settings.IsRuntimeModuleEnabled(moduleId);
+                            var canChange =
+                                moduleAvailable &&
+                                settings.CanChangeRuntimeModule(moduleId);
+                            var moduleLabel = moduleAvailable
+                                ? module.Label
+                                : moduleId;
+
+                            using (new EditorGUILayout.HorizontalScope())
                             {
-                                nextEnabled = EditorGUILayout.ToggleLeft(
-                                    enabled ? "Enabled" : "Disabled",
-                                    enabled,
-                                    GUILayout.Width(96f));
+                                bool nextEnabled;
+                                using (new EditorGUI.DisabledScope(
+                                           PlayServCompanionPackageManager.IsBusy ||
+                                           EditorApplication.isCompiling ||
+                                           EditorApplication.isUpdating ||
+                                           !canChange))
+                                {
+                                    nextEnabled = EditorGUILayout.ToggleLeft(
+                                        $"{moduleLabel}: {(enabled ? "Enabled" : "Disabled")}",
+                                        enabled);
+                                }
+
+                                if (nextEnabled != enabled)
+                                    changed |= settings.SetRuntimeModuleEnabled(
+                                        moduleId,
+                                        nextEnabled);
                             }
 
-                            GUILayout.FlexibleSpace();
+                            if (!moduleAvailable)
+                            {
+                                GUILayout.Space(4f);
+                                GUILayout.Label(
+                                    $"Waiting for Unity to import the {moduleLabel} module descriptor.",
+                                    PlayServWindowTheme.SectionSubtitleStyle);
+                            }
+                            else if (!canChange)
+                            {
+                                var blockReason =
+                                    settings.GetRuntimeModuleBlockReason(moduleId);
+                                if (!string.IsNullOrWhiteSpace(blockReason))
+                                {
+                                    GUILayout.Space(4f);
+                                    GUILayout.Label(
+                                        blockReason,
+                                        PlayServWindowTheme.SectionSubtitleStyle);
+                                }
+                            }
+                        }
 
+                        GUILayout.Space(4f);
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            GUILayout.FlexibleSpace();
                             using (new EditorGUI.DisabledScope(!canRemove))
                             {
                                 if (PlayServWindowChrome.DrawActionButton(
@@ -295,37 +329,11 @@ namespace Playserv.Editor
                                         "OK");
                                 }
                             }
-
-                            if (nextEnabled != enabled)
-                                changed |= settings.SetRuntimeModuleEnabled(
-                                    package.ModuleId,
-                                    nextEnabled);
-                        }
-
-                        if (!moduleAvailable)
-                        {
-                            GUILayout.Space(4f);
-                            GUILayout.Label(
-                                "Waiting for Unity to import the module descriptor.",
-                                PlayServWindowTheme.SectionSubtitleStyle);
-                        }
-                        else if (!canChange)
-                        {
-                            var blockReason =
-                                settings.GetRuntimeModuleBlockReason(package.ModuleId);
-                            if (!string.IsNullOrWhiteSpace(blockReason))
-                            {
-                                GUILayout.Space(4f);
-                                GUILayout.Label(
-                                    blockReason,
-                                    PlayServWindowTheme.SectionSubtitleStyle);
-                            }
                         }
 
                         if (!canRemove &&
                             !string.IsNullOrWhiteSpace(removeBlockReason) &&
-                            packageInfo.isDirectDependency &&
-                            (canChange || !moduleAvailable))
+                            packageInfo.isDirectDependency)
                         {
                             GUILayout.Space(4f);
                             GUILayout.Label(

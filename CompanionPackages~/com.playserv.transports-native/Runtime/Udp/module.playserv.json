@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "transport-rudp",
-  "order": 120,
-  "label": "RUDP",
-  "description": "Reliable UDP protocol implementation for native/editor builds.",
-  "minSdkVersion": "0.3.0",
+  "id": "transport-udp",
+  "order": 110,
+  "label": "UDP",
+  "description": "UDP protocol implementation for native/editor builds.",
+  "minSdkVersion": "0.3.4",
   "supportedPlatforms": [
     "Editor",
     "Standalone",
@@ -13,16 +13,18 @@
   ],
   "conflictsWith": [],
   "capabilities": [
-    "transport.rudp"
+    "transport.udp"
   ],
-  "requiresPackages": [],
-  "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP",
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP",
   "defaultEnabled": true,
   "isServerModule": false,
   "visibleInSettings": true,
   "visibleInExport": true,
   "assetPaths": [
-    "Runtime/Proxy/Modules/Rudp"
+    "Runtime/Udp"
   ],
   "dependencyIds": [
     "client-execution"
@@ -30,8 +32,7 @@
   "hiddenDependencyAssetPaths": [],
   "hiddenDependencyModuleIds": [],
   "profiles": [
-    "client-sdk",
     "full-sdk"
   ],
-  "rootAssemblyReference": "Playserv.Runtime.Transport.Rudp"
+  "rootAssemblyReference": "Playserv.Runtime.Transport.Udp"
 }

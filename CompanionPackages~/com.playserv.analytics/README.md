@@ -1,0 +1,32 @@
+# PlayServ Analytics
+
+Optional provider-based gameplay analytics for `com.playserv.sdk`. The package
+collects typed events, user and session context, bounded batches, and sends them
+through the PlayServ command transport. It does not depend on Firebase.
+
+## Install
+
+Install this package from `Tools > PlayServ > Settings > SDK module settings`,
+or add it beside the core SDK in `Packages/manifest.json`:
+
+```json
+{
+  "dependencies": {
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#<tag-or-commit>",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#<tag-or-commit>"
+  }
+}
+```
+
+Git installations must use the same tag or commit for both packages.
+
+## Use
+
+1. Open the PlayServ SDK module settings and enable `Analytics`.
+2. Connect the PlayServ client.
+3. Record an event with `PlayServAnalytics.Track(...)`.
+4. Await `PlayServAnalytics.FlushAsync(...)` before a controlled shutdown when
+   delivery of the current batch matters.
+
+Applications can replace the default command provider through
+`PlayServAnalytics.SetProvider(...)`.

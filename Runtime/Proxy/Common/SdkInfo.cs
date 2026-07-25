@@ -8,6 +8,6 @@ namespace Playserv.Proxy.Common
         /// <summary>
         /// Current SDK version.
         /// </summary>
-        public const string Version = "0.3.3";
+        public const string Version = "0.3.4";
     }
 }

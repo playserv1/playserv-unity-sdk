@@ -28,15 +28,7 @@ namespace Playserv.Editor
             new TransportFolderExpectation(
                 PlayServModuleManifest.TransportWebSocketId,
                 "Runtime/Proxy/Modules/WebSocket",
-                "Playserv.Runtime.Transport.WebSocket"),
-            new TransportFolderExpectation(
-                PlayServModuleManifest.TransportUdpId,
-                "Runtime/Proxy/Modules/Udp",
-                "Playserv.Runtime.Transport.Udp"),
-            new TransportFolderExpectation(
-                PlayServModuleManifest.TransportRudpId,
-                "Runtime/Proxy/Modules/Rudp",
-                "Playserv.Runtime.Transport.Rudp")
+                "Playserv.Runtime.Transport.WebSocket")
         };
 
         private static readonly ModuleExpectation[] Expectations =
@@ -72,11 +64,6 @@ namespace Playserv.Editor
                 new[] { "PlayServSpawn", "INetworkPrefabRegistry" },
                 new[] { "PlayServSpawnModule" }),
             new ModuleExpectation(
-                PlayServModuleManifest.PulseId,
-                "Playserv.Runtime.Modules.Pulse",
-                Array.Empty<string>(),
-                new[] { "PlayServPulseModule" }),
-            new ModuleExpectation(
                 PlayServModuleManifest.AppleSignInId,
                 "Playserv.Runtime.Modules.AppleSignIn",
                 Array.Empty<string>(),
@@ -89,16 +76,6 @@ namespace Playserv.Editor
             new ModuleExpectation(
                 PlayServModuleManifest.TransportWebSocketId,
                 "Playserv.Runtime.Transport.WebSocket",
-                Array.Empty<string>(),
-                Array.Empty<string>()),
-            new ModuleExpectation(
-                PlayServModuleManifest.TransportUdpId,
-                "Playserv.Runtime.Transport.Udp",
-                Array.Empty<string>(),
-                Array.Empty<string>()),
-            new ModuleExpectation(
-                PlayServModuleManifest.TransportRudpId,
-                "Playserv.Runtime.Transport.Rudp",
                 Array.Empty<string>(),
                 Array.Empty<string>()),
             new ModuleExpectation(

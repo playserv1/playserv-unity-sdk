@@ -12,19 +12,26 @@ namespace Playserv.Tests.Editor
         public void Catalog_UsesUniquePackageAndModuleIds()
         {
             var packages = PlayServCompanionPackageCatalog.All;
+            var moduleIds = packages
+                .SelectMany(package => package.ModuleIds)
+                .ToArray();
 
-            Assert.That(packages.Count, Is.EqualTo(3));
+            Assert.That(packages.Count, Is.EqualTo(6));
             Assert.That(
                 packages.Select(package => package.PackageId).Distinct().Count(),
                 Is.EqualTo(packages.Count));
             Assert.That(
-                packages.Select(package => package.ModuleId).Distinct().Count(),
-                Is.EqualTo(packages.Count));
+                moduleIds.Distinct().Count(),
+                Is.EqualTo(moduleIds.Length));
         }
 
         [TestCase("com.playserv.apple-signin", "apple-sign-in")]
         [TestCase("com.playserv.google-signin", "google-sign-in")]
         [TestCase("com.playserv.webrtc", "transport-webrtc")]
+        [TestCase("com.playserv.analytics", "analytics")]
+        [TestCase("com.playserv.pulse", "pulse")]
+        [TestCase("com.playserv.transports-native", "transport-udp")]
+        [TestCase("com.playserv.transports-native", "transport-rudp")]
         public void GeneratedCatalog_MapsPackageAndModuleIds(
             string packageId,
             string moduleId)
@@ -34,7 +41,7 @@ namespace Playserv.Tests.Editor
                     packageId,
                     out var package),
                 Is.True);
-            Assert.That(package.ModuleId, Is.EqualTo(moduleId));
+            Assert.That(package.ModuleIds, Contains.Item(moduleId));
             Assert.That(
                 PlayServCompanionPackageCatalog.TryGetByModuleId(
                     moduleId,
@@ -66,7 +73,11 @@ namespace Playserv.Tests.Editor
         [Test]
         public void BuildRegistryReference_UsesExactCoreVersion()
         {
-            var package = PlayServCompanionPackageCatalog.All[2];
+            Assert.That(
+                PlayServCompanionPackageCatalog.TryGetByPackageId(
+                    "com.playserv.webrtc",
+                    out var package),
+                Is.True);
 
             var result = PlayServCompanionPackageManager.BuildRegistryReference(
                 package.PackageId,
@@ -139,6 +150,31 @@ namespace Playserv.Tests.Editor
                 if (Directory.Exists(root))
                     Directory.Delete(root, recursive: true);
             }
+        }
+
+        [Test]
+        public void Validator_IgnoresCompanionSourcesHiddenInsideCorePackage()
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "playserv-core-package");
+            var hiddenAsmdef = Path.Combine(
+                root,
+                "CompanionPackages~",
+                "com.playserv.analytics",
+                "Runtime",
+                "Playserv.Runtime.Modules.Analytics.asmdef");
+            var runtimeAsmdef = Path.Combine(
+                root,
+                "Runtime",
+                "Playserv.Runtime.asmdef");
+
+            Assert.That(
+                PlayServModuleValidator.IsHiddenUpmSourcePath(root, hiddenAsmdef),
+                Is.True);
+            Assert.That(
+                PlayServModuleValidator.IsHiddenUpmSourcePath(root, runtimeAsmdef),
+                Is.False);
         }
     }
 }

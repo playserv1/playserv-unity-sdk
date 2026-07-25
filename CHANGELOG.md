@@ -6,6 +6,26 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-07-25
+
+- Extracted Analytics, Pulse, UDP, and RUDP from the core SDK into optional
+  companion UPM packages.
+- Added `com.playserv.analytics`, `com.playserv.pulse`, and
+  `com.playserv.transports-native`; the native transport package owns
+  independently configurable UDP and RUDP modules.
+- Extended the companion package catalog, settings UI, and removal lifecycle to
+  support multiple module IDs in one package.
+- Kept companion packages visible and installable from the main PlayServ SDK
+  module settings even when their code is not installed.
+- Reduced the Client SDK profile to core gameplay modules plus WebSocket.
+  Installed companion modules are enabled by the Full SDK profile or explicitly
+  by the project.
+- Changed the placeholder Pulse module to disabled by default.
+- Updated all PlayServ packages and the external Schema Tool to `0.3.4`.
+- Added explicit Schema Tool runtime discovery coverage for Unity 2021.3
+  through Unity 6.6 layouts and a build-time Roslyn override for producing the
+  shared .NET 6-compatible tool assembly with newer SDKs.
+
 ## [0.3.3] - 2026-07-25
 
 - Added the optional `com.playserv.schema-tool` companion package, delivered by

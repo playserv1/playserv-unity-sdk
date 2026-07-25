@@ -46,7 +46,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.3.3"
+    "com.playserv.sdk": "0.3.4"
   }
 }
 ```
@@ -201,7 +201,6 @@ and other developers use the same SDK profile and module set.
     "client-execution",
     "data-subscription",
     "events",
-    "pulse",
     "spawn",
     "transport-websocket"
   ],
@@ -212,6 +211,7 @@ and other developers use the same SDK profile and module set.
   ],
   "knownModuleIds": [
     "apple-sign-in",
+    "analytics",
     "client-execution",
     "client-rpc",
     "data-subscription",
@@ -290,30 +290,35 @@ composition assembly unless the game moves those types into its own asmdef.
 ## Companion package management
 
 Open `Tools > PlayServ > Settings > SDK module settings` to install or remove
-Apple Sign In, Google Sign In, and WebRTC through Unity Package Manager. Package
-state and module state are intentionally separate:
+Apple Sign In, Google Sign In, Analytics, Pulse, Native Transports, and WebRTC
+through Unity Package Manager. Package state and module state are intentionally
+separate:
 
 - `Install` adds the companion UPM package to the project.
 - `Installed` means the package code is present in the project.
-- The `Enabled`/`Disabled` checkbox controls whether its assembly is compiled.
-- `Remove Package` first disables the module, then removes the direct UPM
-  dependency.
+- Each `Enabled`/`Disabled` checkbox controls whether that module assembly is
+  compiled. A package may own more than one module; Native Transports owns
+  separate UDP and RUDP modules.
+- `Remove Package` first disables all modules owned by the package, then removes
+  the direct UPM dependency.
 
 Git-installed companions use the same repository commit as the installed core
 package. Local checkouts resolve companions from `CompanionPackages~`; scoped
 registry installations request the matching package version.
 
 The core package contains a committed generated companion catalog that maps each
-package id to its module id and Git subfolder. Package-backed module uninstall
-operations are routed through Unity Package Manager; the local asset deletion
-path is used only for modules imported under `Assets`.
+package id to one or more module ids and a Git subfolder. Package-backed module
+uninstall operations are routed through Unity Package Manager; the local asset
+deletion path is used only for modules imported under `Assets`.
 
 ## External Schema Tool
 
 `com.playserv.schema-tool` is delivered through Unity Package Manager but runs
 outside the Unity managed process. It uses Unity's bundled .NET runtime, so a
-developer does not need to install a system-wide .NET runtime. Unity 2021.3 and
-Unity 6 use the same shipped tool assembly.
+developer does not need to install a system-wide .NET runtime. The same shipped
+tool assembly supports every editor from Unity 2021.3 through Unity 6.6:
+Unity 2021-2023 use the .NET 6 target directly, while Unity 6.x rolls it forward
+to its bundled .NET 8 runtime.
 
 ### Install and initialize
 
@@ -484,10 +489,11 @@ reopens the project.
 
 ## Analytics module
 
-The optional built-in Analytics module records explicit gameplay events without
-Firebase or another analytics SDK. Enable `Analytics` in
-`Tools > PlayServ > Settings > SDK module settings`. It depends on
-`Client Execution` and is included in the client and full SDK profiles.
+The optional `com.playserv.analytics` companion package records explicit
+gameplay events without Firebase or another analytics SDK. Install and enable
+`Analytics` in `Tools > PlayServ > Settings > SDK module settings`. It depends
+on `Client Execution` and is enabled by the Full SDK profile or explicitly by
+the project.
 
 Track events after `PlayServ.Connect()` succeeds:
 

@@ -13,30 +13,47 @@ namespace Playserv.Editor
         {
             new PlayServCompanionPackageDefinition(
                 packageId: "com.playserv.apple-signin",
-                moduleId: "apple-sign-in",
+                moduleIds: new[] { "apple-sign-in" },
                 displayName: "Apple Sign In",
                 description: "Native iOS Sign in with Apple integration.",
                 gitPath: "CompanionPackages~/com.playserv.apple-signin"),
             new PlayServCompanionPackageDefinition(
                 packageId: "com.playserv.google-signin",
-                moduleId: "google-sign-in",
+                moduleIds: new[] { "google-sign-in" },
                 displayName: "Google Sign In",
                 description: "Google Sign-In provider integration without Firebase.",
                 gitPath: "CompanionPackages~/com.playserv.google-signin"),
             new PlayServCompanionPackageDefinition(
                 packageId: "com.playserv.webrtc",
-                moduleId: "transport-webrtc",
+                moduleIds: new[] { "transport-webrtc" },
                 displayName: "WebRTC",
                 description: "WebRTC data-channel transport and WebGL browser plugin.",
-                gitPath: "CompanionPackages~/com.playserv.webrtc")
+                gitPath: "CompanionPackages~/com.playserv.webrtc"),
+            new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.analytics",
+                moduleIds: new[] { "analytics" },
+                displayName: "Analytics",
+                description: "Provider-based gameplay analytics and PlayServ ingestion.",
+                gitPath: "CompanionPackages~/com.playserv.analytics"),
+            new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.pulse",
+                moduleIds: new[] { "pulse" },
+                displayName: "Pulse",
+                description: "Optional realtime configuration and feature flag surface.",
+                gitPath: "CompanionPackages~/com.playserv.pulse"),
+            new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.transports-native",
+                moduleIds: new[] { "transport-udp", "transport-rudp" },
+                displayName: "Native Transports",
+                description: "UDP and reliable UDP transports for native Unity players.",
+                gitPath: "CompanionPackages~/com.playserv.transports-native")
         };
 
         public static IReadOnlyList<PlayServCompanionPackageDefinition> All => Packages;
 
         public static bool IsCompanionModule(string moduleId)
         {
-            return Packages.Any(package =>
-                string.Equals(package.ModuleId, moduleId, StringComparison.Ordinal));
+            return Packages.Any(package => package.ContainsModule(moduleId));
         }
 
         public static bool TryGetByPackageId(
@@ -53,7 +70,7 @@ namespace Playserv.Editor
             out PlayServCompanionPackageDefinition package)
         {
             package = Packages.FirstOrDefault(candidate =>
-                string.Equals(candidate.ModuleId, moduleId, StringComparison.Ordinal));
+                candidate.ContainsModule(moduleId));
             return package != null;
         }
     }

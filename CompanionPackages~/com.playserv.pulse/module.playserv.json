@@ -4,7 +4,7 @@
   "order": 70,
   "label": "Pulse",
   "description": "Realtime config placeholder module and future feature flag surface.",
-  "minSdkVersion": "0.3.0",
+  "minSdkVersion": "0.3.4",
   "supportedPlatforms": [
     "Editor",
     "Standalone",
@@ -16,14 +16,16 @@
   "capabilities": [
     "config.realtime"
   ],
-  "requiresPackages": [],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_PULSE",
-  "defaultEnabled": true,
+  "defaultEnabled": false,
   "isServerModule": false,
   "visibleInSettings": true,
   "visibleInExport": true,
   "assetPaths": [
-    "Runtime/Modules/Pulse"
+    "Runtime"
   ],
   "dependencyIds": [
     "client-execution"
@@ -31,7 +33,6 @@
   "hiddenDependencyAssetPaths": [],
   "hiddenDependencyModuleIds": [],
   "profiles": [
-    "client-sdk",
     "full-sdk"
   ],
   "rootAssemblyReference": "Playserv.Runtime.Modules.Pulse"

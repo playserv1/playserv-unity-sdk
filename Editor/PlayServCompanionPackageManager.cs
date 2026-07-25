@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using Playserv.Modules;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
@@ -87,16 +90,35 @@ namespace Playserv.Editor
                 return false;
             }
 
-            if (settings == null || !settings.IsRuntimeModuleEnabled(package.ModuleId))
+            if (settings == null)
                 return true;
 
-            if (settings.CanChangeRuntimeModule(package.ModuleId))
-                return true;
+            var packageModuleIds = new HashSet<string>(
+                package.ModuleIds,
+                StringComparer.Ordinal);
+            foreach (var moduleId in package.ModuleIds)
+            {
+                if (!settings.IsRuntimeModuleEnabled(moduleId))
+                    continue;
 
-            reason = settings.GetRuntimeModuleBlockReason(package.ModuleId);
-            if (string.IsNullOrWhiteSpace(reason))
-                reason = "Disable dependent modules first.";
-            return false;
+                var externalDependents = PlayServModuleManifest.RuntimeModules
+                    .Where(module =>
+                        !packageModuleIds.Contains(module.Id) &&
+                        settings.IsRuntimeModuleEnabled(module.Id) &&
+                        module.DependencyIds.Contains(
+                            moduleId,
+                            StringComparer.Ordinal))
+                    .Select(module => module.Label)
+                    .ToArray();
+                if (externalDependents.Length == 0)
+                    continue;
+
+                reason =
+                    $"Disable dependent modules first: {string.Join(", ", externalDependents)}.";
+                return false;
+            }
+
+            return true;
         }
 
         public static bool Install(
@@ -154,13 +176,21 @@ namespace Playserv.Editor
             if (!CanRemove(package, settings, out error))
                 return false;
 
-            if (settings != null &&
-                settings.IsRuntimeModuleEnabled(package.ModuleId))
+            if (settings != null)
             {
-                if (!settings.SetRuntimeModuleEnabled(package.ModuleId, false))
+                var moduleIds = OrderModulesForDisable(package.ModuleIds);
+                for (var i = 0; i < moduleIds.Length; i++)
                 {
-                    error = $"Failed to disable {package.DisplayName} before package removal.";
-                    return false;
+                    var moduleId = moduleIds[i];
+                    if (!settings.IsRuntimeModuleEnabled(moduleId))
+                        continue;
+
+                    if (!settings.SetRuntimeModuleEnabled(moduleId, false))
+                    {
+                        error =
+                            $"Failed to disable {PlayServModuleManifest.GetLabel(moduleId)} before removing {package.DisplayName}.";
+                        return false;
+                    }
                 }
             }
 
@@ -169,6 +199,21 @@ namespace Playserv.Editor
             Debug.Log($"[PlayServ] Removing companion package {package.PackageId}.");
             _removeRequest = Client.Remove(package.PackageId);
             return true;
+        }
+
+        private static string[] OrderModulesForDisable(
+            IReadOnlyList<string> packageModuleIds)
+        {
+            var remaining = new HashSet<string>(
+                packageModuleIds ?? Array.Empty<string>(),
+                StringComparer.Ordinal);
+            var ordered = PlayServModuleManifest.RuntimeModules
+                .Where(module => remaining.Remove(module.Id))
+                .Select(module => module.Id)
+                .Reverse()
+                .ToList();
+            ordered.AddRange(remaining.OrderBy(moduleId => moduleId, StringComparer.Ordinal));
+            return ordered.ToArray();
         }
 
         internal static bool TryBuildInstallReference(

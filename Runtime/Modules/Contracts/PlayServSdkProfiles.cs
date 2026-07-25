@@ -23,12 +23,7 @@ namespace Playserv.Modules
                     PlayServModuleManifest.DataSubscriptionId,
                     PlayServModuleManifest.ClientRpcId,
                     PlayServModuleManifest.SpawnId,
-                    PlayServModuleManifest.PulseId,
-                    PlayServModuleManifest.AnalyticsId,
-                    PlayServModuleManifest.TransportWebSocketId,
-                    PlayServModuleManifest.TransportUdpId,
-                    PlayServModuleManifest.TransportRudpId,
-                    PlayServModuleManifest.TransportWebRtcId
+                    PlayServModuleManifest.TransportWebSocketId
                 }),
 
             new PlayServSdkProfile(

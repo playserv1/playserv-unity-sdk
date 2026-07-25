@@ -2,7 +2,9 @@
 
 PlayServ is a modular multiplayer SDK for Unity. The core package provides
 runtime connection management, data subscriptions, typed events, RPC, spawning,
-gameplay analytics, and the built-in WebSocket, UDP, and RUDP transports.
+and the built-in HTTP/WebSocket transport. Analytics, identity providers,
+native transports, WebRTC, Pulse, and schema tooling are optional companion
+packages.
 
 ## Requirements
 
@@ -25,9 +27,8 @@ For a package registry, add `com.playserv.sdk` to the project's
 
 ## Companion packages
 
-Apple Sign In, Google Sign In, WebRTC, and the external Schema Tool are
-distributed as separate packages. With the Git repository, install core first
-and add the required package:
+Optional PlayServ features are distributed as separate packages. With the Git
+repository, install core first and add only the required packages:
 
 ```json
 {
@@ -36,6 +37,9 @@ and add the required package:
     "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#<tag-or-commit>",
     "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#<tag-or-commit>",
     "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#<tag-or-commit>",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#<tag-or-commit>",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#<tag-or-commit>",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#<tag-or-commit>",
     "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#<tag-or-commit>"
   }
 }
@@ -46,12 +50,13 @@ cannot contain Git URLs, so private Git installations must declare core and
 each companion package directly in the project manifest. Use the same tag or
 commit for core and every companion package.
 
-Companion packages can also be managed from `Tools` -> `PlayServ` -> `Settings`
--> `SDK module settings`. Apple Sign In, Google Sign In, and WebRTC stay visible
-there even when they are not installed. `Install` and `Remove Package` update
-the project through Unity Package Manager. `Installed` and `Enabled` are
-separate states: disabling an installed module excludes its assembly through a
-scripting define without removing the package.
+Runtime companion packages can also be managed from `Tools` -> `PlayServ` ->
+`Settings` -> `SDK module settings`. They stay visible there even when they are
+not installed. `Install` and `Remove Package` update the project through Unity
+Package Manager. `Installed` and `Enabled` are separate states: disabling an
+installed module excludes its assembly through a scripting define without
+removing the package. The Native Transports package exposes separate toggles for
+UDP and RUDP.
 
 The Schema Tool is managed from the `Schema Tool` section in the main PlayServ
 window. It is downloaded through UPM but runs as an external process on Unity's
@@ -109,8 +114,9 @@ Optional modules are enabled per project and stored in
 
 ## Analytics
 
-Enable `Analytics` in `Tools` -> `PlayServ` -> `Settings` ->
-`SDK module settings`, connect PlayServ, and track explicit gameplay events:
+Install `com.playserv.analytics`, enable `Analytics` in `Tools` -> `PlayServ` ->
+`Settings` -> `SDK module settings`, connect PlayServ, and track explicit
+gameplay events:
 
 ```csharp
 using System.Collections.Generic;

@@ -7,22 +7,34 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>PlayServ.Schema.Tool</AssemblyName>
     <RootNamespace>PlayServ.Schema.Tool</RootNamespace>
-    <Version>0.3.3</Version>
+    <Version>0.3.4</Version>
     <UseAppHost>false</UseAppHost>
     <RollForward>LatestMajor</RollForward>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
+    <PlayServRoslynPath Condition="'$(PlayServRoslynPath)' == ''">$(MSBuildToolsPath)/Roslyn/bincore</PlayServRoslynPath>
   </PropertyGroup>
 
   <ItemGroup>
     <Reference Include="Microsoft.CodeAnalysis">
-      <HintPath>$(MSBuildToolsPath)/Roslyn/bincore/Microsoft.CodeAnalysis.dll</HintPath>
+      <HintPath>$(PlayServRoslynPath)/Microsoft.CodeAnalysis.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="Microsoft.CodeAnalysis.CSharp">
-      <HintPath>$(MSBuildToolsPath)/Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      <HintPath>$(PlayServRoslynPath)/Microsoft.CodeAnalysis.CSharp.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
+
+  <Target Name="PrunePlayServRuntime" AfterTargets="Publish">
+    <ItemGroup>
+      <PlayServSatelliteResource Include="$(PublishDir)**/*.resources.dll" />
+    </ItemGroup>
+    <Delete Files="@(PlayServSatelliteResource)" />
+    <Delete Files="$(PublishDir)$(AssemblyName).deps.json" />
+  </Target>
 </Project>

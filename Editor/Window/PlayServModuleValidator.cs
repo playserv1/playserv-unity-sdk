@@ -705,6 +705,9 @@ namespace Playserv.Editor
                 for (var i = 0; i < files.Length; i++)
                 {
                     var path = files[i];
+                    if (IsHiddenUpmSourcePath(root.AbsolutePath, path))
+                        continue;
+
                     var model = ReadAsmdef(path, issues);
                     if (model == null || string.IsNullOrWhiteSpace(model.name))
                         continue;
@@ -731,6 +734,37 @@ namespace Playserv.Editor
             }
 
             return asmdefs;
+        }
+
+        internal static bool IsHiddenUpmSourcePath(
+            string packageRoot,
+            string absolutePath)
+        {
+            if (string.IsNullOrWhiteSpace(packageRoot) ||
+                string.IsNullOrWhiteSpace(absolutePath))
+            {
+                return false;
+            }
+
+            var normalizedRoot = Path.GetFullPath(packageRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var normalizedPath = Path.GetFullPath(absolutePath);
+            if (!IsSameOrChildPath(normalizedPath, normalizedRoot) ||
+                normalizedPath.Length <= normalizedRoot.Length)
+            {
+                return false;
+            }
+
+            var relativePath = normalizedPath
+                .Substring(normalizedRoot.Length)
+                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return relativePath
+                .Split(new[]
+                {
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar
+                }, StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment.EndsWith("~", StringComparison.Ordinal));
         }
 
         private static void ValidateRootAssemblyReferences(
