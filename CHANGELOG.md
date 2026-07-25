@@ -6,6 +6,21 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Split Apple Sign In, Google Sign In, and WebRTC into standalone companion UPM
+  packages under `CompanionPackages~`; the core package no longer imports their
+  runtime, editor, test, native, or WebGL plugin assets.
+- Added Git subfolder installation instructions for
+  `com.playserv.apple-signin`, `com.playserv.google-signin`, and
+  `com.playserv.webrtc`.
+- Added companion package installation and removal controls to the main SDK
+  module settings window.
+- Added separate `Installed` and `Enabled` companion states, a committed
+  generated package catalog, and UPM-backed module lifecycle removal.
+- Added versioned PlayServ cache maintenance that removes stale generated state,
+  codegen cache, and inactive PlayServ package caches after SDK updates.
+- Added confirmed full `Library` rebuild and restart tooling for corrupted Unity
+  project caches.
+
 ## [0.3.1] - 2026-07-24
 
 - Removed serialized runtime authorization and deployment tokens from

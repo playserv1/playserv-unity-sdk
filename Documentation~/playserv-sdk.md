@@ -286,10 +286,55 @@ Schema DTOs and typed event extensions remain project-owned under
 `Assembly-CSharp`, so they intentionally remain outside the named module
 composition assembly unless the game moves those types into its own asmdef.
 
+## Companion package management
+
+Open `Tools > PlayServ > Settings > SDK module settings` to install or remove
+Apple Sign In, Google Sign In, and WebRTC through Unity Package Manager. Package
+state and module state are intentionally separate:
+
+- `Install` adds the companion UPM package to the project.
+- `Installed` means the package code is present in the project.
+- The `Enabled`/`Disabled` checkbox controls whether its assembly is compiled.
+- `Remove Package` first disables the module, then removes the direct UPM
+  dependency.
+
+Git-installed companions use the same repository commit as the installed core
+package. Local checkouts resolve companions from `CompanionPackages~`; scoped
+registry installations request the matching package version.
+
+The core package contains a committed generated companion catalog that maps each
+package id to its module id and Git subfolder. Package-backed module uninstall
+operations are routed through Unity Package Manager; the local asset deletion
+path is used only for modules imported under `Assets`.
+
+## SDK cache maintenance
+
+PlayServ stores its cache schema and installed SDK version in
+`Library/PlayServ/sdk-cache-state.json`. On a version or schema change, targeted
+maintenance removes:
+
+- `Library/SharedCodegen`;
+- `Library/PlayServ/Cache`;
+- stale PlayServ package directories under `Library/PackageCache`;
+- `Assets/PlayServ/Generated/Runtime`, which is regenerated from the active
+  module graph.
+
+The current package cache and unrelated Unity caches are preserved. Use
+`Tools > PlayServ > Cache > Clear PlayServ Cache` to run the targeted cleanup
+manually. Use `Rebuild Project Library...` only when Unity's broader cache is
+corrupted; it requires confirmation, closes Unity, deletes `Library`, and
+reopens the project.
+
 ## Apple Sign In module
 
 Apple Sign In is an optional client module for iOS builds. It uses Apple's native
 `AuthenticationServices.framework` and does not require any third-party auth SDK.
+
+Install `com.playserv.apple-signin` before enabling the module:
+
+```json
+"com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#<tag-or-commit>"
+```
 
 ### 1. Configure Apple Developer
 
@@ -410,6 +455,12 @@ Google Sign In is an optional client module for Android and iOS builds. PlayServ
 provides the module toggle, settings asset, and runtime facade. The game project
 must also contain a Google Sign-In Unity provider plugin so native Android/iOS
 sign-in can run.
+
+Install `com.playserv.google-signin` before enabling the module:
+
+```json
+"com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#<tag-or-commit>"
+```
 
 Google Unity plugin reference: https://github.com/googlesamples/google-signin-unity
 

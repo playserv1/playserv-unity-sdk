@@ -60,6 +60,16 @@ namespace Playserv.Editor
 
             if (moduleRoot.AssetPath.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase))
             {
+                if (PlayServCompanionPackageCatalog.TryGetByModuleId(
+                        manifest.Id,
+                        out var companionPackage))
+                {
+                    return PlayServCompanionPackageManager.CanRemove(
+                        companionPackage,
+                        settings,
+                        out reason);
+                }
+
                 reason = "Remove this module package through Unity Package Manager.";
                 return false;
             }
@@ -89,6 +99,22 @@ namespace Playserv.Editor
             {
                 error = $"Unknown module id: {module.Id}.";
                 return false;
+            }
+
+            if (PlayServCompanionPackageCatalog.TryGetByModuleId(
+                    manifest.Id,
+                    out var companionPackage) &&
+                PlayServEditorModuleAvailability.TryGetModuleRoot(
+                    manifest,
+                    out var companionModuleRoot) &&
+                companionModuleRoot.AssetPath.StartsWith(
+                    "Packages/",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return PlayServCompanionPackageManager.Remove(
+                    companionPackage,
+                    settings,
+                    out error);
             }
 
             if (module.IsEnabled(settings) && !module.SetEnabled(settings, false))

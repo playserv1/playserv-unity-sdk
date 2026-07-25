@@ -4,7 +4,7 @@
   "order": 80,
   "label": "Apple Sign In",
   "description": "Native iOS Sign in with Apple facade, credential settings, Xcode capability setup, quick login, credential state, and revocation callbacks.",
-  "minSdkVersion": "0.3.0",
+  "minSdkVersion": "0.3.1",
   "supportedPlatforms": [
     "Editor",
     "iOS"
@@ -13,15 +13,17 @@
   "capabilities": [
     "identity.apple"
   ],
-  "requiresPackages": [],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN",
   "defaultEnabled": false,
   "isServerModule": false,
   "visibleInSettings": true,
   "visibleInExport": true,
   "assetPaths": [
-    "Runtime/Modules/AppleSignIn/Implementation",
-    "Runtime/Modules/AppleSignIn/Editor"
+    "Runtime/Implementation",
+    "Editor"
   ],
   "dependencyIds": [
     "client-execution"

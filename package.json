@@ -7,6 +7,10 @@
   "author": {
     "name": "PlayServ"
   },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:playserv1/playserv-unity-sdk.git"
+  },
   "license": "MIT",
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.2",

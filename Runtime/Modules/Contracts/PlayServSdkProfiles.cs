@@ -15,7 +15,7 @@ namespace Playserv.Modules
             new PlayServSdkProfile(
                 ClientSdkId,
                 "Client SDK",
-                "Client gameplay package. Server-only runtime modules are excluded.",
+                "Enables installed client gameplay modules. Server-only runtime modules are excluded.",
                 new[]
                 {
                     PlayServModuleManifest.ClientExecutionId,
@@ -42,7 +42,7 @@ namespace Playserv.Modules
             new PlayServSdkProfile(
                 FullSdkId,
                 "Full SDK",
-                "Client and server runtime modules in one package.",
+                "Enables all installed client, server, and companion runtime modules.",
                 new[]
                 {
                     PlayServModuleManifest.ClientExecutionId,

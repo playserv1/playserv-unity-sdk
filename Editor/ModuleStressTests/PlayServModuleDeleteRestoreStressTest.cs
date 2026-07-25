@@ -36,11 +36,7 @@ namespace Playserv.Editor
             new TransportFolderExpectation(
                 PlayServModuleManifest.TransportRudpId,
                 "Runtime/Proxy/Modules/Rudp",
-                "Playserv.Runtime.Transport.Rudp"),
-            new TransportFolderExpectation(
-                PlayServModuleManifest.TransportWebRtcId,
-                "Runtime/Proxy/Modules/WebRtc",
-                "Playserv.Runtime.Transport.WebRtc")
+                "Playserv.Runtime.Transport.Rudp")
         };
 
         private static readonly ModuleExpectation[] Expectations =

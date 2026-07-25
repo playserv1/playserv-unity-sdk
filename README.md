@@ -1,8 +1,8 @@
 # PlayServ Unity SDK
 
-PlayServ is a modular multiplayer SDK for Unity. It provides runtime connection
-management, data subscriptions, typed events, RPC, spawning, multiple transports,
-and optional Apple and Google sign-in modules.
+PlayServ is a modular multiplayer SDK for Unity. The core package provides
+runtime connection management, data subscriptions, typed events, RPC, spawning,
+and the built-in WebSocket, UDP, and RUDP transports.
 
 ## Requirements
 
@@ -22,6 +22,46 @@ https://<git-host>/<organization>/<repository>.git#<tag-or-commit>
 
 For a package registry, add `com.playserv.sdk` to the project's
 `Packages/manifest.json`.
+
+## Companion packages
+
+Apple Sign In, Google Sign In, and WebRTC are distributed as separate packages.
+With the Git repository, install core first and add the required package:
+
+```json
+{
+  "dependencies": {
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#<tag-or-commit>",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#<tag-or-commit>",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#<tag-or-commit>",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#<tag-or-commit>"
+  }
+}
+```
+
+Only add the companion packages used by the game. Unity package dependencies
+cannot contain Git URLs, so private Git installations must declare core and
+each companion package directly in the project manifest. Use the same tag or
+commit for core and every companion package.
+
+Companion packages can also be managed from `Tools` -> `PlayServ` -> `Settings`
+-> `SDK module settings`. Apple Sign In, Google Sign In, and WebRTC stay visible
+there even when they are not installed. `Install` and `Remove Package` update
+the project through Unity Package Manager. `Installed` and `Enabled` are
+separate states: disabling an installed module excludes its assembly through a
+scripting define without removing the package.
+
+## Cache maintenance
+
+When the installed SDK version or PlayServ cache schema changes, the editor
+automatically clears PlayServ generated state, the shared codegen cache, and
+inactive `Library/PackageCache/com.playserv.*` directories. Active package
+caches and unrelated Unity caches are preserved.
+
+Use `Tools` -> `PlayServ` -> `Cache` -> `Clear PlayServ Cache` for a manual
+targeted cleanup. `Rebuild Project Library...` is the recovery option for a
+corrupted Unity cache: after confirmation it closes Unity, deletes the complete
+project `Library` directory, and reopens the project.
 
 ## Configure
 

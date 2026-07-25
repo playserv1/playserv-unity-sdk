@@ -4,26 +4,25 @@
   "order": 130,
   "label": "WebRTC",
   "description": "WebRTC data channel and signaling implementation.",
-  "minSdkVersion": "0.3.0",
+  "minSdkVersion": "0.3.1",
   "supportedPlatforms": [
     "Editor",
-    "Standalone",
-    "Android",
-    "iOS",
     "WebGL"
   ],
   "conflictsWith": [],
   "capabilities": [
     "transport.webrtc"
   ],
-  "requiresPackages": [],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
   "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBRTC",
   "defaultEnabled": true,
   "isServerModule": false,
   "visibleInSettings": true,
   "visibleInExport": true,
   "assetPaths": [
-    "Runtime/Proxy/Modules/WebRtc"
+    "Runtime"
   ],
   "dependencyIds": [
     "client-execution"
