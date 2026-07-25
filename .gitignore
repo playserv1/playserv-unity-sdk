@@ -105,3 +105,12 @@ InitTestScene*.unity*
 # PlayServ SDK exports
 /exports/
 /Runtime/exports/
+
+# Project-local PlayServ tool launchers and process state
+/.playserv/bin/
+/.playserv/*.lock
+/.playserv/*.pid
+
+# The Schema Tool is a real external .NET project, not a Unity-generated project.
+!/CompanionPackages~/com.playserv.schema-tool/Tools~/SchemaTool/Source/PlayServ.Schema.Tool.csproj
+/CompanionPackages~/com.playserv.schema-tool/Tools~/SchemaTool/Source/obj/

@@ -100,8 +100,8 @@ namespace Playserv.Editor
                     {
                         GUILayout.Space(6f);
                         changed |= DrawToggleModule(
-                            "Model Sync",
-                            "Schema update checks and generated model refresh controls.",
+                            "Schema Tool",
+                            "External schema analysis, generation, validation, and watch controls.",
                             settings.ModelSync,
                             settings.SetModelSync);
                     }

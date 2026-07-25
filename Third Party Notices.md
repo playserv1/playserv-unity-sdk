@@ -14,8 +14,8 @@ Newtonsoft.Json.
 
 ## Microsoft Roslyn
 
-The package includes `Microsoft.CodeAnalysis.dll` and
-`Microsoft.CodeAnalysis.CSharp.dll` for editor-only source analysis.
+The Schema Tool companion package includes `Microsoft.CodeAnalysis.dll` and
+`Microsoft.CodeAnalysis.CSharp.dll` for external source analysis.
 
 - Project: https://github.com/dotnet/roslyn
 - Copyright: .NET Foundation and contributors

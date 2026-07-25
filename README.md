@@ -25,8 +25,9 @@ For a package registry, add `com.playserv.sdk` to the project's
 
 ## Companion packages
 
-Apple Sign In, Google Sign In, and WebRTC are distributed as separate packages.
-With the Git repository, install core first and add the required package:
+Apple Sign In, Google Sign In, WebRTC, and the external Schema Tool are
+distributed as separate packages. With the Git repository, install core first
+and add the required package:
 
 ```json
 {
@@ -34,7 +35,8 @@ With the Git repository, install core first and add the required package:
     "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#<tag-or-commit>",
     "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#<tag-or-commit>",
     "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#<tag-or-commit>",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#<tag-or-commit>"
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#<tag-or-commit>",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#<tag-or-commit>"
   }
 }
 ```
@@ -50,6 +52,12 @@ there even when they are not installed. `Install` and `Remove Package` update
 the project through Unity Package Manager. `Installed` and `Enabled` are
 separate states: disabling an installed module excludes its assembly through a
 scripting define without removing the package.
+
+The Schema Tool is managed from the `Schema Tool` section in the main PlayServ
+window. It is downloaded through UPM but runs as an external process on Unity's
+bundled .NET runtime. It can analyze `[PlayServSchema]` C# contracts, generate
+JSON Schema and backend C# contracts, validate drift in CI, and watch project
+files independently of the Unity compilation loop.
 
 ## Cache maintenance
 
@@ -135,6 +143,7 @@ scenes without compiling example code into projects that do not import it.
 - [Complete Unity SDK guide](Documentation~/playserv-sdk.md)
 - [Server/shared runtime guide](Documentation~/server-sdk.md)
 - [Analytics setup](Documentation~/playserv-sdk.md#analytics-module)
+- [External Schema Tool](Documentation~/playserv-sdk.md#external-schema-tool)
 - [Apple Sign In setup](Documentation~/playserv-sdk.md#apple-sign-in-module)
 - [Google Sign In setup](Documentation~/playserv-sdk.md#google-sign-in-module)
 - [Changelog](CHANGELOG.md)

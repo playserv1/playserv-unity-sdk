@@ -1,13 +1,17 @@
-using System;
+using System.IO;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
-using Playserv.ModelGenerator.Editor;
 
 namespace Playserv.Editor
 {
     internal sealed class PlayServModelSectionPresenter : IPlayServEditorSection
     {
+        private bool _commandRunning;
+        private string _status = string.Empty;
+        private MessageType _statusType = MessageType.Info;
+        private PlayServSchemaToolResponse _response;
+
         public void Dispose()
         {
         }
@@ -15,227 +19,290 @@ namespace Playserv.Editor
         public void Draw(PlayServWindowContext context)
         {
             var state = context.State;
+            var installed = PlayServSchemaToolRunner.IsInstalled;
+            var configured = PlayServSchemaToolRunner.IsConfigured;
+            var watching = PlayServSchemaToolRunner.IsWatchRunning;
+            var subtitle = installed
+                ? $"External analyzer | {(configured ? "Configured" : "Not configured")} | " +
+                  $"{(watching ? "Watch running" : "Watch stopped")}"
+                : "External analyzer | Companion package is not installed";
             var expanded = PlayServWindowChrome.BeginSectionCard(
                 ref state.FoldModel,
                 "Schema",
-                "Model Sync",
-                "Check the latest schema, compare timestamps, and regenerate editor-side models from the current source of truth.");
+                "Schema Tool",
+                subtitle);
 
             if (expanded)
             {
                 GUILayout.Space(6f);
-
-                string currentVersion = EditorPrefs.GetString(Const.PrefKeyJsonSchemaVersion, string.Empty);
-                string currentTimestampRaw = EditorPrefs.GetString(Const.PrefKeyJsonSchemaTimestamp, string.Empty);
-
-                string latestVersion = EditorPrefs.GetString(Const.PrefKeyJsonSchemaLatestVersion, string.Empty);
-                string latestTimestampRaw = EditorPrefs.GetString(Const.PrefKeyJsonSchemaLatestTimestamp, string.Empty);
-
-                bool hasCurrent = !string.IsNullOrEmpty(currentVersion) || !string.IsNullOrEmpty(currentTimestampRaw);
-                bool hasLatest = state.ShowAvailableSchemaInfo &&
-                                 (!string.IsNullOrEmpty(latestVersion) || !string.IsNullOrEmpty(latestTimestampRaw));
-
-                bool differs = false;
-                bool hasComparableTimestamps = false;
-                bool latestIsNewerByTimestamp = false;
-
-                if (hasLatest &&
-                    TryParseTimestamp(currentTimestampRaw, out var currentTs) &&
-                    TryParseTimestamp(latestTimestampRaw, out var latestTs))
-                {
-                    hasComparableTimestamps = true;
-                    latestIsNewerByTimestamp = latestTs > currentTs;
-                }
-
-                if (hasLatest)
-                {
-                    differs = hasComparableTimestamps
-                        ? latestIsNewerByTimestamp
-                        : !string.IsNullOrEmpty(latestTimestampRaw) && latestTimestampRaw != currentTimestampRaw;
-                }
-
-                string statusMessage = null;
-                MessageType? statusType = null;
-
-                if (hasLatest)
-                {
-                    if (differs)
-                    {
-                        statusMessage = "A newer schema is available.";
-                        statusType = MessageType.Warning;
-                    }
-                    else
-                    {
-                        statusMessage = "You have the latest schema already.";
-                        statusType = MessageType.Info;
-                    }
-                }
-
-                if (hasCurrent || hasLatest)
-                {
-                    if (statusMessage != null && statusType.HasValue)
-                        PlayServWindowChrome.DrawNotice(statusMessage, statusType.Value);
-
-                    EditorGUILayout.LabelField("Schema details", PlayServWindowTheme.MiniHeadingStyle);
-
-                    EditorGUILayout.BeginVertical(PlayServWindowTheme.LogContainerStyle);
-
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(" ", GUILayout.Width(14f));
-                    EditorGUILayout.LabelField("Current schema", PlayServWindowTheme.SectionLabelStyle);
-                    if (state.ShowAvailableSchemaInfo)
-                        EditorGUILayout.LabelField("Latest available schema", PlayServWindowTheme.SectionLabelStyle);
-                    EditorGUILayout.EndHorizontal();
-
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("V", GUILayout.Width(14f));
-                    EditorGUILayout.SelectableLabel(
-                        string.IsNullOrEmpty(currentVersion) ? "—" : currentVersion,
-                        PlayServWindowTheme.InputStyle,
-                        GUILayout.Height(context.StyledFieldHeight));
-
-                    if (state.ShowAvailableSchemaInfo)
-                    {
-                        EditorGUILayout.SelectableLabel(
-                            string.IsNullOrEmpty(latestVersion) ? "—" : latestVersion,
-                            PlayServWindowTheme.InputStyle,
-                            GUILayout.Height(context.StyledFieldHeight));
-                    }
-
-                    EditorGUILayout.EndHorizontal();
-
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("T", GUILayout.Width(14f));
-                    EditorGUILayout.SelectableLabel(
-                        string.IsNullOrEmpty(currentTimestampRaw) ? "—" : FormatTimestamp(currentTimestampRaw),
-                        PlayServWindowTheme.InputStyle,
-                        GUILayout.Height(context.StyledFieldHeight));
-
-                    if (state.ShowAvailableSchemaInfo)
-                    {
-                        EditorGUILayout.SelectableLabel(
-                            string.IsNullOrEmpty(latestTimestampRaw) ? "—" : FormatTimestamp(latestTimestampRaw),
-                            PlayServWindowTheme.InputStyle,
-                            GUILayout.Height(context.StyledFieldHeight));
-                    }
-
-                    EditorGUILayout.EndHorizontal();
-
-                    if (state.ShowAvailableSchemaInfo)
-                    {
-                        GUILayout.Space(6f);
-
-                        EditorGUILayout.BeginHorizontal();
-
-                        if (PlayServWindowChrome.DrawActionButton("Hide", PlayServWindowButtonTone.Ghost, GUILayout.Width(120f), GUILayout.Height(28f)))
-                            state.ShowAvailableSchemaInfo = false;
-
-                        GUILayout.FlexibleSpace();
-
-                        using (new EditorGUI.DisabledScope(!differs))
-                        {
-                            if (PlayServWindowChrome.DrawActionButton("Apply New Schema", PlayServWindowButtonTone.Primary, GUILayout.Width(180f), GUILayout.Height(28f)))
-                            {
-                                if (EditorUtility.DisplayDialog(
-                                        "Apply new schema",
-                                        "This will replace the current schema with the latest downloaded one.\nContinue?",
-                                        "Apply",
-                                        "Cancel"))
-                                {
-                                    SchemaCodeGenerator.GenerateModels(true);
-                                    state.ShowAvailableSchemaInfo = false;
-                                    EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestVersion);
-                                    EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestTimestamp);
-                                }
-                            }
-                        }
-
-                        EditorGUILayout.EndHorizontal();
-                    }
-
-                    EditorGUILayout.EndVertical();
-
-                    GUILayout.Space(6f);
-                }
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (PlayServWindowChrome.DrawActionButton("Check Updates", PlayServWindowButtonTone.Secondary, GUILayout.Width(138f), GUILayout.Height(32f)))
-                    {
-                        ClearLatestSchemaInfo(state);
-                        _ = CheckSchemaUpdatesAsync(context);
-                    }
-
-                    GUILayout.Space(8f);
-
-                    if (PlayServWindowChrome.DrawActionButton("Re-generate Models", PlayServWindowButtonTone.Primary, GUILayout.Width(176f), GUILayout.Height(32f)))
-                        SchemaCodeGenerator.GenerateModels(false);
-                }
+                if (!installed)
+                    DrawInstall(context);
+                else
+                    DrawInstalled(context, configured, watching);
             }
 
             PlayServWindowChrome.EndSectionCard(expanded);
             EditorPrefs.SetBool(Const.PrefFoldModel, state.FoldModel);
         }
 
-        private static string FormatTimestamp(string raw)
+        private void DrawInstall(PlayServWindowContext context)
         {
-            if (string.IsNullOrEmpty(raw))
-                return string.Empty;
+            var packageId = PlayServSchemaToolPackage.PackageId;
+            var packageError = PlayServCompanionPackageManager.GetLastError(packageId);
+            if (!string.IsNullOrWhiteSpace(packageError))
+                PlayServWindowChrome.DrawNotice(packageError, MessageType.Warning);
 
-            if (DateTimeOffset.TryParse(raw, out var dto))
-                return dto.ToLocalTime().DateTime.ToString("yyyy-MM-dd HH:mm:ss");
-
-            return raw;
+            using (new EditorGUI.DisabledScope(
+                       PlayServCompanionPackageManager.IsBusy || _commandRunning))
+            {
+                var label = PlayServCompanionPackageManager.IsBusyFor(packageId)
+                    ? "Installing..."
+                    : "Install Schema Tool";
+                if (PlayServWindowChrome.DrawActionButton(
+                        label,
+                        PlayServWindowButtonTone.Primary,
+                        GUILayout.Width(190f),
+                        GUILayout.Height(32f)) &&
+                    !PlayServCompanionPackageManager.Install(
+                        PlayServSchemaToolPackage.Definition,
+                        out var error))
+                {
+                    SetStatus(error, MessageType.Warning, context);
+                }
+            }
         }
 
-        private static bool TryParseTimestamp(string raw, out DateTimeOffset value)
+        private void DrawInstalled(
+            PlayServWindowContext context,
+            bool configured,
+            bool watching)
         {
-            if (string.IsNullOrEmpty(raw))
+            DrawMetrics(configured, watching);
+
+            if (!string.IsNullOrWhiteSpace(_status))
             {
-                value = default;
-                return false;
+                GUILayout.Space(8f);
+                PlayServWindowChrome.DrawNotice(_status, _statusType);
             }
 
-            return DateTimeOffset.TryParse(raw, out value);
+            GUILayout.Space(10f);
+            using (new EditorGUI.DisabledScope(
+                       _commandRunning || PlayServCompanionPackageManager.IsBusy))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (PlayServWindowChrome.DrawActionButton(
+                            configured ? "Reinitialize" : "Initialize",
+                            PlayServWindowButtonTone.Secondary,
+                            GUILayout.Width(120f),
+                            GUILayout.Height(32f)))
+                    {
+                        _ = ExecuteAsync("init", context);
+                    }
+
+                    GUILayout.Space(6f);
+                    using (new EditorGUI.DisabledScope(!configured))
+                    {
+                        if (PlayServWindowChrome.DrawActionButton(
+                                "Analyze",
+                                PlayServWindowButtonTone.Secondary,
+                                GUILayout.Width(108f),
+                                GUILayout.Height(32f)))
+                        {
+                            _ = ExecuteAsync("analyze", context);
+                        }
+
+                        GUILayout.Space(6f);
+                        if (PlayServWindowChrome.DrawActionButton(
+                                "Generate",
+                                PlayServWindowButtonTone.Primary,
+                                GUILayout.Width(112f),
+                                GUILayout.Height(32f)))
+                        {
+                            _ = ExecuteAsync("generate", context);
+                        }
+
+                        GUILayout.Space(6f);
+                        if (PlayServWindowChrome.DrawActionButton(
+                                "Validate",
+                                PlayServWindowButtonTone.Secondary,
+                                GUILayout.Width(108f),
+                                GUILayout.Height(32f)))
+                        {
+                            _ = ExecuteAsync("validate", context);
+                        }
+                    }
+                }
+
+                GUILayout.Space(8f);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUI.DisabledScope(!configured))
+                    {
+                        if (PlayServWindowChrome.DrawActionButton(
+                                watching ? "Stop Watch" : "Start Watch",
+                                watching
+                                    ? PlayServWindowButtonTone.Secondary
+                                    : PlayServWindowButtonTone.Primary,
+                                GUILayout.Width(132f),
+                                GUILayout.Height(32f)))
+                        {
+                            ToggleWatch(watching, context);
+                        }
+                    }
+
+                    GUILayout.Space(6f);
+                    if (PlayServWindowChrome.DrawActionButton(
+                            "Create IDE Launcher",
+                            PlayServWindowButtonTone.Secondary,
+                            GUILayout.Width(170f),
+                            GUILayout.Height(32f)))
+                    {
+                        CreateLauncher(context);
+                    }
+
+                    GUILayout.Space(6f);
+                    using (new EditorGUI.DisabledScope(!configured))
+                    {
+                        if (PlayServWindowChrome.DrawActionButton(
+                                "Open Config",
+                                PlayServWindowButtonTone.Ghost,
+                                GUILayout.Width(120f),
+                                GUILayout.Height(32f)))
+                        {
+                            EditorUtility.RevealInFinder(
+                                PlayServSchemaToolRunner.ConfigurationPath);
+                        }
+                    }
+                }
+
+                GUILayout.Space(8f);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.FlexibleSpace();
+                    using (new EditorGUI.DisabledScope(watching))
+                    {
+                        if (PlayServWindowChrome.DrawActionButton(
+                                "Remove Package",
+                                PlayServWindowButtonTone.Ghost,
+                                GUILayout.Width(140f),
+                                GUILayout.Height(28f)) &&
+                            !PlayServCompanionPackageManager.Remove(
+                                PlayServSchemaToolPackage.Definition,
+                                null,
+                                out var error))
+                        {
+                            SetStatus(error, MessageType.Warning, context);
+                        }
+                    }
+                }
+            }
         }
 
-        private static async Task CheckSchemaUpdatesAsync(PlayServWindowContext context)
+        private void DrawMetrics(bool configured, bool watching)
         {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                PlayServWindowChrome.DrawOverviewCard(
+                    "TOOL",
+                    _response == null || string.IsNullOrWhiteSpace(_response.version)
+                        ? "Installed"
+                        : _response.version,
+                    "External process");
+                GUILayout.Space(8f);
+                PlayServWindowChrome.DrawOverviewCard(
+                    "SCHEMAS",
+                    _response == null ? "—" : _response.schemaCount.ToString(),
+                    configured ? "Project configured" : "Run Initialize");
+                GUILayout.Space(8f);
+                PlayServWindowChrome.DrawOverviewCard(
+                    "WATCH",
+                    watching ? "Running" : "Stopped",
+                    "File changes");
+            }
+        }
+
+        private async Task ExecuteAsync(string command, PlayServWindowContext context)
+        {
+            _commandRunning = true;
+            SetStatus($"Running {command}...", MessageType.Info, context);
             try
             {
-                if (await SchemaLoader.LoadSchema(ResolveSchemaCredential(context)))
+                var result = await PlayServSchemaToolRunner.RunAsync(command);
+                _response = result.Response;
+                SetStatus(
+                    string.IsNullOrWhiteSpace(result.Message)
+                        ? result.Success ? "Schema Tool completed." : "Schema Tool failed."
+                        : result.Message,
+                    result.Success ? MessageType.Info : MessageType.Warning,
+                    context);
+                if (result.Success &&
+                    (command == "generate" || command == "init"))
                 {
-                    SchemaLoader.CheckNewSchema();
-                    context.State.ShowAvailableSchemaInfo = true;
+                    AssetDatabase.Refresh();
                 }
-                else
-                {
-                    ClearLatestSchemaInfo(context.State);
-                }
-            }
-            catch (Exception e)
-            {
-                ClearLatestSchemaInfo(context.State);
-                Debug.LogError($"[SchemaDownloader] Check updates failed: {e.Message}");
             }
             finally
             {
+                _commandRunning = false;
                 context.Repaint();
             }
         }
 
-        private static string ResolveSchemaCredential(PlayServWindowContext context)
+        private void ToggleWatch(bool watching, PlayServWindowContext context)
         {
-            return context.ClientTokenProperty == null
-                ? string.Empty
-                : context.ClientTokenProperty.stringValue;
+            var success = watching
+                ? PlayServSchemaToolRunner.StopWatch(out var error)
+                : PlayServSchemaToolRunner.StartWatch(out error);
+            SetStatus(
+                success
+                    ? watching ? "Schema watcher stopped." : "Schema watcher started."
+                    : error,
+                success ? MessageType.Info : MessageType.Warning,
+                context);
         }
 
-        private static void ClearLatestSchemaInfo(PlayServWindowState state)
+        private void CreateLauncher(PlayServWindowContext context)
         {
-            state.ShowAvailableSchemaInfo = false;
-            EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestVersion);
-            EditorPrefs.DeleteKey(Const.PrefKeyJsonSchemaLatestTimestamp);
+            var success = PlayServSchemaToolRunner.CreateIdeLaunchers(
+                out var launcherPath,
+                out var error);
+            SetStatus(
+                success
+                    ? $"IDE launcher created at {RelativeToProject(launcherPath)}."
+                    : error,
+                success ? MessageType.Info : MessageType.Warning,
+                context);
+        }
+
+        private void SetStatus(
+            string message,
+            MessageType type,
+            PlayServWindowContext context)
+        {
+            _status = message ?? string.Empty;
+            _statusType = type;
+            context.Repaint();
+        }
+
+        private static string RelativeToProject(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return string.Empty;
+
+            try
+            {
+                return path.StartsWith(
+                    PlayServSchemaToolRunner.ProjectRoot,
+                    System.StringComparison.OrdinalIgnoreCase)
+                    ? path.Substring(PlayServSchemaToolRunner.ProjectRoot.Length)
+                        .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    : path;
+            }
+            catch
+            {
+                return path;
+            }
         }
     }
 }

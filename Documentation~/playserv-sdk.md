@@ -308,6 +308,162 @@ package id to its module id and Git subfolder. Package-backed module uninstall
 operations are routed through Unity Package Manager; the local asset deletion
 path is used only for modules imported under `Assets`.
 
+## External Schema Tool
+
+`com.playserv.schema-tool` is delivered through Unity Package Manager but runs
+outside the Unity managed process. It uses Unity's bundled .NET runtime, so a
+developer does not need to install a system-wide .NET runtime. Unity 2021.3 and
+Unity 6 use the same shipped tool assembly.
+
+### Install and initialize
+
+1. Open `Tools > PlayServ > Settings`.
+2. Expand `Schema Tool`.
+3. Select `Install Schema Tool`.
+4. Select `Initialize`.
+5. Commit `playserv.schema.json` and generated `playserv.schema.lock.json`.
+
+For a Git installation, the package may also be declared directly:
+
+```json
+{
+  "dependencies": {
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#<revision>",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#<revision>"
+  }
+}
+```
+
+Use the same revision for core and Schema Tool.
+
+### Declare contracts in C#
+
+Only explicitly attributed types become schemas:
+
+```csharp
+using System;
+using System.Collections.Generic;
+using Playserv.Schema;
+
+namespace Game.Contracts
+{
+    [PlayServSchema("player.profile", Version = "1")]
+    [PlayServFormerlyNamed("LegacyPlayerProfile")]
+    public sealed class PlayerProfile
+    {
+        [PlayServField("playerId", Required = PlayServRequiredMode.Required)]
+        public string Id { get; set; }
+
+        public int Level { get; set; }
+        public List<string> Tags { get; set; }
+        public DateTime? LastSeenAt { get; set; }
+
+        [PlayServIgnore]
+        public string LocalOnlyCache { get; set; }
+    }
+}
+```
+
+- `PlayServSchema` sets the stable schema ID, authority, and optional version.
+- `PlayServField` overrides the serialized name or required state.
+- `PlayServFormerlyNamed` records a previous type or field name for migrations.
+- `PlayServIgnore` excludes a public member.
+
+The analyzer parses C# with Roslyn. It does not load game assemblies or execute
+project code.
+
+### Configure sources and targets
+
+Initialization creates `playserv.schema.json` in the project root:
+
+```json
+{
+  "schemaVersion": 1,
+  "projectId": "my-game",
+  "sources": [
+    {
+      "id": "unity-client",
+      "kind": "csharp",
+      "paths": [
+        "Assets/**/*.cs"
+      ],
+      "authority": "contract"
+    }
+  ],
+  "targets": [
+    {
+      "kind": "json-schema",
+      "output": "Assets/PlayServ/Generated/Schemas/playserv.schema.json"
+    },
+    {
+      "kind": "csharp-contracts",
+      "output": "../backend/Generated/PlayServContracts.g.cs",
+      "namespace": "Game.Backend.Contracts"
+    }
+  ],
+  "service": {
+    "endpoint": "",
+    "environment": "",
+    "projectId": ""
+  }
+}
+```
+
+Each C# source has its own `id`, glob paths, and authority. Generated output
+paths are excluded from source discovery, so backend generation cannot feed
+back into the client schema.
+
+`json-schema` writes a deterministic JSON Schema 2020-12 document with stable
+PlayServ metadata. `csharp-contracts` writes backend DTOs from the same canonical
+contract graph. The lock file records tool/protocol versions and hashes for all
+sources and outputs.
+
+### Run from Unity, Rider, or CLI
+
+The main SDK window provides:
+
+- `Analyze`: discover schemas and report duplicate IDs or fields.
+- `Generate`: update configured outputs and the lock file.
+- `Validate`: fail when committed generated files are stale.
+- `Start Watch`: run continuous external analysis independently of Unity.
+- `Create IDE Launcher`: create `.playserv/bin/playserv-schema`.
+
+After creating the launcher:
+
+```bash
+.playserv/bin/playserv-schema analyze
+.playserv/bin/playserv-schema generate
+.playserv/bin/playserv-schema validate
+.playserv/bin/playserv-schema watch
+```
+
+Rider can call the launcher as an External Tool. A file watcher may use:
+
+```text
+Program:    $ProjectFileDir$/.playserv/bin/playserv-schema
+Arguments:  generate --changed "$FilePath$"
+Directory:  $ProjectFileDir$
+```
+
+The `--changed` path is an IDE optimization hint; correctness never depends on
+the IDE sending it. Watch mode combines filesystem events with a lightweight
+source-state check, covering editors that save through atomic file replacement.
+Only one watcher may run for a project.
+
+For CI, run `validate`. Exit code `0` means generated contracts match the source;
+`1` means schema diagnostics or drift were found; `2` means configuration or
+tool execution failed.
+
+### Schema Service boundary
+
+Version 1 establishes the local canonical graph, deterministic files, source
+authorities, and a versioned tool protocol. A `remote` source may be declared,
+but `sync` currently performs local reconciliation only. Upload/download and
+conflict resolution will be enabled after the Schema Service API defines
+authentication, revisions, ownership, and breaking-change policy. Tokens will
+be read from the process environment or OS credential storage, never from
+`playserv.schema.json` or command-line arguments.
+
 ## SDK cache maintenance
 
 PlayServ stores its cache schema and installed SDK version in
