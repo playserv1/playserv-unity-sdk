@@ -15,13 +15,27 @@ using UnityEngine.Networking;
 public static class SchemaLoader
 {
     private const string SchemaBySdkKeyEndpointPath = "/api/schemas/by-sdk-key";
-    private const string LatestSchemaAssetPath = "Assets/Resources/latest-schema.json";
     private const string LatestSchemaFileName = "latest-schema.json";
     private const int SchemaRequestTimeoutSeconds = 30;
     
     public static Task<bool> LoadSchema(string token)
     {
-        return DownloadSchema(token);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new InvalidOperationException(
+                "A public PlayServ Client Token is required to download the server schema.");
+        }
+
+        var normalizedToken = token.Trim();
+        if (!normalizedToken.StartsWith("pk_", StringComparison.Ordinal) ||
+            normalizedToken.IndexOf('\r') >= 0 ||
+            normalizedToken.IndexOf('\n') >= 0)
+        {
+            throw new InvalidOperationException(
+                "Server schema download accepts only a public pk_* Client Token.");
+        }
+
+        return DownloadSchema(normalizedToken);
     }
 
     public static void CheckNewSchema()
@@ -344,10 +358,15 @@ public static class SchemaLoader
 
     private static void DeleteLatestSchemaFileIfExists()
     {
-        if (!File.Exists(LatestSchemaAssetPath))
+        if (!File.Exists(
+                PlayServServerSchemaWorkflow.ToAbsolutePath(
+                    PlayServServerSchemaWorkflow.LatestSchemaAssetPath)))
+        {
             return;
+        }
 
-        AssetDatabase.DeleteAsset(LatestSchemaAssetPath);
+        AssetDatabase.DeleteAsset(
+            PlayServServerSchemaWorkflow.LatestSchemaAssetPath);
         AssetDatabase.Refresh();
     }
 

@@ -6,6 +6,17 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Restored server schema download and C# model generation in the main SDK
+  window alongside the external local-contract Schema Tool.
+- Split the schema UI into explicit `C# -> local outputs` and
+  `Schema API -> JSON Schema -> Unity C#` workflows, with advanced tooling
+  hidden behind a separate control.
+- Added downloaded/current schema comparison by content hash, version,
+  timestamp, and definition count before applying server changes.
+- Changed server schema generation to validate the complete schema and all
+  generated file names before touching project output, preventing data loss on
+  malformed schemas and rejecting generated path traversal.
+
 ## [0.3.4] - 2026-07-25
 
 - Extracted Analytics, Pulse, UDP, and RUDP from the core SDK into optional

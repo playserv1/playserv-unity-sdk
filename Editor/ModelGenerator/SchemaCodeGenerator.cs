@@ -1,149 +1,320 @@
-using UnityEditor;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using UnityEngine;
+using System.Text;
 using Playserv.CodeGenerator;
 using Playserv.Editor;
 using Playserv.Modules;
+using UnityEditor;
+using UnityEngine;
 
 namespace Playserv.ModelGenerator.Editor
 {
+    internal sealed class PlayServModelGenerationResult
+    {
+        private PlayServModelGenerationResult(
+            bool success,
+            int generatedFileCount,
+            string sourcePath,
+            string error)
+        {
+            Success = success;
+            GeneratedFileCount = generatedFileCount;
+            SourcePath = sourcePath ?? string.Empty;
+            Error = error ?? string.Empty;
+        }
+
+        public bool Success { get; }
+
+        public int GeneratedFileCount { get; }
+
+        public string SourcePath { get; }
+
+        public string Error { get; }
+
+        public static PlayServModelGenerationResult Completed(
+            int generatedFileCount,
+            string sourcePath)
+        {
+            return new PlayServModelGenerationResult(
+                true,
+                generatedFileCount,
+                sourcePath,
+                string.Empty);
+        }
+
+        public static PlayServModelGenerationResult Failed(
+            string sourcePath,
+            string error)
+        {
+            return new PlayServModelGenerationResult(false, 0, sourcePath, error);
+        }
+    }
+
     internal static class SchemaCodeGenerator
     {
-        private const string RootFolderPath = "/Shared/Generated/Models";
-        private const string LatestSchemaFilePath = "Assets/Resources/latest-schema.json";
-        private const string CurrentSchemaFilePath = "Assets/Resources/current-schema.json";
-
-        // [MenuItem("Tools/PlayServ/Generate Models from JSON Schema")]
         public static void Generate()
         {
-            foreach (var file in GetFilesDataCollection())
+            var path = EditorUtility.OpenFilePanel(
+                "Select JSON schema",
+                string.Empty,
+                "json");
+            if (string.IsNullOrWhiteSpace(path))
             {
-                GenerateFileClass(file.Key, file.Value);
+                Debug.LogWarning("Schema file selection was cancelled.");
+                return;
             }
 
-            AssetDatabase.Refresh();
-            ResetSchemaSelectionProviderIfAvailable();
+            Report(GenerateFromSchemaFile(path, acceptAsCurrent: true));
         }
 
         public static void GenerateModels(bool isLatestSchemaUse = true)
         {
-            if (Directory.Exists(Application.dataPath + RootFolderPath))
-                Directory.Delete(Application.dataPath + RootFolderPath, true);
-
-            foreach (var file in GetFilesDataCollection(false, isLatestSchemaUse))
-            {
-                GenerateFileClass(file.Key, file.Value);
-            }
-
-            AssetDatabase.Refresh();
-            ResetSchemaSelectionProviderIfAvailable();
+            Report(GenerateModelsWithResult(isLatestSchemaUse));
         }
 
-        private static Dictionary<string, string> GetFilesDataCollection(bool selectFile = true,
-            bool isLatestSchemaUse = true)
+        internal static PlayServModelGenerationResult GenerateModelsWithResult(
+            bool useLatestSchema)
         {
-            // Parameters: Title, Directory to start in, Extension (empty string for all)
-            var path = selectFile ? EditorUtility.OpenFilePanel("Select json schema", "", "json") :
-                isLatestSchemaUse ? LatestSchemaFilePath : CurrentSchemaFilePath;
-
-            if (!string.IsNullOrEmpty(path))
-            {
-                Debug.Log("Selected json schema File Path: " + path);
-
-                string content = File.ReadAllText(path);
-
-                try
-                {
-                    JsonSchemaRoot root = SchemaJsonReader.ReadRoot(content);
-
-                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaTimestamp, root.JsonSchema.XTimestamp);
-                    EditorPrefs.SetString(Const.PrefKeyJsonSchemaVersion, root.JsonSchema.XVersion);
-
-                    Debug.Log($"[LOG] Schema Version: {root.JsonSchema.XVersion}");
-                    Debug.Log($"[LOG] Timestamp: {root.JsonSchema.XTimestamp}");
-                    Debug.Log($"[LOG] Definitions Found: {SchemaUtils.GetAllDefinitions(root.JsonSchema).Count()}");
-                    Debug.Log("");
-
-                    // 3. Generate Code
-                    var generator = new DotNetGenerator();
-                    Dictionary<string, string> generatedCode = generator.Generate(root.JsonSchema);
-
-                    // 4. Print Result
-                    Debug.Log("--- GENERATED C# CLASSES ---");
-                    foreach (var file in generatedCode)
-                    {
-                        Debug.Log($"// FileName: {file.Key}");
-                        Debug.Log(file.Value);
-                        Debug.Log(Environment.NewLine);
-                    }
-
-                    Debug.Log("-----------------------------");
-
-                    Debug.Log("\nGeneration complete.");
-
-                    if (selectFile || (!selectFile && !isLatestSchemaUse))
-                    {
-                        File.WriteAllText(CurrentSchemaFilePath, content);
-                        Debug.Log("[LOG] Current schema saved/updated.");
-                    }
-
-                    return generatedCode;
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"Error: {ex.Message}");
-                    if (ex.InnerException != null) Debug.LogError($"Detail: {ex.InnerException.Message}");
-                }
-            }
-            else
-            {
-                Debug.LogWarning("File selection was cancelled.");
-            }
-
-            return null;
+            var sourcePath = useLatestSchema
+                ? PlayServServerSchemaWorkflow.LatestSchemaAssetPath
+                : PlayServServerSchemaWorkflow.CurrentSchemaAssetPath;
+            return GenerateFromSchemaFile(
+                PlayServServerSchemaWorkflow.ToAbsolutePath(sourcePath),
+                acceptAsCurrent: useLatestSchema,
+                sourcePath);
         }
 
-        private static void GenerateFileClass(string className, string content)
+        internal static PlayServModelGenerationResult GenerateFromSchemaFile(
+            string absoluteSchemaPath,
+            bool acceptAsCurrent,
+            string displayPath = null)
         {
-            string folderPath = Application.dataPath + RootFolderPath;
-            string fullPath = folderPath + "/" + className + ".cs";
-
-            if (!Directory.Exists(folderPath))
+            var sourcePath = string.IsNullOrWhiteSpace(displayPath)
+                ? absoluteSchemaPath
+                : displayPath;
+            if (string.IsNullOrWhiteSpace(absoluteSchemaPath) ||
+                !File.Exists(absoluteSchemaPath))
             {
-                Directory.CreateDirectory(folderPath);
+                return PlayServModelGenerationResult.Failed(
+                    sourcePath,
+                    $"Schema file was not found: {sourcePath}");
             }
 
-            File.WriteAllText(fullPath, content);
+            try
+            {
+                var content = File.ReadAllText(absoluteSchemaPath);
+                var root = SchemaJsonReader.ReadRoot(content);
+                if (!SchemaJsonReader.IsSupportedRoot(root))
+                {
+                    return PlayServModelGenerationResult.Failed(
+                        sourcePath,
+                        $"{sourcePath} does not contain a supported PlayServ schema.");
+                }
 
-            Debug.Log($"Successfully created C# file at: {fullPath}");
+                var generator = new DotNetGenerator();
+                var generatedCode = generator.Generate(root.JsonSchema);
+                if (generatedCode == null)
+                {
+                    return PlayServModelGenerationResult.Failed(
+                        sourcePath,
+                        "The schema code generator returned no result.");
+                }
+
+                if (!TryPrepareGeneratedFiles(
+                        generatedCode,
+                        out var generatedFiles,
+                        out var validationError))
+                {
+                    return PlayServModelGenerationResult.Failed(
+                        sourcePath,
+                        validationError);
+                }
+
+                WriteGeneratedFiles(generatedFiles);
+                if (acceptAsCurrent)
+                {
+                    WriteText(
+                        PlayServServerSchemaWorkflow.ToAbsolutePath(
+                            PlayServServerSchemaWorkflow.CurrentSchemaAssetPath),
+                        content);
+                }
+
+                SaveCurrentSchemaInfo(
+                    root.JsonSchema.XVersion,
+                    root.JsonSchema.XTimestamp);
+                AssetDatabase.Refresh();
+                ResetSchemaSelectionProviderIfAvailable();
+
+                Debug.Log(
+                    $"[PlayServ Schema] Generated {generatedFiles.Count} C# model files " +
+                    $"from {sourcePath}. Definitions: " +
+                    $"{SchemaUtils.GetAllDefinitions(root.JsonSchema).Count()}.");
+                return PlayServModelGenerationResult.Completed(
+                    generatedFiles.Count,
+                    sourcePath);
+            }
+            catch (Exception exception)
+            {
+                return PlayServModelGenerationResult.Failed(
+                    sourcePath,
+                    exception.GetBaseException().Message);
+            }
         }
 
         public static void CheckNewVersionJsonSchema()
         {
-            if (!File.Exists(LatestSchemaFilePath))
+            var latest = PlayServServerSchemaWorkflow.ReadLatest(out var error);
+            if (!latest.Exists)
             {
-                Debug.LogWarning($"[LOG] Latest schema file not found at '{LatestSchemaFilePath}'.");
+                Debug.LogWarning(
+                    $"[PlayServ Schema] Latest schema was not found at " +
+                    $"{PlayServServerSchemaWorkflow.LatestSchemaAssetPath}.");
                 return;
             }
 
-            var content = File.ReadAllText(LatestSchemaFilePath);
-            JsonSchemaRoot root = SchemaJsonReader.ReadRoot(content);
+            if (!string.IsNullOrWhiteSpace(error))
+            {
+                Debug.LogError($"[PlayServ Schema] {error}");
+                return;
+            }
 
-            EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestTimestamp, root.JsonSchema.XTimestamp);
-            EditorPrefs.SetString(Const.PrefKeyJsonSchemaLatestVersion, root.JsonSchema.XVersion);
+            EditorPrefs.SetString(
+                Const.PrefKeyJsonSchemaLatestTimestamp,
+                latest.Timestamp);
+            EditorPrefs.SetString(
+                Const.PrefKeyJsonSchemaLatestVersion,
+                latest.Version);
+        }
 
-            Debug.Log($"[LOG] Checking New Schema...");
-            Debug.Log($"[LOG] Schema Version: {root.JsonSchema.XVersion}");
-            Debug.Log($"[LOG] Timestamp: {root.JsonSchema.XTimestamp}");
+        internal static bool TryGetGeneratedFileName(
+            string className,
+            out string fileName)
+        {
+            fileName = string.Empty;
+            var value = className?.Trim();
+            if (string.IsNullOrWhiteSpace(value) ||
+                value == "." ||
+                value == ".." ||
+                value.IndexOfAny(new[] { '<', '>', ':', '"', '/', '\\', '|', '?', '*' }) >= 0 ||
+                value.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                return false;
+            }
+
+            fileName = value.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                ? value
+                : value + ".cs";
+            return true;
+        }
+
+        private static bool TryPrepareGeneratedFiles(
+            IReadOnlyDictionary<string, string> generatedCode,
+            out Dictionary<string, string> generatedFiles,
+            out string error)
+        {
+            generatedFiles = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+            error = string.Empty;
+
+            foreach (var entry in generatedCode)
+            {
+                if (!TryGetGeneratedFileName(entry.Key, out var fileName))
+                {
+                    error =
+                        $"Generated model name '{entry.Key}' is not a safe file name.";
+                    return false;
+                }
+
+                if (generatedFiles.ContainsKey(fileName))
+                {
+                    error =
+                        $"Multiple generated models resolve to '{fileName}'.";
+                    return false;
+                }
+
+                generatedFiles.Add(fileName, entry.Value ?? string.Empty);
+            }
+
+            return true;
+        }
+
+        private static void WriteGeneratedFiles(
+            IReadOnlyDictionary<string, string> generatedFiles)
+        {
+            var outputDirectory = PlayServServerSchemaWorkflow.ToAbsolutePath(
+                PlayServServerSchemaWorkflow.GeneratedModelsAssetPath);
+            Directory.CreateDirectory(outputDirectory);
+
+            var expectedPaths = new HashSet<string>(
+                generatedFiles.Keys.Select(
+                    fileName => Path.GetFullPath(
+                        Path.Combine(outputDirectory, fileName))),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in generatedFiles)
+            {
+                WriteText(
+                    Path.Combine(outputDirectory, entry.Key),
+                    entry.Value);
+            }
+
+            foreach (var existingFile in Directory.GetFiles(
+                         outputDirectory,
+                         "*.cs",
+                         SearchOption.TopDirectoryOnly))
+            {
+                var fullPath = Path.GetFullPath(existingFile);
+                if (expectedPaths.Contains(fullPath))
+                    continue;
+
+                File.Delete(fullPath);
+                var metaPath = fullPath + ".meta";
+                if (File.Exists(metaPath))
+                    File.Delete(metaPath);
+            }
+        }
+
+        private static void WriteText(string path, string content)
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllText(path, content ?? string.Empty, new UTF8Encoding(false));
+        }
+
+        private static void SaveCurrentSchemaInfo(string version, string timestamp)
+        {
+            EditorPrefs.SetString(
+                Const.PrefKeyJsonSchemaVersion,
+                version ?? string.Empty);
+            EditorPrefs.SetString(
+                Const.PrefKeyJsonSchemaTimestamp,
+                timestamp ?? string.Empty);
+        }
+
+        private static void Report(PlayServModelGenerationResult result)
+        {
+            if (result.Success)
+            {
+                Debug.Log(
+                    $"[PlayServ Schema] Generated {result.GeneratedFileCount} models " +
+                    $"from {result.SourcePath}.");
+                return;
+            }
+
+            Debug.LogError($"[PlayServ Schema] {result.Error}");
         }
 
         private static void ResetSchemaSelectionProviderIfAvailable()
         {
-            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(PlayServModuleManifest.DataSubscriptionId))
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(
+                    PlayServModuleManifest.DataSubscriptionId))
+            {
                 return;
+            }
 
             PlayServSchemaSelectionRegistry.TryReset();
         }

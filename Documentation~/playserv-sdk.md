@@ -311,6 +311,45 @@ package id to one or more module ids and a Git subfolder. Package-backed module
 uninstall operations are routed through Unity Package Manager; the local asset
 deletion path is used only for modules imported under `Assets`.
 
+## Schema workflows
+
+The main PlayServ window separates schema work into two independent directions.
+
+### Local contracts: C# to schema
+
+`Local contracts` scans explicitly attributed project C# files and generates
+the outputs configured in `playserv.schema.json`:
+
+```text
+C# [PlayServSchema] contracts
+    -> canonical contract graph
+    -> JSON Schema and optional backend C# DTOs
+```
+
+The external `com.playserv.schema-tool` companion owns this workflow.
+
+### Server schema: schema to Unity C#
+
+`Server schema` restores the Schema API workflow:
+
+1. `Download Latest` sends the public `pk_*` Client Token to
+   `POST /api/schemas/by-sdk-key`.
+2. The response is saved as `Assets/Resources/latest-schema.json`.
+3. The SDK compares it with `Assets/Resources/current-schema.json` by content
+   hash and displays version, timestamp, and definition count.
+4. `Apply & Generate C#` asks for confirmation, validates the complete schema,
+   and generates models under `Assets/Shared/Generated/Models`.
+5. Only after successful generation does the downloaded schema become
+   `current-schema.json`.
+
+Downloading never changes generated C# automatically. A malformed schema or
+unsafe generated file name fails before the existing models are touched.
+`Regenerate C# Models` can rebuild models when the downloaded and current
+schemas already match.
+
+The selected environment must provide a Schema API Server address, and
+PlayServ Config must contain a public Client Token.
+
 ## External Schema Tool
 
 `com.playserv.schema-tool` is delivered through Unity Package Manager but runs
@@ -323,9 +362,9 @@ to its bundled .NET 8 runtime.
 ### Install and initialize
 
 1. Open `Tools > PlayServ > Settings`.
-2. Expand `Schema Tool`.
-3. Select `Install Schema Tool`.
-4. Select `Initialize`.
+2. Expand `Schema Workflows`.
+3. Under `Local contracts`, select `Install Local Schema Tool`.
+4. Select `Initialize Local Schema`.
 5. Commit `playserv.schema.json` and generated `playserv.schema.lock.json`.
 
 For a Git installation, the package may also be declared directly:
@@ -425,13 +464,13 @@ sources and outputs.
 
 ### Run from Unity, Rider, or CLI
 
-The main SDK window provides:
+The main SDK window keeps the primary `Generate Local Outputs` and `Analyze`
+actions visible. `Advanced` provides:
 
-- `Analyze`: discover schemas and report duplicate IDs or fields.
-- `Generate`: update configured outputs and the lock file.
-- `Validate`: fail when committed generated files are stale.
+- `Validate Generated`: fail when committed generated files are stale.
 - `Start Watch`: run continuous external analysis independently of Unity.
 - `Create IDE Launcher`: create `.playserv/bin/playserv-schema`.
+- `Open Configuration`: reveal `playserv.schema.json`.
 
 After creating the launcher:
 

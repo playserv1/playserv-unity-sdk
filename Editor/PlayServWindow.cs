@@ -84,8 +84,6 @@ namespace Playserv.Editor
             _state.ShowModuleSettingsLayer = false;
             _state.ModuleSettings.Load();
 
-            _state.ShowAvailableSchemaInfo = false;
-
             ConfigureWindowSize();
 
             _state.WebSocketEndpoint = EditorPrefs.GetString(

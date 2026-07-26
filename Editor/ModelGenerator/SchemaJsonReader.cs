@@ -18,5 +18,12 @@ namespace Playserv.ModelGenerator.Editor
         {
             return JsonCodec.Deserialize<JsonSchemaRoot>(content, SchemaCodecOptions);
         }
+
+        public static bool IsSupportedRoot(JsonSchemaRoot root)
+        {
+            return root != null &&
+                   root.Version > 0 &&
+                   root.JsonSchema != null;
+        }
     }
 }

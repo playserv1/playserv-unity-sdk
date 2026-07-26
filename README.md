@@ -58,11 +58,13 @@ installed module excludes its assembly through a scripting define without
 removing the package. The Native Transports package exposes separate toggles for
 UDP and RUDP.
 
-The Schema Tool is managed from the `Schema Tool` section in the main PlayServ
-window. It is downloaded through UPM but runs as an external process on Unity's
-bundled .NET runtime. It can analyze `[PlayServSchema]` C# contracts, generate
-JSON Schema and backend C# contracts, validate drift in CI, and watch project
-files independently of the Unity compilation loop.
+The `Schema Workflows` section in the main PlayServ window exposes both schema
+directions. `Local contracts` installs the external UPM Schema Tool to analyze
+`[PlayServSchema]` C# contracts, generate JSON Schema and backend DTOs, validate
+drift in CI, and watch project files. `Server schema` downloads the selected
+project schema from the PlayServ Schema API, previews its difference from the
+accepted schema, and generates Unity C# models only after explicit
+confirmation.
 
 ## Cache maintenance
 

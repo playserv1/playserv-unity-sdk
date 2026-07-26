@@ -29,7 +29,6 @@ namespace Playserv.Editor
         public bool FoldGoogleSignIn;
         public bool ShowModuleSettingsLayer;
 
-        public bool ShowAvailableSchemaInfo;
         public Vector2 MainScrollPos;
         public readonly PlayServEditorModuleSettings ModuleSettings = new PlayServEditorModuleSettings();
 
