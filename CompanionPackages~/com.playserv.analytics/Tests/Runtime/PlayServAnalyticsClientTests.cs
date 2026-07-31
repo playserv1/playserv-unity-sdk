@@ -5,13 +5,27 @@ using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Playserv.Analytics;
+using Playserv.Modules;
 using Playserv.Proxy.Logging;
+using Playserv.Wrapper;
 using UnityEngine.TestTools;
 
 namespace Playserv.Tests.Runtime.Analytics
 {
     public sealed class PlayServAnalyticsClientTests
     {
+        [SetUp]
+        public void SetUp()
+        {
+            PlayServAnalyticsProviderRegistry.Reset();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            PlayServAnalyticsProviderRegistry.Reset();
+        }
+
         [UnityTest]
         public IEnumerator TrackAndFlush_SendsTypedContextBatch()
         {
@@ -155,6 +169,58 @@ namespace Playserv.Tests.Runtime.Analytics
             }
         }
 
+        [UnityTest]
+        public IEnumerator ProviderConfiguredBeforeClientCreation_IsUsed()
+        {
+            var defaultProvider = new RecordingProvider();
+            var customProvider = new RecordingProvider();
+            PlayServAnalyticsProviderRegistry.Set(customProvider);
+
+            using (var client = CreateClient(
+                       new PlayServAnalyticsProviderSelector(defaultProvider)))
+            {
+                client.Track("custom_provider", parameters: null);
+                var flush = client.FlushAsync(CancellationToken.None);
+                yield return Await(flush);
+
+                Assert.That(defaultProvider.Batches, Is.Empty);
+                Assert.That(customProvider.Batches.Count, Is.EqualTo(1));
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator ResetProvider_RestoresDefaultProvider()
+        {
+            var defaultProvider = new RecordingProvider();
+            var customProvider = new RecordingProvider();
+            var selector = new PlayServAnalyticsProviderSelector(defaultProvider);
+            PlayServAnalyticsProviderRegistry.Set(customProvider);
+            PlayServAnalyticsProviderRegistry.Reset();
+
+            using (var client = CreateClient(selector))
+            {
+                client.Track("default_provider", parameters: null);
+                var flush = client.FlushAsync(CancellationToken.None);
+                yield return Await(flush);
+
+                Assert.That(customProvider.Batches, Is.Empty);
+                Assert.That(defaultProvider.Batches.Count, Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void PublicProviderConfiguration_DoesNotRequireConnection()
+        {
+            var provider = new RecordingProvider();
+            var facade = new PlayServApiAnalyticsFacade(
+                new DisconnectedRuntimeAccess());
+
+            Assert.DoesNotThrow(() => facade.SetProvider(provider));
+            Assert.That(facade.HasCustomProvider, Is.True);
+            Assert.DoesNotThrow(facade.ResetProvider);
+            Assert.That(facade.HasCustomProvider, Is.False);
+        }
+
         [Test]
         public void UnsupportedParameterType_IsRejected()
         {
@@ -222,6 +288,21 @@ namespace Playserv.Tests.Runtime.Analytics
 
                 Batches.Add(batch);
                 return Task.CompletedTask;
+            }
+        }
+
+        private sealed class DisconnectedRuntimeAccess :
+            IPlayServAnalyticsRuntimeAccess
+        {
+            public IPlayServModuleServiceProvider CurrentServices => null;
+
+            public IPlayServModuleServiceProvider RequiredServices =>
+                throw new InvalidOperationException("No active PlayServ connection.");
+
+            public IPlayServModuleServiceProvider GetServicesForFireAndForget(
+                string operationName)
+            {
+                return null;
             }
         }
 

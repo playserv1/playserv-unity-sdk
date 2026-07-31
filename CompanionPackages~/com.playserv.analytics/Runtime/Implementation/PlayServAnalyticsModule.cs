@@ -33,7 +33,8 @@ namespace Playserv.Analytics
 
             var commandBus = context.Services.Get<IPlayServCommandBus>();
             var runtimeIdentity = context.Services.Get<IPlayServRuntimeIdentity>();
-            var provider = new PlayServCommandAnalyticsProvider(commandBus);
+            var provider = new PlayServAnalyticsProviderSelector(
+                new PlayServCommandAnalyticsProvider(commandBus));
             _client = new PlayServAnalyticsClient(
                 provider,
                 () => runtimeIdentity.UserId,

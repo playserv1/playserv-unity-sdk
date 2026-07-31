@@ -638,7 +638,9 @@ an ingestion handler that authenticates the session, validates and
 deduplicates `EventId`, stores events, and exposes reporting or export.
 
 Until that handler is deployed, route events to another destination by
-implementing `IPlayServAnalyticsProvider`:
+implementing `IPlayServAnalyticsProvider`. The implementation belongs to the
+client project, for example under `Assets/Analytics`; it is not shipped by the
+PlayServ SDK:
 
 ```csharp
 using System.Threading;
@@ -658,11 +660,25 @@ public sealed class ProjectAnalyticsProvider : IPlayServAnalyticsProvider
 }
 ```
 
-Install it after the PlayServ connection creates module services:
+Register it during client startup. Registration is allowed before
+`PlayServ.Connect()` and remains active when the PlayServ runtime reconnects:
 
 ```csharp
 PlayServAnalytics.SetProvider(new ProjectAnalyticsProvider());
 ```
+
+Return to the built-in `module_analytics` transport when needed:
+
+```csharp
+if (PlayServAnalytics.HasCustomProvider)
+    PlayServAnalytics.ResetProvider();
+```
+
+For a Firebase migration, the client project can implement the same interface
+with `FirebaseAnalytics.LogEvent(...)` inside `SendAsync`. This keeps PlayServ's
+event validation, context, consent, queue, and batching while Firebase remains
+an optional client dependency. PlayServ does not compile, install, or select a
+Firebase provider automatically.
 
 Provider failures are propagated by manual `FlushAsync` calls and logged by
 background flushes. In both cases the unsent events remain queued.

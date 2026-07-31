@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "Playserv.Runtime.Modules.Analytics",
-        "Playserv.Runtime.Core"
+        "Playserv.Runtime.Core",
+        "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

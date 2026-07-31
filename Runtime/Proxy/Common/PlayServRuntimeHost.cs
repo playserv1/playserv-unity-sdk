@@ -30,6 +30,8 @@ namespace Playserv.Proxy.Common
 
         public static IPlayServRuntimeAccess RuntimeAccess => RequireConfigured(_getRuntimeAccess, nameof(RuntimeAccess))();
 
+        public static bool IsConfigured => _getRuntimeAccess != null;
+
         public static bool HasCurrentInstance => RuntimeAccess.HasCurrentInstance;
 
         public static IPlayServCommandBus CurrentCommandBus => RuntimeAccess.CurrentCommandBus;

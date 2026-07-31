@@ -12,11 +12,15 @@ namespace Playserv.Wrapper
     {
         bool CollectionEnabled { get; }
 
+        bool HasCustomProvider { get; }
+
         int PendingEventCount { get; }
 
         void SetCollectionEnabled(bool enabled);
 
         void SetProvider(IPlayServAnalyticsProvider provider);
+
+        void ResetProvider();
 
         void SetUserId(string userId);
 
@@ -47,6 +51,8 @@ namespace Playserv.Wrapper
 
         public static bool CollectionEnabled => Api.CollectionEnabled;
 
+        public static bool HasCustomProvider => Api.HasCustomProvider;
+
         public static int PendingEventCount => Api.PendingEventCount;
 
         public static void SetCollectionEnabled(bool enabled) =>
@@ -54,6 +60,8 @@ namespace Playserv.Wrapper
 
         public static void SetProvider(IPlayServAnalyticsProvider provider) =>
             Api.SetProvider(provider);
+
+        public static void ResetProvider() => Api.ResetProvider();
 
         public static void SetUserId(string userId) => Api.SetUserId(userId);
 
@@ -99,6 +107,9 @@ namespace Playserv.Wrapper
         public bool CollectionEnabled =>
             TryGetCurrentClient(out var client) && client.CollectionEnabled;
 
+        public bool HasCustomProvider =>
+            PlayServAnalyticsProviderRegistry.HasCustomProvider;
+
         public int PendingEventCount =>
             TryGetCurrentClient(out var client) ? client.PendingEventCount : 0;
 
@@ -110,10 +121,14 @@ namespace Playserv.Wrapper
 
         public void SetProvider(IPlayServAnalyticsProvider provider)
         {
-            if (provider == null)
-                throw new ArgumentNullException(nameof(provider));
+            PlayServAnalyticsProviderRegistry.Set(provider);
+            NotifyCurrentClientProviderChanged();
+        }
 
-            RequiredClient.SetProvider(provider);
+        public void ResetProvider()
+        {
+            PlayServAnalyticsProviderRegistry.Reset();
+            NotifyCurrentClientProviderChanged();
         }
 
         public void SetUserId(string userId)
@@ -179,6 +194,12 @@ namespace Playserv.Wrapper
                    services.TryGet(out client);
         }
 
+        private void NotifyCurrentClientProviderChanged()
+        {
+            if (TryGetCurrentClient(out var client))
+                client.NotifyProviderChanged();
+        }
+
         private IPlayServAnalyticsClient GetClientForFireAndForget(
             string operationName)
         {
@@ -210,7 +231,9 @@ namespace Playserv.Wrapper
         IPlayServAnalyticsRuntimeAccess
     {
         public IPlayServModuleServiceProvider CurrentServices =>
-            PlayServRuntimeHost.CurrentModuleServices;
+            PlayServRuntimeHost.IsConfigured
+                ? PlayServRuntimeHost.CurrentModuleServices
+                : null;
 
         public IPlayServModuleServiceProvider RequiredServices =>
             PlayServRuntimeHost.RequiredModuleServices;

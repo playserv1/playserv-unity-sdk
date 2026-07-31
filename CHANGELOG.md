@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Made client-defined analytics providers configurable before PlayServ
+  connection setup and persistent across runtime reconnects.
+- Added `PlayServAnalytics.HasCustomProvider` and `ResetProvider()` while
+  keeping Firebase and other vendor adapters in client projects.
 - Restored server schema download and C# model generation in the main SDK
   window alongside the external local-contract Schema Tool.
 - Split the schema UI into explicit `C# -> local outputs` and

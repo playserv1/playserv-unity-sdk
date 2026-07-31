@@ -17,6 +17,8 @@ namespace Playserv.Analytics
 
         void SetProvider(IPlayServAnalyticsProvider provider);
 
+        void NotifyProviderChanged();
+
         void SetUserId(string userId);
 
         void SetUserProperty(string key, string value);
@@ -133,6 +135,11 @@ namespace Playserv.Analytics
                 _provider = provider;
             }
 
+            StartBackgroundFlush();
+        }
+
+        public void NotifyProviderChanged()
+        {
             StartBackgroundFlush();
         }
 

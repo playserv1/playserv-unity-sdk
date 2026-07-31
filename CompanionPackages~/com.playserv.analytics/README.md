@@ -29,4 +29,11 @@ Git installations must use the same tag or commit for both packages.
    delivery of the current batch matters.
 
 Applications can replace the default command provider through
-`PlayServAnalytics.SetProvider(...)`.
+`PlayServAnalytics.SetProvider(...)`. Configure the provider in client project
+code before or after `PlayServ.Connect()`; the selection survives PlayServ
+runtime reconnects. Call `PlayServAnalytics.ResetProvider()` to return to
+PlayServ command delivery.
+
+The SDK deliberately does not include Firebase or another vendor adapter.
+Implement `IPlayServAnalyticsProvider` under the client project's `Assets`
+folder when events must be routed to a custom ingestion service.
