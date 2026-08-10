@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Made backend, deploy API, schema API, and dashboard addresses editable in
+  `PlayServConfig`; project values now override baked package defaults.
+- Changed environment selection to explicitly apply its endpoint defaults to
+  the config while preserving subsequent project-specific edits.
 - Made client-defined analytics providers configurable before PlayServ
   connection setup and persistent across runtime reconnects.
 - Added `PlayServAnalytics.HasCustomProvider` and `ResetProvider()` while

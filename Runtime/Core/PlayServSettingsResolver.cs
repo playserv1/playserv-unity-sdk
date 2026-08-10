@@ -83,16 +83,23 @@ namespace Playserv.Wrapper
                 merged.ClientToken = packageDefaults.ClientToken;
             if (string.IsNullOrWhiteSpace(merged.GameId))
                 merged.GameId = packageDefaults.GameId;
-
-            merged.BackendServerAddress = packageDefaults.BackendServerAddress;
-            merged.WebRtcSignalingServerAddress = packageDefaults.WebRtcSignalingServerAddress;
-            merged.WebRtcDataChannelLabel = packageDefaults.WebRtcDataChannelLabel;
-            merged.WebRtcIceServers = packageDefaults.WebRtcIceServers == null
-                ? Array.Empty<string>()
-                : (string[])packageDefaults.WebRtcIceServers.Clone();
-            merged.DeployApiServerAddress = packageDefaults.DeployApiServerAddress;
-            merged.SchemaApiServerAddress = packageDefaults.SchemaApiServerAddress;
-            merged.DashboardAddress = packageDefaults.DashboardAddress;
+            if (string.IsNullOrWhiteSpace(merged.BackendServerAddress))
+                merged.BackendServerAddress = packageDefaults.BackendServerAddress;
+            if (string.IsNullOrWhiteSpace(merged.WebRtcSignalingServerAddress))
+                merged.WebRtcSignalingServerAddress = packageDefaults.WebRtcSignalingServerAddress;
+            if (string.IsNullOrWhiteSpace(merged.WebRtcDataChannelLabel))
+                merged.WebRtcDataChannelLabel = packageDefaults.WebRtcDataChannelLabel;
+            if ((merged.WebRtcIceServers == null || merged.WebRtcIceServers.Length == 0) &&
+                packageDefaults.WebRtcIceServers != null)
+            {
+                merged.WebRtcIceServers = (string[])packageDefaults.WebRtcIceServers.Clone();
+            }
+            if (string.IsNullOrWhiteSpace(merged.DeployApiServerAddress))
+                merged.DeployApiServerAddress = packageDefaults.DeployApiServerAddress;
+            if (string.IsNullOrWhiteSpace(merged.SchemaApiServerAddress))
+                merged.SchemaApiServerAddress = packageDefaults.SchemaApiServerAddress;
+            if (string.IsNullOrWhiteSpace(merged.DashboardAddress))
+                merged.DashboardAddress = packageDefaults.DashboardAddress;
 
             return merged;
         }

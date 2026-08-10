@@ -20,12 +20,12 @@ namespace Playserv.Editor
             if (config != null)
             {
                 var changed = PlayServDeployCredentialStore.MigrateLegacySecrets(config);
+                changed |= ApplyEnvironmentProfile(config);
                 changed |= EnsureBackendServerAddress(config);
                 changed |= EnsureDeployApiServerAddress(config);
                 changed |= EnsureSchemaApiServerAddress(config);
                 changed |= EnsureDashboardAddress(config);
                 changed |= EnsureDefaultSdkVersion(config);
-                changed |= ApplyEnvironmentProfile(config);
                 if (changed)
                     AssetDatabase.SaveAssets();
                 return config;
@@ -40,12 +40,13 @@ namespace Playserv.Editor
 
             config = ScriptableObject.CreateInstance<PlayServConfig>();
             AssetDatabase.CreateAsset(config, AssetPath);
+            PlayServPackageEnvironmentProvider.TryApplyActiveEnvironmentDefaults(config);
+            ApplyEnvironmentProfile(config);
             EnsureBackendServerAddress(config);
             EnsureDeployApiServerAddress(config);
             EnsureSchemaApiServerAddress(config);
             EnsureDashboardAddress(config);
             EnsureDefaultSdkVersion(config);
-            ApplyEnvironmentProfile(config);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return config;
@@ -214,19 +215,21 @@ namespace Playserv.Editor
 
             if (PlayServPackageDefaultsProvider.TryLoadSettings(out var bakedSettings))
             {
-                // Distributed package mode:
-                // - keep user-entered values once set
-                // - seed public client/game fields from baked package defaults only when currently empty
-                // - always enforce baked endpoints
+                // Distributed package mode: baked values are defaults, while
+                // project config values remain explicit overrides.
                 var merged = config.ToSettings();
                 if (string.IsNullOrWhiteSpace(merged.ClientToken))
                     merged.ClientToken = bakedSettings.ClientToken;
                 if (string.IsNullOrWhiteSpace(merged.GameId))
                     merged.GameId = bakedSettings.GameId;
-                merged.BackendServerAddress = bakedSettings.BackendServerAddress;
-                merged.DeployApiServerAddress = bakedSettings.DeployApiServerAddress;
-                merged.SchemaApiServerAddress = bakedSettings.SchemaApiServerAddress;
-                merged.DashboardAddress = bakedSettings.DashboardAddress;
+                if (string.IsNullOrWhiteSpace(merged.BackendServerAddress))
+                    merged.BackendServerAddress = bakedSettings.BackendServerAddress;
+                if (string.IsNullOrWhiteSpace(merged.DeployApiServerAddress))
+                    merged.DeployApiServerAddress = bakedSettings.DeployApiServerAddress;
+                if (string.IsNullOrWhiteSpace(merged.SchemaApiServerAddress))
+                    merged.SchemaApiServerAddress = bakedSettings.SchemaApiServerAddress;
+                if (string.IsNullOrWhiteSpace(merged.DashboardAddress))
+                    merged.DashboardAddress = bakedSettings.DashboardAddress;
                 return config.ApplySettings(merged);
             }
 

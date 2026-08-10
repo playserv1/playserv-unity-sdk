@@ -25,7 +25,7 @@ namespace Playserv.Editor
             "sdkVersion"
         };
 
-        private static readonly string[] ReadOnlyEndpointPropertyOrder =
+        private static readonly string[] EndpointPropertyOrder =
         {
             "backendServerAddress",
             "deployApiServerAddress",
@@ -40,7 +40,7 @@ namespace Playserv.Editor
             DrawProperties(EditablePropertyOrder, readOnly: false);
             DrawProperties(SdkVersionPropertyOrder, readOnly: !CanEditSdkVersionInClientEditor());
 
-            DrawProperties(ReadOnlyEndpointPropertyOrder, readOnly: true);
+            DrawProperties(EndpointPropertyOrder, readOnly: false);
 
             if (serializedObject.ApplyModifiedProperties())
                 EditorUtility.SetDirty(target);

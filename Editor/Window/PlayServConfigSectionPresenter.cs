@@ -14,7 +14,7 @@ namespace Playserv.Editor
                 ref state.FoldConfig,
                 "Control Room",
                 "PlayServ Config",
-                "Manage runtime identity, fixed endpoints, SDK version, and the project-side config asset from one place.");
+                "Manage runtime identity, configurable endpoints, SDK version, and the project-side config asset from one place.");
 
             if (expanded)
             {

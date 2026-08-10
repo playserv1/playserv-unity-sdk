@@ -33,7 +33,7 @@ namespace Playserv.Editor
                 return false;
 
             settings = config.ToSettings();
-            ApplyPackageDefaults(settings, environmentDefaults.ToSettings());
+            ApplyMissingPackageDefaults(settings, environmentDefaults.ToSettings());
             return true;
         }
 
@@ -58,9 +58,39 @@ namespace Playserv.Editor
             if (selectedIndex == activeIndex)
                 return true;
 
-            EditorPrefs.SetString(ActiveEnvironmentPrefKey, environments[selectedIndex]);
+            var selectedEnvironment = environments[selectedIndex];
+            EditorPrefs.SetString(ActiveEnvironmentPrefKey, selectedEnvironment);
+            var config = PlayServConfigProvider.FindExisting();
+            if (config != null && TryApplyEnvironmentDefaults(config, selectedEnvironment))
+                AssetDatabase.SaveAssets();
+
             changed = true;
             return true;
+        }
+
+        internal static bool TryApplyActiveEnvironmentDefaults(PlayServConfig config)
+        {
+            if (config == null)
+                return false;
+
+            var environments = GetEnvironmentNames();
+            var activeEnvironment = ResolveActiveEnvironmentName(environments);
+            return TryApplyEnvironmentDefaults(config, activeEnvironment);
+        }
+
+        private static bool TryApplyEnvironmentDefaults(
+            PlayServConfig config,
+            string environmentName)
+        {
+            if (config == null ||
+                !TryLoadEnvironmentDefaults(environmentName, out var environmentDefaults))
+            {
+                return false;
+            }
+
+            var settings = config.ToSettings();
+            ApplyEnvironmentDefaults(settings, environmentDefaults.ToSettings());
+            return config.ApplySettings(settings);
         }
 
         private static string[] GetEnvironmentNames()
@@ -115,7 +145,7 @@ namespace Playserv.Editor
             return PlayServPackageDefaultsProvider.TryLoadEnvironmentAsset(normalized, out defaults);
         }
 
-        private static void ApplyPackageDefaults(PlayServSettings target, PlayServSettings defaults)
+        private static void ApplyEnvironmentDefaults(PlayServSettings target, PlayServSettings defaults)
         {
             if (target == null || defaults == null)
                 return;
@@ -140,10 +170,64 @@ namespace Playserv.Editor
             target.TimeoutSeconds = defaults.TimeoutSeconds;
         }
 
+        private static void ApplyMissingPackageDefaults(
+            PlayServSettings target,
+            PlayServSettings defaults)
+        {
+            if (target == null || defaults == null)
+                return;
+
+            AssignIfMissing(value => target.ClientToken = value, target.ClientToken, defaults.ClientToken);
+            AssignIfMissing(value => target.GameId = value, target.GameId, defaults.GameId);
+            AssignIfMissing(
+                value => target.BackendServerAddress = value,
+                target.BackendServerAddress,
+                defaults.BackendServerAddress);
+            AssignIfMissing(
+                value => target.WebRtcSignalingServerAddress = value,
+                target.WebRtcSignalingServerAddress,
+                defaults.WebRtcSignalingServerAddress);
+            AssignIfMissing(
+                value => target.WebRtcDataChannelLabel = value,
+                target.WebRtcDataChannelLabel,
+                defaults.WebRtcDataChannelLabel);
+            AssignIfMissing(
+                value => target.DeployApiServerAddress = value,
+                target.DeployApiServerAddress,
+                defaults.DeployApiServerAddress);
+            AssignIfMissing(
+                value => target.SchemaApiServerAddress = value,
+                target.SchemaApiServerAddress,
+                defaults.SchemaApiServerAddress);
+            AssignIfMissing(
+                value => target.DashboardAddress = value,
+                target.DashboardAddress,
+                defaults.DashboardAddress);
+
+            if ((target.WebRtcIceServers == null || target.WebRtcIceServers.Length == 0) &&
+                defaults.WebRtcIceServers != null &&
+                defaults.WebRtcIceServers.Length > 0)
+            {
+                target.WebRtcIceServers = (string[])defaults.WebRtcIceServers.Clone();
+            }
+        }
+
         private static void AssignIfSet(Action<string> assign, string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
                 assign(value.Trim());
+        }
+
+        private static void AssignIfMissing(
+            Action<string> assign,
+            string currentValue,
+            string defaultValue)
+        {
+            if (string.IsNullOrWhiteSpace(currentValue) &&
+                !string.IsNullOrWhiteSpace(defaultValue))
+            {
+                assign(defaultValue.Trim());
+            }
         }
 
         private static string ResolveActiveEnvironmentName(string[] environments)
