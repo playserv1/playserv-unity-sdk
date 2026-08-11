@@ -70,7 +70,8 @@ namespace Playserv.Wrapper
                 settings.AllowMultipleConnections,
                 settings.KeepAlivePingIntervalMs,
                 settings.KeepAlivePongTimeoutMs,
-                settings.RuntimeTokenProvider);
+                settings.RuntimeTokenProvider,
+                settings.PlayerAccessToken);
 
             _subscribeToInstanceEvents(instance);
             currentSettings = settings;
@@ -133,7 +134,8 @@ namespace Playserv.Wrapper
         private static bool HasHandshakeCredential(PlayServSettings settings)
         {
             return !string.IsNullOrWhiteSpace(settings.ClientToken) ||
-                   settings.RuntimeTokenProvider != null;
+                   settings.RuntimeTokenProvider != null ||
+                   !string.IsNullOrWhiteSpace(settings.PlayerAccessToken);
         }
 
         private void EnsureInstanceForSettings(

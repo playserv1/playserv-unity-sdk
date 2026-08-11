@@ -63,6 +63,21 @@ namespace Playserv.Tests.Runtime
             Assert.That(clone.RuntimeTokenProvider, Is.SameAs(provider));
             Assert.That(typeof(PlayServConfig).GetProperty("Authorization"), Is.Null);
             Assert.That(typeof(PlayServConfig).GetProperty("DeployAuthToken"), Is.Null);
+            Assert.That(typeof(PlayServConfig).GetProperty("PlayerAccessToken"), Is.Null);
+        }
+
+        [Test]
+        public void SettingsClone_PreservesRuntimeOnlyPlayerAccessToken()
+        {
+            var settings = new PlayServSettings
+            {
+                PlayerAccessToken = "player.jwt.value"
+            };
+
+            var clone = settings.Clone();
+
+            Assert.That(clone.PlayerAccessToken, Is.EqualTo("player.jwt.value"));
+            Assert.That(clone.ToRuntimeSettings().PlayerAccessToken, Is.EqualTo("player.jwt.value"));
         }
     }
 }

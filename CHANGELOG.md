@@ -6,6 +6,13 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Added anonymous player sign-in and refresh endpoints to the runtime HTTP client,
+  including player token response contracts and WebSocket-to-HTTP endpoint mapping.
+- Added awaitable live player-auth rotation through `RefreshAuthRequest`, with
+  timeout, cancellation, serialized refresh calls, and reconnect credential reuse.
+- Added `PlayServ.RefreshPlayerAuthAsync` and
+  `PlayServConnection.RefreshPlayerAuthAsync`; initial player JWTs remain
+  runtime-only and are never serialized into `PlayServConfig`.
 - Made backend, deploy API, schema API, and dashboard addresses editable in
   `PlayServConfig`; project values now override baked package defaults.
 - Changed environment selection to explicitly apply its endpoint defaults to

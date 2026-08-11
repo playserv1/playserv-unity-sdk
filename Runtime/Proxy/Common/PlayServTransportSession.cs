@@ -13,6 +13,7 @@ namespace Playserv.Proxy.Common
         private readonly ITransport _transport;
         private readonly ILogger _logger;
         private readonly HandshakeService _handshakeService;
+        private readonly RefreshAuthService _refreshAuthService;
         private readonly KeepAliveManager _keepAliveManager;
         private readonly ReconnectionManager _reconnectionManager;
         private readonly SynchronizationContext _mainThreadContext;
@@ -57,6 +58,7 @@ namespace Playserv.Proxy.Common
             _onConnected = onConnected ?? (() => { });
 
             _handshakeService = new HandshakeService(_transport, _logger);
+            _refreshAuthService = new RefreshAuthService(_transport, _logger);
             _keepAliveManager = new KeepAliveManager(_transport, _logger);
             _reconnectionManager = new ReconnectionManager(
                 _transport,
@@ -81,13 +83,15 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
             int keepAlivePongTimeoutMs = 10000,
-            IPlayServRuntimeTokenProvider runtimeTokenProvider = null)
+            IPlayServRuntimeTokenProvider runtimeTokenProvider = null,
+            string playerAccessToken = null)
         {
             var normalizedClientToken = PlayServCredentialPolicy.NormalizeClientToken(clientToken);
-            if (normalizedClientToken == null && runtimeTokenProvider == null)
+            var normalizedAuthorization = PlayServCredentialPolicy.NormalizePlayerAuthorization(playerAccessToken);
+            if (normalizedClientToken == null && runtimeTokenProvider == null && normalizedAuthorization == null)
             {
                 throw new ArgumentException(
-                    "A public pk_* client token or runtime token provider is required.",
+                    "A public pk_* client token, runtime token provider, or runtime player access token is required.",
                     nameof(clientToken));
             }
 
@@ -101,7 +105,7 @@ namespace Playserv.Proxy.Common
                 throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
 
             _clientToken = normalizedClientToken;
-            _authorization = null;
+            _authorization = normalizedAuthorization;
             _runtimeTokenProvider = runtimeTokenProvider;
             _gameId = gameId;
             _userId = userId;
@@ -169,6 +173,27 @@ namespace Playserv.Proxy.Common
             return true;
         }
 
+        public async Task<bool> RefreshPlayerAuthAsync(
+            string newAccessToken,
+            CancellationToken cancellationToken = default)
+        {
+            if (State != PlayServState.Online)
+                throw new InvalidOperationException("Player auth can only be refreshed while the SDK is online.");
+
+            var authorization = PlayServCredentialPolicy.NormalizePlayerAuthorization(newAccessToken);
+            if (authorization == null)
+                throw new ArgumentException("Player access token is required.", nameof(newAccessToken));
+
+            var success = await _refreshAuthService.RefreshAsync(authorization, cancellationToken);
+            if (success)
+            {
+                _authorization = authorization;
+                _handshakeCredential = ResolveHandshakeCredential(_clientToken, _authorization);
+            }
+
+            return success;
+        }
+
         public void HandleDisconnect()
         {
             _logger.LogWarning("Received disconnect command from server.");
@@ -224,6 +249,7 @@ namespace Playserv.Proxy.Common
 
             _handshakeService.OnError -= RaiseTransportError;
             _handshakeService.Dispose();
+            _refreshAuthService.Dispose();
 
             _reconnectionManager.Stop();
             _reconnectionManager.Dispose();
@@ -319,7 +345,9 @@ namespace Playserv.Proxy.Common
 
         private void EnsureConfigured()
         {
-            if ((_runtimeTokenProvider == null && string.IsNullOrWhiteSpace(_clientToken)) ||
+            if ((_runtimeTokenProvider == null &&
+                 string.IsNullOrWhiteSpace(_clientToken) &&
+                 string.IsNullOrWhiteSpace(_authorization)) ||
                 string.IsNullOrWhiteSpace(_gameId) ||
                 string.IsNullOrWhiteSpace(_userId) ||
                 string.IsNullOrWhiteSpace(_gameVersion))
@@ -330,10 +358,12 @@ namespace Playserv.Proxy.Common
 
         private async Task RefreshRuntimeCredentialAsync()
         {
-            _authorization = _runtimeTokenProvider == null
-                ? null
-                : PlayServCredentialPolicy.NormalizePlayerAuthorization(
+            if (_runtimeTokenProvider != null)
+            {
+                _authorization = PlayServCredentialPolicy.NormalizePlayerAuthorization(
                     await _runtimeTokenProvider.GetTokenAsync(CancellationToken.None));
+            }
+
             _handshakeCredential = ResolveHandshakeCredential(_clientToken, _authorization);
 
             if (string.IsNullOrWhiteSpace(_handshakeCredential))

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Modules;
 using Playserv.Proxy.Interfaces;
@@ -30,7 +31,15 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections,
             int keepAlivePingIntervalMs,
             int keepAlivePongTimeoutMs,
-            IPlayServRuntimeTokenProvider runtimeTokenProvider = null);
+            IPlayServRuntimeTokenProvider runtimeTokenProvider = null,
+            string playerAccessToken = null);
+
+        /// <summary>
+        /// Pushes a rotated player access token into the live connection without reconnecting.
+        /// </summary>
+        Task<bool> RefreshPlayerAuthAsync(
+            string newAccessToken,
+            CancellationToken cancellationToken = default);
 
         ITransportImplementation GetTransportImplementation();
     }

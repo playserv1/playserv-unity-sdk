@@ -1,5 +1,6 @@
 #if UNITY_5_3_OR_NEWER
 using System;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Http.Interfaces;
@@ -16,6 +17,9 @@ namespace Playserv.Http.Modules.Unity
         private const string ApiPath = "/api";
         private const string DeploymentEndpointPath = "/deployments";
         private const string LatestVersionPathTemplate = "games/{0}/version/latest";
+        private const string ClientHeaderName = "X-Playserv-Client";
+        private const string AnonSignInPath = "auth/players/anon";
+        private const string RefreshPath = "auth/players/refresh";
 
         private readonly PlayServRuntimeSettings _settings;
         private readonly IJsonCodec _jsonCodec;
@@ -51,6 +55,147 @@ namespace Playserv.Http.Modules.Unity
 
             PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version response parsed. version={version}");
             return version;
+        }
+
+        public async Task<PlayerTokenBundleDto> SignInAnonAsync(
+            string clientToken,
+            CancellationToken ct = default)
+        {
+            var normalizedClientToken = NormalizePublicClientToken(clientToken);
+
+            var url = BuildAuthUrl(_settings.BackendServerAddress, AnonSignInPath);
+            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting anonymous player sign-in. url={url}");
+
+            using var req = CreateAuthPostRequest(url, normalizedClientToken, "{}");
+            await SendRequestAsync(req, ct);
+
+            var bundle = ParseJsonResponse<PlayerTokenBundleDto>(req, "Anonymous sign-in");
+            if (string.IsNullOrWhiteSpace(bundle.access_token) ||
+                string.IsNullOrWhiteSpace(bundle.refresh_token) ||
+                string.IsNullOrWhiteSpace(bundle.player_id))
+            {
+                throw new InvalidOperationException(
+                    "Anonymous sign-in response did not contain a complete player token bundle.");
+            }
+
+            return bundle;
+        }
+
+        public async Task<PlayerRefreshResponseDto> RefreshAsync(
+            string clientToken,
+            string refreshToken,
+            CancellationToken ct = default)
+        {
+            var normalizedClientToken = NormalizePublicClientToken(clientToken);
+
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                throw new ArgumentException("Refresh token is required.", nameof(refreshToken));
+
+            var url = BuildAuthUrl(_settings.BackendServerAddress, RefreshPath);
+            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting player token refresh. url={url}");
+
+            var requestBody = SerializeJson(new PlayerRefreshRequestBody
+            {
+                refresh_token = refreshToken.Trim()
+            });
+            using var req = CreateAuthPostRequest(url, normalizedClientToken, requestBody);
+            await SendRequestAsync(req, ct);
+
+            var refreshed = ParseJsonResponse<PlayerRefreshResponseDto>(req, "Player token refresh");
+            if (string.IsNullOrWhiteSpace(refreshed.access_token) ||
+                string.IsNullOrWhiteSpace(refreshed.refresh_token))
+            {
+                throw new InvalidOperationException(
+                    "Player token refresh response did not contain access and refresh tokens.");
+            }
+
+            return refreshed;
+        }
+
+        [Serializable]
+        private sealed class PlayerRefreshRequestBody
+        {
+            public string refresh_token;
+        }
+
+        private static UnityWebRequest CreateAuthPostRequest(
+            string url,
+            string clientToken,
+            string jsonBody)
+        {
+            var req = new UnityWebRequest(url, "POST")
+            {
+                uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(jsonBody))
+                {
+                    contentType = "application/json"
+                },
+                downloadHandler = new DownloadHandlerBuffer()
+            };
+            req.SetRequestHeader(ClientHeaderName, clientToken);
+            return req;
+        }
+
+        private string SerializeJson(object value)
+        {
+            return _jsonCodec == null
+                ? JsonUtility.ToJson(value)
+                : _jsonCodec.Serialize(value);
+        }
+
+        private T ParseJsonResponse<T>(UnityWebRequest req, string operationLabel)
+        {
+            var body = req.downloadHandler?.text;
+            if (string.IsNullOrWhiteSpace(body))
+                throw new InvalidOperationException($"{operationLabel} response body is empty.");
+
+            var parsed = _jsonCodec == null
+                ? JsonUtility.FromJson<T>(body)
+                : _jsonCodec.Deserialize<T>(body);
+            if (parsed == null)
+                throw new InvalidOperationException($"{operationLabel} response could not be parsed.");
+
+            return parsed;
+        }
+
+        private static string BuildAuthUrl(string backendServerAddress, string relativePath)
+        {
+            var baseUrl = BuildAuthBaseUrl(backendServerAddress);
+            var rel = (relativePath ?? string.Empty).TrimStart('/');
+            return string.Concat(baseUrl, "/", rel);
+        }
+
+        private static string BuildAuthBaseUrl(string backendServerAddress)
+        {
+            var endpoint = NormalizeEndpoint(backendServerAddress);
+            if (string.IsNullOrWhiteSpace(endpoint))
+                throw new InvalidOperationException("PlayServRuntimeSettings.BackendServerAddress is empty.");
+
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
+            {
+                throw new InvalidOperationException(
+                    $"PlayServRuntimeSettings.BackendServerAddress is invalid: {endpoint}");
+            }
+
+            string httpScheme;
+            if (string.Equals(endpointUri.Scheme, "wss", StringComparison.OrdinalIgnoreCase))
+                httpScheme = Uri.UriSchemeHttps;
+            else if (string.Equals(endpointUri.Scheme, "ws", StringComparison.OrdinalIgnoreCase))
+                httpScheme = Uri.UriSchemeHttp;
+            else if (string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+                httpScheme = endpointUri.Scheme;
+            else
+                throw new InvalidOperationException("Player authentication requires an http, https, ws, or wss backend endpoint.");
+
+            var builder = new UriBuilder(endpointUri)
+            {
+                Scheme = httpScheme,
+                Path = string.Empty,
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+
+            return builder.Uri.ToString().TrimEnd('/');
         }
 
         private static string BuildApiBaseUrl(string serverAddress)
@@ -150,6 +295,24 @@ namespace Playserv.Http.Modules.Unity
         private static string NormalizeEndpoint(string endpoint)
         {
             return endpoint?.Trim() ?? string.Empty;
+        }
+
+        private static string NormalizePublicClientToken(string clientToken)
+        {
+            if (string.IsNullOrWhiteSpace(clientToken))
+                throw new ArgumentException("Client token is required.", nameof(clientToken));
+
+            var normalized = clientToken.Trim();
+            if (normalized.IndexOf('\r') >= 0 || normalized.IndexOf('\n') >= 0)
+                throw new InvalidOperationException("PlayServ credentials cannot contain line breaks.");
+
+            if (!normalized.StartsWith("pk_", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Player authentication requires a public PlayServ pk_* client token.");
+            }
+
+            return normalized;
         }
 
     }

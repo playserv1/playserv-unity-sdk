@@ -8,6 +8,8 @@ namespace Playserv.Proxy.Common
         {
             builder.Register<HandshakeRequest>();
             builder.Register<HandshakeResponse>();
+            builder.Register<RefreshAuthRequest>();
+            builder.Register<RefreshAuthResponse>();
             builder.Register<KeepAliveRequest>();
             builder.Register<KeepAliveResponse>();
             builder.Register<EventMessage>("BroadcastEvent");

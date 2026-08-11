@@ -50,6 +50,13 @@ namespace Playserv.Wrapper
         public IPlayServRuntimeTokenProvider RuntimeTokenProvider { get; set; }
 
         /// <summary>
+        /// Optional runtime-only player JWT used for the initial handshake. Prefer
+        /// <see cref="RuntimeTokenProvider"/> when the credential can rotate.
+        /// This value is never read from or written to <see cref="PlayServConfig"/>.
+        /// </summary>
+        public string PlayerAccessToken { get; set; } = string.Empty;
+
+        /// <summary>
         /// Backward-compatible alias for <see cref="ClientToken"/>.
         /// </summary>
         public string GameAccessToken
@@ -164,6 +171,7 @@ namespace Playserv.Wrapper
             {
                 ClientToken = ClientToken,
                 RuntimeTokenProvider = RuntimeTokenProvider,
+                PlayerAccessToken = PlayerAccessToken,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
@@ -189,6 +197,7 @@ namespace Playserv.Wrapper
             {
                 ClientToken = ClientToken,
                 RuntimeTokenProvider = RuntimeTokenProvider,
+                PlayerAccessToken = PlayerAccessToken,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,

@@ -33,6 +33,13 @@ namespace Playserv.Wrapper
 
         Task<bool> Connect();
 
+        /// <summary>
+        /// Pushes a rotated player access token into the live connection without reconnecting.
+        /// </summary>
+        Task<bool> RefreshPlayerAuthAsync(
+            string newAccessToken,
+            CancellationToken cancellationToken = default);
+
         void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory);
 
         Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default);

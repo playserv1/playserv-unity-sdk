@@ -75,6 +75,11 @@ namespace Playserv.Wrapper
 
         public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
 
+        public Task<bool> RefreshPlayerAuthAsync(
+            string newAccessToken,
+            CancellationToken cancellationToken = default) =>
+            RequiredSession.RefreshPlayerAuthAsync(newAccessToken, cancellationToken);
+
         public void Disconnect() => _configFacade.Disconnect();
 
         public void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>

@@ -86,6 +86,15 @@ namespace Playserv.Wrapper
             ConnectionApi.Connect();
 
         /// <summary>
+        /// Pushes a rotated player access token into the live connection without reconnecting.
+        /// The token remains runtime-only and is not written to <see cref="PlayServConfig"/>.
+        /// </summary>
+        public static Task<bool> RefreshPlayerAuthAsync(
+            string newAccessToken,
+            CancellationToken cancellationToken = default) =>
+            ConnectionApi.RefreshPlayerAuthAsync(newAccessToken, cancellationToken);
+
+        /// <summary>
         /// Disconnects SDK transport and disposes internal runtime instance.
         /// </summary>
         public static void Disconnect() =>

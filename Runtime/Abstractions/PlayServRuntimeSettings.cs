@@ -16,6 +16,7 @@ namespace Playserv.Runtime.Abstractions
 
         public string ClientToken { get; set; } = string.Empty;
         public IPlayServRuntimeTokenProvider RuntimeTokenProvider { get; set; }
+        public string PlayerAccessToken { get; set; } = string.Empty;
 
         public string GameAccessToken
         {
@@ -48,6 +49,7 @@ namespace Playserv.Runtime.Abstractions
             {
                 ClientToken = ClientToken,
                 RuntimeTokenProvider = RuntimeTokenProvider,
+                PlayerAccessToken = PlayerAccessToken,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,

@@ -4,6 +4,7 @@
     "references": [
         "Playserv.Runtime",
         "Playserv.Runtime.Core",
+        "Playserv.Runtime.Http",
         "Playserv.Runtime.Modules",
         "Playserv.Runtime.Serialization",
         "Playserv.Runtime.Abstractions"

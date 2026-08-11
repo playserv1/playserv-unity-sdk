@@ -84,7 +84,8 @@ namespace Playserv.Proxy.Common
             bool allowMultipleConnections = true,
             int keepAlivePingIntervalMs = 30000,
             int keepAlivePongTimeoutMs = 10000,
-            IPlayServRuntimeTokenProvider runtimeTokenProvider = null)
+            IPlayServRuntimeTokenProvider runtimeTokenProvider = null,
+            string playerAccessToken = null)
             => _transportSession.Configure(
                 gameAccessToken,
                 gameId,
@@ -94,7 +95,13 @@ namespace Playserv.Proxy.Common
                 allowMultipleConnections,
                 keepAlivePingIntervalMs,
                 keepAlivePongTimeoutMs,
-                runtimeTokenProvider);
+                runtimeTokenProvider,
+                playerAccessToken);
+
+        public Task<bool> RefreshPlayerAuthAsync(
+            string newAccessToken,
+            CancellationToken cancellationToken = default) =>
+            _transportSession.RefreshPlayerAuthAsync(newAccessToken, cancellationToken);
 
         public Task<bool> Connect() => _transportSession.ConnectAsync();
 
