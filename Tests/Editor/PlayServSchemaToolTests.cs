@@ -83,7 +83,7 @@ namespace Playserv.Tests.Editor
                 var error = process.StandardError.ReadToEnd();
                 Assert.That(process.WaitForExit(15000), Is.True, "Schema Tool timed out.");
                 Assert.That(process.ExitCode, Is.EqualTo(0), error);
-                StringAssert.Contains("\"version\": \"0.3.4\"", output);
+                StringAssert.Contains("\"version\": \"0.3.6\"", output);
                 StringAssert.Contains("\"protocolVersion\": 1", output);
             }
         }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.3.6] - 2026-08-12
+
+- Aligned the external tool, package, and core SDK dependency versions with
+  `0.3.6`.
+
 ## [0.3.4] - 2026-07-25
 
 - Aligned the external tool, package, and core SDK dependency versions with

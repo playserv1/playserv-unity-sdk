@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-08-12
+
 - Marked the runtime module assembly with `AlwaysLinkAssembly` so its automatic
   registration survives managed code stripping in IL2CPP player builds.
 - Made client-defined analytics providers configurable before PlayServ

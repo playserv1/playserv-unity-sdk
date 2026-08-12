@@ -46,7 +46,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.3.4"
+    "com.playserv.sdk": "0.3.6"
   }
 }
 ```

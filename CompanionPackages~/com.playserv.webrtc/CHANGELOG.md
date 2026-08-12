@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-08-12
+
 - Marked the WebRTC transport assembly with `AlwaysLinkAssembly` so its automatic
   registration survives managed code stripping in IL2CPP player builds.
 

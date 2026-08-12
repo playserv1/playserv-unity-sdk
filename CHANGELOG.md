@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-08-12
+
+- Aligned the core SDK, companion packages, runtime handshake, and Schema Tool
+  version metadata with `0.3.6`.
 - Marked every runtime-registration assembly with `AlwaysLinkAssembly` so UnityLinker
   keeps dynamically discovered PlayServ modules, including WebSocket transport, in
   IL2CPP player builds even when game code has no direct reference to their types.

@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.pulse",
   "displayName": "PlayServ Pulse",
-  "version": "0.3.4",
+  "version": "0.3.6",
   "unity": "2021.3",
   "description": "Optional realtime configuration and feature flag module for the PlayServ Unity SDK.",
   "author": {
@@ -13,6 +13,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "com.playserv.sdk": "0.3.4"
+    "com.playserv.sdk": "0.3.6"
   }
 }
