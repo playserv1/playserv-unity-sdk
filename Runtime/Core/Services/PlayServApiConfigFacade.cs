@@ -62,6 +62,12 @@ namespace Playserv.Wrapper
                 throw new ArgumentNullException(nameof(settings));
 
             _settings = settings.Clone();
+            if (ShouldDeferAutomaticPlayerAuthentication(_settings))
+            {
+                PlayServRuntimeSettingsService.EnsureConfigured(_settings, allowMissingUserId: true);
+                return;
+            }
+
             ApplySettings(_settings);
         }
 
@@ -204,6 +210,16 @@ namespace Playserv.Wrapper
                 return false;
 
             return string.Equals(uri.Scheme, WebRtcScheme, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldDeferAutomaticPlayerAuthentication(PlayServSettings settings)
+        {
+            return settings != null &&
+                   settings.EnableAutomaticPlayerAuthentication &&
+                   string.IsNullOrWhiteSpace(settings.UserId) &&
+                   !string.IsNullOrWhiteSpace(settings.ClientToken) &&
+                   settings.RuntimeTokenProvider == null &&
+                   string.IsNullOrWhiteSpace(settings.PlayerAccessToken);
         }
 
 #if UNITY_5_3_OR_NEWER

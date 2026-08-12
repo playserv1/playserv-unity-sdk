@@ -79,5 +79,40 @@ namespace Playserv.Tests.Runtime
             Assert.That(clone.PlayerAccessToken, Is.EqualTo("player.jwt.value"));
             Assert.That(clone.ToRuntimeSettings().PlayerAccessToken, Is.EqualTo("player.jwt.value"));
         }
+
+        [Test]
+        public void SettingsClone_PreservesAutomaticPlayerAuthenticationOptions()
+        {
+            var store = new TestPlayerSessionStore();
+            var settings = new PlayServSettings
+            {
+                EnableAutomaticPlayerAuthentication = false,
+                PlayerSessionStore = store
+            };
+
+            var clone = settings.Clone();
+
+            Assert.That(clone.EnableAutomaticPlayerAuthentication, Is.False);
+            Assert.That(clone.PlayerSessionStore, Is.SameAs(store));
+        }
+
+        private sealed class TestPlayerSessionStore : IPlayServPlayerSessionStore
+        {
+            public Task<PlayServPlayerSessionData> LoadAsync(
+                string scopeKey,
+                CancellationToken cancellationToken = default) =>
+                Task.FromResult<PlayServPlayerSessionData>(null);
+
+            public Task SaveAsync(
+                string scopeKey,
+                PlayServPlayerSessionData session,
+                CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
+
+            public Task ClearAsync(
+                string scopeKey,
+                CancellationToken cancellationToken = default) =>
+                Task.CompletedTask;
+        }
     }
 }

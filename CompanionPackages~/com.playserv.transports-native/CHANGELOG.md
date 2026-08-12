@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-08-12
+
+- Aligned the package and core SDK dependency versions with `0.3.7`.
+
 ## [0.3.6] - 2026-08-12
 
 - Marked the UDP and RUDP transport assemblies with `AlwaysLinkAssembly` so

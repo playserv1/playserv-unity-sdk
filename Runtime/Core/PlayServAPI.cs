@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Http.Common;
 using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
@@ -21,6 +22,7 @@ namespace Playserv.Wrapper
         private readonly IPlayServCommandDispatch _commandDispatch;
         private readonly PlayServApiConfigFacade _configFacade;
         private readonly PlayServApiConnectionOrchestrator _connectionOrchestrator;
+        private readonly PlayServPlayerAuthCoordinator _playerAuthCoordinator;
 
         public string SdkVersion => SdkInfo.Version;
 
@@ -47,31 +49,53 @@ namespace Playserv.Wrapper
                 logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
                 versionRefreshTimeoutSeconds: ConnectVersionRefreshTimeoutSeconds);
 
+            _playerAuthCoordinator = new PlayServPlayerAuthCoordinator(
+                createHttpClient: settings => PlayServRuntimeHttpClientResolver.Create(
+                    new PlayServHttpModuleContext(
+                        settings.ToRuntimeSettings(),
+                        PlayServJsonCompositionRoot.CreateDefaultJsonCodec())),
+                defaultSessionStore: new PlayServPlayerPrefsSessionStore(),
+                getState: () => State,
+                refreshLiveAuthorization: (token, cancellationToken) =>
+                    RequiredSession.RefreshPlayerAuthAsync(token, cancellationToken));
+
             _connectionOrchestrator = new PlayServApiConnectionOrchestrator(
                 getState: () => State,
                 getOrCreateSettings: _configFacade.GetOrCreateSettings,
                 refreshConfiguredGameVersionAsync: _configFacade.RefreshConfiguredGameVersionAsync,
+                preparePlayerAuthenticationAsync: _playerAuthCoordinator.PrepareSettingsForConnectAsync,
                 applySettings: _configFacade.ApplySettings,
+                handleConnected: _playerAuthCoordinator.HandleConnected,
                 getCurrentSession: () => _configFacade.CurrentSession,
-                disconnect: _configFacade.Disconnect,
+                disconnect: DisconnectInternal,
                 resetShutdownState: ResetShutdownState,
                 logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
                 shouldIgnoreMissingInstance: ShouldIgnoreMissingInstance,
                 logShutdownIgnoreWarning: LogShutdownIgnoreWarning);
         }
 
-        public void Config(PlayServSettings settings) => _configFacade.Config(settings);
+        public void Config(PlayServSettings settings)
+        {
+            _playerAuthCoordinator.StopRefreshLoop();
+            _configFacade.Config(settings);
+        }
 
         public void Config(
             string clientToken,
             string gameId,
             string userId,
             string gameVersion,
-            string sdkVersion = null) =>
+            string sdkVersion = null)
+        {
+            _playerAuthCoordinator.StopRefreshLoop();
             _configFacade.Config(clientToken, gameId, userId, gameVersion, sdkVersion);
+        }
 
-        public void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider) =>
+        public void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider)
+        {
+            _playerAuthCoordinator.StopRefreshLoop();
             _configFacade.SetRuntimeTokenProvider(tokenProvider);
+        }
 
         public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
 
@@ -80,7 +104,7 @@ namespace Playserv.Wrapper
             CancellationToken cancellationToken = default) =>
             RequiredSession.RefreshPlayerAuthAsync(newAccessToken, cancellationToken);
 
-        public void Disconnect() => _configFacade.Disconnect();
+        public void Disconnect() => DisconnectInternal();
 
         public void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
             _configFacade.SetWebRtcSignalingClientFactory(signalingClientFactory);
@@ -149,6 +173,12 @@ namespace Playserv.Wrapper
             return _connectionOrchestrator.TryGetSessionForFireAndForget(operationName, out var session)
                 ? session
                 : null;
+        }
+
+        private void DisconnectInternal()
+        {
+            _playerAuthCoordinator.StopRefreshLoop();
+            _configFacade.Disconnect();
         }
 
         private void SubscribeToInstanceEvents(IPlayServRuntimeSession session)

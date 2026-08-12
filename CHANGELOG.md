@@ -6,6 +6,19 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-08-12
+
+- Added built-in anonymous player-session management. With a public client token
+  and no explicit runtime credential provider, `PlayServ.Connect()` now creates
+  or restores the player, supplies its JWT to the handshake, and rotates it for
+  live connections and reconnects.
+- Added runtime-only `IPlayServPlayerSessionStore` customization and a default
+  PlayerPrefs-backed store for refresh credentials and player IDs.
+- Added `EnableAutomaticPlayerAuthentication` for clients that need to retain
+  legacy client-token-only or externally managed authorization behavior.
+- Aligned the core SDK, companion packages, and Schema Tool version metadata
+  with `0.3.7`.
+
 ## [0.3.6] - 2026-08-12
 
 - Aligned the core SDK, companion packages, runtime handshake, and Schema Tool

@@ -57,6 +57,19 @@ namespace Playserv.Wrapper
         public string PlayerAccessToken { get; set; } = string.Empty;
 
         /// <summary>
+        /// When enabled, a public <see cref="ClientToken"/> automatically creates and refreshes
+        /// an anonymous PlayServ player session unless an explicit runtime token provider or
+        /// player access token is supplied.
+        /// </summary>
+        public bool EnableAutomaticPlayerAuthentication { get; set; } = true;
+
+        /// <summary>
+        /// Optional runtime-only persistence used by automatic player authentication.
+        /// When omitted, the SDK uses a PlayerPrefs-backed store.
+        /// </summary>
+        public IPlayServPlayerSessionStore PlayerSessionStore { get; set; }
+
+        /// <summary>
         /// Backward-compatible alias for <see cref="ClientToken"/>.
         /// </summary>
         public string GameAccessToken
@@ -172,6 +185,8 @@ namespace Playserv.Wrapper
                 ClientToken = ClientToken,
                 RuntimeTokenProvider = RuntimeTokenProvider,
                 PlayerAccessToken = PlayerAccessToken,
+                EnableAutomaticPlayerAuthentication = EnableAutomaticPlayerAuthentication,
+                PlayerSessionStore = PlayerSessionStore,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,

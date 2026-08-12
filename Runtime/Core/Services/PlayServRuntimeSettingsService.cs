@@ -108,7 +108,7 @@ namespace Playserv.Wrapper
             return settings;
         }
 
-        public static void EnsureConfigured(PlayServSettings settings)
+        public static void EnsureConfigured(PlayServSettings settings, bool allowMissingUserId = false)
         {
             if (!HasHandshakeCredential(settings))
             {
@@ -121,7 +121,7 @@ namespace Playserv.Wrapper
             if (string.IsNullOrWhiteSpace(settings.GameId))
                 throw new InvalidOperationException("Game ID is required. Call Config(...) first.");
 
-            if (string.IsNullOrWhiteSpace(settings.UserId))
+            if (!allowMissingUserId && string.IsNullOrWhiteSpace(settings.UserId))
                 throw new InvalidOperationException("User ID is required. Call Config(...) first.");
 
             if (string.IsNullOrWhiteSpace(settings.GameVersion))

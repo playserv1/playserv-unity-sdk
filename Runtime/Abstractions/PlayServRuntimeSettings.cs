@@ -27,7 +27,7 @@ namespace Playserv.Runtime.Abstractions
         public string GameId { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public string GameVersion { get; set; } = "1.0.0";
-        public string SdkVersion { get; set; } = "0.3.6";
+        public string SdkVersion { get; set; } = "0.3.7";
         public bool AllowMultipleConnections { get; set; } = true;
         public int KeepAlivePingIntervalMs { get; set; } = 30000;
         public int KeepAlivePongTimeoutMs { get; set; } = 10000;

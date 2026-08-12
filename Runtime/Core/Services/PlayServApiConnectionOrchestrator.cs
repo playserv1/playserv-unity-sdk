@@ -11,7 +11,9 @@ namespace Playserv.Wrapper
         private readonly Func<PlayServState> _getState;
         private readonly Func<PlayServSettings> _getOrCreateSettings;
         private readonly Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> _refreshConfiguredGameVersionAsync;
+        private readonly Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> _preparePlayerAuthenticationAsync;
         private readonly Action<PlayServSettings> _applySettings;
+        private readonly Action<PlayServSettings> _handleConnected;
         private readonly Func<IPlayServRuntimeSession> _getCurrentSession;
         private readonly Action _disconnect;
         private readonly Action _resetShutdownState;
@@ -24,7 +26,9 @@ namespace Playserv.Wrapper
             Func<PlayServState> getState,
             Func<PlayServSettings> getOrCreateSettings,
             Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> refreshConfiguredGameVersionAsync,
+            Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> preparePlayerAuthenticationAsync,
             Action<PlayServSettings> applySettings,
+            Action<PlayServSettings> handleConnected,
             Func<IPlayServRuntimeSession> getCurrentSession,
             Action disconnect,
             Action resetShutdownState,
@@ -35,7 +39,9 @@ namespace Playserv.Wrapper
             _getState = getState ?? throw new ArgumentNullException(nameof(getState));
             _getOrCreateSettings = getOrCreateSettings ?? throw new ArgumentNullException(nameof(getOrCreateSettings));
             _refreshConfiguredGameVersionAsync = refreshConfiguredGameVersionAsync ?? throw new ArgumentNullException(nameof(refreshConfiguredGameVersionAsync));
+            _preparePlayerAuthenticationAsync = preparePlayerAuthenticationAsync ?? throw new ArgumentNullException(nameof(preparePlayerAuthenticationAsync));
             _applySettings = applySettings ?? throw new ArgumentNullException(nameof(applySettings));
+            _handleConnected = handleConnected ?? throw new ArgumentNullException(nameof(handleConnected));
             _getCurrentSession = getCurrentSession ?? throw new ArgumentNullException(nameof(getCurrentSession));
             _disconnect = disconnect ?? throw new ArgumentNullException(nameof(disconnect));
             _resetShutdownState = resetShutdownState ?? throw new ArgumentNullException(nameof(resetShutdownState));
@@ -86,6 +92,8 @@ namespace Playserv.Wrapper
                 _logTrace($"[PlayServ] Connect started. state={state}, gameId={settings.GameId}, endpoint={settings.Endpoint}");
                 settings = await _refreshConfiguredGameVersionAsync(settings, CancellationToken.None);
                 _logTrace($"[PlayServ] Connect continue after version refresh. resolvedGameVersion={settings.GameVersion}");
+                settings = await _preparePlayerAuthenticationAsync(settings, CancellationToken.None);
+                _logTrace($"[PlayServ] Player authentication prepared. userId={settings.UserId}");
                 _applySettings(settings);
                 _logTrace("[PlayServ] Connect applied settings. Starting transport connect.");
 
@@ -96,6 +104,8 @@ namespace Playserv.Wrapper
                 _logTrace($"[PlayServ] Connect transport completed. connected={connected}, state={_getState()}");
                 if (!connected)
                     _disconnect();
+                else
+                    _handleConnected(settings);
 
                 return connected;
             }
