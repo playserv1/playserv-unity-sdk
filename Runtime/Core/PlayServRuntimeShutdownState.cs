@@ -3,6 +3,10 @@ using System.Threading;
 using UnityEngine;
 #endif
 
+#if UNITY_5_3_OR_NEWER
+[assembly: UnityEngine.Scripting.AlwaysLinkAssembly]
+#endif
+
 namespace Playserv.Wrapper
 {
     internal static class PlayServRuntimeShutdownState

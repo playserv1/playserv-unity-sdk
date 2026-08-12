@@ -2,6 +2,7 @@ using Playserv.Modules;
 using Playserv.Proxy.Common;
 using UnityEngine;
 
+[assembly: UnityEngine.Scripting.AlwaysLinkAssembly]
 [assembly: PlayServModule(
     PlayServModuleManifest.ServerId,
     typeof(Playserv.Server.PlayServServerModule),

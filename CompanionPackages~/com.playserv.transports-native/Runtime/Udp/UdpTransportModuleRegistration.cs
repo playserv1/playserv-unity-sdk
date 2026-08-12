@@ -1,6 +1,8 @@
 using Playserv.Proxy.Common;
 using UnityEngine;
 
+[assembly: UnityEngine.Scripting.AlwaysLinkAssembly]
+
 namespace Playserv.Proxy.Implementation
 {
     internal static class UdpTransportModuleRegistration

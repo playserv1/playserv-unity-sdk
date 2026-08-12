@@ -6,6 +6,9 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Marked every runtime-registration assembly with `AlwaysLinkAssembly` so UnityLinker
+  keeps dynamically discovered PlayServ modules, including WebSocket transport, in
+  IL2CPP player builds even when game code has no direct reference to their types.
 - Added anonymous player sign-in and refresh endpoints to the runtime HTTP client,
   including player token response contracts and WebSocket-to-HTTP endpoint mapping.
 - Added awaitable live player-auth rotation through `RefreshAuthRequest`, with

@@ -1,6 +1,7 @@
 using Playserv.Modules;
 using UnityEngine;
 
+[assembly: UnityEngine.Scripting.AlwaysLinkAssembly]
 [assembly: PlayServModule(
     PlayServModuleManifest.PulseId,
     typeof(Playserv.Pulse.PlayServPulseModule),

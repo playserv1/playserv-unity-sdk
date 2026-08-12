@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Marked the runtime module assembly with `AlwaysLinkAssembly` so its automatic
+  registration survives managed code stripping in IL2CPP player builds.
 - Made client-defined analytics providers configurable before PlayServ
   connection setup and persistent across runtime reconnects.
 - Added `HasCustomProvider` and `ResetProvider()` without adding a dependency on

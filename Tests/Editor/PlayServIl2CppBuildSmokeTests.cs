@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -49,6 +50,10 @@ namespace Playserv.Tests.Editor
                     report.summary.result,
                     Is.EqualTo(BuildResult.Succeeded),
                     $"IL2CPP build failed with {report.summary.totalErrors} errors.");
+
+                AssertRuntimeRegistrationSurvivedLinking(
+                    "Playserv.Runtime.Transport.WebSocket",
+                    "WebSocketTransportModuleRegistration");
             }
             finally
             {
@@ -83,6 +88,31 @@ namespace Playserv.Tests.Editor
                 default:
                     return Path.Combine(outputRoot, "PlayServTests");
             }
+        }
+
+        private static void AssertRuntimeRegistrationSurvivedLinking(
+            string assemblyName,
+            string registrationTypeName)
+        {
+            var projectRoot = Directory.GetParent(UnityEngine.Application.dataPath)?.FullName ??
+                              UnityEngine.Application.dataPath;
+            var libraryRoot = Path.Combine(projectRoot, "Library");
+            var generatedSource = Directory
+                .EnumerateFiles(
+                    libraryRoot,
+                    assemblyName + ".cpp",
+                    SearchOption.AllDirectories)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+
+            Assert.That(
+                generatedSource,
+                Is.Not.Null,
+                $"UnityLinker removed {assemblyName} before IL2CPP conversion.");
+            StringAssert.Contains(
+                registrationTypeName,
+                File.ReadAllText(generatedSource),
+                $"IL2CPP output for {assemblyName} does not contain its runtime registration.");
         }
     }
 }

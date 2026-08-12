@@ -4,6 +4,7 @@ using Playserv.Proxy.Common;
 using Playserv.Proxy.Logging;
 using UnityEngine;
 
+[assembly: UnityEngine.Scripting.AlwaysLinkAssembly]
 [assembly: PlayServModule(
     PlayServModuleManifest.AnalyticsId,
     typeof(Playserv.Analytics.PlayServAnalyticsModule),
