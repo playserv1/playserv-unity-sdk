@@ -109,7 +109,6 @@ namespace Playserv.Proxy.Common
             moduleHost.Register(new PlayServProvidedModule(PlayServModuleIds.Serialization));
             registerModules?.Invoke(moduleHost);
 
-            moduleHost.Initialize(new PlayServModuleContext(services));
             return moduleHost;
         }
     }

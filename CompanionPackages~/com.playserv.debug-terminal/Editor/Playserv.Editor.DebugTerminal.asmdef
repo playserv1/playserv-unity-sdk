@@ -1,0 +1,20 @@
+{
+    "name": "Playserv.Editor.DebugTerminal",
+    "rootNamespace": "Playserv.DebugTerminal.Editor",
+    "references": [
+        "Playserv.Runtime.Modules.DebugTerminal"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_DEBUG_TERMINAL"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,26 @@
+{
+    "name": "Playserv.Tests.Runtime.DebugTerminal",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.DebugTerminal",
+        "Playserv.Runtime",
+        "Playserv.Runtime.Abstractions",
+        "Playserv.Runtime.Modules.DataSubscription",
+        "Playserv.Runtime.Modules.Analytics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_DEBUG_TERMINAL",
+        "!PLAYSERV_MODULE_DISABLED_ANALYTICS"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

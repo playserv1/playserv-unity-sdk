@@ -62,5 +62,30 @@ namespace Playserv.Tests.Editor
                     Directory.Delete(root, recursive: true);
             }
         }
+
+        [Test]
+        public void ShouldSkipAutomaticMaintenance_SkipsOnlyBatchTestRuns()
+        {
+            Assert.That(
+                PlayServSdkCacheMaintenance.ShouldSkipAutomaticMaintenance(
+                    true,
+                    new[] { "-batchmode", "-runTests", "-testPlatform", "editmode" }),
+                Is.True);
+            Assert.That(
+                PlayServSdkCacheMaintenance.ShouldSkipAutomaticMaintenance(
+                    true,
+                    new[] { "-batchmode", "-RUNTESTS" }),
+                Is.True);
+            Assert.That(
+                PlayServSdkCacheMaintenance.ShouldSkipAutomaticMaintenance(
+                    true,
+                    new[] { "-batchmode", "-executeMethod", "Build.Run" }),
+                Is.False);
+            Assert.That(
+                PlayServSdkCacheMaintenance.ShouldSkipAutomaticMaintenance(
+                    false,
+                    new[] { "-runTests" }),
+                Is.False);
+        }
     }
 }

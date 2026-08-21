@@ -30,14 +30,16 @@ namespace Playserv.DataSubscription
         ISharedEntityBuilder<T> UsePolling();
 
         /// <summary>
-        /// Adds filter predicate. Reserved for future/extended query generation.
+        /// Retained for source compatibility. Keyed entity reads cannot apply a filter and
+        /// <c>BindAsync</c> reports <c>PlayServQueryCapabilityException</c> when this method is used.
         /// </summary>
         /// <param name="predicate">Entity filter expression.</param>
         /// <returns>Current builder instance.</returns>
+        [Obsolete("Keyed entity subscriptions cannot apply Where filters. Use PlayServData.Records<T>().SubscribeAsync(query) for filtered collections.")]
         ISharedEntityBuilder<T> Where(Expression<Func<T, bool>> predicate);
 
         /// <summary>
-        /// Adds include expression. Reserved for future/extended query generation.
+        /// Expands one direct relation in the keyed entity selection.
         /// </summary>
         /// <typeparam name="TProp">Navigation property type.</typeparam>
         /// <param name="nav">Navigation expression.</param>

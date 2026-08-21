@@ -7,11 +7,12 @@ using System.Threading.Tasks;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Implementation
 {
 #if UNITY_WEBGL && !UNITY_EDITOR
-    public sealed class WebGLWebSocketTransportImplementation : ITransportImplementation
+    public sealed class WebGLWebSocketTransportImplementation : ITransportImplementation, IPlayServTransportCloseInfoSource
     {
         private const int ConnectTimeoutMs = 12000;
 
@@ -29,6 +30,8 @@ namespace Playserv.Proxy.Implementation
         private bool _connecting;
         private bool _bridgeEventsSubscribed;
         private TaskCompletionSource<bool> _connectTcs;
+
+        public event Action<PlayServTransportCloseInfo> Closed;
 
         public WebGLWebSocketTransportImplementation(string uri, ILogger logger = null)
         {
@@ -271,10 +274,27 @@ namespace Playserv.Proxy.Implementation
             }
 
             _logger.LogWarning($"WebGL WebSocket closed: {reason}");
+            Closed?.Invoke(ParseCloseInfo(reason));
             pendingConnect?.TrySetResult(false);
 
             if (wasConnected)
                 CompleteAll();
+        }
+
+        private static PlayServTransportCloseInfo ParseCloseInfo(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return new PlayServTransportCloseInfo(null, string.Empty);
+
+            var separator = value.IndexOf(':');
+            if (separator > 0 && int.TryParse(value.Substring(0, separator), out var statusCode))
+            {
+                return new PlayServTransportCloseInfo(
+                    statusCode,
+                    value.Substring(separator + 1).Trim());
+            }
+
+            return new PlayServTransportCloseInfo(null, value.Trim());
         }
 
         private void ResetChannel()

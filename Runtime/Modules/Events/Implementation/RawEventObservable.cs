@@ -30,8 +30,8 @@ namespace Playserv.Events
             if (observer == null)
                 throw new ArgumentNullException(nameof(observer));
 
-            EnsureSubscription();
             _subscriptionManager.AddRawObserver(_eventType, observer);
+            EnsureSubscription();
 
             return new Unsubscriber(_subscriptionManager, _eventType, observer, TryUnsubscribe);
         }
@@ -41,7 +41,7 @@ namespace Playserv.Events
             if (_subscriptionManager.IsSubscriptionPending(_eventType))
                 return;
 
-            if (_subscriptionManager.GetSubscriptionId(_eventType) != null)
+            if (_subscriptionManager.IsSubscribed(_eventType))
                 return;
 
             _subscriptionManager.AddPendingSubscription(_eventType);
@@ -55,14 +55,8 @@ namespace Playserv.Events
             if (_subscriptionManager.HasObserversForEventType(_eventType))
                 return;
 
-            var subscriptionId = _subscriptionManager.GetSubscriptionId(_eventType);
-            if (subscriptionId == null)
-                return;
-
-            var request = new EventUnsubscribeRequest(subscriptionId);
-            _transport.Send(request, EventsModuleName);
             _subscriptionManager.RemoveSubscription(_eventType);
-            _logger.Log($"Sent raw unsubscription request for event type: {_eventType}");
+            _logger.Log($"Removed local raw event subscription for event type: {_eventType}");
         }
 
         private sealed class Unsubscriber : IDisposable

@@ -38,6 +38,13 @@ namespace Playserv.Wrapper
             remove => ConnectionApi.OnTransportError -= value;
         }
 
+        /// <summary>Raised for uncorrelated transport and protocol failures.</summary>
+        public static event Action<PlayServError> OnError
+        {
+            add => ConnectionApi.OnError += value;
+            remove => ConnectionApi.OnError -= value;
+        }
+
         /// <summary>
         /// Raised every time keepalive ping is sent by the client.
         /// </summary>

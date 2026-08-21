@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Playserv.DataSubscription;
@@ -8,10 +7,6 @@ using Playserv.DataSubscription.Exceptions;
 using Playserv.Proxy.Common;
 using Playserv.Wrapper;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-#if UNITY_EDITOR
-using UnityEditor.SceneManagement;
-#endif
 
 namespace Playserv.Samples
 {
@@ -20,7 +15,6 @@ namespace Playserv.Samples
     /// </summary>
     public sealed class PlayServDataSubscriptionSample : MonoBehaviour
     {
-        private const string SamplesSceneFileName = "Samples.unity";
         private const string SubscriptionPollingInfo = "3s";
         private const int UiLogTrimLimit = 220;
         private static readonly Regex RequestIdRegex =
@@ -308,29 +302,6 @@ namespace Playserv.Samples
             PlayServ.Disconnect();
             _status = "SDK disconnected";
             AddLog(_status);
-        }
-
-        private void BackToSamples()
-        {
-            var scenePath = ResolveSamplesScenePath();
-#if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                if (File.Exists(scenePath))
-                    EditorSceneManager.OpenScene(scenePath);
-                return;
-            }
-#endif
-            SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePath));
-        }
-
-        private static string ResolveSamplesScenePath()
-        {
-            var activePath = SceneManager.GetActiveScene().path;
-            var activeDirectory = Path.GetDirectoryName(activePath);
-            return string.IsNullOrEmpty(activeDirectory)
-                ? SamplesSceneFileName
-                : Path.Combine(activeDirectory, SamplesSceneFileName).Replace('\\', '/');
         }
 
         private void OnConfigurationChanged(SampleConfigurationDto dto)
@@ -743,8 +714,6 @@ namespace Playserv.Samples
                 _ = ConnectSdkAsync();
             if (GUILayout.Button("Disconnect SDK"))
                 DisconnectSdk();
-            if (GUILayout.Button("Back to 0_Samples"))
-                BackToSamples();
             if (GUILayout.Button(_showInfo ? "Hide Info" : "Info"))
                 _showInfo = !_showInfo;
             GUILayout.EndHorizontal();

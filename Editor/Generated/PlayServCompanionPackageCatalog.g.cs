@@ -24,6 +24,24 @@ namespace Playserv.Editor
                 description: "Google Sign-In provider integration without Firebase.",
                 gitPath: "CompanionPackages~/com.playserv.google-signin"),
             new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.facebook-login",
+                moduleIds: new[] { "facebook-login" },
+                displayName: "Facebook Login",
+                description: "Meta Unity SDK Limited Login integration.",
+                gitPath: "CompanionPackages~/com.playserv.facebook-login"),
+            new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.epic-auth",
+                moduleIds: new[] { "epic-auth" },
+                displayName: "Epic Auth",
+                description: "EOS and Epic Games Launcher authentication integration.",
+                gitPath: "CompanionPackages~/com.playserv.epic-auth"),
+            new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.steam-auth",
+                moduleIds: new[] { "steam-auth" },
+                displayName: "Steam Auth",
+                description: "Steamworks.NET Web API ticket integration.",
+                gitPath: "CompanionPackages~/com.playserv.steam-auth"),
+            new PlayServCompanionPackageDefinition(
                 packageId: "com.playserv.webrtc",
                 moduleIds: new[] { "transport-webrtc" },
                 displayName: "WebRTC",
@@ -42,11 +60,23 @@ namespace Playserv.Editor
                 description: "Optional realtime configuration and feature flag surface.",
                 gitPath: "CompanionPackages~/com.playserv.pulse"),
             new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.debug-terminal",
+                moduleIds: new[] { "debug-terminal" },
+                displayName: "Debug Terminal",
+                description: "Authenticated in-game diagnostics terminal and reusable sample prefabs.",
+                gitPath: "CompanionPackages~/com.playserv.debug-terminal"),
+            new PlayServCompanionPackageDefinition(
                 packageId: "com.playserv.transports-native",
                 moduleIds: new[] { "transport-udp", "transport-rudp" },
                 displayName: "Native Transports",
                 description: "UDP and reliable UDP transports for native Unity players.",
-                gitPath: "CompanionPackages~/com.playserv.transports-native")
+                gitPath: "CompanionPackages~/com.playserv.transports-native"),
+            new PlayServCompanionPackageDefinition(
+                packageId: "com.playserv.game-server",
+                moduleIds: new[] { "game-server" },
+                displayName: "PlayServ Game Server",
+                description: "Dedicated-server matchmaking, room heartbeats, reservation admission, and player lookup.",
+                gitPath: "CompanionPackages~/com.playserv.game-server")
         };
 
         public static IReadOnlyList<PlayServCompanionPackageDefinition> All => Packages;

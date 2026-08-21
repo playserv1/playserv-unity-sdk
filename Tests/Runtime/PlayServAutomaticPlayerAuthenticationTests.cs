@@ -45,6 +45,7 @@ namespace Playserv.Tests.Runtime
             Assert.That(http.SignInCount, Is.Zero);
             Assert.That(http.RefreshCount, Is.EqualTo(1));
             Assert.That(store.Session.RefreshToken, Is.EqualTo("refresh-rotated"));
+            Assert.That(store.Session.SessionKind, Is.EqualTo(PlayServSessionKind.Anonymous));
         }
 
         [Test]
@@ -99,11 +100,11 @@ namespace Playserv.Tests.Runtime
             Assert.That(prepared.UserId, Is.EqualTo("player-created"));
         }
 
-        private static PlayServAnonymousPlayerSession CreateSession(
+        private static PlayServPlayerSession CreateSession(
             IPlayServRuntimeHttpClient httpClient,
             IPlayServPlayerSessionStore sessionStore)
         {
-            return new PlayServAnonymousPlayerSession(
+            return new PlayServPlayerSession(
                 CreateSettings(),
                 httpClient,
                 sessionStore,
@@ -117,8 +118,11 @@ namespace Playserv.Tests.Runtime
             return new PlayServPlayerAuthCoordinator(
                 _ => httpClient,
                 sessionStore,
+                CreateSettings,
                 () => PlayServState.Offline,
-                (_, __) => Task.FromResult(true));
+                (_, __) => Task.FromResult(true),
+                () => { },
+                () => Task.FromResult(true));
         }
 
         private static PlayServSettings CreateSettings()
@@ -128,7 +132,8 @@ namespace Playserv.Tests.Runtime
                 ClientToken = "pk_public",
                 GameId = "test-game",
                 GameVersion = "1.0.0",
-                BackendServerAddress = "wss://example.test/ws"
+                BackendServerAddress = "wss://example.test/ws",
+                EnableAutomaticPlayerFingerprint = false
             };
         }
 
@@ -202,7 +207,12 @@ namespace Playserv.Tests.Runtime
             {
                 RefreshCount++;
                 if (RejectRefreshAsUnauthorized)
-                    throw new InvalidOperationException("Request failed. HTTP 401.");
+                    throw new PlayServRuntimeHttpException(
+                        "Request failed. HTTP 401.",
+                        401,
+                        string.Empty,
+                        "unauthenticated",
+                        isNetworkError: false);
 
                 return Task.FromResult(new PlayerRefreshResponseDto
                 {
@@ -210,6 +220,30 @@ namespace Playserv.Tests.Runtime
                     refresh_token = "refresh-rotated",
                     expires_at = DateTimeOffset.UtcNow.AddHours(1).ToString("O")
                 });
+            }
+
+            public Task<PlayerTokenBundleDto> LoginExternalAsync(
+                string clientToken,
+                PlayerExternalLoginRequestDto request,
+                string playerAccessToken = null,
+                CancellationToken ct = default)
+            {
+                throw new NotSupportedException();
+            }
+
+            public Task SignOutAsync(
+                string clientToken,
+                string refreshToken,
+                CancellationToken ct = default)
+            {
+                throw new NotSupportedException();
+            }
+
+            public Task<PlayServRuntimeDataResponse> SendDataAsync(
+                PlayServRuntimeDataRequest request,
+                CancellationToken ct = default)
+            {
+                throw new NotSupportedException();
             }
         }
     }

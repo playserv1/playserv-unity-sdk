@@ -15,8 +15,13 @@ namespace Playserv.Modules
         public const string Spawn = PlayServModuleManifest.SpawnId;
         public const string Pulse = PlayServModuleManifest.PulseId;
         public const string Analytics = PlayServModuleManifest.AnalyticsId;
+        public const string DebugTerminal = PlayServModuleManifest.DebugTerminalId;
         public const string AppleSignIn = PlayServModuleManifest.AppleSignInId;
         public const string GoogleSignIn = PlayServModuleManifest.GoogleSignInId;
+        public const string FacebookLogin = PlayServModuleManifest.FacebookLoginId;
+        public const string EpicAuth = PlayServModuleManifest.EpicAuthId;
+        public const string SteamAuth = PlayServModuleManifest.SteamAuthId;
+        public const string GameServer = PlayServModuleManifest.GameServerId;
         public const string TransportWebSocket = PlayServModuleManifest.TransportWebSocketId;
         public const string TransportUdp = PlayServModuleManifest.TransportUdpId;
         public const string TransportRudp = PlayServModuleManifest.TransportRudpId;

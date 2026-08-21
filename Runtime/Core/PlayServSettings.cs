@@ -1,4 +1,5 @@
 using System;
+using Playserv.Identity;
 using Playserv.Proxy.Common;
 using Playserv.Runtime.Abstractions;
 
@@ -70,6 +71,20 @@ namespace Playserv.Wrapper
         public IPlayServPlayerSessionStore PlayerSessionStore { get; set; }
 
         /// <summary>
+        /// Enables the built-in Android/iOS device fingerprint provider when no explicit
+        /// <see cref="PlayerFingerprintProvider"/> is configured. Unsupported platforms omit
+        /// the fingerprint and emit one development-only warning.
+        /// </summary>
+        public bool EnableAutomaticPlayerFingerprint { get; set; } = true;
+
+        /// <summary>
+        /// Optional, runtime-only source of consented device signals used for anonymous and
+        /// provider login. An explicit provider takes precedence over automatic collection,
+        /// including when it returns <see langword="null"/>.
+        /// </summary>
+        public IPlayServPlayerFingerprintProvider PlayerFingerprintProvider { get; set; }
+
+        /// <summary>
         /// Backward-compatible alias for <see cref="ClientToken"/>.
         /// </summary>
         public string GameAccessToken
@@ -92,6 +107,13 @@ namespace Playserv.Wrapper
         /// Current game client version.
         /// </summary>
         public string GameVersion { get; set; } = "1.0.0";
+
+        /// <summary>
+        /// When enabled, <see cref="PlayServ.Connect"/> resolves the latest deployed game
+        /// version before opening the runtime connection. Disable this for session-only
+        /// debug overrides that must use <see cref="GameVersion"/> exactly as provided.
+        /// </summary>
+        public bool ResolveLatestGameVersionOnConnect { get; set; } = true;
 
         /// <summary>
         /// SDK version sent in handshake.
@@ -187,9 +209,12 @@ namespace Playserv.Wrapper
                 PlayerAccessToken = PlayerAccessToken,
                 EnableAutomaticPlayerAuthentication = EnableAutomaticPlayerAuthentication,
                 PlayerSessionStore = PlayerSessionStore,
+                EnableAutomaticPlayerFingerprint = EnableAutomaticPlayerFingerprint,
+                PlayerFingerprintProvider = PlayerFingerprintProvider,
                 GameId = GameId,
                 UserId = UserId,
                 GameVersion = GameVersion,
+                ResolveLatestGameVersionOnConnect = ResolveLatestGameVersionOnConnect,
                 SdkVersion = SdkVersion,
                 AllowMultipleConnections = AllowMultipleConnections,
                 KeepAlivePingIntervalMs = KeepAlivePingIntervalMs,

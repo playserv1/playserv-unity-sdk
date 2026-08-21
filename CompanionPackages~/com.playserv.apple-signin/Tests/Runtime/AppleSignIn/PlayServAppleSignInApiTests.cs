@@ -89,6 +89,30 @@ namespace Playserv.Tests.Runtime.AppleSignIn
             Assert.That(_provider.RevocationCallbackEnabled, Is.True);
         }
 
+        [Test]
+        public void BackendProof_RequiresIdentityTokenAndNeverUsesAuthorizationCode()
+        {
+            var authorizationCodeOnly = new PlayServAppleSignInCredential(
+                PlayServAppleCredentialType.AppleId,
+                "apple-user",
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                "authorization-code",
+                string.Empty,
+                string.Empty);
+
+            Assert.That(authorizationCodeOnly.TryCreateBackendProof(out var missingProof), Is.False);
+            Assert.That(missingProof, Is.Null);
+
+            var credential = CreateCredential("apple-user");
+            Assert.That(credential.TryCreateBackendProof(out var proof), Is.True);
+            Assert.That(proof.ProviderToken, Is.EqualTo("identity-token"));
+            Assert.That(proof.AuthorizationCode, Is.EqualTo(string.Empty));
+        }
+
         private static PlayServAppleSignInCredential CreateCredential(string userId)
         {
             return new PlayServAppleSignInCredential(

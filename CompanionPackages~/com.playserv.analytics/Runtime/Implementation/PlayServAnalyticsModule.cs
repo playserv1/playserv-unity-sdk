@@ -30,15 +30,12 @@ namespace Playserv.Analytics
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            CommandTypeProviderRegistry.Register(new AnalyticsCommandTypeProvider());
-
-            var commandBus = context.Services.Get<IPlayServCommandBus>();
-            var runtimeIdentity = context.Services.Get<IPlayServRuntimeIdentity>();
+            context.Services.TryGet<IPlayServRuntimeIdentity>(out var runtimeIdentity);
             var provider = new PlayServAnalyticsProviderSelector(
-                new PlayServCommandAnalyticsProvider(commandBus));
+                PlayServHttpAnalyticsProvider.CreateDefault());
             _client = new PlayServAnalyticsClient(
                 provider,
-                () => runtimeIdentity.UserId,
+                () => runtimeIdentity == null ? string.Empty : runtimeIdentity.UserId,
                 PlayServLog.ForCategory(PlayServLogCategory.Analytics),
                 SdkInfo.Version,
                 Application.version,

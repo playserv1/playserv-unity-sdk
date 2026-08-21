@@ -2,7 +2,8 @@
     "name": "Playserv.Tests.Runtime.GoogleSignIn",
     "rootNamespace": "",
     "references": [
-        "Playserv.Runtime.Modules.GoogleSignIn"
+        "Playserv.Runtime.Modules.GoogleSignIn",
+        "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

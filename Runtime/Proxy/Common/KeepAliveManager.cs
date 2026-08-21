@@ -401,13 +401,37 @@ namespace Playserv.Proxy.Common
             }
         }
 
-        internal Task WaitForBackgroundTasksAsync()
+        internal async Task WaitForBackgroundTasksAsync()
         {
-            lock (_lock)
+            while (true)
             {
-                return _backgroundTasks.Count == 0
-                    ? Task.CompletedTask
-                    : Task.WhenAll(new List<Task>(_backgroundTasks));
+                Task[] tasks;
+                lock (_lock)
+                {
+                    // Task continuations are not ordered relative to Task.WhenAll.
+                    // Unity 6 can therefore complete WhenAll before the tracking
+                    // continuation removes the same completed task from the set.
+                    if (_backgroundTasks.Count == 0)
+                        return;
+
+                    tasks = new List<Task>(_backgroundTasks).ToArray();
+                }
+
+                try
+                {
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                }
+                finally
+                {
+                    lock (_lock)
+                    {
+                        for (var i = 0; i < tasks.Length; i++)
+                        {
+                            if (tasks[i].IsCompleted)
+                                _backgroundTasks.Remove(tasks[i]);
+                        }
+                    }
+                }
             }
         }
 

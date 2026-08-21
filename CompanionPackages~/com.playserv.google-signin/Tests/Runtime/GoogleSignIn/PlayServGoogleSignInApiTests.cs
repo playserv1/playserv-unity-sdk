@@ -75,6 +75,28 @@ namespace Playserv.Tests.Runtime.GoogleSignIn
             Assert.That(_provider.DisconnectCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public void BackendProof_RequiresIdTokenAndNeverUsesAuthCode()
+        {
+            var authCodeOnly = new PlayServGoogleSignInCredential(
+                "google-user",
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                "authorization-code");
+
+            Assert.That(authCodeOnly.TryCreateBackendProof(out var missingProof), Is.False);
+            Assert.That(missingProof, Is.Null);
+
+            var credential = CreateCredential("google-user");
+            Assert.That(credential.TryCreateBackendProof(out var proof), Is.True);
+            Assert.That(proof.ProviderToken, Is.EqualTo("identity-token"));
+            Assert.That(proof.AuthorizationCode, Is.EqualTo(string.Empty));
+        }
+
         private static PlayServGoogleSignInCredential CreateCredential(string userId)
         {
             return new PlayServGoogleSignInCredential(

@@ -48,43 +48,119 @@ namespace Playserv.Tests.Editor
         {
             var dotnetPath = PlayServSchemaToolRunner.ResolveBundledDotNet();
             Assert.That(File.Exists(dotnetPath), Is.True, dotnetPath);
+            var toolPath = ResolveShippedToolPath();
 
-            var corePackage = PackageManagerPackageInfo.FindForAssetPath(
-                "Packages/com.playserv.sdk/package.json");
-            Assert.That(corePackage, Is.Not.Null);
-            var companionPackage = PackageManagerPackageInfo.FindForAssetPath(
-                "Packages/com.playserv.schema-tool/package.json");
-            var toolPath = companionPackage != null
-                ? Path.Combine(
-                    companionPackage.resolvedPath,
-                    PlayServSchemaToolPackage.ToolRelativePath)
-                : Path.Combine(
-                    corePackage.resolvedPath,
-                    "CompanionPackages~/com.playserv.schema-tool",
-                    PlayServSchemaToolPackage.ToolRelativePath);
-            if (!File.Exists(toolPath))
-                Assert.Ignore("Schema Tool companion source is not present in this package layout.");
+            var result = RunTool(dotnetPath, toolPath, "version --json");
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.Error);
+            StringAssert.Contains("\"version\": \"0.4.0\"", result.Output);
+            StringAssert.Contains("\"protocolVersion\": 1", result.Output);
+        }
 
-            var startInfo = new ProcessStartInfo
+        [Test]
+        public void ShippedTool_TargetsUnity2021LinuxRuntime()
+        {
+            var toolPath = ResolveShippedToolPath();
+            var runtimeConfigPath = Path.ChangeExtension(toolPath, ".runtimeconfig.json");
+            var dependencyManifestPath = Path.ChangeExtension(toolPath, ".deps.json");
+            Assert.That(File.Exists(runtimeConfigPath), Is.True, runtimeConfigPath);
+            Assert.That(File.Exists(dependencyManifestPath), Is.True, dependencyManifestPath);
+
+            var runtimeConfig = File.ReadAllText(runtimeConfigPath);
+            StringAssert.Contains("\"tfm\": \"net5.0\"", runtimeConfig);
+            StringAssert.Contains("\"version\": \"5.0.0\"", runtimeConfig);
+            StringAssert.Contains("\"rollForward\": \"LatestMajor\"", runtimeConfig);
+
+            var dependencyManifest = File.ReadAllText(dependencyManifestPath);
+            StringAssert.Contains(
+                "\"System.Collections.Immutable/6.0.0\"",
+                dependencyManifest);
+            StringAssert.Contains(
+                "\"System.Runtime.CompilerServices.Unsafe/6.0.0\"",
+                dependencyManifest);
+            StringAssert.Contains(
+                "\"System.Text.Encoding.CodePages/6.0.0\"",
+                dependencyManifest);
+
+            var runtimeDirectory = Path.GetDirectoryName(toolPath);
+            foreach (var dependency in new[]
+                     {
+                         "System.Collections.Immutable.dll",
+                         "System.Runtime.CompilerServices.Unsafe.dll",
+                         "System.Text.Encoding.CodePages.dll"
+                     })
             {
-                FileName = dotnetPath,
-                Arguments = $"\"{toolPath}\" version --json",
-                WorkingDirectory = corePackage.resolvedPath,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
+                Assert.That(
+                    File.Exists(Path.Combine(runtimeDirectory, dependency)),
+                    Is.True,
+                    dependency);
+            }
+        }
 
-            using (var process = Process.Start(startInfo))
+        [Test]
+        public void ShippedTool_RoslynDependenciesUsePortableImages()
+        {
+            var runtimeDirectory = Path.GetDirectoryName(ResolveShippedToolPath());
+            foreach (var dependency in new[]
+                     {
+                         "Microsoft.CodeAnalysis.dll",
+                         "Microsoft.CodeAnalysis.CSharp.dll"
+                     })
             {
-                Assert.That(process, Is.Not.Null);
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                Assert.That(process.WaitForExit(15000), Is.True, "Schema Tool timed out.");
-                Assert.That(process.ExitCode, Is.EqualTo(0), error);
-                StringAssert.Contains("\"version\": \"0.3.7\"", output);
-                StringAssert.Contains("\"protocolVersion\": 1", output);
+                var dependencyPath = Path.Combine(runtimeDirectory, dependency);
+                Assert.That(File.Exists(dependencyPath), Is.True, dependencyPath);
+                Assert.That(
+                    ReadPortableExecutableMagic(dependencyPath),
+                    Is.EqualTo(0x10b),
+                    dependency +
+                    " must be a portable PE32 IL image, not a platform-specific PE32+ ReadyToRun image.");
+            }
+        }
+
+        [Test]
+        public void ShippedTool_AnalyzesAndGeneratesOnUnityBundledDotNet()
+        {
+            var dotnetPath = PlayServSchemaToolRunner.ResolveBundledDotNet();
+            Assert.That(File.Exists(dotnetPath), Is.True, dotnetPath);
+            var toolPath = ResolveShippedToolPath();
+            var projectRoot = Path.Combine(
+                Path.GetTempPath(),
+                "playserv-schema-tool-tests-" + System.Guid.NewGuid().ToString("N"));
+
+            Directory.CreateDirectory(projectRoot);
+            try
+            {
+                var initialize = RunTool(
+                    dotnetPath,
+                    toolPath,
+                    $"init --project \"{projectRoot}\" --json");
+                Assert.That(initialize.ExitCode, Is.EqualTo(0), initialize.Error);
+
+                var assetsPath = Path.Combine(projectRoot, "Assets");
+                Directory.CreateDirectory(assetsPath);
+                File.WriteAllText(
+                    Path.Combine(assetsPath, "PlayerProfile.cs"),
+                    "[PlayServSchema(\"player.profile\")]\n" +
+                    "public sealed class PlayerProfile\n" +
+                    "{\n" +
+                    "    public string DisplayName { get; set; }\n" +
+                    "}\n");
+
+                var generate = RunTool(
+                    dotnetPath,
+                    toolPath,
+                    $"generate --project \"{projectRoot}\" --json");
+                Assert.That(generate.ExitCode, Is.EqualTo(0), generate.Error);
+                StringAssert.Contains("\"schemaCount\": 1", generate.Output);
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        projectRoot,
+                        "Assets/PlayServ/Generated/Schemas/playserv.schema.json")),
+                    Is.True);
+            }
+            finally
+            {
+                if (Directory.Exists(projectRoot))
+                    Directory.Delete(projectRoot, true);
             }
         }
 
@@ -122,6 +198,80 @@ namespace Playserv.Tests.Editor
                     EditorApplication.applicationContentsPath,
                     Application.platform),
                 Is.EqualTo(PlayServSchemaToolRunner.ResolveBundledDotNet()));
+        }
+
+        private static string ResolveShippedToolPath()
+        {
+            var corePackage = PackageManagerPackageInfo.FindForAssetPath(
+                "Packages/com.playserv.sdk/package.json");
+            Assert.That(corePackage, Is.Not.Null);
+            var companionPackage = PackageManagerPackageInfo.FindForAssetPath(
+                "Packages/com.playserv.schema-tool/package.json");
+            var toolPath = companionPackage != null
+                ? Path.Combine(
+                    companionPackage.resolvedPath,
+                    PlayServSchemaToolPackage.ToolRelativePath)
+                : Path.Combine(
+                    corePackage.resolvedPath,
+                    "CompanionPackages~/com.playserv.schema-tool",
+                    PlayServSchemaToolPackage.ToolRelativePath);
+            if (!File.Exists(toolPath))
+                Assert.Ignore("Schema Tool companion source is not present in this package layout.");
+            return toolPath;
+        }
+
+        private static ToolProcessResult RunTool(
+            string dotnetPath,
+            string toolPath,
+            string arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = dotnetPath,
+                Arguments = $"\"{toolPath}\" {arguments}",
+                WorkingDirectory = Path.GetDirectoryName(toolPath),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using (var process = Process.Start(startInfo))
+            {
+                Assert.That(process, Is.Not.Null);
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                Assert.That(process.WaitForExit(15000), Is.True, "Schema Tool timed out.");
+                return new ToolProcessResult(process.ExitCode, output, error);
+            }
+        }
+
+        private static int ReadPortableExecutableMagic(string path)
+        {
+            using (var stream = File.OpenRead(path))
+            using (var reader = new BinaryReader(stream))
+            {
+                stream.Position = 0x3c;
+                var peHeaderOffset = reader.ReadInt32();
+                stream.Position = peHeaderOffset;
+                Assert.That(reader.ReadUInt32(), Is.EqualTo(0x00004550u), path);
+                stream.Position = peHeaderOffset + 24;
+                return reader.ReadUInt16();
+            }
+        }
+
+        private sealed class ToolProcessResult
+        {
+            public ToolProcessResult(int exitCode, string output, string error)
+            {
+                ExitCode = exitCode;
+                Output = output;
+                Error = error;
+            }
+
+            public int ExitCode { get; }
+            public string Output { get; }
+            public string Error { get; }
         }
     }
 }

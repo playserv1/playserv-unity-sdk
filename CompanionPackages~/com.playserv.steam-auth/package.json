@@ -1,0 +1,25 @@
+{
+  "name": "com.playserv.steam-auth",
+  "displayName": "PlayServ Steam Auth",
+  "version": "0.4.0",
+  "unity": "2021.3",
+  "description": "Optional Steamworks.NET Web API ticket integration for the PlayServ Unity SDK.",
+  "author": {
+    "name": "PlayServ"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:playserv1/playserv-unity-sdk.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.playserv.sdk": "0.4.0"
+  },
+  "samples": [
+    {
+      "displayName": "Steam Identity Login",
+      "description": "Acquire a Steam Web API ticket and authenticate it with PlayServ.",
+      "path": "Samples~/IdentityLogin"
+    }
+  ]
+}

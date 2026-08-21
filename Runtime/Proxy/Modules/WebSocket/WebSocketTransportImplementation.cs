@@ -7,10 +7,11 @@ using System.Threading.Tasks;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
+using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Proxy.Implementation
 {
-    public sealed class WebSocketTransportImplementation : ITransportImplementation
+    public sealed class WebSocketTransportImplementation : ITransportImplementation, IPlayServTransportCloseInfoSource
     {
         private readonly Uri _uri;
 
@@ -26,6 +27,8 @@ namespace Playserv.Proxy.Implementation
         private ClientWebSocket _socket = new ClientWebSocket();
         private CancellationTokenSource _connectCTS;
         private Task _receiveLoop;
+
+        public event Action<PlayServTransportCloseInfo> Closed;
 
         public WebSocketTransportImplementation(string uri, ILogger logger = null)
         {
@@ -210,6 +213,10 @@ namespace Playserv.Proxy.Implementation
                             : result.CloseStatusDescription;
                         _logger.LogWarning(
                             $"WebSocket close frame received. status={closeStatus}, description={closeDescription}, socketState={_socket.State}");
+
+                        Closed?.Invoke(new PlayServTransportCloseInfo(
+                            result.CloseStatus.HasValue ? (int?)result.CloseStatus.Value : null,
+                            result.CloseStatusDescription));
 
                         try
                         {

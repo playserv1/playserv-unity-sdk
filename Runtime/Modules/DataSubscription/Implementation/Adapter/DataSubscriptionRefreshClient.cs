@@ -30,14 +30,28 @@ namespace Playserv.DataSubscription
 
         public async Task RefreshAsync(long subscriptionId, int timeoutMs, CancellationToken ct = default)
         {
+            await RefreshWithUpdateAsync(subscriptionId, timeoutMs, ct);
+        }
+
+        internal async Task<DataSubscriptionUpdate> RefreshWithUpdateAsync(
+            long subscriptionId,
+            int timeoutMs,
+            CancellationToken ct = default,
+            Action<long> onRequestCreated = null)
+        {
             if (subscriptionId <= 0)
                 throw new ArgumentOutOfRangeException(nameof(subscriptionId));
+
+            ct.ThrowIfCancellationRequested();
 
             if (_commandBus.State != PlayServState.Online)
             {
                 throw new DataSubscriptionException(
                     0,
-                    $"Data subscription refresh skipped because SDK state is {_commandBus.State}.");
+                    $"Data subscription refresh skipped because the connection is unavailable " +
+                    $"(SDK state is {_commandBus.State}).",
+                    retryable: true,
+                    sourceCode: "subscription_connection_unavailable");
             }
 
             var request = new DataSubscriptionRefreshRequest
@@ -45,11 +59,15 @@ namespace Playserv.DataSubscription
                 RequestId = _requestIds.Next(),
                 SubscriptionId = subscriptionId
             };
+            onRequestCreated?.Invoke(request.RequestId);
 
-            await SendRefreshRequestAsync(request, timeoutMs, ct);
+            return await SendRefreshRequestAsync(request, timeoutMs, ct);
         }
 
-        private async Task SendRefreshRequestAsync(DataSubscriptionRefreshRequest request, int timeoutMs, CancellationToken ct)
+        private async Task<DataSubscriptionUpdate> SendRefreshRequestAsync(
+            DataSubscriptionRefreshRequest request,
+            int timeoutMs,
+            CancellationToken ct)
         {
             var tcs = new TaskCompletionSource<DataSubscriptionUpdate>();
             IDisposable typedSubscription = null;
@@ -143,6 +161,8 @@ namespace Playserv.DataSubscription
                             ? "Subscription refresh returned an error update."
                             : update.ErrorMessage);
                 }
+
+                return update;
             }
             finally
             {

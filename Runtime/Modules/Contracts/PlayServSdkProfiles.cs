@@ -23,6 +23,7 @@ namespace Playserv.Modules
                     PlayServModuleManifest.DataSubscriptionId,
                     PlayServModuleManifest.ClientRpcId,
                     PlayServModuleManifest.SpawnId,
+                    PlayServModuleManifest.AnalyticsId,
                     PlayServModuleManifest.TransportWebSocketId
                 }),
 
@@ -32,7 +33,9 @@ namespace Playserv.Modules
                 "Server runtime package. Client gameplay facades are excluded.",
                 new[]
                 {
-                    PlayServModuleManifest.ServerId
+                    PlayServModuleManifest.ServerId,
+                    PlayServModuleManifest.GameServerId,
+                    PlayServModuleManifest.AnalyticsId
                 }),
 
             new PlayServSdkProfile(
@@ -51,6 +54,10 @@ namespace Playserv.Modules
                     PlayServModuleManifest.AnalyticsId,
                     PlayServModuleManifest.AppleSignInId,
                     PlayServModuleManifest.GoogleSignInId,
+                    PlayServModuleManifest.FacebookLoginId,
+                    PlayServModuleManifest.EpicAuthId,
+                    PlayServModuleManifest.SteamAuthId,
+                    PlayServModuleManifest.GameServerId,
                     PlayServModuleManifest.TransportWebSocketId,
                     PlayServModuleManifest.TransportUdpId,
                     PlayServModuleManifest.TransportRudpId,

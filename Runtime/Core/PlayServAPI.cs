@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Http.Common;
+using Playserv.Identity;
 using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
@@ -14,7 +15,7 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServApi : IPlayServConnectionApi, IPlayServRuntimeAccess
+    internal sealed class PlayServApi : IPlayServConnectionApi, IPlayServAuthApi, IPlayServRuntimeAccess
     {
         private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;
@@ -23,6 +24,7 @@ namespace Playserv.Wrapper
         private readonly PlayServApiConfigFacade _configFacade;
         private readonly PlayServApiConnectionOrchestrator _connectionOrchestrator;
         private readonly PlayServPlayerAuthCoordinator _playerAuthCoordinator;
+        private IPlayServTransportCloseInfoSource _transportCloseInfoSource;
 
         public string SdkVersion => SdkInfo.Version;
 
@@ -31,8 +33,44 @@ namespace Playserv.Wrapper
         public PlayServState State => _configFacade.State;
 
         public event Action<TransportError> OnTransportError;
+        public event Action<PlayServError> OnError;
         public event Action OnKeepAlivePingSent;
         public event Action OnKeepAlivePongReceived;
+
+        public bool IsLoggedIn => CurrentSession.IsLoggedIn;
+
+        public string PlayerId => CurrentSession.PlayerId;
+
+        public PlayServSessionKind SessionKind => CurrentSession.Kind;
+
+        public PlayServSessionInfo CurrentSession => _playerAuthCoordinator.CurrentSession;
+
+        public event Action<PlayServSessionLostInfo> SessionLost
+        {
+            add => _playerAuthCoordinator.SessionLost += value;
+            remove => _playerAuthCoordinator.SessionLost -= value;
+        }
+
+        public Task<PlayServAuthProvidersResult> GetProvidersAsync(
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.GetProvidersAsync(cancellationToken);
+
+        public Task<PlayServAuthResult> LinkIdentityAsync(
+            PlayServExternalIdentityProof proof,
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.LinkIdentityAsync(proof, cancellationToken);
+
+        public Task<PlayServAuthResult> UnlinkIdentityAsync(
+            string providerId,
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.UnlinkIdentityAsync(providerId, cancellationToken);
+
+        public Task<PlayServAuthResult> MergeIdentityAsync(
+            PlayServAuthConflict conflict,
+            PlayServMergeChoice choice,
+            PlayServExternalIdentityProof proof,
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.MergeIdentityAsync(conflict, choice, proof, cancellationToken);
 
         public PlayServApi()
         {
@@ -55,9 +93,12 @@ namespace Playserv.Wrapper
                         settings.ToRuntimeSettings(),
                         PlayServJsonCompositionRoot.CreateDefaultJsonCodec())),
                 defaultSessionStore: new PlayServPlayerPrefsSessionStore(),
+                getSettings: _configFacade.GetOrCreateSettings,
                 getState: () => State,
                 refreshLiveAuthorization: (token, cancellationToken) =>
-                    RequiredSession.RefreshPlayerAuthAsync(token, cancellationToken));
+                    RequiredSession.RefreshPlayerAuthAsync(token, cancellationToken),
+                disconnectTransport: DisconnectTransportForAuth,
+                connectTransport: () => _connectionOrchestrator.ConnectAsync());
 
             _connectionOrchestrator = new PlayServApiConnectionOrchestrator(
                 getState: () => State,
@@ -98,6 +139,15 @@ namespace Playserv.Wrapper
         }
 
         public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
+
+        public Task<PlayServAuthResult> LoginExternalAsync(
+            Playserv.Identity.PlayServExternalIdentityProof proof,
+            PlayServExternalLoginMode mode,
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.LoginExternalAsync(proof, mode, cancellationToken);
+
+        public Task<PlayServAuthResult> LogoutAsync(CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.LogoutAsync(cancellationToken);
 
         public Task<bool> RefreshPlayerAuthAsync(
             string newAccessToken,
@@ -178,7 +228,7 @@ namespace Playserv.Wrapper
         private void DisconnectInternal()
         {
             _playerAuthCoordinator.StopRefreshLoop();
-            _configFacade.Disconnect();
+            DisconnectTransportForAuth();
         }
 
         private void SubscribeToInstanceEvents(IPlayServRuntimeSession session)
@@ -195,9 +245,19 @@ namespace Playserv.Wrapper
             session.OnKeepAlivePingSent += HandleKeepAlivePingSent;
             session.OnKeepAlivePongReceived += HandleKeepAlivePongReceived;
             session.OnModuleCommand += HandleModuleCommand;
+
+            UnsubscribeFromTransportCloseInfo();
+            _transportCloseInfoSource = session.GetTransportImplementation() as IPlayServTransportCloseInfoSource;
+            if (_transportCloseInfoSource != null)
+                _transportCloseInfoSource.Closed += HandleTransportClosed;
         }
 
-        private void HandleTransportError(TransportError error) => OnTransportError?.Invoke(error);
+        private void HandleTransportError(TransportError error)
+        {
+            OnTransportError?.Invoke(error);
+            if (error?.UnifiedError != null)
+                OnError?.Invoke(error.UnifiedError);
+        }
 
         private void HandleKeepAlivePingSent() => OnKeepAlivePingSent?.Invoke();
 
@@ -206,6 +266,51 @@ namespace Playserv.Wrapper
         private void HandleModuleCommand(string commandName, object command)
         {
             PlayServRuntimeHost.NotifyModuleCommand(commandName, command);
+
+            if (command is ParseErrorResponse parse)
+            {
+                OnError?.Invoke(new PlayServError(
+                    PlayServErrorCode.Validation,
+                    "parse_error",
+                    parse.Error,
+                    rawDetails: parse.ReceivedJson));
+            }
+            else if (command is ValidationErrorResponse validation)
+            {
+                OnError?.Invoke(new PlayServError(
+                    PlayServErrorCode.Validation,
+                    "validation_error",
+                    validation.Error,
+                    rawDetails: validation.ReceivedJson));
+            }
+            else if (command is CommandErrorResponse error &&
+                     string.IsNullOrWhiteSpace(error.SourceCommand))
+            {
+                OnError?.Invoke(new PlayServError(
+                    PlayServErrorCode.ServerError,
+                    error.Error,
+                    error.Message,
+                    retryable: error.Retryable,
+                    rawDetails: error.Details));
+            }
+        }
+
+        private void HandleTransportClosed(PlayServTransportCloseInfo closeInfo) =>
+            _playerAuthCoordinator.HandleTransportClosed(closeInfo);
+
+        private void DisconnectTransportForAuth()
+        {
+            UnsubscribeFromTransportCloseInfo();
+            _configFacade.Disconnect();
+        }
+
+        private void UnsubscribeFromTransportCloseInfo()
+        {
+            if (_transportCloseInfoSource == null)
+                return;
+
+            _transportCloseInfoSource.Closed -= HandleTransportClosed;
+            _transportCloseInfoSource = null;
         }
 
         private void LogShutdownIgnoreWarning(string operationName)

@@ -1,0 +1,26 @@
+{
+    "name": "Playserv.Tests.Runtime.DebugTerminal.GameServer",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime",
+        "Playserv.Runtime.Modules.DebugTerminal",
+        "Playserv.Runtime.Modules.DebugTerminal.GameServer",
+        "Playserv.Runtime.Modules.GameServer"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_EDITOR || UNITY_SERVER",
+        "!PLAYSERV_MODULE_DISABLED_DEBUG_TERMINAL",
+        "!PLAYSERV_MODULE_DISABLED_GAME_SERVER"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

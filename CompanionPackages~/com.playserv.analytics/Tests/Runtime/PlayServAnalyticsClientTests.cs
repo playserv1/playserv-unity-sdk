@@ -5,8 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using Playserv.Analytics;
+using Playserv.Http.Interfaces;
 using Playserv.Modules;
 using Playserv.Proxy.Logging;
+using Playserv.Runtime.Abstractions;
+using Playserv.Serialization;
 using Playserv.Wrapper;
 using UnityEngine.TestTools;
 
@@ -71,6 +74,23 @@ namespace Playserv.Tests.Runtime.Analytics
                     Is.EqualTo(PlayServAnalyticsParameterType.String));
                 Assert.That(analyticsEvent.UserProperties, Has.Length.EqualTo(1));
                 Assert.That(analyticsEvent.UserProperties[0].Key, Is.EqualTo("role"));
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PerEventUserId_DoesNotMutateSharedUserContext()
+        {
+            var provider = new RecordingProvider();
+            using (var client = CreateClient(provider))
+            {
+                client.Track("server_event", parameters: null, eventUserId: "plr_1");
+                client.Track("runtime_event", parameters: null);
+
+                var flush = client.FlushAsync(CancellationToken.None);
+                yield return Await(flush);
+
+                Assert.That(provider.Batches[0].Events[0].UserId, Is.EqualTo("plr_1"));
+                Assert.That(provider.Batches[0].Events[1].UserId, Is.EqualTo("runtime-user"));
             }
         }
 
@@ -236,6 +256,94 @@ namespace Playserv.Tests.Runtime.Analytics
             }
         }
 
+        [UnityTest]
+        public IEnumerator HttpProvider_PostsRuntimeIngestShapeWithCurrentPlayerToken()
+        {
+            var http = new RecordingHttpClient();
+            var json = new NewtonsoftJsonCodec();
+            var settings = new PlayServSettings
+            {
+                BackendServerAddress = "https://platform.example",
+                ClientToken = "pk_test",
+                RuntimeTokenProvider = new StaticTokenProvider("player-jwt")
+            };
+            var provider = new PlayServHttpAnalyticsProvider(settings, http, json);
+            var batch = new PlayServAnalyticsBatch
+            {
+                BatchId = "batch-1",
+                SentAtUnixMilliseconds = 1_700_000_000_500,
+                Events = new[]
+                {
+                    new PlayServAnalyticsEvent
+                    {
+                        EventId = "event-1",
+                        Name = "match_finished",
+                        TimestampUnixMilliseconds = 1_700_000_000_000,
+                        Sequence = 4,
+                        SessionId = "session-1",
+                        UserId = "plr_1",
+                        SdkVersion = "0.4.0",
+                        ApplicationVersion = "1.2.3",
+                        Platform = "Android",
+                        Parameters = new[]
+                        {
+                            PlayServAnalyticsParameter.Integer("score", 1250),
+                            PlayServAnalyticsParameter.Boolean("won", true)
+                        },
+                        UserProperties = new[]
+                        {
+                            new PlayServAnalyticsUserProperty("tier", "premium")
+                        }
+                    }
+                }
+            };
+
+            var send = provider.SendAsync(batch, CancellationToken.None);
+            yield return Await(send);
+
+            Assert.That(provider.IsReady, Is.True);
+            Assert.That(http.LastDataRequest, Is.Not.Null);
+            Assert.That(http.LastDataRequest.Method, Is.EqualTo("POST"));
+            Assert.That(http.LastDataRequest.RelativePath, Is.EqualTo("analytics/events"));
+            Assert.That(http.LastDataRequest.ClientToken, Is.EqualTo("pk_test"));
+            Assert.That(http.LastDataRequest.BearerToken, Is.EqualTo("player-jwt"));
+
+            var root = (Dictionary<string, object>)json.ParseToPlainValue(
+                http.LastDataRequest.JsonBody);
+            var events = (List<object>)root["events"];
+            var wireEvent = (Dictionary<string, object>)events[0];
+            Assert.That(wireEvent["type"], Is.EqualTo("match_finished"));
+            Assert.That(wireEvent["channel"], Is.EqualTo("unity"));
+            Assert.That(
+                Convert.ToDateTime(wireEvent["event_time"]).ToUniversalTime(),
+                Is.EqualTo(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000).UtcDateTime));
+
+            var payload = (Dictionary<string, object>)wireEvent["payload"];
+            Assert.That(payload["event_id"], Is.EqualTo("event-1"));
+            Assert.That(payload["user_id"], Is.EqualTo("plr_1"));
+            var parameters = (Dictionary<string, object>)payload["parameters"];
+            Assert.That(Convert.ToInt64(parameters["score"]), Is.EqualTo(1250));
+            Assert.That(parameters["won"], Is.EqualTo(true));
+            var properties = (Dictionary<string, object>)payload["user_properties"];
+            Assert.That(properties["tier"], Is.EqualTo("premium"));
+        }
+
+        [Test]
+        public void HttpProvider_RequiresConfiguredRuntimeEndpointAndClientToken()
+        {
+            var provider = new PlayServHttpAnalyticsProvider(
+                new PlayServSettings(),
+                new RecordingHttpClient(),
+                new NewtonsoftJsonCodec());
+
+            Assert.That(provider.IsReady, Is.False);
+            Assert.Throws<InvalidOperationException>(
+                () => provider.SendAsync(
+                        new PlayServAnalyticsBatch { Events = Array.Empty<PlayServAnalyticsEvent>() })
+                    .GetAwaiter()
+                    .GetResult());
+        }
+
         private static PlayServAnalyticsClient CreateClient(
             IPlayServAnalyticsProvider provider,
             int batchSize = 20,
@@ -288,6 +396,66 @@ namespace Playserv.Tests.Runtime.Analytics
 
                 Batches.Add(batch);
                 return Task.CompletedTask;
+            }
+        }
+
+        private sealed class StaticTokenProvider : IPlayServRuntimeTokenProvider
+        {
+            private readonly string _token;
+
+            public StaticTokenProvider(string token)
+            {
+                _token = token;
+            }
+
+            public Task<string> GetTokenAsync(CancellationToken cancellationToken = default)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.FromResult(_token);
+            }
+        }
+
+        private sealed class RecordingHttpClient : IPlayServRuntimeHttpClient
+        {
+            public PlayServRuntimeDataRequest LastDataRequest { get; private set; }
+
+            public Task<string> GetLatestVersionAsync(
+                string gameId,
+                CancellationToken ct = default) =>
+                throw new NotSupportedException();
+
+            public Task<PlayerTokenBundleDto> SignInAnonAsync(
+                string clientToken,
+                CancellationToken ct = default) =>
+                throw new NotSupportedException();
+
+            public Task<PlayerRefreshResponseDto> RefreshAsync(
+                string clientToken,
+                string refreshToken,
+                CancellationToken ct = default) =>
+                throw new NotSupportedException();
+
+            public Task<PlayerTokenBundleDto> LoginExternalAsync(
+                string clientToken,
+                PlayerExternalLoginRequestDto request,
+                string playerAccessToken = null,
+                CancellationToken ct = default) =>
+                throw new NotSupportedException();
+
+            public Task SignOutAsync(
+                string clientToken,
+                string refreshToken,
+                CancellationToken ct = default) =>
+                throw new NotSupportedException();
+
+            public Task<PlayServRuntimeDataResponse> SendDataAsync(
+                PlayServRuntimeDataRequest request,
+                CancellationToken ct = default)
+            {
+                ct.ThrowIfCancellationRequested();
+                LastDataRequest = request;
+                return Task.FromResult(
+                    new PlayServRuntimeDataResponse(202, "{\"accepted\":1}", null, null));
             }
         }
 

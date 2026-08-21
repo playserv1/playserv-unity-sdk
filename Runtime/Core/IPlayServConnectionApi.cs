@@ -16,6 +16,8 @@ namespace Playserv.Wrapper
 
         event Action<TransportError> OnTransportError;
 
+        event Action<PlayServError> OnError;
+
         event Action OnKeepAlivePingSent;
 
         event Action OnKeepAlivePongReceived;

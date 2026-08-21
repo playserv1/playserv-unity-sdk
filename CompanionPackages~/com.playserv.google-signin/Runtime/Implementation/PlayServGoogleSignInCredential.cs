@@ -4,7 +4,7 @@ namespace Playserv.GoogleSignIn
 {
     /// <summary>
     /// Credential returned by the Google provider. User and profile fields are
-    /// untrusted until a backend validates the ID token or authorization code.
+    /// untrusted until a backend validates the ID token.
     /// </summary>
     public sealed class PlayServGoogleSignInCredential
     {
@@ -48,17 +48,15 @@ namespace Playserv.GoogleSignIn
 
         public bool TryCreateBackendProof(out PlayServExternalIdentityProof proof)
         {
-            if (string.IsNullOrWhiteSpace(IdToken) &&
-                string.IsNullOrWhiteSpace(AuthCode))
+            if (string.IsNullOrWhiteSpace(IdToken))
             {
                 proof = null;
                 return false;
             }
 
-            proof = new PlayServExternalIdentityProof(
+            proof = PlayServExternalIdentityProof.FromProviderToken(
                 PlayServIdentityProviderIds.Google,
-                IdToken,
-                AuthCode);
+                IdToken);
             return true;
         }
     }

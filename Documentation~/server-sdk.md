@@ -1,6 +1,37 @@
 # PlayServ Server SDK
 
-This document describes the server-side SDK/runtime parts that are shared with the Unity SDK and how to build them outside Unity.
+This document describes both the local server/shared runtime and the optional
+Unity Dedicated Server HTTP companion.
+
+## Unity Dedicated Server companion
+
+Install `com.playserv.game-server` when a Unity Dedicated Server executable
+must call PlayServ's existing server-only runtime endpoints. The companion is
+separate from the player SDK credential path: it accepts only `sk_*`, sends only
+`Authorization: Bearer sk_*`, and refuses operations in ordinary client builds
+before it reads a credential or starts HTTP. Editor execution is allowed for
+tests.
+
+Configure `Playserv.GameServer.PlayServGameServer` from environment variables
+`PLAYSERV_API_URL` and `PLAYSERV_SERVER_KEY`, or supply
+`PlayServGameServerOptions` with a rotating `IPlayServServerKeyProvider`.
+Credentials are resolved for every request and are never persisted or logged.
+
+The package supports server matchmaking with explicit player IDs, server
+launch, room list/upsert/close, reservation consumption, safe player lookup,
+typed Records, Cloud Functions and multiple independent room heartbeat loops.
+Records use `acl.server` with ETags and the existing query/singleton APIs;
+functions use the existing `/fn/{slug}` gateway. Server Analytics uses a
+bounded retry-safe queue with per-event player IDs, while Catalog and
+Storefront reads reuse the player runtime's typed query/page models. Calling
+`PlayServGameServer.Realtime.ConnectAsync` additionally enables collection and
+record subscriptions through an independent rotating-server-key WebSocket
+session. `ValidatePlayerTokenAsync` performs credential-free RS256/JWKS checks
+for early admission but does not replace authoritative revocation or reservation
+checks. None of these surfaces adds a public client token or player JWT.
+Graceful hosts should await `PlayServGameServer.ShutdownAsync` before process
+exit and inspect its additive `AnalyticsError`. See the companion's
+`README.md` and Dedicated Server sample for a complete setup.
 
 ## Scope
 

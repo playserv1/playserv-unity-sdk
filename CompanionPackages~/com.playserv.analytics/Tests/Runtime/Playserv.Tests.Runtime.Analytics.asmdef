@@ -4,7 +4,11 @@
     "references": [
         "Playserv.Runtime.Modules.Analytics",
         "Playserv.Runtime.Core",
-        "Playserv.Runtime.Modules"
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime",
+        "Playserv.Runtime.Http",
+        "Playserv.Runtime.Serialization",
+        "Playserv.Runtime.Abstractions"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

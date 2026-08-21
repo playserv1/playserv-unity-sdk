@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+- Restored Unity 2021.3 Linux compatibility by targeting its bundled .NET 5
+  runtime while retaining roll-forward support for newer Unity editors.
+- Replaced platform-specific SDK Roslyn binaries with portable NuGet
+  assemblies so schema analysis runs on Linux and macOS Unity editors.
+- Preserved the published dependency manifest so Unity 2021 Linux resolves the
+  shipped Roslyn support assemblies instead of incompatible framework copies.
+
+## [0.4.0] - 2026-08-20
+
+- Aligned the external tool, package, and core SDK dependency versions with
+  `0.4.0`.
+
+## [0.3.9] - 2026-08-19
+
+- Aligned the external tool, package, and core SDK dependency versions with
+  `0.3.9`.
+
+## [0.3.8] - 2026-08-17
+
+- Aligned the package and core SDK dependency versions with `0.3.8`.
+
 ## [0.3.7] - 2026-08-12
 
 - Aligned the external tool, package, and core SDK dependency versions with

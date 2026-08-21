@@ -5,7 +5,9 @@
         "GUID:d56cc792bddf46f29ad15a50f1b88d20",
         "GUID:e1d5feab6d23433e845e1dae147023cd",
         "GUID:0c3f3753168e4ea982725186a6ee5448",
-        "GUID:558599bafc954e9eb0b852954a58e989"
+        "GUID:558599bafc954e9eb0b852954a58e989",
+        "Playserv.Runtime",
+        "Playserv.Runtime.Http"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

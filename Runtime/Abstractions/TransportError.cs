@@ -17,15 +17,28 @@ namespace Playserv.Wrapper
         /// </summary>
         public string Message { get; }
 
+        /// <summary>Cross-module representation of this transport failure.</summary>
+        public PlayServError UnifiedError { get; }
+
         /// <summary>
         /// Creates transport error.
         /// </summary>
         /// <param name="code">Error code.</param>
         /// <param name="message">Error message.</param>
-        public TransportError(TransportErrorCode code, string message)
+        public TransportError(
+            TransportErrorCode code,
+            string message,
+            string rawDetails = null,
+            bool retryable = false)
         {
             Code = code;
             Message = message;
+            UnifiedError = PlayServError.FromTransport(
+                (int)code,
+                code.ToString(),
+                message,
+                retryable,
+                rawDetails);
         }
 
         /// <summary>
@@ -38,7 +51,7 @@ namespace Playserv.Wrapper
             TransportErrorCode.InvalidHandshakePayload => new TransportError(code, "Invalid handshake payload. Check the public ClientToken or runtime player JWT, SDKVersion, and GameVersion."),
             TransportErrorCode.SdkVersionUnsupported => new TransportError(code, "SDK version is not supported. Please update your SDK."),
             TransportErrorCode.GameVersionMismatch => new TransportError(code, "Game version mismatch. Please update your game client."),
-            TransportErrorCode.ConnectionLimitReached => new TransportError(code, "Connection limit reached. Please try again later."),
+            TransportErrorCode.ConnectionLimitReached => new TransportError(code, "Connection limit reached. Please try again later.", retryable: true),
             TransportErrorCode.SessionForceRejected => new TransportError(code, "Connection rejected. Server is in maintenance mode."),
             TransportErrorCode.ForcedDisconnect => new TransportError(code, "Connection was terminated by the server."),
             _ => new TransportError(code, "Unknown transport error occurred.")

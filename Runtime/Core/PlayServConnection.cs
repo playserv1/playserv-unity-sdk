@@ -25,6 +25,12 @@ namespace Playserv.Wrapper
             remove => Api.OnTransportError -= value;
         }
 
+        public static event Action<PlayServError> OnError
+        {
+            add => Api.OnError += value;
+            remove => Api.OnError -= value;
+        }
+
         public static event Action OnKeepAlivePingSent
         {
             add => Api.OnKeepAlivePingSent += value;

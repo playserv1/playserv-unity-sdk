@@ -27,12 +27,10 @@ namespace Playserv.Editor
             "PlayServ.CacheMaintenance.Pending";
 
         private static readonly string[] ManagedPackageIds =
-        {
-            "com.playserv.sdk",
-            "com.playserv.apple-signin",
-            "com.playserv.google-signin",
-            "com.playserv.webrtc"
-        };
+            new[] { "com.playserv.sdk", "com.playserv.schema-tool" }
+                .Concat(PlayServCompanionPackageCatalog.All.Select(package => package.PackageId))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
 
         static PlayServSdkCacheMaintenance()
         {
@@ -146,8 +144,26 @@ namespace Playserv.Editor
                 .ToArray();
         }
 
+        internal static bool ShouldSkipAutomaticMaintenance(
+            bool isBatchMode,
+            IEnumerable<string> commandLineArguments)
+        {
+            if (!isBatchMode)
+                return false;
+
+            return (commandLineArguments ?? Array.Empty<string>()).Any(argument =>
+                string.Equals(argument, "-runTests", StringComparison.OrdinalIgnoreCase));
+        }
+
         private static void RunAutomaticMaintenance()
         {
+            if (ShouldSkipAutomaticMaintenance(
+                    Application.isBatchMode,
+                    Environment.GetCommandLineArgs()))
+            {
+                return;
+            }
+
             if (EditorApplication.isCompiling || EditorApplication.isUpdating)
             {
                 EditorApplication.delayCall -= RunAutomaticMaintenance;

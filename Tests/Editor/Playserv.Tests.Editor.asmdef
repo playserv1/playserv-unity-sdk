@@ -6,6 +6,8 @@
         "Playserv.Editor.Migration",
         "Playserv.Editor.ModelSync",
         "Playserv.Runtime",
+        "Playserv.Runtime.Abstractions",
+        "Playserv.Runtime.Core",
         "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [

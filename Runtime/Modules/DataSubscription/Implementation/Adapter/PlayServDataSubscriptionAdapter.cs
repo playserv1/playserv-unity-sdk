@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Data;
 using Playserv.DataSubscription.Exceptions;
 using Playserv.DataSubscription.Responses;
 using Playserv.Modules;
@@ -17,6 +18,7 @@ namespace Playserv.DataSubscription
         internal const int DataSubscriptionResponseTimeoutMs = 8000;
         internal const int DataMutationResponseTimeoutMs = 8000;
         internal const int DataSubscriptionRefreshTimeoutMs = 8000;
+        internal const int DataSubscriptionCloseTimeoutMs = 8000;
         internal const int DefaultDataGetPollIntervalMs = 4000;
         internal const int DefaultDataGetPollRequestTimeoutMs = 4000;
         internal const int SubscriptionPollIntervalMs = 3000;
@@ -27,6 +29,8 @@ namespace Playserv.DataSubscription
         private readonly IJsonCodec _jsonCodec;
         private readonly DataSubscriptionRegistry _registry;
         private readonly TransportSubscriptionClient _transportSubscriptionClient;
+        private readonly DataSubscriptionCloseClient _transportCloseClient;
+        private readonly TransportSubscriptionRegistry _transportRegistry;
         private readonly DataSubscriptionRefreshClient _transportRefreshClient;
         private readonly DataMutationClient _dataMutationClient;
         private readonly DataGetClient _dataGetClient;
@@ -40,6 +44,13 @@ namespace Playserv.DataSubscription
             _registry = new DataSubscriptionRegistry(logger, _jsonCodec);
             var requestIds = new DataSubscriptionRequestIdSource();
             _transportSubscriptionClient = new TransportSubscriptionClient(commandBus, logger, requestIds, _jsonCodec);
+            _transportCloseClient = new DataSubscriptionCloseClient(commandBus, requestIds, _jsonCodec);
+            _transportRegistry = new TransportSubscriptionRegistry(
+                commandBus,
+                _transportSubscriptionClient,
+                _transportCloseClient,
+                _jsonCodec,
+                logger);
             _transportRefreshClient = new DataSubscriptionRefreshClient(commandBus, logger, requestIds, _jsonCodec);
             _dataMutationClient = new DataMutationClient(commandBus, logger, requestIds, _jsonCodec);
             _dataGetClient = new DataGetClient(commandBus, logger, requestIds, _jsonCodec);
@@ -58,7 +69,9 @@ namespace Playserv.DataSubscription
             var operation = string.IsNullOrWhiteSpace(operationName) ? "Data subscription operation" : operationName;
             return new DataSubscriptionException(
                 0,
-                $"{operation} skipped because SDK state is {_commandBus.State}.");
+                $"{operation} skipped because the connection is unavailable (SDK state is {_commandBus.State}).",
+                retryable: true,
+                sourceCode: "subscription_connection_unavailable");
         }
 
         public IDisposable OnSubscriptionData(long subscriptionId, Action<object> onData)
@@ -91,6 +104,15 @@ namespace Playserv.DataSubscription
             CancellationToken ct = default)
         {
             return _transportSubscriptionClient.TryOpenTransportSubscriptionAsync(query, variables, allowFallbackToPolling, ct);
+        }
+
+        internal Task<TransportSubscriptionLease> AcquireTransportSubscriptionAsync(
+            string query,
+            Dictionary<string, object> variables,
+            string rootFieldName,
+            CancellationToken ct = default)
+        {
+            return _transportRegistry.AcquireAsync(query, variables, rootFieldName, ct);
         }
 
         internal IDisposable RegisterPollingSubscription(
@@ -148,6 +170,28 @@ namespace Playserv.DataSubscription
             return _dataMutationClient.SendMutationAsync(subscriptionId, query, variables, patch);
         }
 
+        internal void SendMutation(
+            TransportSubscriptionLease lease,
+            string query,
+            Dictionary<string, object> variables,
+            object patch)
+        {
+            if (lease == null)
+                throw new ArgumentNullException(nameof(lease));
+            SendMutation(lease.SubscriptionId, query, variables, patch);
+        }
+
+        internal Task SendMutationAsync(
+            TransportSubscriptionLease lease,
+            string query,
+            Dictionary<string, object> variables,
+            object patch)
+        {
+            if (lease == null)
+                throw new ArgumentNullException(nameof(lease));
+            return SendMutationAsync(lease.SubscriptionId, query, variables, patch);
+        }
+
         public void RequestFullState(long subscriptionId)
         {
             _ = RequestFullStateFireAndForgetAsync(subscriptionId);
@@ -155,12 +199,18 @@ namespace Playserv.DataSubscription
 
         public Task RequestFullStateAsync(long subscriptionId)
         {
+            return RequestFullStateAsync(subscriptionId, CancellationToken.None);
+        }
+
+        internal Task RequestFullStateAsync(long subscriptionId, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
             if (_registry.TryGetEntry(subscriptionId, out var entry))
             {
                 return _pollingCoordinator.RefreshEntryAsync(
                     entry,
                     SubscriptionPollRequestTimeoutMs,
-                    CancellationToken.None,
+                    ct,
                     response => _registry.ProcessResponse(subscriptionId, response),
                     ex => _registry.ProcessException(subscriptionId, ex));
             }
@@ -168,7 +218,38 @@ namespace Playserv.DataSubscription
             return _transportRefreshClient.RefreshAsync(
                 subscriptionId,
                 DataSubscriptionRefreshTimeoutMs,
-                CancellationToken.None);
+                ct);
+        }
+
+        internal void RequestFullState(TransportSubscriptionLease lease)
+        {
+            if (lease == null)
+                throw new ArgumentNullException(nameof(lease));
+            RequestFullState(lease.SubscriptionId);
+        }
+
+        internal Task RequestFullStateAsync(
+            TransportSubscriptionLease lease,
+            CancellationToken ct = default)
+        {
+            if (lease == null)
+                throw new ArgumentNullException(nameof(lease));
+            return RequestFullStateAsync(lease.SubscriptionId, ct);
+        }
+
+        internal Task<DataSubscriptionUpdate> RequestTransportFullStateAsync(
+            TransportSubscriptionLease lease,
+            CancellationToken ct = default,
+            Action<long> onRequestCreated = null)
+        {
+            if (lease == null)
+                throw new ArgumentNullException(nameof(lease));
+            ct.ThrowIfCancellationRequested();
+            return _transportRefreshClient.RefreshWithUpdateAsync(
+                lease.SubscriptionId,
+                DataSubscriptionRefreshTimeoutMs,
+                ct,
+                onRequestCreated);
         }
 
         private async Task RequestFullStateFireAndForgetAsync(long subscriptionId)
@@ -202,35 +283,28 @@ namespace Playserv.DataSubscription
 
             if (mode == DataSubscriptionMode.Transport)
             {
-                var transportSubscriptionId = await TryOpenTransportSubscriptionAsync(
+                var transportLease = await AcquireTransportSubscriptionAsync(
                     query,
                     variables,
-                    allowFallbackToPolling: false);
+                    entityTypeName);
 
-                if (transportSubscriptionId.HasValue)
-                {
-                    SafeLog(
-                        $"[DataSubscription] Opened transport subscription. id={transportSubscriptionId.Value}, key={playerId}");
+                SafeLog(
+                    $"[DataSubscription] Opened transport subscription. id={transportLease.SubscriptionId}, key={playerId}");
 
-                    return new SharedEntity<TDto>(
-                        this,
-                        transportSubscriptionId.Value,
-                        null,
-                        query,
-                        variables,
-                        raw =>
-                        {
-                            if (raw == null)
-                                return new TDto();
+                return new SharedEntity<TDto>(
+                    this,
+                    transportLease,
+                    null,
+                    query,
+                    variables,
+                    raw =>
+                    {
+                        if (raw == null)
+                            return new TDto();
 
-                            var entity = _jsonCodec.Convert<TEntity>(raw);
-                            return entity == null ? new TDto() : map(entity);
-                        });
-                }
-
-                throw new DataSubscriptionException(
-                    0,
-                    "Transport subscription failed and fallback is disabled. Use polling subscription explicitly.");
+                        var entity = _jsonCodec.Convert<TEntity>(raw);
+                        return entity == null ? new TDto() : map(entity);
+                    });
             }
 
             SafeLog(
@@ -260,6 +334,14 @@ namespace Playserv.DataSubscription
             Dictionary<string, object> variables = null)
             where TItem : class, new()
         {
+            return await SelectTypedCollectionAsync<TItem>(query, variables, CancellationToken.None);
+        }
+
+        internal async Task<ISharedCollection<TItem>> SelectTypedCollectionAsync<TItem>(
+            string query,
+            Dictionary<string, object> variables,
+            CancellationToken ct)
+        {
             if (string.IsNullOrWhiteSpace(query))
                 throw new ArgumentException("Collection query is required.", nameof(query));
 
@@ -267,20 +349,48 @@ namespace Playserv.DataSubscription
             var vars = variables ?? new Dictionary<string, object>();
 
             // Collections ride the transport (push) plane only — there is no polling collection mode.
-            var transportSubscriptionId = await TryOpenTransportSubscriptionAsync(
+            var transportLease = await AcquireTransportSubscriptionAsync(
                 query,
                 vars,
-                allowFallbackToPolling: false);
-
-            if (!transportSubscriptionId.HasValue)
-                throw new DataSubscriptionException(
-                    0,
-                    "Transport collection subscription failed (no fallback for collections).");
+                rootField,
+                ct);
 
             SafeLog(
-                $"[DataSubscription] Opened transport collection. id={transportSubscriptionId.Value}, root={rootField}, query={query}");
+                $"[DataSubscription] Opened transport collection. id={transportLease.SubscriptionId}, root={rootField}, query={query}");
 
-            return new SharedCollection<TItem>(this, transportSubscriptionId.Value, rootField);
+            return new SharedCollection<TItem>(this, transportLease, rootField);
+        }
+
+        internal async Task<IPlayServRecordSubscription<TItem>> SelectTypedRecordAsync<TItem>(
+            PlayServRecord<TItem> record,
+            string query,
+            Dictionary<string, object> variables,
+            string rootFieldName,
+            CancellationToken ct)
+        {
+            if (record == null)
+                throw new ArgumentNullException(nameof(record));
+            if (string.IsNullOrWhiteSpace(query))
+                throw new ArgumentException("Record subscription query is required.", nameof(query));
+
+            var transportLease = await AcquireTransportSubscriptionAsync(
+                query,
+                variables ?? new Dictionary<string, object>(),
+                rootFieldName,
+                ct);
+            var handle = new PlayServRecordSubscription<TItem>(record, this, transportLease);
+            try
+            {
+                await handle.InitializeAsync(ct);
+                SafeLog(
+                    $"[DataSubscription] Opened typed record subscription. id={transportLease.SubscriptionId}, record={record.Id}");
+                return handle;
+            }
+            catch
+            {
+                handle.Dispose();
+                throw;
+            }
         }
 
         /// <summary>The root field of a query is its leading identifier — the entity/table name
@@ -323,7 +433,13 @@ namespace Playserv.DataSubscription
 
         public void Dispose()
         {
+            _transportRegistry.Dispose();
             _registry.DisposeAll();
+        }
+
+        internal void OnConnected()
+        {
+            _transportRegistry.OnConnected();
         }
 
         private void SafeLog(string message)

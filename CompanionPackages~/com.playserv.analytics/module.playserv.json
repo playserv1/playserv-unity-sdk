@@ -3,7 +3,7 @@
   "id": "analytics",
   "order": 75,
   "label": "Analytics",
-  "description": "Provider-based gameplay analytics with typed parameters, user/session context, bounded batching, and PlayServ transport delivery.",
+  "description": "Provider-based gameplay analytics with typed parameters, user/session context, bounded batching, and HTTP ingestion.",
   "minSdkVersion": "0.3.4",
   "supportedPlatforms": [
     "Editor",
@@ -27,12 +27,12 @@
   "assetPaths": [
     "Runtime/Implementation"
   ],
-  "dependencyIds": [
-    "client-execution"
-  ],
+  "dependencyIds": [],
   "hiddenDependencyAssetPaths": [],
   "hiddenDependencyModuleIds": [],
   "profiles": [
+    "client-sdk",
+    "server-sdk",
     "full-sdk"
   ],
   "rootAssemblyReference": "Playserv.Runtime.Modules.Analytics"

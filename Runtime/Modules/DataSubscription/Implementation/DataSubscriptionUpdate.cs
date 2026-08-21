@@ -43,6 +43,18 @@ namespace Playserv.DataSubscription
         /// </summary>
         public string ErrorMessage { get; set; }
 
+        /// <summary>Backend error text used by current dataflow termination frames.</summary>
+        public string Message { get; set; }
+
+        public string EffectiveErrorMessage =>
+            string.IsNullOrWhiteSpace(ErrorMessage) ? Message : ErrorMessage;
+
+        /// <summary>Entity schema name included by backend reconnect restoration frames.</summary>
+        public string EntityType { get; set; }
+
+        /// <summary>Record key included by backend reconnect restoration frames.</summary>
+        public string IdValue { get; set; }
+
         /// <summary>
         /// True when update represents error instead of data payload.
         /// </summary>

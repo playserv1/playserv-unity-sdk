@@ -8,7 +8,7 @@ namespace Playserv.DataSubscription
     /// Represents synchronized server entity projection with change notifications and mutation helpers.
     /// </summary>
     /// <typeparam name="T">Client DTO type.</typeparam>
-    public interface ISharedEntity<T>
+    public interface ISharedEntity<T> : IPlayServSubscriptionHandle, IPlayServRefreshableSubscription
     {
         /// <summary>
         /// Raised when synchronized value was updated from server or local mutation.
@@ -51,7 +51,7 @@ namespace Playserv.DataSubscription
         /// <summary>
         /// Requests full state refresh from server asynchronously.
         /// </summary>
-        /// <returns>Task completed when refresh request is sent.</returns>
+        /// <returns>Task completed after the refreshed snapshot is applied.</returns>
         Task RefreshAsync();
     }
 }

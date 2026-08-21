@@ -4,6 +4,7 @@
     "references": [
         "Playserv.Runtime.Modules",
         "Playserv.Runtime.Core",
+        "Playserv.Runtime.Abstractions",
         "Playserv.Runtime.Serialization"
     ],
     "includePlatforms": [],

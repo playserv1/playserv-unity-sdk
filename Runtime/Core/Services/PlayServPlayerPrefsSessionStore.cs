@@ -19,9 +19,17 @@ namespace Playserv.Wrapper
             var prefix = BuildKeyPrefix(scopeKey);
             var playerId = PlayerPrefs.GetString(prefix + "PlayerId", string.Empty);
             var refreshToken = PlayerPrefs.GetString(prefix + "RefreshToken", string.Empty);
+            var kindValue = PlayerPrefs.GetInt(prefix + "SessionKind", (int)PlayServSessionKind.Anonymous);
+            var refreshExpiryText = PlayerPrefs.GetString(prefix + "RefreshExpiresAtUtc", string.Empty);
+            var kind = Enum.IsDefined(typeof(PlayServSessionKind), kindValue)
+                ? (PlayServSessionKind)kindValue
+                : PlayServSessionKind.Anonymous;
+            DateTimeOffset? refreshExpiry = DateTimeOffset.TryParse(refreshExpiryText, out var parsedExpiry)
+                ? (DateTimeOffset?)parsedExpiry
+                : null;
             var session = string.IsNullOrWhiteSpace(playerId) || string.IsNullOrWhiteSpace(refreshToken)
                 ? null
-                : new PlayServPlayerSessionData(playerId, refreshToken);
+                : new PlayServPlayerSessionData(playerId, refreshToken, kind, refreshExpiry);
             return Task.FromResult(session);
         }
 
@@ -37,6 +45,10 @@ namespace Playserv.Wrapper
             var prefix = BuildKeyPrefix(scopeKey);
             PlayerPrefs.SetString(prefix + "PlayerId", session.PlayerId ?? string.Empty);
             PlayerPrefs.SetString(prefix + "RefreshToken", session.RefreshToken ?? string.Empty);
+            PlayerPrefs.SetInt(prefix + "SessionKind", (int)session.SessionKind);
+            PlayerPrefs.SetString(
+                prefix + "RefreshExpiresAtUtc",
+                session.RefreshTokenExpiresAtUtc?.ToString("O") ?? string.Empty);
             PlayerPrefs.Save();
             return Task.CompletedTask;
         }
@@ -49,6 +61,8 @@ namespace Playserv.Wrapper
             var prefix = BuildKeyPrefix(scopeKey);
             PlayerPrefs.DeleteKey(prefix + "PlayerId");
             PlayerPrefs.DeleteKey(prefix + "RefreshToken");
+            PlayerPrefs.DeleteKey(prefix + "SessionKind");
+            PlayerPrefs.DeleteKey(prefix + "RefreshExpiresAtUtc");
             PlayerPrefs.Save();
             return Task.CompletedTask;
         }

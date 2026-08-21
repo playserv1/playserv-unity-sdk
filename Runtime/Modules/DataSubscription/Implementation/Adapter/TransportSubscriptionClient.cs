@@ -135,7 +135,13 @@ namespace Playserv.DataSubscription
 
                 var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
-                tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
+                tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(
+                    request.RequestId,
+                    0,
+                    message,
+                    errorResponse.Retryable,
+                    errorResponse.Error,
+                    errorResponse.Details));
             });
 
             commandErrorNamedSubscription = _commandBus.OnCommand("CommandErrorResponse", command =>
@@ -148,7 +154,13 @@ namespace Playserv.DataSubscription
 
                 var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
-                tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
+                tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(
+                    request.RequestId,
+                    0,
+                    message,
+                    errorResponse.Retryable,
+                    errorResponse.Error,
+                    errorResponse.Details));
             });
 
             commandErrorRpcSubscription = _commandBus.OnCommand("RpcErrorResponse", command =>
@@ -161,7 +173,13 @@ namespace Playserv.DataSubscription
 
                 var message = DataSubscriptionRequestSupport.FormatCommandErrorMessage(errorResponse);
 
-                tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(request.RequestId, 0, message));
+                tcs.TrySetResult(DataSubscriptionRequestSupport.CreateDataSubscriptionErrorResponse(
+                    request.RequestId,
+                    0,
+                    message,
+                    errorResponse.Retryable,
+                    errorResponse.Error,
+                    errorResponse.Details));
             });
 
             try

@@ -1,0 +1,23 @@
+{
+  "name": "Playserv.Tests.Runtime.EpicAuth",
+  "rootNamespace": "",
+  "references": [
+    "Playserv.Runtime.Modules.EpicAuth",
+    "Playserv.Runtime.Modules",
+    "Playserv.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "!PLAYSERV_MODULE_DISABLED_EPIC_AUTH"
+  ],
+  "versionDefines": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "noEngineReferences": false
+}

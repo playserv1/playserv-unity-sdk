@@ -5,49 +5,38 @@ Each sample can be launched as a standalone scene and then adapted to your game 
 
 ## What is included
 
-- `Samples.unity` (`0_Samples`) - scene hub and base connection controls.
-- `Common/PlayServBootstrapSample.cs` - shared bootstrap for SDK config and connection.
+- `Identity/PlayServIdentityLifecycleSample.cs` - provider discovery, safe
+  link/conflict/merge flow, unlink, automatic mobile fingerprint configuration,
+  and custom fingerprint fallback construction.
 - `1_DataSubscriptionScene.unity` - data subscription example (`SelectEntity`, internal polling registry).
+- `DataSubscription/PlayServRecordsSample.cs` - typed V2 records CRUD/query,
+  verified natural-key load-or-create, cursor-based LoadAll, bounded LoadMany,
+  typed realtime collection subscriptions, and backend-wins synchronization
+  for individual record handles.
+- `Commerce/PlayServCommerceSample.cs` - paged live storefront discovery and
+  typed catalog item loading over the runtime HTTP API.
+- `Status/PlayServStatusSample.cs` - credential-free current health, daily
+  availability history, and validated federation discovery.
+- `Matchmaking/PlayServMatchmakingSample.cs` - typed lobby-state placement,
+  SDK-managed Join polling, and player-authenticated game-server launch.
 - `2_EventsScene.unity` - event pub/sub example (`Subscribe`, `Publish`).
 - `3_RPC.unity` - RPC call example (`PlayServRpc.Invoke`) with `NotificationEvent` handling.
 - `4_Spawn.unity` - network spawning example (`PlayServSpawn.Spawn`).
 
-## How to run all samples
+## How to run the samples
 
 1. Import this sample from the PlayServ SDK package details in Package Manager.
-2. Open `Samples.unity` from the imported sample folder.
-3. On the `PlayServBootstrap` object, set:
-   `gameId`, `userId`, `gameVersion`, and a runtime credential:
-   `clientToken` (`pk_*`).
-4. Enable `autoConnect` if you want automatic connection on Play Mode start.
-5. Press Play.
-6. In `PlayServ Samples Hub (0_Samples)`:
-   - click `Connect SDK` (if auto-connect is disabled),
-   - open any sample scene.
+2. Open the scene for the API you want to test.
+3. Press Play and use `Connect SDK`. The scene resolves the active project
+   configuration through the SDK.
 
-Important: `PlayServBootstrapSample` uses `DontDestroyOnLoad`, so the same connection is reused across sample scenes.
+For an authenticated connection popup and a single command-driven diagnostics
+scene, install `com.playserv.debug-terminal`, enable `Debug Terminal` in the
+PlayServ module settings, and import its **Debug Terminal** sample.
 
----
-
-## 0_Samples (Hub + Bootstrap)
-
-### Purpose
-Single entry point for all demo scenes: configuration, connect/disconnect, and scene navigation.
-
-### What it demonstrates
-- Base initialization through `PlayServ.Config(PlayServSettings)`.
-- Reusing one SDK connection across multiple scenes.
-- Basic SDK state monitoring.
-
-### How to use
-1. Configure `PlayServBootstrap` in the Inspector.
-2. Connect (`Connect SDK`).
-3. Open a scene from the `Scenes` list.
-4. Use `Back to 0_Samples` inside each sample scene when needed.
-
-### What you can build with it
-- A single persistent bootstrap for your entire game.
-- No repeated `Connect()` calls during scene transitions.
+Identity credentials must come from the platform provider at runtime. The
+identity sample deliberately accepts them as method arguments and acquires a
+fresh proof before merge; it does not serialize tokens into a scene or asset.
 
 ---
 
@@ -58,6 +47,7 @@ Shows live `Configuration(id: "default")` state from the tanks schema, local mut
 
 ### What it demonstrates
 - `PlayServData.SelectEntity<TEntity, TDto>(...)`.
+- `PlayServData.Records<T>()` handles with server IDs, snapshots, ETags, queries, and `LoadOrCreateAsync`.
 - Query generation for the `Configuration` entity from the current schema/model shape.
 - Handling `Changed`, `Error`, and `Terminated`.
 - Local updates: `Update(...)`, `UpdateAsync(...)`.
@@ -193,6 +183,5 @@ Shows networked prefab spawning at runtime.
 ## Useful notes
 
 - All sample overlays are full-screen and include in-window usage hints.
-- Every scene includes a `Back to 0_Samples` button.
 - If controls do not work, check `SDK state` and `Logs` first.
 - You can copy these scripts into production code as a baseline.

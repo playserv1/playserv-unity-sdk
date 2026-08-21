@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using Playserv.Data;
 
 namespace Playserv.DataSubscription
 {
@@ -9,9 +10,10 @@ namespace Playserv.DataSubscription
     {
         private readonly PlayServDataSubscriptionAdapter _adapter;
         private readonly string _entityType;
+        private Type _modelType;
         private object _key;
-        private Expression<Func<T, bool>> _wherePredicate;
-        private readonly List<Expression> _includes = new List<Expression>();
+        private LambdaExpression _wherePredicate;
+        private readonly List<LambdaExpression> _includes = new List<LambdaExpression>();
         private LambdaExpression _selector;
         private DataSubscriptionMode _mode = DataSubscriptionMode.Polling;
 
@@ -19,6 +21,7 @@ namespace Playserv.DataSubscription
         {
             _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
             _entityType = entityType ?? typeof(T).Name;
+            _modelType = typeof(T);
         }
 
         public ISharedEntityBuilder<T> Key(object id)
@@ -39,24 +42,35 @@ namespace Playserv.DataSubscription
             return this;
         }
 
+        [Obsolete("Keyed entity subscriptions cannot apply Where filters. Use PlayServData.Records<T>().SubscribeAsync(query) for filtered collections.")]
         public ISharedEntityBuilder<T> Where(Expression<Func<T, bool>> predicate)
         {
+            if (predicate == null)
+                throw new ArgumentNullException(nameof(predicate));
             _wherePredicate = predicate;
             return this;
         }
 
         public ISharedEntityBuilder<T> Include<TProp>(Expression<Func<T, TProp>> nav)
         {
+            if (nav == null)
+                throw new ArgumentNullException(nameof(nav));
             _includes.Add(nav);
             return this;
         }
 
         public ISharedEntityBuilder<TResult> Select<TResult>(Expression<Func<T, TResult>> selector) where TResult : class, new()
         {
+            if (selector == null)
+                throw new ArgumentNullException(nameof(selector));
+
             var builder = new SharedEntityBuilder<TResult>(_adapter, _entityType);
             builder.SetKey(_key);
             builder.SetSelector(selector);
             builder.SetMode(_mode);
+            builder.SetModelType(_modelType);
+            builder.SetWhere(_wherePredicate);
+            builder.SetIncludes(_includes);
             return builder;
         }
 
@@ -75,6 +89,23 @@ namespace Playserv.DataSubscription
             _mode = mode;
         }
 
+        internal void SetModelType(Type modelType)
+        {
+            _modelType = modelType ?? throw new ArgumentNullException(nameof(modelType));
+        }
+
+        internal void SetWhere(LambdaExpression predicate)
+        {
+            _wherePredicate = predicate;
+        }
+
+        internal void SetIncludes(IEnumerable<LambdaExpression> includes)
+        {
+            _includes.Clear();
+            if (includes != null)
+                _includes.AddRange(includes);
+        }
+
         public Task<ISharedEntity<T>> BindAsync()
         {
             return BindAsync<T>();
@@ -84,29 +115,36 @@ namespace Playserv.DataSubscription
         {
             if (_key == null)
                 throw new InvalidOperationException("Key must be specified using Key() method");
+            if (_wherePredicate != null)
+            {
+                throw new PlayServQueryCapabilityException(
+                    PlayServQueryTarget.KeyedEntitySubscription,
+                    new[] { "Where" });
+            }
 
             var stringKey = ConvertKeyToString(_key);
-            var query = QueryBuilder.BuildQuery<T>(_entityType, _key, jsonCodec: _adapter.GetJsonCodec());
+            var query = QueryBuilder.BuildKeyedQuery(
+                _entityType,
+                _key,
+                _modelType,
+                _selector,
+                _includes,
+                _adapter.GetJsonCodec());
             var variables = QueryBuilder.BuildVariables(_key);
 
             if (_mode == DataSubscriptionMode.Transport)
             {
-                var transportSubscriptionId = await _adapter.TryOpenTransportSubscriptionAsync(
+                var transportLease = await _adapter.AcquireTransportSubscriptionAsync(
                     query,
                     variables,
-                    allowFallbackToPolling: false);
+                    _entityType);
 
-                if (transportSubscriptionId.HasValue)
-                {
-                    var transportEntity = new SharedEntity<TResult>(
-                        _adapter,
-                        transportSubscriptionId.Value,
-                        _selector,
-                        query,
-                        variables);
-
-                    return transportEntity;
-                }
+                return new SharedEntity<TResult>(
+                    _adapter,
+                    transportLease,
+                    _selector,
+                    query,
+                    variables);
             }
 
             var pollingSubscriptionId = _adapter.NextSubscriptionId();

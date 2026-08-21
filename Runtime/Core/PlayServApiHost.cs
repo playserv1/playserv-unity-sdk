@@ -5,5 +5,7 @@ namespace Playserv.Wrapper
         private static readonly PlayServApi Api = new PlayServApi();
 
         internal static IPlayServConnectionApi Connection => Api;
+
+        internal static IPlayServAuthApi Auth => Api;
     }
 }

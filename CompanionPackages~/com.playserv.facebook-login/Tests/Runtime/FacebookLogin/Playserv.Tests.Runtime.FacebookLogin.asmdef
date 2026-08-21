@@ -1,0 +1,23 @@
+{
+  "name": "Playserv.Tests.Runtime.FacebookLogin",
+  "rootNamespace": "",
+  "references": [
+    "Playserv.Runtime.Modules.FacebookLogin",
+    "Playserv.Runtime.Modules",
+    "Playserv.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "!PLAYSERV_MODULE_DISABLED_FACEBOOK_LOGIN"
+  ],
+  "versionDefines": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "noEngineReferences": false
+}

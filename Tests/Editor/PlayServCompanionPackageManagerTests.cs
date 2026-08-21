@@ -16,7 +16,7 @@ namespace Playserv.Tests.Editor
                 .SelectMany(package => package.ModuleIds)
                 .ToArray();
 
-            Assert.That(packages.Count, Is.EqualTo(6));
+            Assert.That(packages.Count, Is.EqualTo(11));
             Assert.That(
                 packages.Select(package => package.PackageId).Distinct().Count(),
                 Is.EqualTo(packages.Count));
@@ -27,11 +27,16 @@ namespace Playserv.Tests.Editor
 
         [TestCase("com.playserv.apple-signin", "apple-sign-in")]
         [TestCase("com.playserv.google-signin", "google-sign-in")]
+        [TestCase("com.playserv.facebook-login", "facebook-login")]
+        [TestCase("com.playserv.epic-auth", "epic-auth")]
+        [TestCase("com.playserv.steam-auth", "steam-auth")]
         [TestCase("com.playserv.webrtc", "transport-webrtc")]
         [TestCase("com.playserv.analytics", "analytics")]
         [TestCase("com.playserv.pulse", "pulse")]
+        [TestCase("com.playserv.debug-terminal", "debug-terminal")]
         [TestCase("com.playserv.transports-native", "transport-udp")]
         [TestCase("com.playserv.transports-native", "transport-rudp")]
+        [TestCase("com.playserv.game-server", "game-server")]
         public void GeneratedCatalog_MapsPackageAndModuleIds(
             string packageId,
             string moduleId)
@@ -86,10 +91,12 @@ namespace Playserv.Tests.Editor
             Assert.That(result, Is.EqualTo("com.playserv.webrtc@0.3.1"));
         }
 
-        [Test]
-        public void ModuleLifecycle_RecognizesInstalledCompanionPackage()
+        [TestCase("com.playserv.apple-signin", "apple-sign-in")]
+        [TestCase("com.playserv.debug-terminal", "debug-terminal")]
+        public void ModuleLifecycle_RecognizesInstalledCompanionPackage(
+            string packageId,
+            string moduleId)
         {
-            const string packageId = "com.playserv.apple-signin";
             if (!PlayServCompanionPackageManager.TryGetInstalledPackage(
                     packageId,
                     out var packageInfo))
@@ -103,7 +110,7 @@ namespace Playserv.Tests.Editor
                 .SingleOrDefault(candidate =>
                     string.Equals(
                         candidate.Id,
-                        "apple-sign-in",
+                        moduleId,
                         StringComparison.Ordinal));
             Assert.That(module, Is.Not.Null);
 

@@ -2,7 +2,13 @@
 
 This document contains practical examples for the public runtime API exposed by:
 - `Playserv.Wrapper.PlayServ`
+- `Playserv.Wrapper.PlayServAuth`
 - `Playserv.Wrapper.PlayServData`
+- `Playserv.Wrapper.PlayServMatchmaking`
+- `Playserv.Wrapper.PlayServCode`
+- `Playserv.Wrapper.PlayServCatalog`
+- `Playserv.Wrapper.PlayServStorefronts`
+- `Playserv.Wrapper.PlayServStatus`
 - `Playserv.Wrapper.PlayServEvents`
 - `Playserv.Wrapper.PlayServAnalytics`
 - `Playserv.Wrapper.PlayServRpc`
@@ -46,7 +52,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.3.7"
+    "com.playserv.sdk": "0.4.0"
   }
 }
 ```
@@ -290,9 +296,9 @@ composition assembly unless the game moves those types into its own asmdef.
 ## Companion package management
 
 Open `Tools > PlayServ > Settings > SDK module settings` to install or remove
-Apple Sign In, Google Sign In, Analytics, Pulse, Native Transports, and WebRTC
-through Unity Package Manager. Package state and module state are intentionally
-separate:
+Apple Sign In, Google Sign In, Steam Auth, Epic Auth, Facebook Login,
+Analytics, Pulse, Native Transports, WebRTC, and Game Server through Unity Package Manager.
+Package state and module state are intentionally separate:
 
 - `Install` adds the companion UPM package to the project.
 - `Installed` means the package code is present in the project.
@@ -310,6 +316,17 @@ The core package contains a committed generated companion catalog that maps each
 package id to one or more module ids and a Git subfolder. Package-backed module
 uninstall operations are routed through Unity Package Manager; the local asset
 deletion path is used only for modules imported under `Assets`.
+
+The `com.playserv.game-server` companion is dedicated to `UNITY_SERVER` builds
+and accepts only `sk_*` credentials. It provides multi-room heartbeats, server
+matchmaking, launch, room lifecycle, reservation admission and safe player
+lookup without weakening the core player's credential policy. Configure it
+through `PlayServGameServerOptions`; the default environment sources are
+`PLAYSERV_API_URL` and `PLAYSERV_SERVER_KEY`. See
+`CompanionPackages~/com.playserv.game-server/README.md`.
+The facade also provides bounded server Analytics with per-event player
+attribution and read-only typed Catalog/Storefront access using the same
+rotating server credential.
 
 ## Schema workflows
 
@@ -628,19 +645,20 @@ PlayServAnalytics.Track(eventName, eventParameters);
 
 Remove the Firebase Analytics package only after all direct
 `FirebaseAnalytics.LogEvent` calls have been migrated and the PlayServ backend
-handler is available.
+ingestion endpoint has been verified in the target environment.
 
 ### Provider and backend contract
 
-By default, the module sends the serializable `PlayServAnalyticsBatch` command
-as `TrackAnalyticsBatch` to `module_analytics`. The PlayServ backend still needs
-an ingestion handler that authenticates the session, validates and
-deduplicates `EventId`, stores events, and exposes reporting or export.
+By default, the module maps each bounded batch to the shipped
+`POST /analytics/events` runtime endpoint. The public `pk_*` token identifies
+the project and environment; when a managed or custom player token is
+available, the request also includes it so the backend can attribute the
+caller. Event parameters and user properties are preserved inside the event
+payload together with SDK, app, platform, session, sequence and batch context.
 
-Until that handler is deployed, route events to another destination by
-implementing `IPlayServAnalyticsProvider`. The implementation belongs to the
-client project, for example under `Assets/Analytics`; it is not shipped by the
-PlayServ SDK:
+Route events to another destination by implementing
+`IPlayServAnalyticsProvider`. The implementation belongs to the client project,
+for example under `Assets/Analytics`; it is not shipped by the PlayServ SDK:
 
 ```csharp
 using System.Threading;
@@ -667,7 +685,7 @@ Register it during client startup. Registration is allowed before
 PlayServAnalytics.SetProvider(new ProjectAnalyticsProvider());
 ```
 
-Return to the built-in `module_analytics` transport when needed:
+Return to the built-in HTTP ingestion provider when needed:
 
 ```csharp
 if (PlayServAnalytics.HasCustomProvider)
@@ -682,6 +700,789 @@ Firebase provider automatically.
 
 Provider failures are propagated by manual `FlushAsync` calls and logged by
 background flushes. In both cases the unsent events remain queued.
+
+## Player authentication
+
+When `PlayServSettings` contains a public `pk_*` client token and does not
+contain `PlayerAccessToken` or an application-supplied `RuntimeTokenProvider`,
+`PlayServ.Connect()` automatically creates or restores a managed anonymous
+player. The access token stays in memory; the player ID and rotated refresh
+token are stored through `IPlayServPlayerSessionStore`.
+
+Current state is available without exposing either token:
+
+```csharp
+bool authenticated = PlayServAuth.IsLoggedIn;
+string playerId = PlayServAuth.PlayerId;
+PlayServSessionKind kind = PlayServAuth.SessionKind;
+PlayServSessionInfo session = PlayServAuth.CurrentSession;
+IReadOnlyList<string> linkedProviders = session.LinkedProviders;
+```
+
+After an identity provider returns an ID token, verify it through the PlayServ
+backend and preserve the current anonymous player by default:
+
+```csharp
+using Playserv.Identity;
+using Playserv.Wrapper;
+
+var proof = PlayServExternalIdentityProof.FromGoogleIdToken(
+    googleIdToken,
+    expectedNonce);
+
+PlayServAuthResult result = await PlayServAuth.LoginExternalAsync(proof);
+if (result.IsSuccess)
+{
+    UnityEngine.Debug.Log($"Player {result.Session.PlayerId} is registered.");
+}
+else if (result.Conflict != null)
+{
+    UnityEngine.Debug.LogWarning(
+        $"{result.Conflict.ProviderId} belongs to " +
+        result.Conflict.Conflicting.PlayerId);
+}
+else
+{
+    UnityEngine.Debug.LogError(result.Error.ToString());
+}
+```
+
+`PreserveCurrentPlayer` sends the current player JWT and keeps the current
+`plr_*` while linking the provider. A `409 provider_already_linked` result is
+returned as `PlayServAuthConflict` and does not replace the current player.
+Use `RecoverProviderAccount` when signing in on another installation and the
+provider-owned player should replace the local anonymous player:
+
+```csharp
+var result = await PlayServAuth.LoginExternalAsync(
+    proof,
+    PlayServExternalLoginMode.RecoverProviderAccount);
+```
+
+Discover available providers and manage additional identities through the same
+managed session:
+
+```csharp
+PlayServAuthProvidersResult providers = await PlayServAuth.GetProvidersAsync();
+foreach (PlayServAuthProviderInfo provider in providers.Providers)
+    UnityEngine.Debug.Log($"{provider.Label}: available={provider.Available}");
+
+PlayServAuthResult link = await PlayServAuth.LinkIdentityAsync(proof);
+if (link.Conflict?.Current != null && link.Conflict.Conflicting != null)
+{
+    // The proof belongs to another player. The UI must ask which player to keep.
+    PlayServAuthResult merge = await PlayServAuth.MergeIdentityAsync(
+        link.Conflict,
+        PlayServMergeChoice.KeepCurrentPlayer,
+        proof); // obtain a fresh provider proof before a real merge
+}
+
+PlayServAuthResult unlink = await PlayServAuth.UnlinkIdentityAsync("google");
+```
+
+Merge is identity-only: records owned by the absorbed player are not moved.
+`MergeIdentityAsync` accepts only a typed provider conflict, validates that it
+still belongs to the current managed player, and derives the primary/absorbed
+IDs from `PlayServMergeChoice`. A merge provider overlap is returned as
+`PlayServAuthConflictKind.MergeProviderConflict` with `ConflictingProviders`.
+
+`PlayServAuthResult.IdentityMutationState` distinguishes confirmed remote
+application from a rejected operation or an outcome that became unknowable due
+to a network failure. In particular, a merge may commit and then return `403`
+when the primary becomes banned; the SDK probes the current refresh credential,
+emits `SessionLost(Banned)` when confirmed, and otherwise reports
+`MergeOutcomeUnknown`.
+
+The built-in token-proof helpers cover Apple/Google ID tokens, Facebook Limited
+Login, Epic external auth tokens (including launcher exchange-code mode), Steam
+tickets, and PlayServ custom tokens. Provider discovery also preserves entries
+without a token helper, such as `playserv-webhook`; `SupportsProviderToken`
+indicates whether this SDK can construct a native proof. Browser OAuth/PKCE is
+not performed by the Unity SDK in this release.
+
+Automatic player fingerprinting is enabled by default on Android and iOS. The
+SDK hashes Unity's platform-scoped device identifier together with the platform
+and `Application.identifier`, then sends only the lowercase SHA-256 digest as
+`stable.device_id_hash`. The source identifier is never stored, logged, or sent.
+Disable automatic collection explicitly when your title's privacy policy
+requires it:
+
+```csharp
+settings.EnableAutomaticPlayerFingerprint = false;
+```
+
+Desktop, console, WebGL, and games with their own consent flow can configure a
+runtime-only `IPlayServPlayerFingerprintProvider`. An explicit provider always
+takes precedence, including when it returns `null`:
+
+```csharp
+settings.PlayerFingerprintProvider = new MyFingerprintProvider();
+
+// Returned by MyFingerprintProvider.GetFingerprintAsync(ct):
+var fingerprint = new PlayServPlayerFingerprint(
+    new Dictionary<string, object> { ["platform"] = "windows" },
+    new Dictionary<string, object>
+    {
+        ["app_version"] = Application.version,
+        ["locale"] = "uk-UA"
+    });
+```
+
+The fingerprint is sent for anonymous minting and both provider-login modes.
+`PreserveCurrentPlayer` reuses one collected snapshot for an anonymous bootstrap
+and the following provider login. Refresh, link, unlink, merge, and sign-out do
+not add fingerprint fields. Unsupported automatic platforms continue without a
+fingerprint and emit one Editor/Development Build warning. The validator rejects
+raw device IDs and identifiers forbidden by the runtime contract, including
+advertising IDs, hardware serials, IMEI/IMSI, MAC addresses, and WebGL
+fingerprinting signals. Fingerprints remain ban/anti-abuse signals only: they
+never select or restore a player session.
+
+On Android the source value depends on the app signing key; debug, locally
+signed, and Google Play-signed builds may therefore produce different hashes.
+On iOS the source is identifier-for-vendor and follows its platform lifecycle.
+
+Successful login creates a new backend session, so an online built-in transport
+is disconnected and reconnected with the new authorization. Ordinary access
+token refresh remains in-place and does not reconnect.
+
+Explicit logout attempts to revoke the current refresh token, always removes
+the local managed session, creates a new anonymous player, and reconnects if the
+transport was online:
+
+```csharp
+PlayServAuthResult logout = await PlayServAuth.LogoutAsync();
+// A failed remote revoke is reported in logout.Error; logout.Session still
+// describes the fresh anonymous player when local replacement succeeded.
+```
+
+Terminal server and refresh failures stop automatic refresh/reconnect and raise
+one session-loss notification. Explicit logout does not raise this event:
+
+```csharp
+PlayServAuth.SessionLost += info =>
+{
+    UnityEngine.Debug.LogWarning(
+        $"Session lost: {info.Reason}; player={info.PreviousSession.PlayerId}");
+};
+```
+
+Network, HTTP, persistence, conflict, and transport-reconnect failures are
+returned through `PlayServAuthResult`. Cancellation, null arguments, and calls
+made while the transport is connecting/handshaking/reconnecting remain
+exceptions. HTTP failures expose `HttpStatus`, `BackendCode`, `BackendTitle`,
+and `BackendDetail` on `PlayServAuthError`. When the application supplies `RuntimeTokenProvider` or
+`PlayerAccessToken`, `SessionKind` is `Unmanaged`; managed login/logout refuses
+to overwrite that configuration. Provider discovery remains available because
+it only requires the public project client token.
+
+The default `PlayerPrefs` store remains compatible with sessions written by
+0.3.7; records without a kind are treated as anonymous. Because PlayerPrefs is
+not secure credential storage, Editor and Development builds warn once when a
+registered refresh token is saved. Production games should provide a
+platform-secure `IPlayServPlayerSessionStore`. Tokens are never written to SDK
+logs.
+
+## Unified errors
+
+Core runtime error surfaces expose a common immutable `PlayServError` alongside
+their existing domain-specific error types. `Code` is a stable cross-module category;
+`SourceCode` retains the exact Problem Details, auth, RPC, or protocol code.
+`HttpStatus` and `TransportCode` identify the originating plane, while
+`Retryable` applies one policy to network failures, timeouts, `408`, `425`,
+`429`, `5xx`, and backend command errors marked retryable.
+
+```csharp
+PlayServ.OnError += error =>
+    UnityEngine.Debug.LogError($"{error.Code}/{error.SourceCode}: {error.Message}");
+
+PlayServAuthResult login = await PlayServAuth.LoginExternalAsync(proof);
+if (!login.IsSuccess && login.UnifiedError?.Retryable == true)
+    ScheduleLoginRetry();
+```
+
+`TransportError`, `PlayServAuthError`, `PlayServRpcError`,
+`PlayServDataException`, and `DataSubscriptionException` remain available and
+provide `UnifiedError` for source compatibility. Correlated auth/data/RPC
+failures stay on their operation result or exception and are not duplicated on
+the global event. `RawDetails` is never logged automatically, and credential-like
+JSON fields, bearer values, and JWT-shaped strings are redacted centrally.
+
+## Typed V2 records
+
+`PlayServData.Records<T>()` resolves `typeof(T).Name` through the runtime table
+catalogue and caches its `ent_*` ID. Use `Records<T>("ent_...")` when the CLR
+name differs from the schema name. Existing subscription methods on
+`PlayServData` are unchanged.
+
+The same cache is public through `PlayServData.GetTablesAsync()`,
+`GetTableAsync(idOrName)`, and `RefreshTablesAsync()`. Each
+`PlayServDataTableInfo` contains the entity ID/name/description, singleton flag,
+row count, updated timestamp, read policy, and complete client/server/backend
+capabilities. A missing lookup throws `PlayServDataTableNotFoundException`.
+
+```csharp
+using System.Linq;
+using Playserv.Data;
+using Playserv.DataSubscription;
+using Playserv.Schema;
+using Playserv.Serialization;
+using Playserv.Wrapper;
+
+public sealed class InventoryItem
+{
+    [PlayServField("code")]
+    public string Code { get; set; }
+
+    [PlayServJsonName("display_name")]
+    public string DisplayName { get; set; }
+
+    public int Durability { get; set; }
+
+    [PlayServField("owner_profile")]
+    public InventoryOwner OwnerProfile { get; set; }
+
+    [PlayServIgnore]
+    public string LocalUiState { get; set; }
+}
+
+public sealed class InventoryOwner
+{
+    public string DisplayName { get; set; }
+}
+
+var items = PlayServData.Records<InventoryItem>();
+PlayServRecord<InventoryItem> created = await items.CreateAsync(
+    new InventoryItem { Code = "starter-sword", DisplayName = "Sword", Durability = 100 });
+
+PlayServRecord<InventoryItem> loaded = await items.LoadAsync(created.Id);
+loaded.Value.Durability--;
+await loaded.SaveAsync();
+```
+
+The table catalogue also supplies advisory ACL capabilities:
+
+```csharp
+PlayServDataCapabilities capabilities = await items.GetCapabilitiesAsync();
+if (capabilities.IsKnown)
+{
+    ShowReadUi(capabilities.CanRead);
+    ShowWriteUi(capabilities.CanWrite);
+}
+
+// Re-fetch after changing schema ACL in the dashboard.
+capabilities = await items.RefreshCapabilitiesAsync();
+```
+
+`Capabilities.Client` is the authority used by the Unity player SDK;
+`Server` and `Backend` expose the other advertised subjects for diagnostics.
+Known client denials are refreshed once and rejected before the record or
+realtime request. Older/custom backends that omit `acl` produce `Unknown` and
+are never blocked locally. These checks are advisory: the backend remains
+authoritative, and `CanWrite` does not bypass player ownership, record
+visibility, validation, or ETag rules. Backend and local ACL refusals use
+`PlayServDataAccessDeniedException`; `WasRejectedLocally` distinguishes them.
+
+The backend, not the client model, mints the `rec_*` ID. Each handle stores its
+flattened value, timestamps, optional player owner, canonical JSON snapshot and
+ETag. `HasPendingChanges` compares the current top-level value to that snapshot.
+`SaveAsync` sends only changed fields as JSON Merge Patch, including explicit
+`null`, and advances snapshot/ETag only after a successful response. Stale
+`If-Match` returns `PlayServRecordConflictException` with
+`Kind == StaleVersion`.
+
+Use selectors or string fields for dynamic schemas:
+
+```csharp
+var allowedCodes = new[] { "starter-sword", "starter-shield" };
+var query = new PlayServRecordQuery<InventoryItem>()
+    .Where(x => x.Durability >= 10 && x.DisplayName != null)
+    .And(x => allowedCodes.Contains(x.Code))
+    .OrderBy(x => x.Code)
+    .Search("sword")
+    .SelectFields(x => x.Code, x => x.DisplayName, x => x.Durability)
+    .Include(x => x.OwnerProfile)
+    .WithLimit(50);
+
+PlayServRecordPage<InventoryItem> page = await items.QueryAsync(query);
+string next = page.NextCursor;
+string previous = page.PreviousCursor;
+```
+
+Selectors use the same `PlayServJsonName` / `PlayServField` mapping as runtime
+serialization; `PlayServIgnore` members cannot be selected or serialized.
+`PlayServLoadOptions` supports `Fields` and `Expand`. A projected load or query
+with selected/hidden fields produces `IsPartial == true`; saving it is rejected
+until a full `ReloadAsync()` prevents omitted fields from becoming accidental
+deletions.
+
+`Where(x => ...)` accepts `==`, `!=`, `>`, `>=`, `<`, `<=`, null equality,
+captured collection `Contains`, and predicates joined with `&&`. Repeated
+`Where` and `And` clauses are also combined with AND. `||`, field-to-field
+comparisons, arithmetic, and arbitrary method calls are rejected locally.
+`SelectFields` and `Hide` are mutually exclusive.
+
+The current REST query route does not accept `fields` or `expand`. When a query
+uses `SelectFields` or `Include`, the SDK first obtains the page and then runs up
+to four record GET requests concurrently with those options. Ordering and
+cursor metadata come from the original page, ETags come from the hydrated GETs,
+and a hydration failure fails the whole call instead of returning mixed handles.
+
+A fully loaded record can also own a keyed realtime subscription:
+
+```csharp
+IPlayServRecordSubscription<InventoryItem> recordLive =
+    await loaded.SubscribeAsync();
+
+recordLive.Changed += change =>
+    RenderChangedFields(change.Record, change.ChangedFields);
+recordLive.Conflict += conflict =>
+    ShowBackendWon(conflict.LocalValue, conflict.RemoteValue);
+recordLive.SynchronizationError += error =>
+    UnityEngine.Debug.LogError(error.UnifiedError.ToString());
+
+// Completes after the canonical REST reload updates Value, snapshot and ETag.
+await recordLive.RefreshAsync(cancellationToken);
+```
+
+The dataflow snapshot contains record fields but not REST metadata. For that
+reason each changed push triggers a canonical `GET /records/{id}` before the
+handle is mutated. `Value`, the canonical snapshot, `UpdatedAt`, owner, and
+`ETag` therefore move to one authoritative version, and repeated push frames
+are coalesced. Partial handles are fully reloaded before the transport opens;
+handles with existing unsaved changes must first call `SaveAsync` or
+`ReloadAsync`.
+
+Edits made after subscription are allowed. If a remote update arrives while
+`HasPendingChanges` is true, synchronization uses backend-wins semantics:
+`Conflict` is raised first with a clone of the local value, the applied remote
+value, and local/remote top-level wire-field changes; `Changed` follows with
+`OverwrotePendingChanges == true`. A server deletion or terminal target-not-
+found frame sets `IsDeleted`, retains the last valid value, emits the standard
+failure sequence once, and leaves the handle in `Terminated` state. Explicit
+`CloseAsync`/`Dispose`, refcounting, reconnect replay, and main-thread event
+delivery reuse the normal managed-subscription lifecycle.
+
+`ISharedCollection<T>`, `IPlayServRecordSubscription<T>`, and the legacy
+`ISharedEntity<T>` implement `IPlayServRefreshableSubscription`. Explicit
+`RefreshAsync(ct)` uses the handle's current server ID, including the remapped ID
+after reconnect. It does not add a backend reference or alter local refcounts.
+Cancellation stops waiting and leaves the handle active; an already-sent request
+cannot be retracted, so a late snapshot can still arrive through the normal push
+path. Closed and terminated handles reject refresh locally.
+
+Use the same query type to open a native realtime collection:
+
+```csharp
+var liveQuery = new PlayServRecordQuery<InventoryItem>()
+    .Where(x => x.Durability, PlayServQueryOperator.LessThan, 25)
+    .SelectFields(x => x.Code, x => x.DisplayName, x => x.Durability)
+    .Include(x => x.OwnerProfile)
+    .WithLimit(50);
+
+ISharedCollection<InventoryItem> live = await items.SubscribeAsync(liveQuery);
+live.Changed += current => RenderInventory(current);
+live.Failure += error => UnityEngine.Debug.LogError(error.ToString());
+
+// Request a correlated full snapshot without replacing the subscription handle.
+await live.RefreshAsync(cancellationToken);
+
+// CloseAsync waits for DataSubscriptionCloseResponse. Dispose performs the
+// same close as best effort when a result is not needed.
+PlayServSubscriptionCloseResult close = await live.CloseAsync();
+```
+
+Identical realtime queries share one server subscription and are reference
+counted locally; only the final handle sends `DataSubscriptionCloseRequest`.
+Active handles are replayed after reconnect and rebound to the new server ID.
+Backend-restored references are released once so reconnect does not leak an
+extra refcount. A deleted target or server `49001` moves every matching handle
+to `Terminated`, raises `Failure`/the legacy `Error`, then `Terminated`, and is
+not replayed again. `Value`/`Items` retain their last valid snapshot.
+
+| Query feature | REST | Realtime transport |
+| --- | --- | --- |
+| `Eq/Neq`, `GT/GTE`, `LT/LTE`, string operators, AND | Yes | Yes |
+| OR groups (up to 8, each group is AND) | No | Yes |
+| Limit and positive field projection | Yes | Yes |
+| Direct `Include` | Yes, hydrated through record GET | Yes, nested selection |
+| Nested `Include` (up to 6 relation levels) | No | Yes |
+| `In/Nin`, null/empty/between/count checks | Yes | No |
+| Search, sort, cursor, `Hide` | Yes | No |
+
+Unsupported realtime features throw `PlayServQueryCapabilityException` before
+the transport request and list every rejected feature. There is no client-side
+filtering, sorting, or REST re-query fallback. The raw `SelectCollection` API is
+still available for hand-written dataflow queries.
+
+Realtime OR values use the same expression parser and are always sent through
+dataflow variables. Common filters apply to every alternative, and nested paths
+use the wire name of every relation segment:
+
+```csharp
+var regionalGuilds = new PlayServRecordQuery<InventoryItem>()
+    .Where(x => x.Durability > 0)
+    .Or(
+        x => x.Region == "eu",
+        x => x.Region == "us" && x.Durability >= 10)
+    .Include(x => x.Guild.Owner)
+    .WithLimit(50);
+
+ISharedCollection<InventoryItem> live =
+    await items.SubscribeAsync(regionalGuilds, cancellationToken);
+```
+
+Using OR or a nested include with `QueryAsync` is rejected as a REST capability
+error before table catalogue or record network I/O. Direct REST includes remain
+available through bounded record hydration.
+
+Legacy keyed `ISharedEntityBuilder<T>.Include` and `Select` now affect the
+selection set. Its `Where` method remains for source compatibility but is
+deprecated: keyed backend reads do not apply filters, so `BindAsync` throws a
+capability exception instead of silently ignoring the predicate. Use
+`Records<T>().SubscribeAsync(...)` for filtered collections.
+
+Natural keys are primitive schema fields declared `unique` or `primary`:
+
+```csharp
+PlayServLoadOrCreateResult<InventoryItem> result =
+    await items.LoadOrCreateAsync(
+        PlayServNaturalKey<InventoryItem>.For(x => x.Code, "starter-sword"),
+        () => new InventoryItem { Code = "starter-sword", Durability = 100 });
+```
+
+The SDK resolves natural keys through the existing records query endpoint, and
+the factory runs only when that query is empty. After create, the returned
+server-minted ID is reloaded before the handle is exposed. If the ID was not
+persisted because another client won the unique-key race, the SDK repeats the
+query and returns the competing handle with `WasCreated == false`. If neither
+record exists it reports `created_record_not_persisted`; multiple query matches
+report `natural_key_not_unique`. This recovery protects Unity callers from a
+phantom handle, but it is not an atomic backend operation and cannot undo
+server-side notifications or metadata effects from a rejected insert.
+
+Network/auth/validation failures use `PlayServDataException`, missing records
+use `PlayServRecordNotFoundException`, and structured `409`/`412` failures use
+`PlayServRecordConflictException`; cancellation and invalid API use remain
+ordinary exceptions.
+
+Bulk convenience methods are implemented entirely by the SDK over the existing
+runtime endpoints:
+
+```csharp
+PlayServLoadAllResult<InventoryItem> all = await items.LoadAllAsync(
+    new PlayServRecordQuery<InventoryItem>().Where(x => x.Durability < 25),
+    maxRecords: 5_000);
+
+PlayServBulkResult<PlayServRecord<InventoryItem>> saved =
+    await items.BulkSaveAsync(all.Records, maxConcurrency: 4);
+```
+
+`LoadManyAsync` and `PopulateManyAsync` preserve input order and expose typed
+per-item failures without discarding successful results. `DeleteByIdAsync`
+accepts an optional ETag. `BulkSaveAsync`, `BulkDeleteAsync`, and
+`DeleteAllAsync` are bounded client-side fan-outs, not server transactions.
+Before deleting, `DeleteAllAsync` loads the complete matching set and aborts
+without a delete request if `maxRecords` is exceeded. A filtered query requires
+`MatchingRecords`; an unrestricted query requires explicit `AllRecords`.
+
+Singleton entities use `GetSingletonAsync<T>()` or
+`Records<T>().GetSingletonAsync()`. Their handles provide the same snapshot,
+ETag, `HasPendingChanges`, `SaveAsync`, and `ReloadAsync` behavior.
+
+## Player matchmaking
+
+`PlayServMatchmaking` calls the existing player-authenticated runtime
+matchmaking endpoint. Configure or establish a player session first; the SDK
+uses the current `RuntimeTokenProvider` JWT and public `pk_*` client token.
+
+```csharp
+using Playserv.Matchmaking;
+using Playserv.Wrapper;
+
+PlayServJoinGameResult join = await PlayServMatchmaking.JoinGameAsync(
+    new PlayServJoinGameRequest
+    {
+        FunctionSlug = "tank-room",
+        Matchmaker = "ranked",
+        Parameters = new
+        {
+            mode = "duo",
+            skill = 1700,
+            party_id = currentPartyId
+        },
+        WaitMs = 20_000
+    },
+    cancellationToken: destroyCancellationToken);
+
+if (join.Status == PlayServJoinGameStatus.Matched)
+{
+    ConnectToRoom(
+        join.Reservation.RoomName,
+        join.Reservation.ReservationToken);
+}
+```
+
+`Parameters` accepts a typed DTO, anonymous object, or string-keyed dictionary.
+It must serialize to a JSON object. The SDK snapshots it before the first
+request and sends the same value through the backend's `params` field on every
+`searching` retry and `room_closed` re-entry. The backend can validate it
+against the matchmaker's configured lobby-state schema. Unity never sends
+`player_id`; the platform derives the player from the verified JWT.
+
+`PlayServFindMatchRequest` exposes the complete player request: function slug,
+matchmaker, parameters, `WaitMs`, and `SearchAgeMs`. `PlayServJoinGameRequest`
+exposes the same stable placement inputs except search age, which the SDK owns
+and updates from elapsed time. The positional Find/Join overloads remain
+backward compatible.
+
+The default Join performs 20-second placement waits and handles `searching`
+responses inside one call. Its UnityWebRequest deadline is 25 seconds: the same
+`20_000` value serialized as `wait_ms`, plus a fixed five-second network
+margin. Custom waits follow the same rule, rounded up to a whole second. A
+request without a server wait uses a 10-second deadline. Caller cancellation
+aborts the request and remains an `OperationCanceledException`.
+
+The optional `tryEnter` callback can validate or enter the returned room before
+the join completes. Throw `PlayServRoomEntryRefusedException("room_closed")`
+from that callback to restart placement; other refusal codes propagate.
+
+Operational Find, Join, and Launch failures throw
+`PlayServMatchmakingException`. Its `Operation`, `FunctionSlug`, and
+`UnifiedError` normalize backend Problem Details, network/timeouts, and invalid
+success payloads while retaining the exact backend `SourceCode`. Caller
+cancellation remains `OperationCanceledException`; invalid arguments and
+missing configuration remain standard exceptions. The existing
+`PlayServRoomEntryRefusedException.ErrorCode` remains available and now also
+has `UnifiedError`.
+
+Request an orchestrated game-server deployment when the game explicitly needs
+to start capacity:
+
+```csharp
+PlayServServerLaunchResult launch =
+    await PlayServMatchmaking.LaunchServerAsync(
+        "tank-room",
+        region: "eu-west",
+        cancellationToken);
+
+UnityEngine.Debug.Log($"Accepted deployment: {launch.DeploymentId}");
+```
+
+The `202` response means only that the orchestrator accepted the deployment.
+It does not create a matchmaking room; the launched server must boot and
+self-register before placement can find it.
+
+Unity exposes only player-safe matchmaking calls. `ListRooms`, `UpsertRoom`,
+`CloseRoom`, and `ConsumeReservation` require an `sk_*` server credential and
+therefore remain in the PlayServ C# server SDK rather than the Unity player
+runtime.
+
+## Cloud functions
+
+`PlayServCode` invokes deployed functions through the existing runtime
+`/fn/{slug}` gateway. It is an HTTP surface and is separate from the live
+WebSocket-based `PlayServRpc` API.
+
+Typed POST calls serialize the request and deserialize the response:
+
+```csharp
+using System;
+using Playserv.Code;
+using Playserv.Wrapper;
+
+[Serializable]
+public sealed class GrantRewardResponse
+{
+    public string reward_id;
+    public int amount;
+}
+
+PlayServFunctionResult<GrantRewardResponse> result =
+    await PlayServCode.CallAsync<GrantRewardResponse>(
+        "grant-daily-reward",
+        new { streak = 7 },
+        new PlayServFunctionCallOptions
+        {
+            Version = "v2",
+            TimeoutSeconds = 30
+        },
+        cancellationToken);
+
+if (!result.IsSuccess)
+    UnityEngine.Debug.LogError(result.Error);
+```
+
+Use the raw request when the function needs another HTTP verb, query values, a
+non-JSON body, or selected pass-through headers:
+
+```csharp
+using System.Collections.Generic;
+
+var response = await PlayServCode.InvokeAsync(
+    new PlayServFunctionRequest
+    {
+        Slug = "profile",
+        Method = PlayServFunctionMethod.Put,
+        Query = new Dictionary<string, string> { ["region"] = "eu" },
+        RawBody = "name=Alex",
+        ContentType = "application/x-www-form-urlencoded",
+        Headers = new Dictionary<string, string>
+        {
+            ["X-Correlation-Id"] = correlationId
+        }
+    },
+    cancellationToken);
+```
+
+The gateway accepts GET, POST, PUT, PATCH and DELETE. `Version` is encoded as
+`X-Playserv-Function-Version`; callers cannot inject Authorization,
+`X-Playserv-Client`, or arbitrary `X-Playserv-*` values. The SDK supplies the
+public `pk_*` credential and includes the current player JWT when one is
+available. The gateway verifies that credential, strips it before forwarding,
+and provides verified caller context to the function.
+
+HTTP and Problem Details failures are returned as `PlayServError`. Invalid API
+arguments and caller cancellation remain exceptions. A typed response that is
+not valid JSON returns `PlayServErrorCode.Deserialization` while preserving the
+raw response body and metadata.
+
+Functions can also receive and return arbitrary bytes without UTF-8 conversion:
+
+```csharp
+var progress = new Progress<PlayServFunctionTransferProgress>(value =>
+    UnityEngine.Debug.Log($"{value.Direction}: {value.BytesTransferred}"));
+
+PlayServFunctionResult binary = await PlayServCode.InvokeBytesAsync(
+    new PlayServFunctionRequest
+    {
+        Slug = "build-generated-asset",
+        Method = PlayServFunctionMethod.Post,
+        RawBodyBytes = sourceArchive,
+        ContentType = "application/zip"
+    },
+    new PlayServFunctionTransferOptions
+    {
+        MaxResponseBytes = 16L * 1024L * 1024L,
+        Progress = progress
+    },
+    cancellationToken);
+
+if (binary.IsSuccess)
+    ConsumeAsset(binary.Response.BodyBytes);
+```
+
+`Body`, `RawBody`, and `RawBodyBytes` are mutually exclusive. `BodyBytes` is the
+authoritative buffered response for binary content; `Body` remains available
+for text and JSON compatibility. The standard HTTP module implements the
+additive `IPlayServRuntimeBinaryHttpClient` capability. A custom HTTP module
+that has not opted into that interface returns `binary_http_not_supported`
+without making a function request.
+
+Large responses should be streamed to disk:
+
+```csharp
+PlayServFunctionDownloadResult download = await PlayServCode.DownloadToFileAsync(
+    new PlayServFunctionRequest
+    {
+        Slug = "export-world",
+        Method = PlayServFunctionMethod.Get
+    },
+    System.IO.Path.Combine(Application.persistentDataPath, "world.zip"),
+    new PlayServFunctionDownloadOptions
+    {
+        MaxResponseBytes = 512L * 1024L * 1024L,
+        OverwriteExistingFile = true,
+        Progress = progress
+    },
+    cancellationToken);
+```
+
+The response is written to a unique temporary file beside the target and moved
+only after a complete successful response. Cancellation or HTTP, network, size,
+or persistence failure removes the partial file and preserves an existing
+target. Buffered transfers default to 16 MiB; file transfers default to 512 MiB.
+Exceeding the configured limit produces `PlayServErrorCode.InvalidResponse`
+with `SourceCode == "function_response_too_large"`. File downloads require an
+absolute path and are unavailable on WebGL; use `InvokeBytesAsync` there.
+
+## Catalog and storefronts
+
+The read-only commerce facades consume the runtime `GET /catalog/items`,
+`GET /catalog/items/{itemId}`, `GET /storefronts`, and
+`GET /storefronts/{id}` endpoints. They always send the configured public
+`pk_*` token and also send the current managed or custom player JWT when one is
+available.
+
+```csharp
+using Playserv.Commerce;
+using Playserv.Wrapper;
+
+PlayServStorefrontPage storefronts = await PlayServStorefronts.ListAsync(
+    new PlayServStorefrontQuery
+    {
+        Status = "live",
+        Audience = "all_players",
+        Limit = 25
+    },
+    cancellationToken);
+
+foreach (PlayServStorefront storefront in storefronts.Storefronts)
+{
+    foreach (PlayServStorefrontItem placement in storefront.Items)
+    {
+        PlayServCatalogItem item = await PlayServCatalog.GetAsync(
+            placement.ItemId,
+            cancellationToken);
+        ShowStoreItem(item.Name, item.ImageUrl);
+    }
+}
+```
+
+Catalog list queries support `Status`, `Search`, `Sort`, `Cursor`, and `Limit`.
+Storefront queries additionally support `Audience`. Page responses retain
+`cursor_next`, `cursor_prev`, `has_more`, and `total_estimate`; page sizes must
+be between 1 and 200. Full DTOs expose catalog localizations, bundle contents,
+platform mappings, storefront audiences, schedules, and 30-day statistics.
+
+HTTP Problem Details become `PlayServCommerceException.UnifiedError`, while
+caller cancellation and invalid arguments remain exceptions. The facade does
+not fabricate purchase or receipt-validation calls: the currently shipped
+runtime commerce endpoints are read-only.
+
+## Public platform status
+
+`PlayServStatus` reads the credential-exempt `GET /status`,
+`GET /status/history`, and `GET /status/federation` endpoints. Only the backend
+address must be configured; these requests deliberately send neither
+`X-PlayServ-Client` nor player authorization.
+
+```csharp
+using Playserv.Status;
+using Playserv.Wrapper;
+
+PlayServPlatformStatus current = await PlayServStatus.GetCurrentAsync(
+    cancellationToken);
+
+PlayServPlatformStatusHistory history = await PlayServStatus.GetHistoryAsync(
+    pop: "iad-1",
+    days: 30,
+    cancellationToken: cancellationToken);
+
+PlayServStatusFederation federation = await PlayServStatus.GetFederationAsync(
+    cancellationToken);
+```
+
+Current status exposes the backend's open-ended system names and tri-state
+health strings, probe age, and timestamps. History exposes daily availability
+and green/yellow/red minute totals for a 1–365 day window. Federation origins
+are validated as absolute HTTP(S) URIs and deduplicated, but are not fetched by
+the SDK. This avoids silently trusting or contacting a different origin; a
+game-owned status UI can apply its own allowlist first.
+
+HTTP, network, and malformed-response failures throw
+`PlayServStatusException` with a `UnifiedError`. Invalid arguments and caller
+cancellation keep the normal .NET exception semantics.
 
 ## Apple Sign In module
 
@@ -707,9 +1508,9 @@ Install `com.playserv.apple-signin` before enabling the module:
    - Redirect URI, if a Services ID/web flow is used
    - Sign in with Apple `.p8` private key
 
-The PlayServ SDK does not currently provide the backend endpoint that exchanges
-or validates Apple credentials. Never place the `.p8` private key or a generated
-Apple client secret in a Unity asset, game build, source repository, or client-side
+The PlayServ backend validates the Apple ID token through
+`/auth/players/login`. Never place the `.p8` private key or a generated Apple
+client secret in a Unity asset, game build, source repository, or client-side
 environment variable.
 
 Apple setup reference: https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple
@@ -740,8 +1541,8 @@ Open `PlayServAppleSignInSettings.asset` and configure:
 - `Entitlements File Name`: generated entitlements file name for the Xcode project.
 
 Team ID, Services ID, Key ID, redirect URI, and private keys are intentionally
-not part of `PlayServAppleSignInSettings`. They belong to the future PlayServ
-authentication backend. When upgrading from an older SDK, the editor
+not part of `PlayServAppleSignInSettings`. They belong only to PlayServ backend
+configuration. When upgrading from an older SDK, the editor
 re-serializes existing Apple settings assets to remove those legacy fields.
 
 Apple only returns `Email` and `FullName` the first time a user grants consent.
@@ -782,14 +1583,14 @@ public static class AppleLoginExample
         var identityToken = credential.IdentityToken;
         var authorizationCode = credential.AuthorizationCode;
 
-        if (credential.TryCreateBackendProof(out var proof))
-        {
-            // proof is still unverified. Send it to the PlayServ auth backend
-            // when that endpoint is available.
-        }
+        if (!credential.TryCreateBackendProof(out var proof))
+            throw new InvalidOperationException("Apple did not return an ID token.");
 
-        // Until backend verification exists, do not use appleUserId, email,
-        // identityToken, or authorizationCode to create a trusted PlayServ session.
+        var result = await PlayServAuth.LoginExternalAsync(proof);
+        // Use PlayServAuth.LinkIdentityAsync(proof) when adding Apple to an
+        // already registered managed player.
+        if (!result.IsSuccess)
+            Console.WriteLine(result.Error?.ToString() ?? "Apple account conflict.");
     }
 
     public static async Task CheckCredentialState(string appleUserId)
@@ -805,7 +1606,8 @@ public static class AppleLoginExample
 - `IsAvailable` is `false`: run on an iOS device/build with the module enabled.
 - Xcode capability is missing: keep `Add Sign In Capability On Build` enabled or add the capability manually in Xcode.
 - `Email` or `FullName` is empty: Apple returns these only on first consent.
-- Backend token validation fails after server auth is introduced: check Bundle ID/Services ID, Team ID, Key ID, nonce, and the expected audience value.
+- Backend proof is unavailable: Apple returned an authorization code but no ID token; the helper never submits an authorization code as an ID token.
+- Backend token validation fails: check Bundle ID/Services ID, Team ID, Key ID, nonce, and the expected audience value.
 
 ## Google Sign In module
 
@@ -876,9 +1678,10 @@ Open `PlayServGoogleSignInSettings.asset` and configure:
 - `Account Name`: optional preferred account hint.
 - `Additional Scopes`: optional extra Google OAuth scopes required by the game.
 
-For the common PlayServ/backend flow, keep `Request Id Token` and
-`Request Auth Code` enabled. The current SDK returns these provider credentials
-but does not yet exchange them for a verified PlayServ session.
+For PlayServ authentication, keep `Request Id Token` enabled and configure the
+Web client ID. `Request Auth Code` is optional and is only needed for a separate
+application-owned server exchange; PlayServ never submits an auth code as an ID
+token.
 
 ### 5. Use Google login at runtime
 
@@ -900,12 +1703,13 @@ public static class GoogleLoginExample
 
         if (credential.TryCreateBackendProof(out var proof))
         {
-            // proof is still unverified. Send it to the PlayServ auth backend
-            // when that endpoint is available.
+            var result = await PlayServAuth.LoginExternalAsync(proof);
+            // Use PlayServAuth.LinkIdentityAsync(proof) to add Google as an
+            // additional provider for the current managed player.
+            if (!result.IsSuccess)
+                UnityEngine.Debug.LogError(
+                    result.Error?.ToString() ?? "Google account conflict.");
         }
-
-        // Until backend verification exists, do not use googleUserId, email,
-        // idToken, or authCode to create a trusted PlayServ session.
     }
 }
 ```
@@ -922,14 +1726,136 @@ PlayServGoogleSignIn.Disconnect();
 - `IsAvailable` is `false`: the Google Sign-In Unity provider plugin is missing, not loaded, or the PlayServ module is disabled.
 - ID token is empty: enable `Request Id Token` and set `Web Client Id`.
 - Auth code is empty: enable `Request Auth Code` and set `Web Client Id`.
+- Backend proof is unavailable: Google returned an auth code but no ID token; the helper never submits an auth code as an ID token.
 - Android login fails: verify package name, SHA-1 fingerprint, keystore, and resolver output.
 - iOS login fails: verify Bundle Identifier, URL scheme/plist setup, and Xcode project configuration.
 
-`PlayServExternalIdentityProof` deliberately contains only the provider ID,
-ID token, and authorization code. It does not contain email or provider user ID,
-because client profile values must not be accepted as proof of identity. A proof
-remains unverified until a future PlayServ backend endpoint validates its
-signature, audience, issuer, expiry, and nonce where applicable.
+`PlayServExternalIdentityProof` contains only the provider ID, provider token,
+optional provider mode, and nonce. It does not contain email or provider user
+ID because client profile values must not be accepted as proof of identity. The
+proof remains unverified until `PlayServAuth.LoginExternalAsync` sends it to the
+PlayServ backend for signature, audience, issuer, expiry, and nonce validation.
+
+## Steam Auth module
+
+Install `com.playserv.steam-auth` alongside a game-owned Steamworks.NET
+installation. The PlayServ package has no direct Steamworks.NET dependency and
+finds the supported API through reflection:
+
+```json
+"com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#<tag-or-commit>"
+```
+
+The game remains responsible for `SteamAPI.Init`, `SteamAPI.Shutdown`, and
+regular `SteamAPI.RunCallbacks()` pumping. Enable `Steam Auth` in SDK module
+settings, then use the one-step helper:
+
+```csharp
+using Playserv.Wrapper;
+
+if (PlayServSteamAuth.IsAvailable && PlayServSteamAuth.IsInitialized)
+{
+    PlayServAuthResult result = await PlayServSteamAuth.LoginAsync(
+        PlayServExternalLoginMode.PreserveCurrentPlayer);
+
+    // Add Steam to the current managed player instead:
+    // result = await PlayServSteamAuth.LinkAsync();
+}
+```
+
+The helper obtains `GetAuthTicketForWebApi(null)`, correlates the asynchronous
+callback by its ticket handle, submits only `m_cubTicket` bytes as lowercase
+hex, and cancels the ticket after the PlayServ request completes. The `null`
+identity matches current PlayServ backend ticket validation. For manual use,
+`GetCredentialAsync` returns an `IDisposable` credential whose
+`TryCreateBackendProof` method builds the Steam proof.
+
+`IsAvailable` means a compatible Steamworks.NET API was found;
+`IsInitialized` additionally requires Steam to be running and the local user to
+be logged on. Credential acquisition failures throw
+`PlayServSteamAuthException`. The facade never logs or persists ticket bytes.
+
+## Epic Auth module
+
+Install `com.playserv.epic-auth` alongside the game-owned EOS-Contrib/PlayEveryWare
+plugin and enable `Epic Auth` in SDK module settings:
+
+```json
+"com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#<tag-or-commit>"
+```
+
+EOS initialization and EAS login remain game responsibilities. To copy the
+current local Epic Account Services access token:
+
+```csharp
+using Playserv.EpicAuth;
+using Playserv.Wrapper;
+
+PlayServAuthResult result = await PlayServEpicAuth.LoginAsync(
+    PlayServEpicAuthRequest.Eos());
+
+// Pass an Epic Account ID explicitly when selecting another local EAS user:
+// result = await PlayServEpicAuth.LinkAsync(
+//     PlayServEpicAuthRequest.Eos(epicAccountId));
+```
+
+An EOS Product User ID belongs to the Connect identity path and is not an Epic
+Account ID. Do not pass a Product User ID to `Eos(epicAccountId)`.
+
+For an Epic Games Launcher start, the package can read the exchange code from
+`GetCommandLineArgsFromEpicLauncher().authPassword`:
+
+```csharp
+PlayServAuthResult result = await PlayServEpicAuth.LoginAsync(
+    PlayServEpicAuthRequest.Launcher());
+```
+
+`Launcher(exchangeCode)` accepts an explicit code. The credential selects the
+backend `launcher_exchange_code` mode automatically. A missing or incompatible
+EOS plugin makes `IsAvailable` false; provider failures throw
+`PlayServEpicAuthException` before PlayServ HTTP begins. Tokens are never logged
+or persisted.
+
+## Facebook Limited Login module
+
+Install `com.playserv.facebook-login` alongside Meta Unity SDK and enable
+`Facebook Login` in SDK module settings:
+
+```json
+"com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#<tag-or-commit>"
+```
+
+The game must complete `FB.Init` first. The adapter deliberately supports only
+Meta Limited Login:
+
+```csharp
+using Playserv.FacebookLogin;
+using Playserv.Wrapper;
+
+var request = new PlayServFacebookLoginRequest(
+    new[] { "public_profile", "email" });
+
+PlayServAuthResult result = await PlayServFacebookLogin.LoginAsync(
+    request,
+    PlayServExternalLoginMode.PreserveCurrentPlayer);
+
+// Add Facebook to the current managed player instead:
+// result = await PlayServFacebookLogin.LinkAsync(request);
+```
+
+The bridge invokes
+`FB.Mobile.LoginWithTrackingPreference(LoginTracking.LIMITED, permissions, nonce, callback)`.
+When no nonce is supplied it generates a cryptographically secure 32-byte
+base64url value. Missing, canceled, errored, or nonce-mismatched callbacks fail
+with `PlayServFacebookLoginException` before any PlayServ HTTP request. Only
+`CurrentAuthenticationToken().TokenString` and its matching nonce become the
+backend proof; regular Facebook access tokens are not used. Tokens and nonces
+are never logged or persisted.
+
+For all three companion facades, automatic Android/iOS fingerprint collection
+continues through the single downstream `PlayServAuth.LoginExternalAsync` call.
+Provider acquisition errors are exceptions, while backend authentication and
+identity conflicts remain ordinary `PlayServAuthResult` failures.
 
 ## 1) Configure SDK
 
@@ -1090,6 +2016,13 @@ public static class CommandExamples
 
 ## 4) Publish and subscribe events
 
+Event subscriptions are keyed by their event type. Multiple observers of the
+same type share one connection subscription, and disposing the final observer
+removes it locally. Active event types are subscribed again automatically after
+a reconnect. If the backend rejects a topic, that observable receives a
+`PlayServEventSubscriptionException` with a normalized `UnifiedError`; other
+event types continue running.
+
 ```csharp
 using System;
 using Playserv.Events;
@@ -1182,7 +2115,6 @@ public sealed class PlayerHudDto
 public sealed class PlayerHudSync : MonoBehaviour
 {
     private ISharedEntity<PlayerHudDto> _shared;
-    private IDisposable _sharedDisposable;
 
     public async Task BindAsync(string playerId)
     {
@@ -1197,11 +2129,8 @@ public sealed class PlayerHudSync : MonoBehaviour
 
         _shared.Changed += OnChanged;
         _shared.Error += OnError;
+        _shared.Failure += error => Debug.LogError(error.ToString());
         _shared.Terminated += OnTerminated;
-
-        // Public return type does not include Dispose, but runtime object supports IDisposable.
-        if (_shared is IDisposable disposable)
-            _sharedDisposable = disposable;
     }
 
     public async Task DealDamageAsync(int damage)
@@ -1242,8 +2171,8 @@ public sealed class PlayerHudSync : MonoBehaviour
             _shared.Terminated -= OnTerminated;
         }
 
-        _sharedDisposable?.Dispose();
-        _sharedDisposable = null;
+        _shared?.Dispose(); // best-effort server close on the final local handle
+        _shared = null;
     }
 }
 ```

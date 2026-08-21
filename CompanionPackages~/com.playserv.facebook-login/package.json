@@ -1,0 +1,25 @@
+{
+  "name": "com.playserv.facebook-login",
+  "displayName": "PlayServ Facebook Login",
+  "version": "0.4.0",
+  "unity": "2021.3",
+  "description": "Optional Meta Unity SDK Limited Login integration for the PlayServ Unity SDK.",
+  "author": {
+    "name": "PlayServ"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:playserv1/playserv-unity-sdk.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.playserv.sdk": "0.4.0"
+  },
+  "samples": [
+    {
+      "displayName": "Facebook Limited Login",
+      "description": "Authenticate a Meta Limited Login token with PlayServ.",
+      "path": "Samples~/IdentityLogin"
+    }
+  ]
+}

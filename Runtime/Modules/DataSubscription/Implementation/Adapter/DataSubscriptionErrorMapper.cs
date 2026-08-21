@@ -40,7 +40,12 @@ namespace Playserv.DataSubscription
                 UpdateDataCorruptionException.Code => new UpdateDataCorruptionException(message),
                 SubscriptionNotFoundException.Code => new SubscriptionNotFoundException(0, message),
                 SubscriptionTerminatedException.Code => new SubscriptionTerminatedException(0, message),
-                _ => new DataSubscriptionException(error.ErrorCode, message)
+                _ => new DataSubscriptionException(
+                    error.ErrorCode,
+                    message,
+                    error.Retryable,
+                    error.SourceCode,
+                    error.RawDetails)
             };
         }
 

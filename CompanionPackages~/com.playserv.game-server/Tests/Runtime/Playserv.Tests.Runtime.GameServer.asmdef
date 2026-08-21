@@ -1,0 +1,27 @@
+{
+  "name": "Playserv.Tests.Runtime.GameServer",
+  "rootNamespace": "",
+  "references": [
+    "Playserv.Runtime.Modules.GameServer",
+    "Playserv.Runtime",
+    "Playserv.Runtime.Core",
+    "Playserv.Runtime.Modules",
+    "Playserv.Runtime.Abstractions",
+    "Playserv.Runtime.Serialization",
+    "Playserv.Runtime.Modules.DataSubscription"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "!PLAYSERV_MODULE_DISABLED_GAME_SERVER"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

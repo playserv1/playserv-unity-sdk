@@ -46,12 +46,21 @@ if (PlayServGoogleSignIn.IsAvailable)
     var credential = await PlayServGoogleSignIn.SignInAsync();
     var idToken = credential.IdToken;
     var authCode = credential.AuthCode;
+
+    if (credential.TryCreateBackendProof(out var proof))
+    {
+        PlayServAuthResult login = await PlayServAuth.LoginExternalAsync(proof);
+        // Or link Google to the current managed player:
+        // PlayServAuthResult link = await PlayServAuth.LinkIdentityAsync(proof);
+    }
 }
 ```
 
 `IsAvailable` is `false` when the provider plugin is absent. Provider
-credentials remain untrusted until the backend validates their signature,
-audience, issuer and expiry.
+credentials remain untrusted until `LoginExternalAsync` or `LinkIdentityAsync`
+validates them on the backend. Obtain a fresh proof before conflict-driven
+`MergeIdentityAsync`. `TryCreateBackendProof` accepts only the Google ID token and never
+submits an auth-code-only credential as an ID token.
 
 ## Tests
 

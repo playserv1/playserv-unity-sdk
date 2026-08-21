@@ -6,6 +6,8 @@
         "Playserv.Runtime.Core",
         "Playserv.Runtime.Http",
         "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Modules.DataSubscription",
+        "Playserv.Runtime.Modules.Events",
         "Playserv.Runtime.Serialization",
         "Playserv.Runtime.Abstractions"
     ],

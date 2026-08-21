@@ -111,6 +111,34 @@ namespace Playserv.DataSubscription
             }
         }
 
+        public static bool TryMapDataSubscriptionCloseResponse(
+            IJsonCodec jsonCodec,
+            object command,
+            out DataSubscriptionCloseResponse response)
+        {
+            if (jsonCodec == null)
+                throw new ArgumentNullException(nameof(jsonCodec));
+
+            response = null;
+            if (command == null)
+                return false;
+            if (command is DataSubscriptionCloseResponse typed)
+            {
+                response = typed;
+                return true;
+            }
+
+            try
+            {
+                response = jsonCodec.Convert<DataSubscriptionCloseResponse>(command);
+                return response != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static bool TryMapDataMutationResponse(IJsonCodec jsonCodec, object command, out DataMutationResponse response)
         {
             if (jsonCodec == null)
@@ -194,6 +222,16 @@ namespace Playserv.DataSubscription
                    sourceCommand.IndexOf("DataSubscriptionRefreshRequest", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        public static bool LooksLikeDataSubscriptionCloseCommandError(CommandErrorResponse response)
+        {
+            var error = response?.Error ?? string.Empty;
+            var message = response?.Message ?? string.Empty;
+            var sourceCommand = response?.SourceCommand ?? string.Empty;
+            return message.IndexOf("DataSubscriptionClose", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("DataSubscriptionClose", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   sourceCommand.IndexOf("DataSubscriptionClose", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public static string FormatCommandErrorMessage(CommandErrorResponse response)
         {
             if (response == null)
@@ -213,9 +251,6 @@ namespace Playserv.DataSubscription
             if (!string.IsNullOrWhiteSpace(response.SourceService))
                 parts.Add($"sourceService={response.SourceService}");
 
-            if (!string.IsNullOrWhiteSpace(response.Details))
-                parts.Add($"details={response.Details}");
-
             return parts.Count == 0
                 ? "Unknown server command error."
                 : string.Join("; ", parts);
@@ -234,7 +269,13 @@ namespace Playserv.DataSubscription
             };
         }
 
-        public static DataSubscriptionResponse CreateDataSubscriptionErrorResponse(long requestId, int errorCode, string message)
+        public static DataSubscriptionResponse CreateDataSubscriptionErrorResponse(
+            long requestId,
+            int errorCode,
+            string message,
+            bool? retryable = null,
+            string sourceCode = null,
+            string rawDetails = null)
         {
             return new DataSubscriptionResponse
             {
@@ -242,7 +283,10 @@ namespace Playserv.DataSubscription
                 Error = new DataSubscriptionError
                 {
                     ErrorCode = errorCode,
-                    Message = message ?? "Unknown data subscription error."
+                    Message = message ?? "Unknown data subscription error.",
+                    Retryable = retryable,
+                    SourceCode = sourceCode,
+                    RawDetails = rawDetails
                 }
             };
         }

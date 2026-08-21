@@ -21,5 +21,65 @@ namespace Playserv.Http.Interfaces
             string clientToken,
             string refreshToken,
             CancellationToken ct = default);
+
+        Task<PlayerTokenBundleDto> LoginExternalAsync(
+            string clientToken,
+            PlayerExternalLoginRequestDto request,
+            string playerAccessToken = null,
+            CancellationToken ct = default);
+
+        Task SignOutAsync(
+            string clientToken,
+            string refreshToken,
+            CancellationToken ct = default);
+
+        Task<PlayServRuntimeDataResponse> SendDataAsync(
+            PlayServRuntimeDataRequest request,
+            CancellationToken ct = default);
+    }
+
+    /// <summary>
+    /// Optional additive capability for exact byte uploads, bounded byte responses and
+    /// streaming downloads. Existing custom HTTP modules do not need to implement it.
+    /// </summary>
+    public interface IPlayServRuntimeBinaryHttpClient
+    {
+        Task<PlayServRuntimeDataResponse> SendBinaryDataAsync(
+            PlayServRuntimeBinaryDataRequest request,
+            CancellationToken ct = default);
+    }
+
+    /// <summary>
+    /// Optional extension implemented by runtime HTTP clients that support the
+    /// managed player identity lifecycle introduced in SDK 0.3.8.
+    /// </summary>
+    public interface IPlayServPlayerIdentityHttpClient
+    {
+        Task<PlayerTokenBundleDto> SignInAnonAsync(
+            string clientToken,
+            PlayerFingerprintDto fingerprint,
+            CancellationToken ct = default);
+
+        Task<PlayerAuthProvidersProbeDto> GetAuthProvidersAsync(
+            string clientToken,
+            CancellationToken ct = default);
+
+        Task<PlayerTokenBundleDto> LinkIdentityAsync(
+            string clientToken,
+            PlayerLinkRequestDto request,
+            string playerAccessToken,
+            CancellationToken ct = default);
+
+        Task UnlinkIdentityAsync(
+            string clientToken,
+            PlayerUnlinkRequestDto request,
+            string playerAccessToken,
+            CancellationToken ct = default);
+
+        Task<PlayerTokenBundleDto> MergeIdentityAsync(
+            string clientToken,
+            PlayerMergeRequestDto request,
+            string playerAccessToken,
+            CancellationToken ct = default);
     }
 }

@@ -43,7 +43,7 @@ namespace Playserv.Editor
         [InitializeOnLoadMethod]
         private static void OnEditorLoad()
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            if (Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
                 return;
 
             if (!EditorPrefs.HasKey(Const.PrefKeyShowOnStartup))

@@ -1,9 +1,12 @@
 # Third Party Notices
 
-The PlayServ Schema Tool distributes Microsoft Roslyn assemblies from the
-.NET SDK. Roslyn is licensed under the MIT License.
+The PlayServ Schema Tool distributes portable Microsoft Roslyn assemblies from
+the official NuGet packages and selected .NET runtime support assemblies
+required by Roslyn on Unity 2021.3. These components are licensed under the MIT
+License.
 
 https://github.com/dotnet/roslyn
+https://github.com/dotnet/runtime
 
 Copyright (c) .NET Foundation and Contributors
 

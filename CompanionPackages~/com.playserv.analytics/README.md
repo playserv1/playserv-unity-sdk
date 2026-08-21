@@ -2,7 +2,7 @@
 
 Optional provider-based gameplay analytics for `com.playserv.sdk`. The package
 collects typed events, user and session context, bounded batches, and sends them
-through the PlayServ command transport. It does not depend on Firebase.
+to the PlayServ runtime HTTP ingestion endpoint. It does not depend on Firebase.
 
 ## Install
 
@@ -28,12 +28,20 @@ Git installations must use the same tag or commit for both packages.
 4. Await `PlayServAnalytics.FlushAsync(...)` before a controlled shutdown when
    delivery of the current batch matters.
 
-Applications can replace the default command provider through
+Applications can replace the default HTTP provider through
 `PlayServAnalytics.SetProvider(...)`. Configure the provider in client project
 code before or after `PlayServ.Connect()`; the selection survives PlayServ
 runtime reconnects. Call `PlayServAnalytics.ResetProvider()` to return to
-PlayServ command delivery.
+PlayServ `POST /analytics/events` delivery.
 
 The SDK deliberately does not include Firebase or another vendor adapter.
 Implement `IPlayServAnalyticsProvider` under the client project's `Assets`
 folder when events must be routed to a custom ingestion service.
+
+## Dedicated servers
+
+The same queue and typed parameter model can be used by Unity Dedicated Server
+through `com.playserv.game-server`. Server events use
+`PlayServGameServer.Analytics.Track(..., playerId: ...)`, so player attribution
+is local to each event rather than mutable process-wide state. Delivery uses
+the rotating `sk_*` credential and `ShutdownAsync` reports a failed final flush.

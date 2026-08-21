@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Abstractions",
         "Playserv.Runtime.Core",
         "Playserv.Runtime.Modules.RPC.Core",
         "Playserv.Runtime.Serialization"

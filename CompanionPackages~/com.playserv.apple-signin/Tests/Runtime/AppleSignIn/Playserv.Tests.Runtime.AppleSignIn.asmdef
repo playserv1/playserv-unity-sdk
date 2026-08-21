@@ -2,7 +2,8 @@
     "name": "Playserv.Tests.Runtime.AppleSignIn",
     "rootNamespace": "",
     "references": [
-        "Playserv.Runtime.Modules.AppleSignIn"
+        "Playserv.Runtime.Modules.AppleSignIn",
+        "Playserv.Runtime.Modules"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

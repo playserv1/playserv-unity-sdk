@@ -85,7 +85,8 @@ namespace Playserv.Wrapper
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
 
-            if (string.IsNullOrWhiteSpace(settings.DeployApiServerAddress) ||
+            if (!settings.ResolveLatestGameVersionOnConnect ||
+                string.IsNullOrWhiteSpace(settings.DeployApiServerAddress) ||
                 string.IsNullOrWhiteSpace(settings.GameId))
             {
                 return settings;

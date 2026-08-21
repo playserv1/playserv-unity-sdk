@@ -14,7 +14,9 @@ namespace Playserv.DataSubscription
             builder.Register<DataMutationResponse>();
             builder.Register<DataSubscriptionRequest>();
             builder.Register<DataSubscriptionRefreshRequest>();
+            builder.Register<DataSubscriptionCloseRequest>();
             builder.Register<DataSubscriptionResponse>();
+            builder.Register<DataSubscriptionCloseResponse>();
             builder.Register<DataSubscriptionUpdate>();
         }
     }

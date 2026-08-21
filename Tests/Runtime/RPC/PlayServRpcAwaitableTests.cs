@@ -139,6 +139,7 @@ namespace Playserv.Tests.Runtime.RPC
             var result = invocation.GetAwaiter().GetResult();
             Assert.That(result.IsSuccess, Is.False);
             Assert.That(result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.ServerError));
+            Assert.That(result.UnifiedError.Code, Is.EqualTo(PlayServErrorCode.ServerError));
             Assert.That(result.Error.Status, Is.EqualTo("not_found"));
             Assert.That(result.Error.Message, Is.EqualTo("room service is unavailable"));
         }
@@ -162,6 +163,7 @@ namespace Playserv.Tests.Runtime.RPC
             yield return Await(timedOut);
             var timeoutResult = timedOut.GetAwaiter().GetResult();
             Assert.That(timeoutResult.Error.Code, Is.EqualTo(PlayServRpcErrorCode.Timeout));
+            Assert.That(timeoutResult.UnifiedError.Retryable, Is.True);
 
             var active = facade.InvokeAsync<FindMatchRequest, FindMatchResponse>(
                 "RoomService",

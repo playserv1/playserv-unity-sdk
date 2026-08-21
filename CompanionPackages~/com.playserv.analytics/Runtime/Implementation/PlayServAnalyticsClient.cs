@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Proxy.Common;
 using Playserv.Proxy.Logging;
+using Playserv.Wrapper;
+using UnityApplication = UnityEngine.Application;
 
 namespace Playserv.Analytics
 {
@@ -28,6 +31,11 @@ namespace Playserv.Analytics
         void ClearUserProperties();
 
         void Track(string eventName, IReadOnlyDictionary<string, object> parameters);
+
+        void Track(
+            string eventName,
+            IReadOnlyDictionary<string, object> parameters,
+            string eventUserId);
 
         Task FlushAsync(CancellationToken cancellationToken);
     }
@@ -63,6 +71,18 @@ namespace Playserv.Analytics
         private long _sequence;
         private bool _collectionEnabled = true;
         private bool _disposed;
+
+        internal static PlayServAnalyticsClient CreateServer(
+            IPlayServAnalyticsProvider provider)
+        {
+            return new PlayServAnalyticsClient(
+                provider,
+                () => string.Empty,
+                PlayServLog.ForCategory(PlayServLogCategory.Analytics),
+                SdkInfo.Version,
+                UnityApplication.version,
+                UnityApplication.platform.ToString());
+        }
 
         public PlayServAnalyticsClient(
             IPlayServAnalyticsProvider provider,
@@ -185,6 +205,14 @@ namespace Playserv.Analytics
             string eventName,
             IReadOnlyDictionary<string, object> parameters)
         {
+            Track(eventName, parameters, null);
+        }
+
+        public void Track(
+            string eventName,
+            IReadOnlyDictionary<string, object> parameters,
+            string eventUserId)
+        {
             var normalizedName = ValidateEventName(eventName);
             var convertedParameters = ConvertParameters(parameters);
             var shouldFlush = false;
@@ -209,7 +237,7 @@ namespace Playserv.Analytics
                     TimestampUnixMilliseconds = UtcNowUnixMilliseconds(),
                     Sequence = Interlocked.Increment(ref _sequence),
                     SessionId = _sessionId,
-                    UserId = ResolveUserId(),
+                    UserId = ResolveUserId(eventUserId),
                     SdkVersion = _sdkVersion,
                     ApplicationVersion = _applicationVersion,
                     Platform = _platform,
@@ -352,8 +380,11 @@ namespace Playserv.Analytics
             }
         }
 
-        private string ResolveUserId()
+        private string ResolveUserId(string eventUserId)
         {
+            if (!string.IsNullOrWhiteSpace(eventUserId))
+                return eventUserId.Trim();
+
             if (!string.IsNullOrWhiteSpace(_userId))
                 return _userId;
 

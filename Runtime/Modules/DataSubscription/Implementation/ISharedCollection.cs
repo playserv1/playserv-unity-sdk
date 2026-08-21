@@ -9,10 +9,11 @@ namespace Playserv.DataSubscription
     /// collection subscription (conventions §21.2). Subscribe ONCE via
     /// <c>PlayServData.SelectCollection</c>; <see cref="Items"/> is replaced and
     /// <see cref="Changed"/> raised on every server push (initial snapshot + on any row change).
-    /// There is no polling and no client-side write — the collection is server-maintained.
+    /// There is no polling and no client-side write — the collection is server-maintained. Use
+    /// <see cref="IPlayServRefreshableSubscription.RefreshAsync"/> to request its current snapshot.
     /// </summary>
     /// <typeparam name="TItem">Row model the collection rows deserialize to.</typeparam>
-    public interface ISharedCollection<TItem>
+    public interface ISharedCollection<TItem> : IPlayServSubscriptionHandle, IPlayServRefreshableSubscription
     {
         /// <summary>Current rows. Replaced wholesale on each server push (Overwrite semantics).</summary>
         IReadOnlyList<TItem> Items { get; }

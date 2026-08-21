@@ -6,20 +6,20 @@ namespace Playserv.Events
 {
     internal sealed class EventSubscriptionManager
     {
-        private readonly Dictionary<string, string> _eventTypeToSubscriptionId = new Dictionary<string, string>();
-        private readonly Dictionary<string, string> _subscriptionIdToEventType = new Dictionary<string, string>();
-        private readonly List<string> _pendingEventTypes = new List<string>();
+        private readonly HashSet<string> _activeEventTypes = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _pendingEventTypes = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<Type, List<IObserverRegistration>> _typeObservers = new Dictionary<Type, List<IObserverRegistration>>();
         private readonly Dictionary<string, List<IObserver<string>>> _rawObserversByEventType =
             new Dictionary<string, List<IObserver<string>>>(StringComparer.Ordinal);
         private readonly object _lock = new object();
 
-        public void AddSubscription(string eventType, string subscriptionId)
+        public void MarkSubscriptionActive(string eventType)
         {
             lock (_lock)
             {
-                _eventTypeToSubscriptionId[eventType] = subscriptionId;
-                _subscriptionIdToEventType[subscriptionId] = eventType;
+                _pendingEventTypes.Remove(eventType);
+                if (HasObserversForEventTypeLocked(eventType))
+                    _activeEventTypes.Add(eventType);
             }
         }
 
@@ -27,58 +27,25 @@ namespace Playserv.Events
         {
             lock (_lock)
             {
-                if (_eventTypeToSubscriptionId.TryGetValue(eventType, out var subscriptionId))
-                {
-                    _eventTypeToSubscriptionId.Remove(eventType);
-                    _subscriptionIdToEventType.Remove(subscriptionId);
-                }
+                _activeEventTypes.Remove(eventType);
+                _pendingEventTypes.Remove(eventType);
             }
         }
 
-        public string GetSubscriptionId(string eventType)
+        public bool IsSubscribed(string eventType)
         {
             lock (_lock)
             {
-                return _eventTypeToSubscriptionId.TryGetValue(eventType, out var id) ? id : null;
+                return _activeEventTypes.Contains(eventType);
             }
         }
 
-        public string GetTopic(string subscriptionId)
+        public void ResetConnectionSubscriptions()
         {
             lock (_lock)
             {
-                return _subscriptionIdToEventType.TryGetValue(subscriptionId, out var eventType) ? eventType : null;
-            }
-        }
-
-        public bool TryBindOrphanSubscriptionToSingleObservedTopic(string subscriptionId, out string eventType)
-        {
-            if (string.IsNullOrWhiteSpace(subscriptionId))
-            {
-                eventType = null;
-                return false;
-            }
-
-            lock (_lock)
-            {
-                if (_subscriptionIdToEventType.TryGetValue(subscriptionId, out var existingTopic))
-                {
-                    eventType = existingTopic;
-                    return true;
-                }
-
-                var candidates = GetObservedTopicsWithoutSubscriptionLocked(2);
-
-                if (candidates.Length != 1)
-                {
-                    eventType = null;
-                    return false;
-                }
-
-                eventType = candidates[0];
-                _eventTypeToSubscriptionId[eventType] = subscriptionId;
-                _subscriptionIdToEventType[subscriptionId] = eventType;
-                return true;
+                _activeEventTypes.Clear();
+                _pendingEventTypes.Clear();
             }
         }
 
@@ -86,8 +53,7 @@ namespace Playserv.Events
         {
             lock (_lock)
             {
-                if (!_pendingEventTypes.Contains(eventType))
-                    _pendingEventTypes.Add(eventType);
+                _pendingEventTypes.Add(eventType);
             }
         }
 
@@ -107,19 +73,11 @@ namespace Playserv.Events
             }
         }
 
-        public string GetFirstPendingTopic()
-        {
-            lock (_lock)
-            {
-                return _pendingEventTypes.Count > 0 ? _pendingEventTypes[0] : null;
-            }
-        }
-
         public IReadOnlyList<string> GetAllTopics()
         {
             lock (_lock)
             {
-                return _eventTypeToSubscriptionId.Keys.ToList();
+                return _activeEventTypes.ToList();
             }
         }
 
@@ -135,7 +93,7 @@ namespace Playserv.Events
             {
                 var topics = new List<string>();
 
-                foreach (var eventType in _eventTypeToSubscriptionId.Keys)
+                foreach (var eventType in _activeEventTypes)
                     AddTopicOnce(topics, eventType);
 
                 foreach (var eventType in _pendingEventTypes)
@@ -264,19 +222,47 @@ namespace Playserv.Events
 
             lock (_lock)
             {
-                if (_rawObserversByEventType.TryGetValue(eventType, out var rawObservers) && rawObservers.Count > 0)
-                    return true;
+                return HasObserversForEventTypeLocked(eventType);
+            }
+        }
 
-                foreach (var pair in _typeObservers)
+        public void NotifySubscriptionError(string eventType, Exception exception)
+        {
+            List<IObserverRegistration> typedObservers = null;
+            List<IObserver<string>> rawObservers = null;
+
+            lock (_lock)
+            {
+                _activeEventTypes.Remove(eventType);
+                _pendingEventTypes.Remove(eventType);
+
+                foreach (var pair in _typeObservers.ToArray())
                 {
-                    if (pair.Value.Count == 0)
+                    if (!string.Equals(EventTypeRegistry.GetCanonicalName(pair.Key), eventType, StringComparison.Ordinal))
                         continue;
 
-                    if (string.Equals(EventTypeRegistry.GetCanonicalName(pair.Key), eventType, StringComparison.Ordinal))
-                        return true;
+                    typedObservers = typedObservers ?? new List<IObserverRegistration>();
+                    typedObservers.AddRange(pair.Value);
+                    _typeObservers.Remove(pair.Key);
                 }
 
-                return false;
+                if (_rawObserversByEventType.TryGetValue(eventType, out var registeredRaw))
+                {
+                    rawObservers = registeredRaw.ToList();
+                    _rawObserversByEventType.Remove(eventType);
+                }
+            }
+
+            if (typedObservers != null)
+            {
+                foreach (var observer in typedObservers)
+                    observer.OnError(exception);
+            }
+
+            if (rawObservers != null)
+            {
+                foreach (var observer in rawObservers)
+                    observer.OnError(exception);
             }
         }
 
@@ -344,42 +330,19 @@ namespace Playserv.Events
             }
         }
 
-        private string[] GetObservedTopicsWithoutSubscriptionLocked(int limit)
+        private bool HasObserversForEventTypeLocked(string eventType)
         {
-            var candidates = new List<string>(limit);
-            foreach (var type in _typeObservers.Keys)
+            if (_rawObserversByEventType.TryGetValue(eventType, out var rawObservers) && rawObservers.Count > 0)
+                return true;
+
+            foreach (var pair in _typeObservers)
             {
-                AddCandidateLocked(candidates, EventTypeRegistry.GetCanonicalName(type), limit);
-                if (candidates.Count >= limit)
-                    return candidates.ToArray();
+                if (pair.Value.Count > 0 &&
+                    string.Equals(EventTypeRegistry.GetCanonicalName(pair.Key), eventType, StringComparison.Ordinal))
+                    return true;
             }
 
-            foreach (var eventType in _rawObserversByEventType.Keys)
-            {
-                AddCandidateLocked(candidates, eventType, limit);
-                if (candidates.Count >= limit)
-                    return candidates.ToArray();
-            }
-
-            return candidates.ToArray();
-        }
-
-        private void AddCandidateLocked(List<string> candidates, string eventType, int limit)
-        {
-            if (string.IsNullOrWhiteSpace(eventType))
-                return;
-
-            if (_eventTypeToSubscriptionId.ContainsKey(eventType) || _pendingEventTypes.Contains(eventType))
-                return;
-
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                if (string.Equals(candidates[i], eventType, StringComparison.Ordinal))
-                    return;
-            }
-
-            if (candidates.Count < limit)
-                candidates.Add(eventType);
+            return false;
         }
 
         private interface IObserverRegistration
@@ -387,6 +350,8 @@ namespace Playserv.Events
             bool Matches(object observer);
 
             void OnNext(object eventData);
+
+            void OnError(Exception exception);
         }
 
         private sealed class ObserverRegistration<T> : IObserverRegistration
@@ -406,6 +371,11 @@ namespace Playserv.Events
             public void OnNext(object eventData)
             {
                 _observer.OnNext((T)eventData);
+            }
+
+            public void OnError(Exception exception)
+            {
+                _observer.OnError(exception);
             }
         }
     }

@@ -287,7 +287,12 @@ namespace Playserv.Wrapper
                 status ?? response?.Status,
                 response?.Message ?? message,
                 response?.Timestamp ?? DateTimeOffset.UtcNow,
-                new PlayServRpcError(code, message, status ?? response?.Status, exception));
+                new PlayServRpcError(
+                    code,
+                    message,
+                    status ?? response?.Status,
+                    exception,
+                    response?.Result));
         }
 
         private static bool IsSuccessStatus(string status)

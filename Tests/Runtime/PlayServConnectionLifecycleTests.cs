@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using Playserv.DataSubscription;
 using Playserv.Modules;
 using Playserv.Proxy.Common;
 using Playserv.Proxy.Implementation;
@@ -38,6 +39,22 @@ namespace Playserv.Tests.Runtime
             Assert.That(lifecycle.ConnectAsync().GetAwaiter().GetResult(), Is.True);
             Assert.That(transport.ConnectCount, Is.EqualTo(2));
             Assert.That(transport.ReceiveSubscriptionCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void RuntimeSession_InitializesDataSubscriptionAfterCommandBusIsReady()
+        {
+            var transport = new TestTransportImplementation();
+
+            Assert.DoesNotThrow(() =>
+            {
+                using var session = new PlayServImplementation(
+                    "ws://example.test",
+                    (_, __) => transport,
+                    host => host.Register(new PlayServDataSubscriptionModule()));
+
+                Assert.That(session.HasModule(PlayServModuleIds.Data), Is.True);
+            });
         }
 
         [UnityTest]
@@ -80,6 +97,32 @@ namespace Playserv.Tests.Runtime
             Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)));
         }
 
+        [Test]
+        public void RefreshConfiguredGameVersion_Disabled_PreservesExactVersionWithoutSideEffects()
+        {
+            var resolveCount = 0;
+            var syncCount = 0;
+            var service = CreateSettingsService(
+                (_, __, ___) =>
+                {
+                    resolveCount++;
+                    return Task.FromResult("server-version");
+                },
+                timeoutSeconds: 30,
+                _ => syncCount++);
+            var settings = CreateVersionedSettings();
+            settings.GameVersion = "popup-version";
+            settings.ResolveLatestGameVersionOnConnect = false;
+
+            var resolved = service.RefreshConfiguredGameVersionAsync(settings).GetAwaiter().GetResult();
+
+            Assert.That(resolved, Is.SameAs(settings));
+            Assert.That(resolved.GameVersion, Is.EqualTo("popup-version"));
+            Assert.That(resolveCount, Is.Zero);
+            Assert.That(syncCount, Is.Zero);
+            Assert.That(settings.Clone().ResolveLatestGameVersionOnConnect, Is.False);
+        }
+
         private static IEnumerator WaitForCompletion(Task task)
         {
             while (!task.IsCompleted)
@@ -88,7 +131,8 @@ namespace Playserv.Tests.Runtime
 
         private static PlayServRuntimeSettingsService CreateSettingsService(
             Func<PlayServSettings, string, CancellationToken, Task<string>> resolveLatestVersion,
-            int timeoutSeconds)
+            int timeoutSeconds,
+            Action<string> syncLoadedConfigGameVersion = null)
         {
             return new PlayServRuntimeSettingsService(
                 () => new PlayServSettings(),
@@ -97,7 +141,7 @@ namespace Playserv.Tests.Runtime
                 _ => string.Empty,
                 _ => { },
                 resolveLatestVersion,
-                _ => { },
+                syncLoadedConfigGameVersion ?? (_ => { }),
                 _ => { },
                 timeoutSeconds);
         }

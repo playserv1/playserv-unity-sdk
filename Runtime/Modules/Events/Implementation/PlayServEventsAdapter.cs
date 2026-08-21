@@ -168,11 +168,9 @@ namespace Playserv.Events
         public void ResubscribeAllOnReconnect()
         {
             var topics = _subscriptionManager.GetTopicsForResubscribe();
+            _subscriptionManager.ResetConnectionSubscriptions();
             foreach (var eventType in topics)
             {
-                // The old subscription id belongs to the dead connection; re-request and let the
-                // normal EventSubscribeResponse flow bind the topic to its fresh id.
-                _subscriptionManager.RemoveSubscription(eventType);
                 _subscriptionManager.AddPendingSubscription(eventType);
                 _ = _transport.Send(new EventSubscribeRequest(eventType), EventsModuleName);
                 _logger.Log($"Replayed event subscription after reconnect: eventType={eventType}");
@@ -208,40 +206,34 @@ namespace Playserv.Events
             _transport.OnReceive<EventSubscribeResponse>()
                 .Subscribe(response =>
                 {
-                    if (response == null || string.IsNullOrWhiteSpace(response.eventSubscriptionId))
+                    if (response == null || string.IsNullOrWhiteSpace(response.EventType))
                     {
-                        _logger.LogWarning("Received EventSubscribeResponse with empty subscription id.");
+                        _logger.LogWarning("Received EventSubscribeResponse with empty EventType.");
                         return;
                     }
 
-                    var existingTopic = _subscriptionManager.GetTopic(response.eventSubscriptionId);
-                    if (!string.IsNullOrWhiteSpace(existingTopic))
+                    var eventType = response.EventType.Trim();
+                    if (!_subscriptionManager.IsSubscriptionPending(eventType))
                     {
                         _logger.LogWarning(
-                            $"Ignoring duplicate subscription response: eventType={existingTopic}, subscriptionId={response.eventSubscriptionId}");
+                            $"Ignoring late or duplicate event subscription response: eventType={eventType}");
                         return;
                     }
 
-                    var eventType = _subscriptionManager.GetFirstPendingTopic();
-                    if (eventType == null)
+                    if (!response.success)
                     {
-                        if (_subscriptionManager.TryBindOrphanSubscriptionToSingleObservedTopic(
-                                response.eventSubscriptionId,
-                                out var reboundTopic))
-                        {
-                            _logger.LogWarning(
-                                $"Recovered late subscription response: eventType={reboundTopic}, subscriptionId={response.eventSubscriptionId}");
-                            return;
-                        }
-
-                        _logger.LogWarning(
-                            $"Ignoring late subscription response without pending topic: subscriptionId={response.eventSubscriptionId}");
+                        var exception = new PlayServEventSubscriptionException(
+                            eventType,
+                            response.errorCode,
+                            response.errorMessage);
+                        _subscriptionManager.NotifySubscriptionError(eventType, exception);
+                        _logger.LogError(
+                            $"Event subscription rejected: eventType={eventType}, code={response.errorCode}");
                         return;
                     }
 
-                    _subscriptionManager.RemovePendingSubscription(eventType);
-                    _subscriptionManager.AddSubscription(eventType, response.eventSubscriptionId);
-                    _logger.Log($"Event subscription successful: eventType={eventType}, subscriptionId={response.eventSubscriptionId}");
+                    _subscriptionManager.MarkSubscriptionActive(eventType);
+                    _logger.Log($"Event subscription successful: eventType={eventType}");
                 });
 
             _transport.OnReceive<Playserv.Proxy.Common.ErrorResponse>()
@@ -261,9 +253,6 @@ namespace Playserv.Events
 
             _transport.OnReceive<EventMessage>()
                 .Subscribe(HandleEventMessage);
-
-            _transport.OnReceive<EventSubscribedMessage>()
-                .Subscribe(HandleSubscribedEventMessage);
         }
 
         private void HandleEventMessage(EventMessage message)
@@ -363,39 +352,6 @@ namespace Playserv.Events
                    string.Equals(eventTypeName, "Heartbeat", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(eventTypeName, "Ping", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(eventTypeName, "Pong", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void HandleSubscribedEventMessage(EventSubscribedMessage message)
-        {
-            if (message == null)
-                return;
-
-            if (string.IsNullOrWhiteSpace(message.EventSubscriptionId))
-            {
-                _logger.LogWarning("Received EventSubscribedMessage without EventSubscriptionId.");
-                return;
-            }
-
-            var eventType = _subscriptionManager.GetTopic(message.EventSubscriptionId);
-            if (string.IsNullOrWhiteSpace(eventType))
-            {
-                if (_subscriptionManager.TryBindOrphanSubscriptionToSingleObservedTopic(
-                        message.EventSubscriptionId,
-                        out var reboundTopic))
-                {
-                    eventType = reboundTopic;
-                    _logger.LogWarning(
-                        $"Recovered EventSubscribedMessage mapping: eventType={eventType}, subscriptionId={message.EventSubscriptionId}");
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        $"Received EventSubscribedMessage for unknown subscription id: {message.EventSubscriptionId}");
-                    return;
-                }
-            }
-
-            HandleEventPayload(eventType, message.Payload);
         }
 
         private async Task<bool> ExecuteGroupCommandAsync<TRequest, TResponse>(

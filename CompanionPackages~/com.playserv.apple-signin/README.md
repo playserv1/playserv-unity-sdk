@@ -38,6 +38,7 @@ The settings asset is stored at
 ## Use
 
 ```csharp
+using System;
 using Playserv.Wrapper;
 
 if (PlayServAppleSignIn.IsAvailable)
@@ -45,12 +46,21 @@ if (PlayServAppleSignIn.IsAvailable)
     var credential = await PlayServAppleSignIn.SignInAsync();
     var identityToken = credential.IdentityToken;
     var authorizationCode = credential.AuthorizationCode;
+
+    if (!credential.TryCreateBackendProof(out var proof))
+        throw new InvalidOperationException("Apple did not return an ID token.");
+
+    PlayServAuthResult login = await PlayServAuth.LoginExternalAsync(proof);
+    // The same proof type can link Apple as an additional identity:
+    // PlayServAuthResult link = await PlayServAuth.LinkIdentityAsync(proof);
 }
 ```
 
 Apple private keys, Team ID, Key ID and generated client secrets belong only on
-the backend. Provider credentials remain untrusted until the backend validates
-their signature, audience, issuer, expiry and nonce.
+the backend. `TryCreateBackendProof` accepts only the Apple ID token and never
+submits an authorization-code-only credential as an ID token. The proof remains
+untrusted until `LoginExternalAsync` or `LinkIdentityAsync` validates it on the
+backend. Obtain a fresh proof before conflict-driven `MergeIdentityAsync`.
 
 ## Tests
 

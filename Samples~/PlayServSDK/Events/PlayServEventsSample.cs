@@ -1,13 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading.Tasks;
 using Playserv.Wrapper;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-#if UNITY_EDITOR
-using UnityEditor.SceneManagement;
-#endif
 
 namespace Playserv.Samples
 {
@@ -16,7 +11,6 @@ namespace Playserv.Samples
     /// </summary>
     public sealed class PlayServEventsSample : MonoBehaviour
     {
-        private const string SamplesSceneFileName = "Samples.unity";
 
         [Header("Message")]
         [SerializeField] private string messageText = "Hello from events sample";
@@ -235,29 +229,6 @@ namespace Playserv.Samples
             }
         }
 
-        private void BackToSamples()
-        {
-            var scenePath = ResolveSamplesScenePath();
-#if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                if (File.Exists(scenePath))
-                    EditorSceneManager.OpenScene(scenePath);
-                return;
-            }
-#endif
-            SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePath));
-        }
-
-        private static string ResolveSamplesScenePath()
-        {
-            var activePath = SceneManager.GetActiveScene().path;
-            var activeDirectory = Path.GetDirectoryName(activePath);
-            return string.IsNullOrEmpty(activeDirectory)
-                ? SamplesSceneFileName
-                : Path.Combine(activeDirectory, SamplesSceneFileName).Replace('\\', '/');
-        }
-
         private void AddMessage(string line)
         {
             if (string.IsNullOrWhiteSpace(line))
@@ -295,8 +266,6 @@ namespace Playserv.Samples
                 _ = ConnectSdkAsync();
             if (GUILayout.Button("Disconnect SDK"))
                 DisconnectSdk();
-            if (GUILayout.Button("Back to 0_Samples"))
-                BackToSamples();
             if (GUILayout.Button(_showInfo ? "Hide Info" : "Info"))
                 _showInfo = !_showInfo;
             GUILayout.EndHorizontal();

@@ -474,7 +474,28 @@ namespace Playserv.Serialization
         private static string GetCustomJsonName(MemberInfo member)
         {
             var attribute = member.GetCustomAttribute<PlayServJsonNameAttribute>(true);
-            return attribute?.Name;
+            if (!string.IsNullOrWhiteSpace(attribute?.Name))
+                return attribute.Name;
+
+            var schemaField = member.GetCustomAttributes(true).FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.GetType().FullName,
+                    "Playserv.Schema.PlayServFieldAttribute",
+                    StringComparison.Ordinal));
+            if (schemaField == null)
+                return null;
+
+            var nameProperty = schemaField.GetType().GetProperty("Name", BindingFlags.Public | BindingFlags.Instance);
+            return nameProperty?.GetValue(schemaField, null) as string;
+        }
+
+        private static bool HasPlayServIgnore(MemberInfo member)
+        {
+            return member.GetCustomAttributes(true).Any(candidate =>
+                string.Equals(
+                    candidate.GetType().FullName,
+                    "Playserv.Schema.PlayServIgnoreAttribute",
+                    StringComparison.Ordinal));
         }
 
         private sealed class PlayServJsonNameContractResolver : DefaultContractResolver
@@ -486,6 +507,8 @@ namespace Playserv.Serialization
 
                 if (!string.IsNullOrWhiteSpace(attributeName))
                     property.PropertyName = attributeName;
+                if (HasPlayServIgnore(member))
+                    property.Ignored = true;
 
                 return property;
             }

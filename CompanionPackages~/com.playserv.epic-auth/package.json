@@ -1,0 +1,25 @@
+{
+  "name": "com.playserv.epic-auth",
+  "displayName": "PlayServ Epic Auth",
+  "version": "0.4.0",
+  "unity": "2021.3",
+  "description": "Optional EOS-Contrib Epic Account Services integration for the PlayServ Unity SDK.",
+  "author": {
+    "name": "PlayServ"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:playserv1/playserv-unity-sdk.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.playserv.sdk": "0.4.0"
+  },
+  "samples": [
+    {
+      "displayName": "Epic Identity Login",
+      "description": "Authenticate EOS or Epic Games Launcher credentials with PlayServ.",
+      "path": "Samples~/IdentityLogin"
+    }
+  ]
+}

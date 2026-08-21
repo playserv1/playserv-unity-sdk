@@ -40,7 +40,7 @@ namespace Playserv.Proxy.Common
             var response = command as ParseErrorResponse;
             if (response != null)
             {
-                logger.LogError($"Parse error received from server. Error: {response.Error}, Received JSON: {response.ReceivedJson}");
+                logger.LogError($"Parse error received from server. Error: {response.Error}");
                 return;
             }
 
@@ -52,7 +52,7 @@ namespace Playserv.Proxy.Common
             var response = command as ValidationErrorResponse;
             if (response != null)
             {
-                logger.LogError($"Validation error received from server. Error: {response.Error}, Received JSON: {response.ReceivedJson}");
+                logger.LogError($"Validation error received from server. Error: {response.Error}");
                 return;
             }
 
@@ -92,7 +92,7 @@ namespace Playserv.Proxy.Common
         {
             return $"{prefix}. Error: {response.Error}, Message: {response.Message}, " +
                    $"SourceCommand: {response.SourceCommand}, SourceService: {response.SourceService}, " +
-                   $"Retryable: {response.Retryable}, Details: {response.Details}, Timestamp: {response.Timestamp}";
+                   $"Retryable: {response.Retryable}, Timestamp: {response.Timestamp}";
         }
     }
 }

@@ -5,9 +5,9 @@ using Playserv.Proxy.Logging;
 
 namespace Playserv.DataSubscription
 {
-    public sealed class PlayServDataSubscriptionModule : IPlayServModule
+    public sealed class PlayServDataSubscriptionModule : IPlayServModule, IPlayServConnectionAwareModule
     {
-        private IDataSubscriptionAdapter _adapter;
+        private PlayServDataSubscriptionAdapter _adapter;
 
         public PlayServModuleDescriptor Descriptor { get; } = new PlayServModuleDescriptor(
             PlayServModuleIds.Data,
@@ -26,16 +26,20 @@ namespace Playserv.DataSubscription
                 context.Services.Get<IPlayServCommandBus>(),
                 PlayServLog.ForCategory(PlayServLogCategory.Data));
             context.Services.Register<IDataSubscriptionAdapter>(_adapter);
-            if (_adapter is PlayServDataSubscriptionAdapter concreteAdapter)
-                context.Services.Register(concreteAdapter);
+            context.Services.Register(_adapter);
 
             context.Services.Register(this);
         }
 
         public void Shutdown()
         {
-            if (_adapter is IDisposable disposable)
-                disposable.Dispose();
+            _adapter?.Dispose();
+            _adapter = null;
+        }
+
+        public void OnConnected()
+        {
+            _adapter?.OnConnected();
         }
     }
 }

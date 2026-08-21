@@ -1,4 +1,5 @@
 using System;
+using Playserv.Wrapper;
 
 namespace Playserv.RPC
 {
@@ -26,12 +27,14 @@ namespace Playserv.RPC
             PlayServRpcErrorCode code,
             string message,
             string status,
-            Exception exception)
+            Exception exception,
+            string rawDetails = null)
         {
             Code = code;
             Message = message ?? string.Empty;
             Status = status ?? string.Empty;
             Exception = exception;
+            UnifiedError = CreateUnifiedError(code, Message, Status, rawDetails);
         }
 
         public PlayServRpcErrorCode Code { get; }
@@ -42,11 +45,42 @@ namespace Playserv.RPC
 
         public Exception Exception { get; }
 
+        /// <summary>Cross-module representation of this RPC failure.</summary>
+        public PlayServError UnifiedError { get; }
+
         public override string ToString()
         {
             return string.IsNullOrWhiteSpace(Status)
                 ? $"{Code}: {Message}"
                 : $"{Code} ({Status}): {Message}";
+        }
+
+        private static PlayServError CreateUnifiedError(
+            PlayServRpcErrorCode code,
+            string message,
+            string status,
+            string rawDetails)
+        {
+            var commonCode = code switch
+            {
+                PlayServRpcErrorCode.None => PlayServErrorCode.None,
+                PlayServRpcErrorCode.SerializationFailed => PlayServErrorCode.Serialization,
+                PlayServRpcErrorCode.TransportFailed => PlayServErrorCode.Transport,
+                PlayServRpcErrorCode.Timeout => PlayServErrorCode.Timeout,
+                PlayServRpcErrorCode.Canceled => PlayServErrorCode.Canceled,
+                PlayServRpcErrorCode.ServerError => PlayServErrorCode.ServerError,
+                PlayServRpcErrorCode.InvalidResponse => PlayServErrorCode.InvalidResponse,
+                PlayServRpcErrorCode.DeserializationFailed => PlayServErrorCode.Deserialization,
+                _ => PlayServErrorCode.Unknown
+            };
+            return new PlayServError(
+                commonCode,
+                string.IsNullOrWhiteSpace(status) ? code.ToString() : status,
+                message,
+                retryable: code == PlayServRpcErrorCode.TransportFailed ||
+                           code == PlayServRpcErrorCode.Timeout ||
+                           code == PlayServRpcErrorCode.ServerError,
+                rawDetails: rawDetails);
         }
     }
 
@@ -89,5 +123,8 @@ namespace Playserv.RPC
         public DateTimeOffset Timestamp { get; }
 
         public PlayServRpcError Error { get; }
+
+        /// <summary>Cross-module failure, or <c>null</c> when the invocation succeeded.</summary>
+        public PlayServError UnifiedError => Error?.UnifiedError;
     }
 }

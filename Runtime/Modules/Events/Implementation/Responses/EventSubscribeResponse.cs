@@ -1,14 +1,22 @@
 namespace Playserv.Events.Responses
 {
     /// <summary>
-    /// Response for successful event subscription creation.
+    /// Backend acknowledgement for an event-type subscription.
     /// </summary>
     [System.Serializable]
     public sealed class EventSubscribeResponse
     {
         /// <summary>
-        /// Created event subscription id.
-        /// </summary>
-        public string eventSubscriptionId;
+        /// <summary>Canonical event type used to correlate concurrent responses.</summary>
+        public string EventType;
+
+        /// <summary>Whether the subscription was accepted.</summary>
+        public bool success;
+
+        /// <summary>Backend numeric error code when <see cref="success"/> is false.</summary>
+        public int errorCode;
+
+        /// <summary>Backend error message when <see cref="success"/> is false.</summary>
+        public string errorMessage;
     }
 }

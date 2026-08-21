@@ -15,8 +15,13 @@ namespace Playserv.Modules
         public const string SpawnId = "spawn";
         public const string PulseId = "pulse";
         public const string AnalyticsId = "analytics";
+        public const string DebugTerminalId = "debug-terminal";
         public const string AppleSignInId = "apple-sign-in";
         public const string GoogleSignInId = "google-sign-in";
+        public const string FacebookLoginId = "facebook-login";
+        public const string EpicAuthId = "epic-auth";
+        public const string SteamAuthId = "steam-auth";
+        public const string GameServerId = "game-server";
         public const string TransportWebSocketId = "transport-websocket";
         public const string TransportUdpId = "transport-udp";
         public const string TransportRudpId = "transport-rudp";
@@ -31,8 +36,13 @@ namespace Playserv.Modules
         public const string DefineDisableSpawn = "PLAYSERV_MODULE_DISABLED_SPAWN";
         public const string DefineDisablePulse = "PLAYSERV_MODULE_DISABLED_PULSE";
         public const string DefineDisableAnalytics = "PLAYSERV_MODULE_DISABLED_ANALYTICS";
+        public const string DefineDisableDebugTerminal = "PLAYSERV_MODULE_DISABLED_DEBUG_TERMINAL";
         public const string DefineDisableAppleSignIn = "PLAYSERV_MODULE_DISABLED_APPLE_SIGN_IN";
         public const string DefineDisableGoogleSignIn = "PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN";
+        public const string DefineDisableFacebookLogin = "PLAYSERV_MODULE_DISABLED_FACEBOOK_LOGIN";
+        public const string DefineDisableEpicAuth = "PLAYSERV_MODULE_DISABLED_EPIC_AUTH";
+        public const string DefineDisableSteamAuth = "PLAYSERV_MODULE_DISABLED_STEAM_AUTH";
+        public const string DefineDisableGameServer = "PLAYSERV_MODULE_DISABLED_GAME_SERVER";
         public const string DefineDisableTransportWebSocket = "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET";
         public const string DefineDisableTransportUdp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_UDP";
         public const string DefineDisableTransportRudp = "PLAYSERV_MODULE_DISABLED_TRANSPORT_RUDP";

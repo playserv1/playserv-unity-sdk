@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
+using JsonArray = System.Collections.Generic.List<object?>;
+using JsonObject = System.Collections.Generic.Dictionary<string, object?>;
 
 namespace PlayServ.Schema.Tool;
 
@@ -158,7 +159,9 @@ internal static class SchemaGenerator
         }
 
         root["$defs"] = definitions;
-        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) +
+        return JsonSerializer.Serialize(
+                   root,
+                   new JsonSerializerOptions { WriteIndented = true }) +
                Environment.NewLine;
     }
 
@@ -319,9 +322,11 @@ internal static class SchemaGenerator
         {
             return new JsonObject
             {
-                ["anyOf"] = new JsonArray(
+                ["anyOf"] = new JsonArray
+                {
                     schema,
-                    new JsonObject { ["type"] = "null" })
+                    new JsonObject { ["type"] = "null" }
+                }
             };
         }
 

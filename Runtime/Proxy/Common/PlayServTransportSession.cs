@@ -27,6 +27,7 @@ namespace Playserv.Proxy.Common
         private string _clientToken;
         private string _authorization;
         private IPlayServRuntimeTokenProvider _runtimeTokenProvider;
+        private Func<CancellationToken, Task<string>> _serverCredentialProvider;
         private string _gameId;
         private string _userId;
         private string _gameVersion;
@@ -107,6 +108,7 @@ namespace Playserv.Proxy.Common
             _clientToken = normalizedClientToken;
             _authorization = normalizedAuthorization;
             _runtimeTokenProvider = runtimeTokenProvider;
+            _serverCredentialProvider = null;
             _gameId = gameId;
             _userId = userId;
             _gameVersion = gameVersion;
@@ -117,6 +119,39 @@ namespace Playserv.Proxy.Common
 
             _logger.Log(
                 $"Config set: gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, clientTokenSet={!string.IsNullOrEmpty(_clientToken)}, runtimeTokenProviderSet={_runtimeTokenProvider != null}");
+        }
+
+        internal void ConfigureServer(
+            Func<CancellationToken, Task<string>> serverCredentialProvider,
+            string gameId,
+            string instanceId,
+            string gameVersion,
+            string sdkVersion,
+            int keepAlivePingIntervalMs,
+            int keepAlivePongTimeoutMs)
+        {
+            _serverCredentialProvider = serverCredentialProvider ??
+                throw new ArgumentNullException(nameof(serverCredentialProvider));
+            if (string.IsNullOrWhiteSpace(gameId))
+                throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
+            if (string.IsNullOrWhiteSpace(instanceId))
+                throw new ArgumentException("Instance ID cannot be null or empty.", nameof(instanceId));
+            if (string.IsNullOrWhiteSpace(gameVersion))
+                throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
+
+            _clientToken = null;
+            _authorization = null;
+            _runtimeTokenProvider = null;
+            _gameId = gameId;
+            _userId = instanceId;
+            _gameVersion = gameVersion;
+            _sdkVersion = string.IsNullOrWhiteSpace(sdkVersion) ? SdkInfo.Version : sdkVersion;
+            _allowMultipleConnections = true;
+            _keepAliveManager.PingIntervalMs = keepAlivePingIntervalMs;
+            _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
+
+            _logger.Log(
+                $"Server config set: gameId={gameId}, instanceId={instanceId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, rotatingServerCredential=true");
         }
 
         public async Task<bool> ConnectAsync()
@@ -222,7 +257,10 @@ namespace Playserv.Proxy.Common
             StopAndResetConnection();
             State = PlayServState.Offline;
 
-            _notifyTransportError(new TransportError(code, message));
+            _notifyTransportError(new TransportError(
+                code,
+                message,
+                $"reason={reason}; serverVersion={serverVersion}"));
         }
 
         public void HandleClientSettingsResponse(ClientSettingsResponse response)
@@ -345,7 +383,8 @@ namespace Playserv.Proxy.Common
 
         private void EnsureConfigured()
         {
-            if ((_runtimeTokenProvider == null &&
+            if ((_serverCredentialProvider == null &&
+                 _runtimeTokenProvider == null &&
                  string.IsNullOrWhiteSpace(_clientToken) &&
                  string.IsNullOrWhiteSpace(_authorization)) ||
                 string.IsNullOrWhiteSpace(_gameId) ||
@@ -358,6 +397,15 @@ namespace Playserv.Proxy.Common
 
         private async Task RefreshRuntimeCredentialAsync()
         {
+            if (_serverCredentialProvider != null)
+            {
+                var serverKey = NormalizeServerCredential(
+                    await _serverCredentialProvider(CancellationToken.None));
+                _authorization = "Bearer " + serverKey;
+                _handshakeCredential = serverKey;
+                return;
+            }
+
             if (_runtimeTokenProvider != null)
             {
                 _authorization = PlayServCredentialPolicy.NormalizePlayerAuthorization(
@@ -381,6 +429,19 @@ namespace Playserv.Proxy.Common
                 return clientToken;
 
             return PlayServCredentialPolicy.ExtractBearerToken(authorization);
+        }
+
+        private static string NormalizeServerCredential(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new InvalidOperationException("The server credential provider returned an empty credential.");
+            if (value.IndexOf('\r') >= 0 || value.IndexOf('\n') >= 0)
+                throw new InvalidOperationException("PlayServ server credentials cannot contain line breaks.");
+
+            var normalized = value.Trim();
+            if (!normalized.StartsWith("sk_", StringComparison.Ordinal))
+                throw new InvalidOperationException("The dedicated server realtime session requires an sk_* credential.");
+            return normalized;
         }
 
         private Task<bool> IsReconnectEnvironmentReadyAsync()

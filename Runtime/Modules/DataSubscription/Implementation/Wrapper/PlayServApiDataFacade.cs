@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Playserv.Data;
 using Playserv.DataSubscription;
 using Playserv.DataSubscription.Responses;
 
@@ -39,6 +40,29 @@ namespace Playserv.Wrapper
             return Adapter.SelectCollection<TItem>(query, variables);
         }
 
+        internal Task<ISharedCollection<TItem>> SelectTypedCollection<TItem>(
+            string query,
+            Dictionary<string, object> variables,
+            CancellationToken ct)
+        {
+            return ConcreteAdapter.SelectTypedCollectionAsync<TItem>(query, variables, ct);
+        }
+
+        internal Task<IPlayServRecordSubscription<TItem>> SelectTypedRecord<TItem>(
+            PlayServRecord<TItem> record,
+            string query,
+            Dictionary<string, object> variables,
+            string rootFieldName,
+            CancellationToken ct)
+        {
+            return ConcreteAdapter.SelectTypedRecordAsync(
+                record,
+                query,
+                variables,
+                rootFieldName,
+                ct);
+        }
+
         public Task<DataGetResponse> GetDataByKeyAsync(
             string key,
             string query,
@@ -60,5 +84,8 @@ namespace Playserv.Wrapper
 
         private IDataSubscriptionAdapter Adapter =>
             _runtimeAccess.RequiredServices.Get<IDataSubscriptionAdapter>();
+
+        private PlayServDataSubscriptionAdapter ConcreteAdapter =>
+            _runtimeAccess.RequiredServices.Get<PlayServDataSubscriptionAdapter>();
     }
 }

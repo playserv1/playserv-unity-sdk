@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-20
+
+- Added dedicated-server profile support and an internal per-event identity
+  path used by `com.playserv.game-server` without mutable global player state.
+- Aligned the package and core SDK dependency versions with `0.4.0`.
+
+## [0.3.9] - 2026-08-19
+
+- Changed the default provider to send bounded batches through the shipped
+  `POST /analytics/events` runtime endpoint. Custom provider overrides remain
+  supported and retain precedence across reconnects.
+- Aligned the package and core SDK dependency versions with `0.3.9`.
+
+## [0.3.8] - 2026-08-17
+
+- Aligned the package and core SDK dependency versions with `0.3.8`.
+
 ## [0.3.7] - 2026-08-12
 
 - Aligned the package and core SDK dependency versions with `0.3.7`.

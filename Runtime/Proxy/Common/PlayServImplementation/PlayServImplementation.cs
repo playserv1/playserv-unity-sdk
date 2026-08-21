@@ -73,6 +73,16 @@ namespace Playserv.Proxy.Common
             _transportFacade = new CoreTransportFacade(components.Transport);
             _transportSession = components.TransportSession;
             _commandRouter = new PlayServCommandRouter(_transportFacade, _transportSession, _logger);
+
+            try
+            {
+                _moduleHost.Initialize(new PlayServModuleContext(_moduleHost.ServiceRegistry));
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         public void SetConfig(
@@ -97,6 +107,23 @@ namespace Playserv.Proxy.Common
                 keepAlivePongTimeoutMs,
                 runtimeTokenProvider,
                 playerAccessToken);
+
+        internal void SetServerConfig(
+            Func<CancellationToken, Task<string>> serverCredentialProvider,
+            string gameId,
+            string instanceId,
+            string gameVersion,
+            string sdkVersion,
+            int keepAlivePingIntervalMs,
+            int keepAlivePongTimeoutMs) =>
+            _transportSession.ConfigureServer(
+                serverCredentialProvider,
+                gameId,
+                instanceId,
+                gameVersion,
+                sdkVersion,
+                keepAlivePingIntervalMs,
+                keepAlivePongTimeoutMs);
 
         public Task<bool> RefreshPlayerAuthAsync(
             string newAccessToken,

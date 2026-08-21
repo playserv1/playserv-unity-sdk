@@ -56,5 +56,12 @@ namespace Playserv.DataSubscription.Responses
         /// Human-readable error message.
         /// </summary>
         public string Message { get; set; }
+
+        /// <summary>Optional retryability supplied by the generic command error envelope.</summary>
+        public bool? Retryable { get; set; }
+
+        public string SourceCode { get; set; }
+
+        public string RawDetails { get; set; }
     }
 }

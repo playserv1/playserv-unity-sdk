@@ -12,5 +12,6 @@ namespace Playserv.Http.Interfaces
         public string access_token;
         public string refresh_token;
         public string expires_at;
+        public int refresh_expires_in;
     }
 }

@@ -1,0 +1,26 @@
+{
+  "name": "com.playserv.game-server",
+  "displayName": "PlayServ Game Server",
+  "version": "0.4.0",
+  "unity": "2021.3",
+  "description": "Dedicated-server matchmaking, Records, Cloud Functions, Analytics, Commerce, room lifecycle, reservation admission, and player lookup for PlayServ.",
+  "author": {
+    "name": "PlayServ"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:playserv1/playserv-unity-sdk.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.playserv.sdk": "0.4.0",
+    "com.playserv.analytics": "0.4.0"
+  },
+  "samples": [
+    {
+      "displayName": "Dedicated Game Server",
+      "description": "Registers a room, admits reservations, and shuts down gracefully.",
+      "path": "Samples~/DedicatedServer"
+    }
+  ]
+}

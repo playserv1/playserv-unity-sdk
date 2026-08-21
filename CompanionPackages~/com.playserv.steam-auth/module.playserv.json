@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "steam-auth",
+  "order": 93,
+  "label": "Steam Auth",
+  "description": "Steamworks.NET Web API ticket acquisition with PlayServ login and identity-link helpers.",
+  "minSdkVersion": "0.3.8",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "identity.steam"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_STEAM_AUTH",
+  "defaultEnabled": false,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Implementation"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.SteamAuth"
+}
