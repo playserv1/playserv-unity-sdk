@@ -282,7 +282,7 @@ namespace Playserv.Tests.Runtime.Analytics
                         Sequence = 4,
                         SessionId = "session-1",
                         UserId = "plr_1",
-                        SdkVersion = "0.4.0",
+                        SdkVersion = "0.4.1",
                         ApplicationVersion = "1.2.3",
                         Platform = "Android",
                         Parameters = new[]

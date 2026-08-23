@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-23
+
+- Documented copy-paste GitHub UPM installation URLs, immutable distribution
+  tags, and deterministic upgrade/downgrade steps for core and companion packages.
 - Expanded the Unity CI project to install all companion packages, enable every
   runtime module, and fail when any discovered test assembly is silently omitted.
 - Aligned publishing with the `unity-*` source-tag convention, retained legacy
@@ -20,6 +24,8 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
   shipped Roslyn dependency versions during schema analysis.
 - Prevented automatic SDK cache maintenance from recompiling generated module
   assemblies after a batch-mode Unity test run has already started.
+- Synchronized core, companion-package, runtime, documentation, and Schema Tool
+  versions for the `0.4.1` release.
 
 ## [0.4.0] - 2026-08-20
 

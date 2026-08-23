@@ -10,7 +10,7 @@ namespace Playserv.Tests.Editor
 {
     public sealed class PlayServReleaseVersionTests
     {
-        private const string ExpectedVersion = "0.4.0";
+        private const string ExpectedVersion = "0.4.1";
 
         [Test]
         public void CoreAndEveryCompanion_ReportReleaseVersion()
@@ -35,7 +35,7 @@ namespace Playserv.Tests.Editor
                 $"\"com.playserv.analytics\": \"{ExpectedVersion}\"",
                 File.ReadAllText(Path.Combine(debugRoot, "package.json")));
             StringAssert.Contains(
-                $"\"minSdkVersion\": \"{ExpectedVersion}\"",
+                "\"minSdkVersion\": \"0.4.0\"",
                 File.ReadAllText(Path.Combine(debugRoot, "module.playserv.json")));
 
             var gameServerRoot = Path.Combine(companionRoot, "com.playserv.game-server");

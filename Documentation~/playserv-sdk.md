@@ -20,6 +20,28 @@ This document contains practical examples for the public runtime API exposed by:
 
 ## Installation
 
+### GitHub UPM (recommended)
+
+The private distribution repository contains the core package at its root and
+all optional companion packages under `CompanionPackages~`. After configuring
+GitHub SSH access for the operating-system account that runs Unity, open
+`Window` -> `Package Manager` -> `Add package from git URL` and install the
+current stable core package:
+
+```text
+git@github.com:playserv1/playserv-unity-sdk.git#0.4.1
+```
+
+Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
+companion package uses `?path` before the tag fragment:
+
+```text
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.4.1
+```
+
+See the package [README](../README.md#install-from-github) for the complete
+companion manifest and upgrade/downgrade instructions.
+
 ### UnityPackage / Assets import
 
 When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read this package's `package.json` dependencies. The SDK attempts to install `com.unity.nuget.newtonsoft-json` automatically in that mode. If Package Manager cannot install it, add this dependency manually to the game project's `Packages/manifest.json`:
@@ -52,7 +74,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.4.0"
+    "com.playserv.sdk": "0.4.1"
   }
 }
 ```
@@ -61,7 +83,12 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- Release tag should match package version with `v` prefix (example: `v0.1.0`).
+- A source release tag uses `unity-<version>` (for example `unity-0.4.1`).
+- The publisher writes a complete snapshot to distribution `main` and creates
+  the matching plain-SemVer tag (for example `0.4.1`) atomically.
+- Distribution tags are immutable and retain historical releases. Production
+  UPM dependencies must use `#<version>` instead of following unpinned `main`.
+- Core and every installed companion package must use the same version tag.
 - `CHANGELOG.md` must include a heading for the same package version.
 - The editor window displays the installed package version from Package Manager/package.json.
 - Runtime SDK version constants are synchronized from `package.json` by `Tools/PlayServ/Internal/Sync SDK Version From package.json`.

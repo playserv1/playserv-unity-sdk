@@ -7,24 +7,59 @@ and the built-in HTTP/WebSocket transport. Analytics, identity providers,
 native transports, WebRTC, Pulse, schema tooling, and Dedicated Server runtime
 operations are optional companion packages.
 
+## Install from GitHub
+
+The current stable release is `0.4.1`. In Unity, open `Window` ->
+`Package Manager`, choose `Add package from git URL`, and paste this pinned core
+package URL:
+
+```text
+git@github.com:playserv1/playserv-unity-sdk.git#0.4.1
+```
+
+The distribution repository is private. The operating-system account running
+Unity must have GitHub access and an SSH key that can clone
+`playserv1/playserv-unity-sdk`; verify that access with `ssh -T git@github.com`
+before asking Package Manager to install it. Unity uses the machine's Git/SSH
+credentials. PlayServ does not read or store that key.
+
+The same dependency can be added directly to the game project's
+`Packages/manifest.json`:
+
+```json
+{
+  "dependencies": {
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.4.1"
+  }
+}
+```
+
+### Select, upgrade, or downgrade a version
+
+Every published SDK version is an immutable plain-SemVer tag in the
+[`playserv-unity-sdk` tag list](https://github.com/playserv1/playserv-unity-sdk/tags),
+for example `0.4.0`, `0.4.1`, or `0.5.0`. To select another release, replace the
+suffix in every PlayServ Git dependency with `#<version>`:
+
+```text
+git@github.com:playserv1/playserv-unity-sdk.git#<version>
+```
+
+The distribution `main` branch points to the newest published snapshot, but
+production projects should always include `#<version>` so an install cannot
+change unexpectedly. After changing versions, let Unity update the dependency
+graph, then commit both `Packages/manifest.json` and `Packages/packages-lock.json`.
+
+Published tags are never moved, overwritten, or deleted. Historical releases
+remain available through their tags; separate version folders and version
+branches are not used.
+
 ## Requirements
 
 - Unity 2021.3 or newer.
 - A PlayServ game ID and runtime credential.
 - `com.unity.nuget.newtonsoft-json` 3.2.2. Unity Package Manager installs this
   dependency automatically for UPM installations.
-
-## Install
-
-In Unity, open `Window` -> `Package Manager`, choose `Add package from git URL`,
-and enter your repository URL with a tag or commit:
-
-```text
-https://<git-host>/<organization>/<repository>.git#<tag-or-commit>
-```
-
-For a package registry, add `com.playserv.sdk` to the project's
-`Packages/manifest.json`.
 
 ## Companion packages
 
@@ -34,27 +69,28 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#<tag-or-commit>",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#<tag-or-commit>",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#<tag-or-commit>",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#<tag-or-commit>",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#<tag-or-commit>",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#<tag-or-commit>",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#<tag-or-commit>",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#<tag-or-commit>",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#<tag-or-commit>",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#<tag-or-commit>",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#<tag-or-commit>",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#<tag-or-commit>",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#<tag-or-commit>"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.4.1",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.4.1",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.4.1",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.4.1",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.4.1",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.4.1",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.4.1",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.4.1",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.4.1",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.4.1",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.4.1",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.4.1",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.4.1"
   }
 }
 ```
 
 Only add the companion packages used by the game. Unity package dependencies
 cannot contain Git URLs, so private Git installations must declare core and
-each companion package directly in the project manifest. Use the same tag or
-commit for core and every companion package.
+each companion package directly in the project manifest. Use the same immutable
+version tag for core and every companion package. When adding a companion
+through `Add package from git URL`, paste its complete `?path=...#<version>` URL.
 
 Runtime companion packages can also be managed from `Tools` -> `PlayServ` ->
 `Settings` -> `SDK module settings`. They stay visible there even when they are

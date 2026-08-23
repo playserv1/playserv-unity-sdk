@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-23
+
+- Aligned the package and core SDK dependency versions with `0.4.1`.
+
 ## [0.4.0] - 2026-08-20
 
 - Aligned the package and core SDK dependency versions with `0.4.0`.

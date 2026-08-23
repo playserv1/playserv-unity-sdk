@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-23
+
+- Aligned the package, core SDK, Analytics, and Game Server dependency versions
+  with `0.4.1`.
+
 ## [0.4.0] - 2026-08-20
 
 - Added public platform status, runtime table catalogue, bulk Records, realtime
