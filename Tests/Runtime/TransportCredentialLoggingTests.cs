@@ -29,14 +29,14 @@ namespace Playserv.Tests.Runtime
                 GameAccessToken = ClientToken,
                 ClientToken = ClientToken,
                 Authorization = "Bearer " + PlayerJwt,
-                SdkVersion = "0.5.0",
+                SdkVersion = "0.5.1",
                 GameVersion = "game-42"
             }).GetAwaiter().GetResult();
             fixture.RuntimeTransport.Send(new HandshakeRequest
             {
                 GameAccessToken = ServerKey,
                 Authorization = "Bearer " + ServerKey,
-                SdkVersion = "0.5.0",
+                SdkVersion = "0.5.1",
                 GameVersion = "server-42"
             }).GetAwaiter().GetResult();
             fixture.RuntimeTransport.Send(new RefreshAuthRequest
@@ -53,7 +53,7 @@ namespace Playserv.Tests.Runtime
             Assert.That(fixture.Logger.AllText, Does.Contain("HandshakeRequest"));
             Assert.That(fixture.Logger.AllText, Does.Contain("game-42"));
             Assert.That(fixture.Logger.AllText, Does.Contain("server-42"));
-            Assert.That(fixture.Logger.AllText, Does.Contain("0.5.0"));
+            Assert.That(fixture.Logger.AllText, Does.Contain("0.5.1"));
             Assert.That(fixture.Logger.AllText, Does.Contain("[REDACTED]"));
         }
 
@@ -68,14 +68,14 @@ namespace Playserv.Tests.Runtime
                 GameAccessToken = ClientToken,
                 ClientToken = ClientToken,
                 Authorization = "Bearer " + PlayerJwt,
-                SdkVersion = "0.5.0",
+                SdkVersion = "0.5.1",
                 GameVersion = "game-42"
             }));
             fixture.Implementation.Emit(fixture.SerializeFrame(new HandshakeRequest
             {
                 GameAccessToken = ServerKey,
                 Authorization = "Bearer " + ServerKey,
-                SdkVersion = "0.5.0",
+                SdkVersion = "0.5.1",
                 GameVersion = "server-42"
             }));
             fixture.Implementation.Emit(fixture.SerializeFrame(new RefreshAuthRequest
@@ -161,7 +161,7 @@ namespace Playserv.Tests.Runtime
                 GameAccessToken = ClientToken,
                 ClientToken = ClientToken,
                 Authorization = "Bearer " + PlayerJwt,
-                SdkVersion = "0.5.0",
+                SdkVersion = "0.5.1",
                 GameVersion = "game-42"
             }));
 

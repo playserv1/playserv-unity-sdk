@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-12
+
+- Fixed first-connection RPC responses being dropped by attaching command routes
+  after module initialization. Failed initialization also cleans up safely before
+  a command router exists; RPC remains optional.
+
 - Fixed Unity CI preparation after GameCI's floating `v4` tag switched runners:
   pin the compatible Node 24-based v4.3.2 action and its coverage-patch path.
   Skip result validation/upload only when the corresponding Unity test step was

@@ -72,11 +72,12 @@ namespace Playserv.Proxy.Common
             _moduleHost = components.ModuleHost;
             _transportFacade = new CoreTransportFacade(components.Transport);
             _transportSession = components.TransportSession;
-            _commandRouter = new PlayServCommandRouter(_transportFacade, _transportSession, _logger);
-
             try
             {
                 _moduleHost.Initialize(new PlayServModuleContext(_moduleHost.ServiceRegistry));
+                // Modules register their route providers during Initialize. Snapshot the providers
+                // only afterwards, while keeping the command bus available to module initialization.
+                _commandRouter = new PlayServCommandRouter(_transportFacade, _transportSession, _logger);
             }
             catch
             {
@@ -152,7 +153,7 @@ namespace Playserv.Proxy.Common
 
         public void Dispose()
         {
-            _commandRouter.Dispose();
+            _commandRouter?.Dispose();
             _moduleHost.Dispose();
             _transportSession.Dispose();
             _transportFacade.Dispose();

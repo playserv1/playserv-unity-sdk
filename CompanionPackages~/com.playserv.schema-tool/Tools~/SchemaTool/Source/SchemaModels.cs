@@ -4,7 +4,7 @@ namespace PlayServ.Schema.Tool;
 
 internal static class ToolConstants
 {
-    public const string Version = "0.5.0";
+    public const string Version = "0.5.1";
     public const int ProtocolVersion = 1;
     public const int ConfigurationVersion = 1;
     public const int LockVersion = 1;

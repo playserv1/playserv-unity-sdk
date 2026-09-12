@@ -29,14 +29,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 current stable core package:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.5.0
+git@github.com:playserv1/playserv-unity-sdk.git#0.5.1
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.0
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.1
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -74,7 +74,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.5.0"
+    "com.playserv.sdk": "0.5.1"
   }
 }
 ```
@@ -83,9 +83,9 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.5.0`).
+- A source release tag uses `unity-<version>` (for example `unity-0.5.1`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.5.0`) atomically.
+  the matching plain-SemVer tag (for example `0.5.1`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.

@@ -13,11 +13,11 @@ namespace Playserv.Tests.Editor
             var state = new PlayServSdkCacheState
             {
                 schemaVersion = PlayServSdkCacheMaintenance.CurrentCacheSchemaVersion,
-                sdkVersion = "0.5.0"
+                sdkVersion = "0.5.1"
             };
 
             Assert.That(
-                PlayServSdkCacheMaintenance.IsStateCurrent(state, "0.5.0"),
+                PlayServSdkCacheMaintenance.IsStateCurrent(state, "0.5.1"),
                 Is.True);
             Assert.That(
                 PlayServSdkCacheMaintenance.IsStateCurrent(state, "0.4.0"),
@@ -25,7 +25,7 @@ namespace Playserv.Tests.Editor
 
             state.schemaVersion--;
             Assert.That(
-                PlayServSdkCacheMaintenance.IsStateCurrent(state, "0.5.0"),
+                PlayServSdkCacheMaintenance.IsStateCurrent(state, "0.5.1"),
                 Is.False);
         }
 

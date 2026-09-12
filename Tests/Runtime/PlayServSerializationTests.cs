@@ -76,7 +76,7 @@ namespace Playserv.Tests.Runtime
                 ClientToken = "pk_project",
                 Authorization = "Bearer player-jwt",
                 GameVersion = "1.2.3",
-                SdkVersion = "0.5.0"
+                SdkVersion = "0.5.1"
             };
 
             var json = codec.Serialize(request);

@@ -9,15 +9,15 @@ operations are optional companion packages.
 
 ## Install from GitHub
 
-This checkout targets SDK `0.5.0`. In Unity, open `Window` ->
+This checkout targets SDK `0.5.1`. In Unity, open `Window` ->
 `Package Manager`, choose `Add package from git URL`, and paste this pinned core
 package URL:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.5.0
+git@github.com:playserv1/playserv-unity-sdk.git#0.5.1
 ```
 
-The Git URLs below require the `0.5.0` distribution tag to be published first;
+The Git URLs below require the `0.5.1` distribution tag to be published first;
 changing the version in the source repository does not publish that tag.
 
 The distribution repository is private. The operating-system account running
@@ -32,7 +32,7 @@ The same dependency can be added directly to the game project's
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.0"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.1"
   }
 }
 ```
@@ -41,7 +41,7 @@ The same dependency can be added directly to the game project's
 
 Every published SDK version is an immutable plain-SemVer tag in the
 [`playserv-unity-sdk` tag list](https://github.com/playserv1/playserv-unity-sdk/tags),
-for example `0.4.0`, `0.4.1`, or `0.5.0`. To select another release, replace the
+for example `0.4.0`, `0.4.1`, or `0.5.1`. To select another release, replace the
 suffix in every PlayServ Git dependency with `#<version>`:
 
 ```text
@@ -72,19 +72,19 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.0",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.5.0",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.5.0",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.5.0",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.5.0",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.5.0",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.5.0",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.0",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.5.0",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.5.0",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.5.0",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.5.0",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.5.0"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.1",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.5.1",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.5.1",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.5.1",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.5.1",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.5.1",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.5.1",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.1",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.5.1",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.5.1",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.5.1",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.5.1",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.5.1"
   }
 }
 ```
