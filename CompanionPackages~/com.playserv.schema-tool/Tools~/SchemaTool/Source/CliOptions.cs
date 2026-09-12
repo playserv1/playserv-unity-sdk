@@ -5,8 +5,11 @@ internal sealed class CliOptions
     public string Command { get; private set; } = "status";
     public string ProjectRoot { get; private set; } = Directory.GetCurrentDirectory();
     public string ChangedPath { get; private set; } = string.Empty;
+    public string Endpoint { get; private set; } = string.Empty;
+    public int TimeoutSeconds { get; private set; } = 30;
     public bool Json { get; private set; }
     public bool Check { get; private set; }
+    public bool DryRun { get; private set; }
     public bool Help { get; private set; }
 
     public static CliOptions Parse(string[] args)
@@ -25,6 +28,19 @@ internal sealed class CliOptions
                 case "--changed":
                     options.ChangedPath = RequireValue(args, ref index, argument);
                     break;
+                case "--endpoint":
+                    options.Endpoint = RequireValue(args, ref index, argument);
+                    break;
+                case "--timeout-seconds":
+                    var timeoutValue = RequireValue(args, ref index, argument);
+                    if (!int.TryParse(timeoutValue, out var timeoutSeconds) ||
+                        timeoutSeconds < 1 || timeoutSeconds > 300)
+                    {
+                        throw new ArgumentException(
+                            "--timeout-seconds must be an integer from 1 through 300.");
+                    }
+                    options.TimeoutSeconds = timeoutSeconds;
+                    break;
                 case "--json":
                 case "--format=json":
                     options.Json = true;
@@ -32,6 +48,9 @@ internal sealed class CliOptions
                 case "--check":
                 case "--locked":
                     options.Check = true;
+                    break;
+                case "--dry-run":
+                    options.DryRun = true;
                     break;
                 case "--help":
                 case "-h":

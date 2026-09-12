@@ -11,6 +11,24 @@ namespace Playserv.Samples.DataSubscription
 {
     public sealed class PlayServRecordsSample : MonoBehaviour
     {
+        // Keep the operation key AND payload in game-owned state until the outcome is known.
+        // An explicit retry after a lost response must reuse both within backend retention.
+        public Task<PlayServRecord<SampleInventoryItem>> CreateRewardAsync(
+            SampleInventoryItem reward, string operationKey, CancellationToken ct = default) =>
+            PlayServData.Records<SampleInventoryItem>().CreateAsync(
+                reward, ct: ct, idempotencyKey: operationKey);
+
+        public Task<PlayServBulkCreateResult> CreateRewardsAsync(
+            IReadOnlyList<SampleInventoryItem> rewards, string operationKey, CancellationToken ct = default) =>
+            PlayServData.Records<SampleInventoryItem>().BulkCreateAsync(
+                rewards, ct: ct, idempotencyKey: operationKey);
+
+        public Task<PlayServUpsertResult> SeedStarterSwordAsync(string idempotencyKey, CancellationToken ct = default) =>
+            PlayServData.Records<SampleInventoryItem>().UpsertByNaturalKeyAsync(
+                PlayServNaturalKey<SampleInventoryItem>.For(item => item.Code, "starter-sword"),
+                new SampleInventoryItem { Code = "starter-sword", DisplayName = "Starter Sword", Durability = 100 },
+                PlayServUpsertMode.Seed, idempotencyKey: idempotencyKey, ct: ct);
+
         public Task<PlayServDataCapabilities> GetInventoryCapabilitiesAsync(
             bool forceRefresh = false,
             CancellationToken ct = default)
@@ -19,6 +37,18 @@ namespace Playserv.Samples.DataSubscription
             return forceRefresh
                 ? items.RefreshCapabilitiesAsync(ct)
                 : items.GetCapabilitiesAsync(ct);
+        }
+
+        // A UI can keep editing the handle while its earlier Save is awaiting a response.
+        // The first save acknowledges "Sword"; the newer name remains pending if it wasn't sent.
+        public async Task RenameWhileSavingAsync(PlayServRecord<SampleInventoryItem> item, CancellationToken ct = default)
+        {
+            item.Value.DisplayName = "Sword";
+            var save = item.SaveAsync(ct);
+            item.Value.DisplayName = "Enchanted Sword";
+            await save;
+            if (item.HasPendingChanges)
+                await item.SaveAsync(ct);
         }
 
         public async Task<PlayServRecord<SampleInventoryItem>> LoadStarterSwordAsync()
@@ -47,6 +77,25 @@ namespace Playserv.Samples.DataSubscription
             return PlayServData.Records<SampleInventoryItem>().QueryAsync(query);
         }
 
+        // View filters/sorting/hidden columns are owned by the backend administrator.
+        public Task<PlayServRecordPage<SampleInventoryItem>> LoadSavedViewAsync(
+            string viewId, string cursor = null, CancellationToken ct = default) =>
+            PlayServData.Records<SampleInventoryItem>().QueryViewAsync(viewId, new PlayServPagination(cursor, 50), ct);
+
+        public async Task RenameViewItemAsync(PlayServRecord<SampleInventoryItem> item,
+            string name, CancellationToken ct = default)
+        {
+            // Reload BEFORE editing: View records may omit fields and cannot be saved as-is.
+            await item.ReloadAsync(ct);
+            item.Value.DisplayName = name;
+            await item.SaveAsync(ct);
+        }
+
+        // Profile must be an inclusion in the backend schema, not a relation.
+        public Task<PlayServRecordPage<SampleInventoryItem>> LoadRegionalItemsAsync(string region) =>
+            PlayServData.Records<SampleInventoryItem>().QueryAsync(
+                new PlayServRecordQuery<SampleInventoryItem>().Where(item => item.Profile.Region == region));
+
         public Task<PlayServLoadAllResult<SampleInventoryItem>> LoadAllDamagedItemsAsync(
             int maxRecords = 1_000,
             CancellationToken ct = default)
@@ -61,6 +110,7 @@ namespace Playserv.Samples.DataSubscription
                 ct: ct);
         }
 
+        // Plain reads use native ID batches; each input still has its own result/handle.
         public Task<PlayServBulkResult<PlayServRecord<SampleInventoryItem>>> LoadItemsAsync(
             IEnumerable<string> recordIds,
             CancellationToken ct = default) =>
@@ -133,6 +183,9 @@ namespace Playserv.Samples.DataSubscription
 
     public sealed class SampleInventoryItem
     {
+        [PlayServField("profile")]
+        public SampleInventoryProfile Profile { get; set; }
+
         [PlayServField("code")]
         public string Code { get; set; }
 
@@ -147,6 +200,12 @@ namespace Playserv.Samples.DataSubscription
 
         [PlayServField("guild")]
         public SampleGuild Guild { get; set; }
+    }
+
+    public sealed class SampleInventoryProfile
+    {
+        [PlayServField("region")]
+        public string Region { get; set; }
     }
 
     public sealed class SampleGuild

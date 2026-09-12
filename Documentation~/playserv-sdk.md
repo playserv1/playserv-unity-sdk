@@ -29,14 +29,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 current stable core package:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.4.1
+git@github.com:playserv1/playserv-unity-sdk.git#0.5.0
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.4.1
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.0
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -74,7 +74,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.4.1"
+    "com.playserv.sdk": "0.5.0"
   }
 }
 ```
@@ -83,9 +83,9 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.4.1`).
+- A source release tag uses `unity-<version>` (for example `unity-0.5.0`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.4.1`) atomically.
+  the matching plain-SemVer tag (for example `0.5.0`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
@@ -435,11 +435,24 @@ using Playserv.Schema;
 
 namespace Game.Contracts
 {
-    [PlayServSchema("player.profile", Version = "1")]
+    [PlayServSchema(
+        "player.profile",
+        Version = "1",
+        Kind = PlayServSchemaKind.Entity,
+        OwnedBy = PlayServSchemaOwner.Player,
+        Read = PlayServSchemaReadPolicy.Owner,
+        OnPlayerDelete = PlayServPlayerDeletePolicy.CascadeDelete,
+        ClientRead = PlayServSchemaAccess.Allow,
+        ClientWrite = PlayServSchemaAccess.Allow)]
     [PlayServFormerlyNamed("LegacyPlayerProfile")]
     public sealed class PlayerProfile
     {
-        [PlayServField("playerId", Required = PlayServRequiredMode.Required)]
+        [PlayServField(
+            "playerId",
+            Required = PlayServRequiredMode.Required,
+            Type = PlayServSchemaFieldType.Uuid,
+            Primary = true,
+            CodeKey = "player.profile.player-id")]
         public string Id { get; set; }
 
         public int Level { get; set; }
@@ -452,8 +465,10 @@ namespace Game.Contracts
 }
 ```
 
-- `PlayServSchema` sets the stable schema ID, authority, and optional version.
-- `PlayServField` overrides the serialized name or required state.
+- `PlayServSchema` sets the stable schema ID, kind, ownership/read lifecycle,
+  ACL, description, singleton state, and optional version.
+- `PlayServField` overrides the serialized name, stable code key, required,
+  primary/unique/indexed flags, default value, target, and cardinality.
 - `PlayServFormerlyNamed` records a previous type or field name for migrations.
 - `PlayServIgnore` excludes a public member.
 
@@ -490,9 +505,10 @@ Initialization creates `playserv.schema.json` in the project root:
     }
   ],
   "service": {
-    "endpoint": "",
-    "environment": "",
-    "projectId": ""
+    "endpoint": "https://api.playserv.io",
+    "environment": "dev",
+    "projectId": "prj_...",
+    "serverKeyEnvironmentVariable": "PLAYSERV_SERVER_KEY"
   }
 }
 ```
@@ -522,6 +538,8 @@ After creating the launcher:
 .playserv/bin/playserv-schema analyze
 .playserv/bin/playserv-schema generate
 .playserv/bin/playserv-schema validate
+.playserv/bin/playserv-schema push --dry-run
+.playserv/bin/playserv-schema push
 .playserv/bin/playserv-schema watch
 ```
 
@@ -542,15 +560,29 @@ For CI, run `validate`. Exit code `0` means generated contracts match the source
 `1` means schema diagnostics or drift were found; `2` means configuration or
 tool execution failed.
 
-### Schema Service boundary
+### Push to the Schema Service
 
-Version 1 establishes the local canonical graph, deterministic files, source
-authorities, and a versioned tool protocol. A `remote` source may be declared,
-but `sync` currently performs local reconciliation only. Upload/download and
-conflict resolution will be enabled after the Schema Service API defines
-authentication, revisions, ownership, and breaking-change policy. Tokens will
-be read from the process environment or OS credential storage, never from
-`playserv.schema.json` or command-line arguments.
+The advanced Unity control **Push to PlayServ** and the CLI `push` command use
+the shipped code-first Schema Service workflow:
+
+1. Analyze attributed C# without loading game assemblies.
+2. Exchange `PLAYSERV_SERVER_KEY` (or the configured environment-variable
+   name) for a short-lived operator session through `/auth/cli`.
+3. Read the current whole-schema `revision`.
+4. Submit enums, parts, and entities together to `schema:push-from-code` with
+   that revision as the precondition.
+
+The backend applies the bundle atomically. A stale revision, validation error,
+admin-authored name collision, or required migration leaves the existing
+schema unchanged. Stable schema and field code keys preserve server IDs across
+renames. Use `push --dry-run` to build and validate the bundle without reading
+credentials or making a network request.
+
+The server key is read only from the process environment. It is never accepted
+as a CLI argument, written to `playserv.schema.json`, persisted, or logged.
+`--endpoint` overrides `service.endpoint`; otherwise `PLAYSERV_API_URL` is used
+as the final endpoint fallback. The existing `sync` command remains a
+backward-compatible alias for local output reconciliation.
 
 ## SDK cache maintenance
 
@@ -807,6 +839,24 @@ if (link.Conflict?.Current != null && link.Conflict.Conflicting != null)
 PlayServAuthResult unlink = await PlayServAuth.UnlinkIdentityAsync("google");
 ```
 
+Load the signed-in player's safe runtime profile through the same auth facade:
+
+```csharp
+PlayServPlayerProfileResult profileResult =
+    await PlayServAuth.GetCurrentPlayerProfileAsync();
+if (profileResult.IsSuccess)
+{
+    Debug.Log(profileResult.Profile.Name);
+    Debug.Log(string.Join(", ", profileResult.Profile.LinkedProviders));
+}
+
+// Force a backend read instead of returning the cached successful profile.
+profileResult = await PlayServAuth.RefreshCurrentPlayerProfileAsync();
+```
+
+This client route can only read the JWT player's own row. The DTO deliberately
+excludes IP, fingerprint, moderation and merge-forensics fields.
+
 Merge is identity-only: records owned by the absorbed player are not moved.
 `MergeIdentityAsync` accepts only a typed provider conflict, validates that it
 still belongs to the current managed player, and derives the primary/absorbed
@@ -987,6 +1037,41 @@ loaded.Value.Durability--;
 await loaded.SaveAsync();
 ```
 
+### Retrying record creation
+
+`CreateAsync` and `BulkCreateAsync` accept an optional `idempotencyKey` after `ct`.
+Keep a key for each logical operation and reuse it if its response is lost:
+
+```csharp
+// Keep these in game-owned operation state, outside any retry loop.
+string operationKey = System.Guid.NewGuid().ToString("D");
+var reward = new InventoryItem { Code = "reward-sword", DisplayName = "Sword", Durability = 100 };
+
+// If the outcome is unknown, explicitly repeat this call with the SAME key and fields.
+var createdReward = await items.CreateAsync(reward, ct: ct, idempotencyKey: operationKey);
+
+// A different logical operation needs a different key. A bulk key covers the entire
+// atomic batch (1-200 records), not individual rows or a client-side fan-out.
+string batchKey = System.Guid.NewGuid().ToString("D");
+var rewards = new[] { reward };
+var batch = await items.BulkCreateAsync(rewards, ct: ct, idempotencyKey: batchKey);
+```
+
+Reuse requires identical serialized fields, and for bulk creation the same row order
+and defaults, against the same table and caller context (project/environment and
+credentials/player identity), within the backend's idempotency retention window.
+An already completed request replays its original result; a changed payload with the
+same key produces the existing typed `409 conflict`. A still-running request can also
+return a conflict, so idempotency does not make every immediate retry succeed.
+Replay is not a reload of the record's latest state.
+
+Omitting the key or passing `null` generates a new UUID for each call, preserving the
+previous behavior. Explicit keys must be non-blank, contain no control characters and
+have at most 128 characters; invalid keys fail before catalogue or mutation HTTP.
+The SDK neither persists keys nor automatically retries writes. Cancellation stops
+waiting, not an accepted server write. These APIs also work on Game Server Records
+and `AsPlayer(...)`; natural-key upserts and `LoadOrCreateAsync` are unchanged.
+
 The table catalogue also supplies advisory ACL capabilities:
 
 ```csharp
@@ -1017,6 +1102,21 @@ ETag. `HasPendingChanges` compares the current top-level value to that snapshot.
 `null`, and advances snapshot/ETag only after a successful response. Stale
 `If-Match` returns `PlayServRecordConflictException` with
 `Kind == StaleVersion`.
+
+Each save captures its patch before asynchronous access checks and HTTP. Changes to
+serialized fields made while it is pending are preserved over the successful server
+response and remain visible through `HasPendingChanges`. The snapshot, ETag and
+timestamps still advance to the acknowledged server state; a subsequent (including
+already queued) save sends the remaining changes using the new ETag.
+
+This reconciliation uses top-level fields, just like Save: nested objects and arrays
+are retained as whole fields when edited during the request. Server-normalized fields
+without newer local edits are accepted. `Value` can still be replaced, so read it from
+the handle after awaiting Save rather than retaining an old DTO reference. Modify DTOs
+on the owning Unity context; arbitrary simultaneous multi-threaded mutation is not supported.
+Failed or cancelled saves leave the existing snapshot/ETag and local edits unchanged.
+Singleton saves use the same behavior. Explicit reload and realtime synchronization
+continue to use backend-wins semantics and may intentionally replace pending edits.
 
 Use selectors or string fields for dynamic schemas:
 
@@ -1049,11 +1149,52 @@ captured collection `Contains`, and predicates joined with `&&`. Repeated
 comparisons, arithmetic, and arbitrary method calls are rejected locally.
 `SelectFields` and `Hide` are mutually exclusive.
 
+### Read a saved View
+
+Use a known View ID created in the administrative interface. Filters, sorting and
+hidden columns come entirely from the saved View; this API does not accept query
+overrides, create/edit Views, or open realtime View subscriptions.
+
+```csharp
+var viewPage = await items.QueryViewAsync("view_inventory", ct: cancellationToken);
+if (viewPage.HasMore)
+    viewPage = await items.QueryViewAsync("view_inventory",
+        new PlayServPagination(viewPage.NextCursor, limit: 50), cancellationToken);
+```
+
+This uses `GET /data/tables/{entityId}/records?view_id=...`, resolving the table
+through the same catalogue/ACL cache as ordinary Records reads. Default page size
+is 50, supported range 1–200. View IDs and cursors are URL-encoded and the server's
+record order is preserved. Changing a saved View between requests can change later
+pages; the SDK does not freeze its definition.
+
+Every returned record has `IsPartial = true`, even if its response happens to
+contain every field: the backend does not expose the hidden-column list. There is
+no automatic hydration. Reload explicitly **before editing**, then save normally:
+
+```csharp
+var itemFromView = viewPage.Records[0]; // Check Records.Count first in game code.
+await itemFromView.ReloadAsync(cancellationToken);
+itemFromView.Value.DisplayName = "New name";
+await itemFromView.SaveAsync(cancellationToken);
+```
+
+Saving a partial handle is rejected locally. Reload reads the full record with
+its current ETag and can itself be denied by backend access rules. Type-name and
+explicit entity-ID sets work on client, Game Server and `AsPlayer(jwt)` facades.
+Server/acting View reads remain server-authorized, without `X-Acting-Player`.
+Backend not-found, ACL, cursor and query-limit failures use the existing Records
+exceptions and source codes; there is no invented View-specific not-found code.
+
+### Query hydration
+
 The current REST query route does not accept `fields` or `expand`. When a query
 uses `SelectFields` or `Include`, the SDK first obtains the page and then runs up
 to four record GET requests concurrently with those options. Ordering and
 cursor metadata come from the original page, ETags come from the hydrated GETs,
 and a hydration failure fails the whole call instead of returning mixed handles.
+
+### Record realtime synchronization
 
 A fully loaded record can also own a keyed realtime subscription:
 
@@ -1178,7 +1319,8 @@ PlayServLoadOrCreateResult<InventoryItem> result =
         () => new InventoryItem { Code = "starter-sword", Durability = 100 });
 ```
 
-The SDK resolves natural keys through the existing records query endpoint, and
+The SDK resolves natural keys through the backend's indexed
+`records:by-natural-key` endpoint, and
 the factory runs only when that query is empty. After create, the returned
 server-minted ID is reloaded before the handle is exposed. If the ID was not
 persisted because another client won the unique-key race, the SDK repeats the
@@ -1206,16 +1348,71 @@ PlayServBulkResult<PlayServRecord<InventoryItem>> saved =
 ```
 
 `LoadManyAsync` and `PopulateManyAsync` preserve input order and expose typed
-per-item failures without discarding successful results. `DeleteByIdAsync`
+per-item failures without discarding successful results. Plain reads deduplicate
+IDs into chunks of at most 200 and page through `records:query` with `id in [...]`.
+Duplicate inputs still receive independent handles; missing/invisible IDs remain
+typed not-found items. A chunk failure affects its items, not successful chunks.
+`maxConcurrency` bounds in-flight requests. Calls specifying `Fields` or `Expand`
+retain point loads for projection/hydration compatibility. Cancellation aborts
+the whole call rather than returning a partial-success batch. `DeleteByIdAsync`
 accepts an optional ETag. `BulkSaveAsync`, `BulkDeleteAsync`, and
-`DeleteAllAsync` are bounded client-side fan-outs, not server transactions.
+`DeleteAllAsync` remains a bounded client-side fan-out. For a single atomic
+backend transaction (up to the backend limit), use `DeleteMatchingAsync` with
+an explicit `MatchingRecords` or `AllRecords` confirmation. `BulkCreateAsync`
+likewise uses the native all-or-nothing `records:bulk-create` endpoint and
+returns server-minted IDs in request order.
 Before deleting, `DeleteAllAsync` loads the complete matching set and aborts
 without a delete request if `maxRecords` is exceeded. A filtered query requires
 `MatchingRecords`; an unrestricted query requires explicit `AllRecords`.
 
+### Typed nested filters
+
+`query.Where(x => x.Profile.Region == "eu")` and the selector/operator overload
+both support inclusion-field paths up to eight segments. Each segment follows
+`PlayServJsonName` / `PlayServField`; ignored members are rejected. The same path
+works in REST and realtime filters, including realtime OR groups. Each plane
+keeps its existing operator restrictions (for example, `in` is REST-only). String paths
+remain available as `Where("profile.region", PlayServQueryOperator.Eq, "eu")`.
+The backend validates inclusion schema traversal: these are not relation joins.
+For many-inclusions, each predicate is existential; two predicates need not
+match the same array element. Sorting and natural-key selectors remain top-level.
+
+### Native natural-key writes
+
+`UpsertByNaturalKeyAsync(key, record, mode, ifMatch, idempotencyKey)` uses one
+native request and returns `Id`/`Created`, without a follow-up read. `record`
+may be a typed DTO, anonymous object or dictionary with wire field names.
+Choose `PlayServUpsertMode.Seed` to leave an existing row unchanged, or `Managed`
+to update the supplied fields. Managed upsert still uses backend create
+validation; omitted required fields may be invalid. The backend checks natural
+key uniqueness and rejects mismatched key values in the record payload.
+
+`BulkUpsertAsync(rows, mode, defaults, idempotencyKey)` accepts 1–200
+`PlayServBulkUpsertRow<T>` values and returns ordered `Rows`, `Created`, `Updated`.
+It is one atomic transaction: a rejected row rejects the entire request.
+Row values override defaults. Neither API automatically retries an ambiguous
+network failure; retain the same idempotency key and payload for a retry.
+
+`PatchByNaturalKeyAsync(key, patch, ifMatch)` returns the updated record and ETag;
+`DeleteByNaturalKeyAsync(key, ifMatch)` waits for deletion. An optional ETag
+protects against stale writes. These APIs also work through Game Server
+`Records<T>()` and `AsPlayer(jwt).Records<T>()`; reads remain server-authorized.
+`LoadOrCreateAsync` retains its existing lazy factory and read/recovery behavior.
+
 Singleton entities use `GetSingletonAsync<T>()` or
 `Records<T>().GetSingletonAsync()`. Their handles provide the same snapshot,
 ETag, `HasPendingChanges`, `SaveAsync`, and `ReloadAsync` behavior.
+
+## Public project health
+
+`await PlayServStatus.GetProjectAsync("my-project", environment: "prod")` reads
+`GET /status/{projectSlug}?env=...` without client/server credentials or player
+login. It exposes public function deployment/revision state, invocation counters,
+probe results and latency percentiles/history. Omit the environment to use the
+backend's unfiltered view. Null counters, probes or metrics mean unavailable
+evidence, not zero activity or a successful probe. Failures use
+`PlayServStatusException.UnifiedError`; a missing project remains a 404.
+Current/history/federation APIs are unchanged.
 
 ## Player matchmaking
 
@@ -1339,6 +1536,23 @@ PlayServFunctionResult<GrantRewardResponse> result =
 if (!result.IsSuccess)
     UnityEngine.Debug.LogError(result.Error);
 ```
+
+Set `PlayServFunctionCallOptions.StrictResponseTypes = true` to reject type
+coercion, including string-to-number conversion, fractional/out-of-range integer
+values, and invalid nested DTO/collection/dictionary values. The same option works
+on `PlayServGameServer.Code.CallAsync`. Strict calls require a JSON response:
+`CallAsync<string>` expects a JSON string (including quotes), and an empty body is
+a deserialization failure. Default `false` preserves plain-text and empty-body compatibility.
+
+The Newtonsoft codec implements optional `IPlayServStrictJsonCodec`. Unsupported
+custom codecs, converters, or response contracts fail before I/O. Validation uses
+the normal resolver's wire names, ignored and required fields; optional missing
+and unknown fields remain compatible. Integer contracts require integer JSON
+tokens. Default enums use numbers; `StringEnumConverter` uses strings and honors
+its `AllowIntegerValues` setting. Guid/date/time/base64 values require string wire
+forms. Mismatches return `Deserialization` with a field path and expected/actual
+types, never field values. The explicitly exposed raw response remains available
+to the caller and should not be logged indiscriminately. Raw/binary calls are unchanged.
 
 Use the raw request when the function needs another HTTP verb, query values, a
 non-JSON body, or selected pass-through headers:
@@ -1890,8 +2104,14 @@ identity conflicts remain ordinary `PlayServAuthResult` failures.
 
 1. Open `Tools/PlayServ/Settings`.
 2. In `PlayServ Config`, ensure `Assets/Resources/PlayServConfig.asset` exists.
-3. Fill `GameId`, `UserId`, `GameVersion`, and the public `ClientToken` (`pk_*`).
+3. Fill `GameVersion`, the public `ClientToken` (`pk_*`), and the backend endpoint.
 4. On runtime start, call `PlayServ.Connect()`.
+
+The public token identifies the project. The SDK obtains the player identity
+from the managed auth session or the JWT supplied by a runtime token provider;
+neither a game ID nor a caller-supplied user ID is sent in the WebSocket
+handshake. `DeploymentGameId` is optional and is used only by Editor deployment
+and latest-version tooling.
 
 ### Option B: configure from code
 
@@ -1901,8 +2121,6 @@ using Playserv.Wrapper;
 PlayServ.Config(new PlayServSettings
 {
     ClientToken = "pk_...",
-    GameId = "game-001",
-    UserId = "player-001",
     GameVersion = "1.0.0",
     SdkVersion = PlayServ.SdkVersion,
     BackendServerAddress = "wss://playserv-proxy.test.playserv.io/ws",
@@ -1933,6 +2151,12 @@ await PlayServ.Connect();
 The provider may return a raw JWT or `Bearer <jwt>`. It is queried before the
 initial handshake and automatic reconnects. Runtime code rejects `sk_*` keys,
 and `ClientToken` accepts only public `pk_*` values.
+
+For migrations from the legacy connection API, remove `GameId` and `UserId`
+from `PlayServSettings` and from positional `Config` calls. Use
+`PlayServAuth.PlayerId` for the verified current player. Move a deployment-only
+identifier to `DeploymentGameId` only when latest-version or Editor deployment
+tools require it.
 
 ### Deployment credential
 
@@ -1967,8 +2191,6 @@ public sealed class PlayServBootstrap : MonoBehaviour
         PlayServ.Config(new PlayServSettings
         {
             ClientToken = "pk_...",
-            GameId = "game-001",
-            UserId = "player-001",
             GameVersion = "1.0.0"
         });
 
@@ -2041,7 +2263,15 @@ public static class CommandExamples
 }
 ```
 
-## 4) Publish and subscribe events
+## 4) Subscribe to events
+
+Group subscription failures preserve the backend message and numeric code in
+`PlayServGroupSubscriptionException.UnifiedError`. Code `02006` maps to
+`group_subscription_limit_reached` (Transport, non-retryable). It can mean the
+configured subscription-count limit or group-key-length limit was exceeded.
+The SDK does not impose a fixed group count, automatically retry the refusal,
+or replay a rejected group after reconnect. Adjust subscriptions/the group key
+before retrying. This transport subscription is not the GroupLeave/roster API.
 
 Event subscriptions are keyed by their event type. Multiple observers of the
 same type share one connection subscription, and disposing the final observer
@@ -2049,6 +2279,11 @@ removes it locally. Active event types are subscribed again automatically after
 a reconnect. If the backend rejects a topic, that observable receives a
 `PlayServEventSubscriptionException` with a normalized `UnifiedError`; other
 event types continue running.
+
+The current backend protocol does not accept client-originated
+`EventMessage`, `GroupEventMessage`, or `UserEventMessage` commands. Therefore
+`PlayServEvents.Publish*` throws `PlayServEventPublishingException` before
+transport I/O. Use RPC, Code, or Records for client-to-server mutations.
 
 ```csharp
 using System;
@@ -2077,33 +2312,6 @@ public sealed class ChatEventsExample : MonoBehaviour
     {
         _chatSubscription?.Dispose();
         _chatSubscription = null;
-    }
-
-    public void SendGlobal(string text)
-    {
-        PlayServEvents.Publish(new ChatMessageEvent
-        {
-            FromUserId = "player-001",
-            Text = text
-        });
-    }
-
-    public void SendToGroup(string groupName, string text)
-    {
-        PlayServEvents.PublishForGroup(groupName, new ChatMessageEvent
-        {
-            FromUserId = "player-001",
-            Text = text
-        });
-    }
-
-    public void SendToUser(string userId, string text)
-    {
-        PlayServEvents.PublishForUser(userId, new ChatMessageEvent
-        {
-            FromUserId = "player-001",
-            Text = text
-        });
     }
 
     private static void OnChatMessage(ChatMessageEvent evt)
@@ -2296,7 +2504,13 @@ cancellation are returned as `PlayServRpcErrorCode.Timeout` and
 `PlayServRpcErrorCode.Canceled`.
 
 The default timeout is 30 seconds. `PlayServRpcInvokeOptions` can override the
-timeout, request ID, and coalescing key. New gateways correlate by request ID;
+timeout, request ID, and coalescing key. Set `StrictResponseTypes = true` on these
+options for the same recursive JSON checks described under Cloud functions.
+The setting is captured per invocation, so concurrent strict/compatible calls do
+not interfere. Unsupported contracts/codecs fail before sending; invalid or empty
+JSON responses return `DeserializationFailed` with payload-free diagnostics.
+Request serialization, cancellation, timeout and response correlation are unchanged.
+New gateways correlate by request ID;
 older gateways fall back to oldest-first matching for the same service and
 method.
 

@@ -38,6 +38,19 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Session was forcefully disconnected by server.
         /// </summary>
-        ForcedDisconnect = 02003
+        ForcedDisconnect = 02003,
+
+        /// <summary>
+        /// The client ingress requires a signed-in player credential.
+        /// </summary>
+        PlayerCredentialRequired = 02004,
+
+        /// <summary>
+        /// The requested group belongs to another project.
+        /// </summary>
+        GroupOutsideProject = 02005,
+
+        /// <summary>The server's group subscription count or group-key length limit was exceeded.</summary>
+        GroupSubscriptionLimitReached = 02006
     }
 }

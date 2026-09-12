@@ -29,7 +29,6 @@ public sealed class PlayServDedicatedServerSample : MonoBehaviour
             await PlayServGameServer.Realtime.ConnectAsync(
                 new PlayServGameServerRealtimeOptions
                 {
-                    GameId = functionSlug,
                     InstanceId = roomName,
                     GameVersion = Application.version
                 },

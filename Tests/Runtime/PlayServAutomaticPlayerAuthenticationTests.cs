@@ -74,30 +74,67 @@ namespace Playserv.Tests.Runtime
             var customProvider = new PlayServDelegateRuntimeTokenProvider(
                 _ => Task.FromResult("custom.jwt"));
             var settings = CreateSettings();
-            settings.UserId = "external-player";
             settings.RuntimeTokenProvider = customProvider;
             using var coordinator = CreateCoordinator(http, new FakeSessionStore());
 
             var prepared = coordinator.PrepareSettingsForConnectAsync(settings).GetAwaiter().GetResult();
 
             Assert.That(prepared.RuntimeTokenProvider, Is.SameAs(customProvider));
-            Assert.That(prepared.UserId, Is.EqualTo("external-player"));
+            Assert.That(prepared.PlayerId, Is.Empty);
             Assert.That(http.SignInCount, Is.Zero);
             Assert.That(http.RefreshCount, Is.Zero);
         }
 
         [Test]
-        public void Coordinator_AutomaticSessionReplacesConfiguredUserIdWithPlayerId()
+        public void Coordinator_AutomaticSessionPopulatesRuntimePlayerId()
         {
             var http = new FakeHttpClient();
             var settings = CreateSettings();
-            settings.UserId = "temporary-device-id";
             using var coordinator = CreateCoordinator(http, new FakeSessionStore());
 
             var prepared = coordinator.PrepareSettingsForConnectAsync(settings).GetAwaiter().GetResult();
 
             Assert.That(prepared.RuntimeTokenProvider, Is.Not.Null);
-            Assert.That(prepared.UserId, Is.EqualTo("player-created"));
+            Assert.That(prepared.PlayerId, Is.EqualTo("player-created"));
+        }
+
+        [Test]
+        public void Coordinator_SwitchingToCustomProviderClearsManagedPlayerIdentity()
+        {
+            var http = new FakeHttpClient();
+            var settings = CreateSettings();
+            using var coordinator = CreateCoordinator(http, new FakeSessionStore());
+
+            coordinator.PrepareSettingsForConnectAsync(settings).GetAwaiter().GetResult();
+            Assert.That(settings.PlayerId, Is.EqualTo("player-created"));
+
+            var customProvider = new PlayServDelegateRuntimeTokenProvider(
+                _ => Task.FromResult("custom.jwt"));
+            settings.RuntimeTokenProvider = customProvider;
+            coordinator.PrepareSettingsForConnectAsync(settings).GetAwaiter().GetResult();
+
+            Assert.That(settings.PlayerId, Is.Empty);
+            Assert.That(settings.RuntimeTokenProvider, Is.SameAs(customProvider));
+        }
+
+        [Test]
+        public void SessionScope_UsesHashedClientTokenWhenDeploymentIdIsAbsent()
+        {
+            var http = new FakeHttpClient();
+            var store = new FakeSessionStore();
+            var settings = CreateSettings();
+            settings.DeploymentGameId = string.Empty;
+            using var session = new PlayServPlayerSession(
+                settings,
+                http,
+                store,
+                SynchronizationContext.Current);
+
+            session.GetTokenAsync().GetAwaiter().GetResult();
+
+            Assert.That(store.LastScopeKey, Does.EndWith(".example.test"));
+            Assert.That(store.LastScopeKey, Does.Not.Contain(settings.ClientToken));
+            Assert.That(store.LastScopeKey.Split('.')[0], Has.Length.EqualTo(64));
         }
 
         private static PlayServPlayerSession CreateSession(
@@ -130,7 +167,7 @@ namespace Playserv.Tests.Runtime
             return new PlayServSettings
             {
                 ClientToken = "pk_public",
-                GameId = "test-game",
+                DeploymentGameId = "test-game",
                 GameVersion = "1.0.0",
                 BackendServerAddress = "wss://example.test/ws",
                 EnableAutomaticPlayerFingerprint = false
@@ -143,11 +180,14 @@ namespace Playserv.Tests.Runtime
 
             public int ClearCount { get; private set; }
 
+            public string LastScopeKey { get; private set; }
+
             public Task<PlayServPlayerSessionData> LoadAsync(
                 string scopeKey,
                 CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                LastScopeKey = scopeKey;
                 return Task.FromResult(Session);
             }
 
@@ -157,6 +197,7 @@ namespace Playserv.Tests.Runtime
                 CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                LastScopeKey = scopeKey;
                 Session = session;
                 return Task.CompletedTask;
             }
@@ -166,6 +207,7 @@ namespace Playserv.Tests.Runtime
                 CancellationToken cancellationToken = default)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                LastScopeKey = scopeKey;
                 Session = null;
                 ClearCount++;
                 return Task.CompletedTask;

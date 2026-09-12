@@ -18,6 +18,9 @@ namespace Playserv.Wrapper
 
         public static PlayServSessionInfo CurrentSession => Api.CurrentSession;
 
+        /// <summary>Last successfully loaded profile for the current player.</summary>
+        public static PlayServPlayerProfile CurrentPlayerProfile => Api.CurrentPlayerProfile;
+
         public static IReadOnlyList<string> LinkedProviders => CurrentSession.LinkedProviders;
 
         public static bool AreLinkedProvidersKnown => CurrentSession.AreLinkedProvidersKnown;
@@ -37,6 +40,16 @@ namespace Playserv.Wrapper
         public static Task<PlayServAuthProvidersResult> GetProvidersAsync(
             CancellationToken cancellationToken = default) =>
             Api.GetProvidersAsync(cancellationToken);
+
+        /// <summary>Returns the cached current-player profile or loads it on first use.</summary>
+        public static Task<PlayServPlayerProfileResult> GetCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default) =>
+            Api.GetCurrentPlayerProfileAsync(cancellationToken);
+
+        /// <summary>Forces a fresh own-profile read from <c>/data/players/{playerId}</c>.</summary>
+        public static Task<PlayServPlayerProfileResult> RefreshCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default) =>
+            Api.RefreshCurrentPlayerProfileAsync(cancellationToken);
 
         /// <summary>Links a freshly verified provider credential to the managed player.</summary>
         public static Task<PlayServAuthResult> LinkIdentityAsync(

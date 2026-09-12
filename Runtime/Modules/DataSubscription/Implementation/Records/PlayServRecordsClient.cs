@@ -13,7 +13,7 @@ using Playserv.Wrapper;
 
 namespace Playserv.Data
 {
-    internal sealed class PlayServRecordsClient
+    internal sealed partial class PlayServRecordsClient
     {
         private const int QueryHydrationConcurrency = 4;
         private static readonly object CatalogueCacheGate = new object();
@@ -226,11 +226,19 @@ namespace Playserv.Data
             }
         }
 
+        internal static void ValidateCreateIdempotencyKey(string idempotencyKey)
+        {
+            ValidateWriteHeader(idempotencyKey, nameof(idempotencyKey));
+            if (idempotencyKey != null && idempotencyKey.Length > 128)
+                throw new ArgumentException("Idempotency key must not exceed 128 characters.", nameof(idempotencyKey));
+        }
+
         internal async Task<PlayServRecord<T>> CreateAsync<T>(
             PlayServRecordSet<T> owner,
             PlayServEntityBinding entity,
             T value,
-            CancellationToken ct)
+            CancellationToken ct,
+            string idempotencyKey = null)
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
@@ -241,10 +249,65 @@ namespace Playserv.Data
                 $"data/tables/{Escape(entity.Id)}/records",
                 _json.Serialize(body),
                 null,
-                Guid.NewGuid().ToString("D"),
+                idempotencyKey ?? Guid.NewGuid().ToString("D"),
                 ct,
                 entity.Id);
             return ParseRecord(owner, entity.Id, response.Body, response.ETag, false);
+        }
+
+        internal async Task<PlayServBulkCreateResult> BulkCreateAsync<T>(
+            PlayServEntityBinding entity,
+            IReadOnlyList<T> values,
+            IReadOnlyDictionary<string, object> defaults,
+            CancellationToken ct,
+            string idempotencyKey = null)
+        {
+            if (values == null)
+                throw new ArgumentNullException(nameof(values));
+            if (values.Count < 1 || values.Count > 200)
+                throw new ArgumentOutOfRangeException(nameof(values), "Atomic bulk create requires between 1 and 200 records.");
+
+            var rows = new List<Dictionary<string, object>>(values.Count);
+            for (var index = 0; index < values.Count; index++)
+            {
+                if (values[index] == null)
+                    throw new ArgumentException($"Record at index {index} is null.", nameof(values));
+                rows.Add(ToRecordFields(values[index]));
+            }
+
+            Dictionary<string, object> defaultFields = null;
+            if (defaults != null)
+            {
+                defaultFields = defaults.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                RemoveSystemFields(defaultFields);
+            }
+
+            var body = new Dictionary<string, object>
+            {
+                ["defaults"] = defaultFields,
+                ["records"] = rows
+            };
+            var response = await SendAsync(
+                "POST",
+                $"data/tables/{Escape(entity.Id)}/records:bulk-create",
+                _json.Serialize(body),
+                null,
+                idempotencyKey ?? Guid.NewGuid().ToString("D"),
+                ct,
+                entity.Id);
+            var root = ParseObject(response.Body, "Bulk create");
+            var ids = GetEnumerable(root, "ids")
+                .Select(item => Convert.ToString(item, CultureInfo.InvariantCulture))
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToArray();
+            var created = checked((int)(GetNullableInt64(root, "created") ?? -1));
+            if (created != values.Count || ids.Length != values.Count)
+            {
+                throw new PlayServDataException(
+                    "Bulk create response did not contain one server-minted ID for every submitted record.",
+                    backendCode: "invalid_response");
+            }
+            return new PlayServBulkCreateResult(ids, created);
         }
 
         internal async Task<PlayServRecord<T>> LoadAsync<T>(
@@ -274,31 +337,80 @@ namespace Playserv.Data
             PlayServRecordSet<T> owner,
             PlayServEntityBinding entity,
             PlayServNaturalKey<T> key,
-            CancellationToken ct)
+            CancellationToken ct,
+            PlayServLoadOptions options = null)
         {
             if (key == null)
                 throw new ArgumentNullException(nameof(key));
 
-            var query = new PlayServRecordQuery<T>()
-                .Where(key.Field, PlayServQueryOperator.Eq, key.Value)
-                .WithLimit(2);
-            var page = await QueryAsync(owner, entity, query, null, ct);
-            if (page.Records.Count == 0)
+            var value = Convert.ToString(key.Value, CultureInfo.InvariantCulture);
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("Natural-key value must have a non-empty text representation.", nameof(key));
+            var path = $"data/tables/{Escape(entity.Id)}/records:by-natural-key" +
+                       $"?field={Escape(key.Field)}&value={Escape(value)}" +
+                       BuildLoadQuery(options, "&");
+            try
+            {
+                var response = await SendAsync("GET", path, null, null, null, ct, entity.Id);
+                return ParseRecord(owner, entity.Id, response.Body, response.ETag, options?.IsPartial == true);
+            }
+            catch (PlayServRecordNotFoundException)
+            {
                 return null;
-            if (page.Records.Count > 1)
+            }
+        }
+
+        internal async Task<PlayServDeleteByFilterResult> DeleteByFilterAsync<T>(
+            PlayServEntityBinding entity,
+            PlayServRecordQuery<T> query,
+            bool deleteAll,
+            CancellationToken ct)
+        {
+            var snapshot = (query ?? new PlayServRecordQuery<T>()).Snapshot();
+            var body = new Dictionary<string, object>
+            {
+                ["q"] = snapshot.SearchText,
+                ["filters"] = snapshot.Filters.Select(FilterToWire).ToList(),
+                ["all"] = deleteAll ? (bool?)true : null
+            };
+            var response = await SendAsync(
+                "POST",
+                $"data/tables/{Escape(entity.Id)}/records:delete-by-filter",
+                _json.Serialize(body),
+                null,
+                null,
+                ct,
+                entity.Id);
+            var root = ParseObject(response.Body, "Delete by filter");
+            var ids = GetEnumerable(root, "ids")
+                .Select(item => Convert.ToString(item, CultureInfo.InvariantCulture))
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToArray();
+            var deleted = checked((int)(GetNullableInt64(root, "deleted") ?? -1));
+            if (deleted < 0 || deleted != ids.Length)
             {
                 throw new PlayServDataException(
-                    $"Natural key '{key.Field}' resolved more than one record in entity '{entity.Id}'.",
-                    backendCode: "natural_key_not_unique",
-                    extensions: new Dictionary<string, object>
-                    {
-                        ["entity_id"] = entity.Id,
-                        ["field"] = key.Field,
-                        ["value"] = key.Value
-                    });
+                    "Delete-by-filter response contained inconsistent deleted IDs.",
+                    backendCode: "invalid_response");
             }
+            return new PlayServDeleteByFilterResult(ids, deleted);
+        }
 
-            return page.Records[0];
+        internal async Task<PlayServRecordPage<T>> QueryViewAsync<T>(
+            PlayServRecordSet<T> owner,
+            PlayServEntityBinding entity,
+            string viewId,
+            PlayServPagination pagination,
+            CancellationToken ct)
+        {
+            var path = $"data/tables/{Escape(entity.Id)}/records?view_id={Escape(viewId)}" +
+                "&limit=" + pagination.Limit.ToString(CultureInfo.InvariantCulture);
+            if (pagination.Cursor != null)
+                path += "&cursor=" + Escape(pagination.Cursor);
+            var response = await SendAsync("GET", path, null, null, null, ct, entity.Id);
+            var root = ParseObject(response.Body, "Record View query");
+            RequireQueryPageEnvelope(root);
+            return ParseRecordPage(root, ParseQueryRecords(owner, entity, root, true));
         }
 
         internal async Task<PlayServRecordPage<T>> QueryAsync<T>(
@@ -306,7 +418,8 @@ namespace Playserv.Data
             PlayServEntityBinding entity,
             PlayServRecordQuery<T> query,
             PlayServPagination pagination,
-            CancellationToken ct)
+            CancellationToken ct,
+            bool requireBatchEnvelope = false)
         {
             query = query ?? new PlayServRecordQuery<T>();
             var cursor = pagination?.Cursor ?? query.Cursor;
@@ -315,13 +428,7 @@ namespace Playserv.Data
             var body = new Dictionary<string, object>
             {
                 ["q"] = snapshot.SearchText,
-                ["filters"] = snapshot.Filters.Select(filter => new Dictionary<string, object>
-                {
-                    ["field"] = filter.Field,
-                    ["op"] = PlayServRecordWireNames.OperatorToWire(filter.Operator),
-                    ["value"] = filter.Value,
-                    ["value2"] = filter.Value2
-                }).ToList(),
+                ["filters"] = snapshot.Filters.Select(FilterToWire).ToList(),
                 ["sort"] = snapshot.Sort.Select(sort => new Dictionary<string, object>
                 {
                     ["field"] = sort.Field,
@@ -340,16 +447,29 @@ namespace Playserv.Data
                 ct,
                 entity.Id);
             var root = ParseObject(response.Body, "Record query");
-            var records = GetEnumerable(root, "data")
-                .Select(item => ParseRecord(
-                    owner,
-                    entity.Id,
-                    _json.Serialize(item),
-                    null,
-                    snapshot.ProducesPartialRecords))
-                .ToList();
+            if (requireBatchEnvelope) RequireQueryPageEnvelope(root);
+            var records = ParseQueryRecords(owner, entity, root, snapshot.ProducesPartialRecords);
             if (snapshot.RequiresHydration && records.Count > 0)
                 records = (await HydrateQueryRecordsAsync(owner, entity, records, snapshot, ct)).ToList();
+            return ParseRecordPage(root, records);
+        }
+
+        private static void RequireQueryPageEnvelope(IDictionary<string, object> root)
+        {
+            if (!TryGet(root, "data", out var data) || !(data is IList) ||
+                !TryGet(root, "page", out var page) || !(page is IDictionary<string, object> pageFields) ||
+                !TryGet(pageFields, "has_more", out var hasMore) || !(hasMore is bool))
+                throw new PlayServDataException("Record query response was incomplete.", backendCode: "invalid_response");
+        }
+
+        private List<PlayServRecord<T>> ParseQueryRecords<T>(PlayServRecordSet<T> owner,
+            PlayServEntityBinding entity, Dictionary<string, object> root, bool isPartial) =>
+            GetEnumerable(root, "data")
+                .Select(item => ParseRecord(owner, entity.Id, _json.Serialize(item), null, isPartial)).ToList();
+
+        private static PlayServRecordPage<T> ParseRecordPage<T>(IDictionary<string, object> root,
+            IReadOnlyList<PlayServRecord<T>> records)
+        {
             var page = TryGet(root, "page", out var pageValue)
                 ? AsDictionary(pageValue)
                 : new Dictionary<string, object>();
@@ -496,6 +616,41 @@ namespace Playserv.Data
             AsDictionary(_json.ParseToPlainValue(canonicalJson));
 
         internal string Canonical(object value) => _json.ToCanonicalJson(CanonicalValue(value));
+
+        internal T PreserveChangesDuringSave<T>(
+            IReadOnlyDictionary<string, object> sent,
+            T currentValue,
+            T serverValue,
+            string serverSnapshot)
+        {
+            // Do not resurrect a Value explicitly cleared during I/O. A subsequent Save
+            // still rejects null through its existing validation.
+            if (currentValue == null)
+                return currentValue;
+
+            var current = ToRecordFields(currentValue);
+            Dictionary<string, object> merged = null;
+            foreach (var key in sent.Keys.Union(current.Keys, StringComparer.Ordinal))
+            {
+                var hadBefore = sent.TryGetValue(key, out var before);
+                var hasNow = current.TryGetValue(key, out var now);
+                if (hadBefore == hasNow &&
+                    string.Equals(Canonical(before), Canonical(now), StringComparison.Ordinal))
+                    continue;
+
+                if (merged == null)
+                    merged = ParseSnapshot(serverSnapshot);
+                // Use the same top-level boundary as Save's patch: nested objects and arrays
+                // are one field. Removal is distinct from an explicit null local value.
+                if (hasNow)
+                    merged[key] = now;
+                else
+                    merged.Remove(key);
+            }
+            // Server normalization of fields not edited during I/O remains authoritative.
+            // The caller keeps serverSnapshot unchanged, so only unacknowledged edits stay dirty.
+            return merged == null ? serverValue : _json.Convert<T>(merged);
+        }
 
         private async Task<PlayServRuntimeDataResponse> SendAsync(
             string method,
@@ -787,7 +942,16 @@ namespace Playserv.Data
             return PlayServDataCapabilityState.Unknown;
         }
 
-        private static string BuildLoadQuery(PlayServLoadOptions options)
+        private static Dictionary<string, object> FilterToWire(PlayServQueryFilter filter) =>
+            new Dictionary<string, object>
+            {
+                ["field"] = filter.Field,
+                ["op"] = PlayServRecordWireNames.OperatorToWire(filter.Operator),
+                ["value"] = filter.Value,
+                ["value2"] = filter.Value2
+            };
+
+        private static string BuildLoadQuery(PlayServLoadOptions options, string prefix = "?")
         {
             if (options == null)
                 return string.Empty;
@@ -797,7 +961,7 @@ namespace Playserv.Data
                 query.Add("fields=" + Escape(string.Join(",", options.Fields)));
             if (options.Expand != null && options.Expand.Count > 0)
                 query.Add("expand=" + Escape(string.Join(",", options.Expand)));
-            return query.Count == 0 ? string.Empty : "?" + string.Join("&", query);
+            return query.Count == 0 ? string.Empty : prefix + string.Join("&", query);
         }
 
         private static void RemoveSystemFields(IDictionary<string, object> fields)

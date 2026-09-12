@@ -20,7 +20,7 @@ namespace Playserv.Proxy.Common
 
         public PlayServState State => _transportSession.State;
 
-        public string UserId => _transportSession.UserId;
+        public string PlayerId => _transportSession.PlayerId;
 
         public IPlayServModuleServiceProvider ModuleServices => _moduleHost.Services;
 
@@ -87,8 +87,7 @@ namespace Playserv.Proxy.Common
 
         public void SetConfig(
             string gameAccessToken,
-            string gameId,
-            string userId,
+            string playerId,
             string gameVersion,
             string sdkVersion = null,
             bool allowMultipleConnections = true,
@@ -98,8 +97,7 @@ namespace Playserv.Proxy.Common
             string playerAccessToken = null)
             => _transportSession.Configure(
                 gameAccessToken,
-                gameId,
-                userId,
+                playerId,
                 gameVersion,
                 sdkVersion,
                 allowMultipleConnections,
@@ -110,7 +108,6 @@ namespace Playserv.Proxy.Common
 
         internal void SetServerConfig(
             Func<CancellationToken, Task<string>> serverCredentialProvider,
-            string gameId,
             string instanceId,
             string gameVersion,
             string sdkVersion,
@@ -118,7 +115,6 @@ namespace Playserv.Proxy.Common
             int keepAlivePongTimeoutMs) =>
             _transportSession.ConfigureServer(
                 serverCredentialProvider,
-                gameId,
                 instanceId,
                 gameVersion,
                 sdkVersion,

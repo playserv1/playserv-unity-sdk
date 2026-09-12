@@ -33,14 +33,5 @@ namespace Playserv.Proxy.Common
         /// </summary>
         public string GameVersion { get; set; }
 
-        /// <summary>
-        /// Current user id.
-        /// </summary>
-        public string UserId { get; set; }
-
-        /// <summary>
-        /// Game id.
-        /// </summary>
-        public string GameId { get; set; }
     }
 }

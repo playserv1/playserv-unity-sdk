@@ -13,6 +13,7 @@ namespace Playserv.Proxy.Implementation
         private readonly MessageEnvelopeCodec _envelopeCodec;
         private readonly ISdkLogger _logger;
         private readonly Func<bool> _isDisposed;
+        private readonly TransportLogRedactor _logRedactor;
         private readonly System.Threading.SemaphoreSlim _sendGate = new System.Threading.SemaphoreSlim(1, 1);
 
         public TransportSender(
@@ -20,13 +21,15 @@ namespace Playserv.Proxy.Implementation
             IMessageSerializer serializer,
             MessageEnvelopeCodec envelopeCodec,
             ISdkLogger logger,
-            Func<bool> isDisposed)
+            Func<bool> isDisposed,
+            TransportLogRedactor logRedactor)
         {
             _implementation = implementation ?? throw new ArgumentNullException(nameof(implementation));
             _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _envelopeCodec = envelopeCodec ?? throw new ArgumentNullException(nameof(envelopeCodec));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _isDisposed = isDisposed ?? throw new ArgumentNullException(nameof(isDisposed));
+            _logRedactor = logRedactor ?? throw new ArgumentNullException(nameof(logRedactor));
         }
 
         public async Task Send<T>(T command, string moduleName = null)
@@ -59,10 +62,10 @@ namespace Playserv.Proxy.Implementation
 
 #if !PLAYSERV_DISABLE_LOGS
                     var packetName = OutboundPacketDiagnostics.Register(envelope, command, data);
-                    _logger.LogWarning($"[PKT-OUT] {packetName}");
+                    _logger.LogWarning($"[PKT-OUT] {_logRedactor.RedactText(packetName)}");
 #endif
                     await _implementation.Send(data);
-                    LogTransportJson($"Message sent: {typeof(T).Name} with payload: {json}", json);
+                    LogTransportJson($"Message sent: {typeof(T).Name} with payload", json);
                 }
                 finally
                 {
@@ -76,20 +79,21 @@ namespace Playserv.Proxy.Implementation
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to send message {typeof(T).Name}: {ex.Message}");
+                _logger.LogError(
+                    $"Failed to send message {typeof(T).Name}: {_logRedactor.RedactText(ex.Message)}");
                 throw;
             }
         }
 
-        private void LogTransportJson(string message, string json)
+        private void LogTransportJson(string description, string json)
         {
 #if PlayServ_Logs
-            _logger.Log(message);
+            _logger.Log($"{description}: {_logRedactor.RedactJson(json)}");
 #else
             if (IsHeartbeatTransportFrame(json))
                 return;
 
-            _logger.Log(message);
+            _logger.Log($"{description}: {_logRedactor.RedactJson(json)}");
 #endif
         }
 

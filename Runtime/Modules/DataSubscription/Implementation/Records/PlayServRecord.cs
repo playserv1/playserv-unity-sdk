@@ -71,6 +71,8 @@ namespace Playserv.Data
 
         internal PlayServRecordSet<T> OwnerSet { get; }
 
+        internal string CanonicalSnapshot => _snapshot;
+
         /// <summary>
         /// Keeps this full record handle current through the realtime dataflow transport.
         /// Push frames trigger a canonical REST reload so timestamps, snapshot and ETag advance
@@ -80,6 +82,11 @@ namespace Playserv.Data
             CancellationToken ct = default) =>
             OwnerSet.SubscribeAsync(this, ct);
 
+        /// <summary>
+        /// Saves a captured top-level patch. Edits made while the request is pending are
+        /// retained over the server response for the next save; snapshot and ETag reflect
+        /// the acknowledged server state. Reload and realtime retain backend-wins behavior.
+        /// </summary>
         public async Task SaveAsync(CancellationToken ct = default)
         {
             await _operations.WaitAsync(ct);
@@ -94,7 +101,9 @@ namespace Playserv.Data
                 if (Value == null)
                     throw new InvalidOperationException("A record value cannot be null when saving.");
 
-                var current = _client.ToRecordFields(Value);
+                // Detach nested objects/collections before the first await, including ACL
+                // and credential resolution. This is the value represented by this patch.
+                var current = _client.ParseSnapshot(_client.Canonical(_client.ToRecordFields(Value)));
                 var patch = BuildMergePatch(_client.ParseSnapshot(_snapshot), current);
                 if (patch.Count == 0)
                     return;
@@ -104,6 +113,7 @@ namespace Playserv.Data
                     false,
                     ct);
                 var updated = await _client.SaveAsync(this, patch, ct);
+                updated.Value = _client.PreserveChangesDuringSave(current, Value, updated.Value, updated._snapshot);
                 CopyFrom(updated);
             }
             finally
@@ -360,6 +370,10 @@ namespace Playserv.Data
 
         internal PlayServRecordSet<T> OwnerSet { get; }
 
+        /// <summary>
+        /// Saves a captured top-level patch while retaining edits made during the request
+        /// as pending changes against the acknowledged server snapshot and ETag.
+        /// </summary>
         public async Task SaveAsync(CancellationToken ct = default)
         {
             await _operations.WaitAsync(ct);
@@ -373,7 +387,7 @@ namespace Playserv.Data
                 if (Value == null)
                     throw new InvalidOperationException("A singleton value cannot be null when saving.");
 
-                var current = _client.ToRecordFields(Value);
+                var current = _client.ParseSnapshot(_client.Canonical(_client.ToRecordFields(Value)));
                 var snapshot = _client.ParseSnapshot(_snapshot);
                 var patch = new Dictionary<string, object>(StringComparer.Ordinal);
                 foreach (var key in snapshot.Keys.Union(current.Keys, StringComparer.Ordinal))
@@ -394,6 +408,7 @@ namespace Playserv.Data
                     true,
                     ct);
                 var updated = await _client.SaveSingletonAsync(this, patch, ct);
+                updated.Value = _client.PreserveChangesDuringSave(current, Value, updated.Value, updated._snapshot);
                 CopyFrom(updated);
             }
             finally

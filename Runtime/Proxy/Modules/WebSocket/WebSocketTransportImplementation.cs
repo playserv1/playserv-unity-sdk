@@ -8,6 +8,7 @@ using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
+using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Implementation
 {
@@ -125,6 +126,10 @@ namespace Playserv.Proxy.Implementation
             if (data == null)
                 throw new ArgumentNullException(nameof(data));
 
+            PlayServWebSocketPayloadLimits.EnsureAllowed(
+                data.LongLength,
+                PlayServWebSocketPayloadDirection.Outbound);
+
             if (_socket.State != WebSocketState.Open)
             {
                 _logger.LogError("Attempted to send data but WebSocket is not connected.");
@@ -234,6 +239,34 @@ namespace Playserv.Proxy.Implementation
                         }
 
                         channel.Complete();
+                        return;
+                    }
+
+                    var accumulatedBytes = ms.Length + result.Count;
+                    if (accumulatedBytes > PlayServWebSocketPayloadLimits.MaxMessageBytes)
+                    {
+                        var exception = new PlayServWebSocketPayloadException(
+                            PlayServWebSocketPayloadDirection.Inbound,
+                            accumulatedBytes);
+                        _logger.LogError(exception.Message);
+                        Closed?.Invoke(new PlayServTransportCloseInfo(1009, "message too large"));
+                        try
+                        {
+                            if (_socket.State == WebSocketState.Open ||
+                                _socket.State == WebSocketState.CloseReceived)
+                            {
+                                await _socket.CloseAsync(
+                                    WebSocketCloseStatus.MessageTooBig,
+                                    "message too large",
+                                    CancellationToken.None);
+                            }
+                        }
+                        catch (Exception closeException)
+                        {
+                            _logger.LogWarning(
+                                $"Failed to close oversized websocket message cleanly: {closeException.Message}");
+                        }
+                        channel.Error(exception);
                         return;
                     }
 

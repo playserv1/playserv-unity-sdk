@@ -8,6 +8,12 @@ namespace Playserv.RPC
     public sealed class PlayServRpcInvokeOptions
     {
         /// <summary>
+        /// Reject JSON type coercion in typed responses. Defaults to false. Unsupported codecs or
+        /// response contracts return DeserializationFailed before sending. Captured when invoked.
+        /// </summary>
+        public bool StrictResponseTypes { get; set; }
+
+        /// <summary>
         /// Default time an awaitable RPC waits for a response.
         /// </summary>
         public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);

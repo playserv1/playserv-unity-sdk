@@ -28,8 +28,7 @@ namespace Playserv.Proxy.Common
         private string _authorization;
         private IPlayServRuntimeTokenProvider _runtimeTokenProvider;
         private Func<CancellationToken, Task<string>> _serverCredentialProvider;
-        private string _gameId;
-        private string _userId;
+        private string _playerId;
         private string _gameVersion;
         private string _sdkVersion = SdkInfo.Version;
         private bool _disconnectedByServer;
@@ -37,7 +36,7 @@ namespace Playserv.Proxy.Common
 
         public PlayServState State { get; private set; } = PlayServState.Offline;
 
-        public string UserId => _userId ?? string.Empty;
+        public string PlayerId => _playerId ?? string.Empty;
 
         public PlayServTransportSession(
             ITransport transport,
@@ -77,8 +76,7 @@ namespace Playserv.Proxy.Common
 
         public void Configure(
             string clientToken,
-            string gameId,
-            string userId,
+            string playerId,
             string gameVersion,
             string sdkVersion = null,
             bool allowMultipleConnections = true,
@@ -96,12 +94,6 @@ namespace Playserv.Proxy.Common
                     nameof(clientToken));
             }
 
-            if (string.IsNullOrWhiteSpace(gameId))
-                throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
-
-            if (string.IsNullOrWhiteSpace(userId))
-                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
-
             if (string.IsNullOrWhiteSpace(gameVersion))
                 throw new ArgumentException("Game version cannot be null or empty.", nameof(gameVersion));
 
@@ -109,8 +101,7 @@ namespace Playserv.Proxy.Common
             _authorization = normalizedAuthorization;
             _runtimeTokenProvider = runtimeTokenProvider;
             _serverCredentialProvider = null;
-            _gameId = gameId;
-            _userId = userId;
+            _playerId = playerId?.Trim() ?? string.Empty;
             _gameVersion = gameVersion;
             _sdkVersion = string.IsNullOrWhiteSpace(sdkVersion) ? SdkInfo.Version : sdkVersion;
             _allowMultipleConnections = allowMultipleConnections;
@@ -118,12 +109,11 @@ namespace Playserv.Proxy.Common
             _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
 
             _logger.Log(
-                $"Config set: gameId={gameId}, userId={userId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, clientTokenSet={!string.IsNullOrEmpty(_clientToken)}, runtimeTokenProviderSet={_runtimeTokenProvider != null}");
+                $"Config set: playerIdKnown={!string.IsNullOrEmpty(_playerId)}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, allowMultiple={allowMultipleConnections}, clientTokenSet={!string.IsNullOrEmpty(_clientToken)}, runtimeTokenProviderSet={_runtimeTokenProvider != null}");
         }
 
         internal void ConfigureServer(
             Func<CancellationToken, Task<string>> serverCredentialProvider,
-            string gameId,
             string instanceId,
             string gameVersion,
             string sdkVersion,
@@ -132,8 +122,6 @@ namespace Playserv.Proxy.Common
         {
             _serverCredentialProvider = serverCredentialProvider ??
                 throw new ArgumentNullException(nameof(serverCredentialProvider));
-            if (string.IsNullOrWhiteSpace(gameId))
-                throw new ArgumentException("Game ID cannot be null or empty.", nameof(gameId));
             if (string.IsNullOrWhiteSpace(instanceId))
                 throw new ArgumentException("Instance ID cannot be null or empty.", nameof(instanceId));
             if (string.IsNullOrWhiteSpace(gameVersion))
@@ -142,8 +130,7 @@ namespace Playserv.Proxy.Common
             _clientToken = null;
             _authorization = null;
             _runtimeTokenProvider = null;
-            _gameId = gameId;
-            _userId = instanceId;
+            _playerId = string.Empty;
             _gameVersion = gameVersion;
             _sdkVersion = string.IsNullOrWhiteSpace(sdkVersion) ? SdkInfo.Version : sdkVersion;
             _allowMultipleConnections = true;
@@ -151,7 +138,7 @@ namespace Playserv.Proxy.Common
             _keepAliveManager.PongTimeoutMs = keepAlivePongTimeoutMs;
 
             _logger.Log(
-                $"Server config set: gameId={gameId}, instanceId={instanceId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, rotatingServerCredential=true");
+                $"Server config set: instanceId={instanceId}, gameVersion={gameVersion}, sdkVersion={_sdkVersion}, rotatingServerCredential=true");
         }
 
         public async Task<bool> ConnectAsync()
@@ -186,8 +173,6 @@ namespace Playserv.Proxy.Common
 
             var handshakeResult = await _handshakeService.PerformHandshakeAsync(
                 _handshakeCredential,
-                _gameId,
-                _userId,
                 _gameVersion,
                 _sdkVersion,
                 _clientToken,
@@ -308,8 +293,6 @@ namespace Playserv.Proxy.Common
 
             var handshakeResult = await _handshakeService.PerformHandshakeAsync(
                 _handshakeCredential,
-                _gameId,
-                _userId,
                 _gameVersion,
                 _sdkVersion,
                 _clientToken,
@@ -387,8 +370,6 @@ namespace Playserv.Proxy.Common
                  _runtimeTokenProvider == null &&
                  string.IsNullOrWhiteSpace(_clientToken) &&
                  string.IsNullOrWhiteSpace(_authorization)) ||
-                string.IsNullOrWhiteSpace(_gameId) ||
-                string.IsNullOrWhiteSpace(_userId) ||
                 string.IsNullOrWhiteSpace(_gameVersion))
             {
                 throw new InvalidOperationException("SDK is not configured. Call SetConfig() first.");

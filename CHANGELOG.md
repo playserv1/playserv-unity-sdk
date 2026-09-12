@@ -6,6 +6,73 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+- Fixed Unity CI preparation after GameCI's floating `v4` tag switched runners:
+  pin the compatible Node 24-based v4.3.2 action and its coverage-patch path.
+  Skip result validation/upload only when the corresponding Unity test step was
+  skipped; a started test run without its NUnit XML still fails validation.
+
+## [0.5.0] - 2026-09-12
+
+- 2026-09-12 (PSV-2557): Added player room browsing and direct room join for the
+  `/rooms` contract, typed room refusals, public connect/region/attribute metadata
+  and a monotonic reservation lifetime. Existing FindMatch/JoinGame calls remain
+  compatible. New routes require PSV-2600; room admission-push refusals require
+  PSV-2601. Verified with HTTP fixtures, not a deployed backend integration.
+
+- Added `Records<T>().QueryViewAsync` for paginated reads through an existing
+  saved View, including server/acting callers. View results remain partial until
+  explicitly reloaded, protecting hidden columns from accidental writes.
+
+- Added opt-in strict JSON response types for typed Code (client and Game Server)
+  and awaitable RPC calls. Unsupported codecs/contracts fail before sending;
+  mismatch diagnostics identify fields and types without copying response values.
+
+- Fixed record and singleton saves losing local edits made while a write is in
+  flight. Newer top-level changes remain pending against the acknowledged server
+  snapshot/ETag; explicit reload and realtime backend-wins semantics are unchanged.
+
+- Added optional caller-provided idempotency keys to Records `CreateAsync` and
+  native `BulkCreateAsync`, including Game Server and acting-player callers, so
+  games can explicitly retry an identical request after losing its response.
+  Existing calls still generate a fresh key; no automatic retries are introduced.
+
+- Mapped group subscription error 02006 to a stable, non-retryable unified
+  error; rejected groups never enter the reconnect replay set.
+
+- Added credential-free project status with deployment, counters, probe and
+  latency models, preserving unavailable metrics as null.
+
+- Added typed nested inclusion-field filters (up to eight segments) for REST and
+  realtime, honoring wire-name attributes and keeping query values out of query text.
+
+- Optimized plain LoadMany/PopulateMany reads using bounded native ID queries,
+  preserving input order, independent duplicate handles and typed item failures.
+
+- Added native natural-key upsert, atomic bulk-upsert, patch and delete APIs,
+  including seed/managed modes, ETags, idempotency keys and acting-player writes.
+
+- Fixed outbound and inbound transport frame diagnostics so public client
+  tokens, server keys, bearer credentials and JWTs are redacted before any
+  message reaches the configured logger, including malformed-frame and
+  deserialization-error paths. Network payloads remain unchanged.
+- **Breaking:** removed caller-supplied `GameId` and `UserId` from runtime
+  settings, convenience configuration, WebSocket/WebRTC handshakes, and the
+  dedicated-server realtime options. Runtime project and player identity now
+  come exclusively from `pk_*`/`sk_*` credentials and authenticated player
+  sessions. Optional `DeploymentGameId` remains Editor/tooling-only.
+- Added a code-first Schema Tool push workflow that converts attributed C#
+  contracts into one atomic backend schema bundle with revision preflight,
+  offline dry-run validation, and environment-only server credentials.
+- Enforced the backend's 1 MiB WebSocket message bound before desktop/WebGL
+  sends and while assembling inbound messages, reporting close code 1009.
+- Runtime event publishing now fails immediately with a typed capability error
+  because the shipped backend protocol only supports event subscriptions.
+- Exposed the authenticated player's safe runtime profile with cache-aware and
+  forced-refresh APIs, preserving ETag while excluding operator-only fields.
+- Added indexed natural-key record loads plus native atomic bulk-create and
+  delete-by-filter APIs, preserving server-minted record IDs and explicit
+  confirmation for match-everything deletes.
+
 ## [0.4.1] - 2026-08-23
 
 - Documented copy-paste GitHub UPM installation URLs, immutable distribution

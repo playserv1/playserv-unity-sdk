@@ -198,7 +198,7 @@ namespace Playserv.Deploy.Editor
 
             return
                 $"Upload failed. HTTP {(int)responseCode}. Error: {unityError}.{authHint}" +
-                $" Endpoint: {url}. GameId: {gameId}. Details: {detailText}.{hint}";
+                $" Endpoint: {url}. Deployment ID: {gameId}. Details: {detailText}.{hint}";
         }
 
         private static string[] ExtractErrorDetails(string responseBody)

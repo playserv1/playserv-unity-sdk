@@ -63,7 +63,6 @@ namespace Playserv.GameServer
                 session.OnTransportError += HandleTransportError;
                 session.SetServerConfig(
                     ct => PlayServGameServer.ResolveServerKeyForRealtimeAsync(context, ct),
-                    normalized.GameId,
                     normalized.InstanceId,
                     normalized.GameVersion,
                     SdkInfo.Version,
@@ -183,7 +182,6 @@ namespace Playserv.GameServer
 
             return new PlayServGameServerRealtimeOptions
             {
-                GameId = NormalizeMetadata(source.GameId, Application.identifier, "playserv-unity-server", nameof(source.GameId)),
                 InstanceId = NormalizeMetadata(source.InstanceId, ProcessInstanceId, ProcessInstanceId, nameof(source.InstanceId)),
                 GameVersion = NormalizeMetadata(source.GameVersion, Application.version, SdkInfo.Version, nameof(source.GameVersion)),
                 KeepAliveInterval = source.KeepAliveInterval,

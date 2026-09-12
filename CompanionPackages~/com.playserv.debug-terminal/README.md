@@ -13,7 +13,7 @@ testing. It does not replace production game UI or backend integration tests.
 
 - PlayServ Unity SDK `0.4.0` or newer.
 - Unity `2021.3` or newer, within the compatibility range of the core SDK.
-- A PlayServ project with a public `pk_*` client token, game ID, game version,
+- A PlayServ project with a public `pk_*` client token, game version,
   and reachable backend endpoint.
 - `com.playserv.analytics` installed at the same version as the core SDK.
 - `com.playserv.game-server` installed at the same version as the core SDK.
@@ -155,9 +155,9 @@ The original flat commands remain available for compatibility. `bind`,
 
 | Command | Description |
 | --- | --- |
-| `sdk info` | Print SDK version, connection state, game ID/version, endpoint, session, latest-version lookup, and keepalive configuration. |
+| `sdk info` | Print SDK version, connection state, optional deployment ID, game version, endpoint, session, latest-version lookup, and keepalive configuration. |
 | `sdk modules` | Print registered runtime module IDs and whether each module is selected. |
-| `sdk latest [gameId]` | Resolve the latest backend version for the supplied game or the configured game. |
+| `sdk latest [deploymentId]` | Resolve the latest backend version for the supplied deployment or the configured deployment. |
 | `state` | Print the current connection state and short authentication summary. |
 | `keepalive status` | Print ping/pong counts and the local time of the last ping and pong. |
 | `keepalive reset` | Reset terminal-owned keepalive counters without changing SDK configuration. |
@@ -488,7 +488,7 @@ Canvas hierarchy.
 | --- | --- |
 | Debug Terminal is not listed in PlayServ settings | Use core SDK `0.4.0` or newer, wait for Package Manager import to finish, then reopen settings or run `Repair SDK Modules`. |
 | Package is installed but sample scripts do not compile | Install/enable Analytics, then enable Debug Terminal and its Client Execution, Data Subscription, Events, RPC, and Spawn dependencies. Check that the disable defines are not active unexpectedly. |
-| Popup fields are empty | Select/configure the active `PlayServConfig` environment and confirm its public client token, game ID, version, and backend endpoint. |
+| Popup fields are empty | Select/configure the active `PlayServConfig` environment and confirm its public client token, version, and backend endpoint. The deployment ID is optional. |
 | Client token is rejected | Use a public token beginning with `pk_`; do not use a Bearer value, `sk_*`, or deploy token. |
 | Connect fails and the popup stays open | Check the backend URL, player-auth HTTP availability, game/version existence, network access, and backend handshake logs. |
 | `providers` returns none | Configure identity providers for the game on the PlayServ backend. |

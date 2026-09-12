@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -513,6 +514,36 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(transport.Requests, Has.Count.EqualTo(1));
         }
 
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void SavedViewReads_AreServerAuthorizedWithoutActingHeader(bool acting, bool explicitId)
+        {
+            var transport = new FakeTransport();
+            transport.Enqueue(200,
+                "{\"data\":[{\"entity_id\":\"ent_jobs\",\"name\":\"ServerJob\",\"singleton\":false," +
+                "\"acl\":{\"client\":{\"read\":false},\"server\":{\"read\":true,\"write\":true}}}]}" );
+            transport.Enqueue(200,
+                "{\"data\":[{\"id\":\"rec_1\"}],\"page\":{\"has_more\":false}}" );
+            Configure(transport, new RotatingKeyProvider("sk_view"));
+            var actor = acting ? PlayServGameServer.AsPlayer("aaa.bbb.ccc") : null;
+            var records = acting
+                ? (explicitId ? actor.Records<ServerJob>("ent_jobs") : actor.Records<ServerJob>())
+                : (explicitId ? PlayServGameServer.Records<ServerJob>("ent_jobs") : PlayServGameServer.Records<ServerJob>());
+            var page = records.QueryViewAsync("view-jobs").GetAwaiter().GetResult();
+            Assert.That(page.Records[0].Id, Is.EqualTo("rec_1"));
+            Assert.That(page.Records[0].IsPartial, Is.True);
+            Assert.That(transport.Requests.Count, Is.EqualTo(2));
+            Assert.That(transport.Requests[1].Method, Is.EqualTo("GET"));
+            Assert.That(transport.Requests[1].RelativePath, Is.EqualTo("data/tables/ent_jobs/records?view_id=view-jobs&limit=50"));
+            foreach (var request in transport.Requests)
+            {
+                Assert.That(request.ServerKey, Is.EqualTo("sk_view"));
+                Assert.That(request.Headers.ContainsKey("X-Acting-Player"), Is.False);
+            }
+        }
+
         [Test]
         public void ActingPlayerRecords_SendPlayerJwtOnlyForWrites()
         {
@@ -553,6 +584,85 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(transport.Requests[4].Headers["X-Acting-Player"], Is.EqualTo(playerJwt));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Records_CreateIdempotencyKeysReachServerTransport(bool acting)
+        {
+            const string jwt = "aaa.bbb.ccc";
+            var transport = new FakeTransport();
+            transport.Enqueue(200,
+                "{\"data\":[{\"entity_id\":\"ent_jobs\",\"name\":\"ServerJob\",\"singleton\":false," +
+                "\"acl\":{\"server\":{\"read\":true,\"write\":true}}}]}");
+            transport.Enqueue(201,
+                "{\"id\":\"rec_1\",\"created_at\":\"2026-08-19T10:00:00Z\"," +
+                "\"updated_at\":\"2026-08-19T10:00:00Z\",\"state\":\"queued\"}");
+            transport.Enqueue(201, "{\"ids\":[\"rec_2\"],\"created\":1}");
+            Configure(transport, new RotatingKeyProvider("sk_catalogue", "sk_create", "sk_bulk"));
+            var records = acting
+                ? PlayServGameServer.AsPlayer(jwt).Records<ServerJob>()
+                : PlayServGameServer.Records<ServerJob>();
+            var value = new ServerJob { State = "queued" };
+            records.CreateAsync(value, idempotencyKey: "create-42").GetAwaiter().GetResult();
+            records.BulkCreateAsync(new[] { value }, idempotencyKey: "bulk-42").GetAwaiter().GetResult();
+
+            Assert.That(transport.Requests, Has.Count.EqualTo(3));
+            Assert.That(transport.Requests[0].IdempotencyKey, Is.Null);
+            Assert.That(transport.Requests[0].Headers.ContainsKey("X-Acting-Player"), Is.False);
+            Assert.That(transport.Requests[1].RelativePath, Is.EqualTo("data/tables/ent_jobs/records"));
+            Assert.That(transport.Requests[1].IdempotencyKey, Is.EqualTo("create-42"));
+            Assert.That(transport.Requests[1].ServerKey, Is.EqualTo("sk_create"));
+            Assert.That(transport.Requests[2].RelativePath, Is.EqualTo("data/tables/ent_jobs/records:bulk-create"));
+            Assert.That(transport.Requests[2].IdempotencyKey, Is.EqualTo("bulk-42"));
+            Assert.That(transport.Requests[2].ServerKey, Is.EqualTo("sk_bulk"));
+            foreach (var request in transport.Requests.Skip(1))
+            {
+                Assert.That(request.Headers.ContainsKey("X-Acting-Player"), Is.EqualTo(acting));
+                if (acting) Assert.That(request.Headers["X-Acting-Player"], Is.EqualTo(jwt));
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Records_InvalidCreateKeyDoesNotResolveServerCredential(bool acting)
+        {
+            var transport = new FakeTransport();
+            var provider = new RotatingKeyProvider("sk_unused");
+            Configure(transport, provider);
+            var records = acting
+                ? PlayServGameServer.AsPlayer("aaa.bbb.ccc").Records<ServerJob>()
+                : PlayServGameServer.Records<ServerJob>();
+            Assert.Throws<ArgumentException>(() => records.CreateAsync(
+                new ServerJob(), idempotencyKey: "bad\nkey").GetAwaiter().GetResult());
+            Assert.Throws<ArgumentException>(() => records.BulkCreateAsync(
+                new[] { new ServerJob() }, idempotencyKey: new string('x', 129)).GetAwaiter().GetResult());
+            Assert.That(provider.CallCount, Is.Zero);
+            Assert.That(transport.Requests, Is.Empty);
+        }
+
+        [TestCase("POST", "records:upsert", true)]
+        [TestCase("POST", "records:bulk-upsert", true)]
+        [TestCase("POST", "records:bulk-create", true)]
+        [TestCase("POST", "records:delete-by-filter", true)]
+        [TestCase("POST", "records:query", false)]
+        [TestCase("PATCH", "records:by-natural-key?field=code&value=one", true)]
+        [TestCase("DELETE", "records:by-natural-key?field=code&value=one", true)]
+        [TestCase("GET", "records:by-natural-key?field=code&value=one", false)]
+        public void ActingPlayerRecords_NativeRoutesOnlyAttachToWrites(string method, string suffix, bool expected)
+        {
+            const string jwt = "aaa.bbb.ccc";
+            var transport = new FakeTransport();
+            transport.Enqueue(200, "{}");
+            Configure(transport, new RotatingKeyProvider("sk_server"));
+            var client = new PlayServGameServerRuntimeHttpClient(jwt);
+            client.SendDataAsync(new Playserv.Http.Interfaces.PlayServRuntimeDataRequest
+            {
+                Method = method, RelativePath = "data/tables/ent_jobs/" + suffix
+            }).GetAwaiter().GetResult();
+            Assert.That(transport.Requests[0].Headers.ContainsKey("X-Acting-Player"), Is.EqualTo(expected));
+            if (expected) Assert.That(transport.Requests[0].Headers["X-Acting-Player"], Is.EqualTo(jwt));
+            Assert.That(transport.Requests[0].ServerKey, Is.EqualTo("sk_server"));
+        }
+
         [TestCase("")]
         [TestCase("not-a-jwt")]
         [TestCase("Bearer aaa.bbb.ccc")]
@@ -569,8 +679,9 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(transport.Requests, Is.Empty);
         }
 
-        [Test]
-        public void ServerCode_ForwardsFunctionOptionsWithoutPublicClientCredential()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ServerCode_ForwardsFunctionOptionsWithoutPublicClientCredential(bool strict)
         {
             var transport = new FakeTransport();
             transport.Enqueue(
@@ -585,6 +696,7 @@ namespace Playserv.Tests.Runtime.GameServer
                     new PlayServFunctionCallOptions
                     {
                         Version = "stable",
+                        StrictResponseTypes = strict,
                         Query = new Dictionary<string, string> { ["mode"] = "ranked" },
                         TimeoutSeconds = 17
                     })
@@ -596,6 +708,18 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(transport.Requests[0].ServerKey, Is.EqualTo("sk_function"));
             Assert.That(transport.Requests[0].FunctionVersion, Is.EqualTo("stable"));
             Assert.That(transport.Requests[0].Timeout, Is.EqualTo(TimeSpan.FromSeconds(17)));
+        }
+
+        [Test]
+        public void ServerCode_StrictResponseRejectsCoercion()
+        {
+            var transport = new FakeTransport();
+            transport.Enqueue(200, "{\"room\":42}", contentType: "application/json");
+            Configure(transport, new RotatingKeyProvider("sk_function"));
+            var result = PlayServGameServer.Code.CallAsync<AllocateResponse>("allocate-room", null,
+                new PlayServFunctionCallOptions { StrictResponseTypes = true }).GetAwaiter().GetResult();
+            Assert.That(result.Error.Code, Is.EqualTo(PlayServErrorCode.Deserialization));
+            Assert.That(result.Error.Message, Does.Contain("$.Room").And.Not.Contain("42"));
         }
 
         [Test]

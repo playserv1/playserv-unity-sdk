@@ -193,6 +193,23 @@ namespace Playserv.Editor
 
                         GUILayout.Space(6f);
                         if (PlayServWindowChrome.DrawActionButton(
+                                "Push to PlayServ",
+                                PlayServWindowButtonTone.Secondary,
+                                GUILayout.Width(142f),
+                                GUILayout.Height(30f)) &&
+                            EditorUtility.DisplayDialog(
+                                "Push code-first schema?",
+                                "This sends every attributed C# schema as one atomic bundle " +
+                                "to the configured PlayServ project and environment. " +
+                                "PLAYSERV_SERVER_KEY must be present in the Unity process environment.",
+                                "Push",
+                                "Cancel"))
+                        {
+                            _ = ExecuteLocalAsync("push", context);
+                        }
+
+                        GUILayout.Space(6f);
+                        if (PlayServWindowChrome.DrawActionButton(
                                 watching ? "Stop Watch" : "Start Watch",
                                 PlayServWindowButtonTone.Secondary,
                                 GUILayout.Width(120f),

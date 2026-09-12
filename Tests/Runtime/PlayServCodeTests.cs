@@ -14,7 +14,7 @@ using Playserv.Wrapper;
 
 namespace Playserv.Tests.Runtime
 {
-    public sealed class PlayServCodeTests
+    public sealed partial class PlayServCodeTests
     {
         [Test]
         public void Typed_call_posts_json_with_player_auth_version_query_and_headers()
@@ -449,7 +449,8 @@ namespace Playserv.Tests.Runtime
 
         private static PlayServCodeClient CreateClient(
             IPlayServRuntimeHttpClient http,
-            bool withPlayerToken = true)
+            bool withPlayerToken = true,
+            IJsonCodec codec = null)
         {
             var settings = new PlayServSettings
             {
@@ -460,7 +461,7 @@ namespace Playserv.Tests.Runtime
                         _ => Task.FromResult("player.jwt.value"))
                     : null
             };
-            return new PlayServCodeClient(settings, http, new NewtonsoftJsonCodec());
+            return new PlayServCodeClient(settings, http, codec ?? new NewtonsoftJsonCodec());
         }
 
         [Serializable]
@@ -483,6 +484,7 @@ namespace Playserv.Tests.Runtime
                 new List<PlayServRuntimeBinaryDataRequest>();
 
             public PlayServRuntimeHttpException Exception { get; set; }
+            public Func<PlayServRuntimeDataRequest, Task<PlayServRuntimeDataResponse>> Handler { get; set; }
 
             public PlayServRuntimeHttpException BinaryException { get; set; }
 
@@ -499,6 +501,7 @@ namespace Playserv.Tests.Runtime
                 Requests.Add(request);
                 if (Exception != null)
                     throw Exception;
+                if (Handler != null) return Handler(request);
                 return Task.FromResult(_responses.Dequeue());
             }
 

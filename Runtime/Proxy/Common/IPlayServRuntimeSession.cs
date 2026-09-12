@@ -24,8 +24,7 @@ namespace Playserv.Proxy.Common
 
         void SetConfig(
             string gameAccessToken,
-            string gameId,
-            string userId,
+            string playerId,
             string gameVersion,
             string sdkVersion,
             bool allowMultipleConnections,

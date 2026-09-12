@@ -9,6 +9,12 @@ namespace Playserv.Samples
     /// <summary>Minimal credential-free platform status flow.</summary>
     public sealed class PlayServStatusSample : MonoBehaviour
     {
+        public async Task LoadProjectStatusAsync(string projectSlug, CancellationToken ct = default)
+        {
+            var project = await PlayServStatus.GetProjectAsync(projectSlug, cancellationToken: ct);
+            Debug.Log($"Project {project.ProjectSlug}: {project.Functions.Length} functions reported.");
+        }
+
         public async Task LoadStatusAsync(CancellationToken cancellationToken)
         {
             PlayServPlatformStatus current = await PlayServStatus.GetCurrentAsync(

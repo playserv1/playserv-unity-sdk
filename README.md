@@ -9,13 +9,16 @@ operations are optional companion packages.
 
 ## Install from GitHub
 
-The current stable release is `0.4.1`. In Unity, open `Window` ->
+This checkout targets SDK `0.5.0`. In Unity, open `Window` ->
 `Package Manager`, choose `Add package from git URL`, and paste this pinned core
 package URL:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.4.1
+git@github.com:playserv1/playserv-unity-sdk.git#0.5.0
 ```
+
+The Git URLs below require the `0.5.0` distribution tag to be published first;
+changing the version in the source repository does not publish that tag.
 
 The distribution repository is private. The operating-system account running
 Unity must have GitHub access and an SSH key that can clone
@@ -29,7 +32,7 @@ The same dependency can be added directly to the game project's
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.4.1"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.0"
   }
 }
 ```
@@ -57,7 +60,7 @@ branches are not used.
 ## Requirements
 
 - Unity 2021.3 or newer.
-- A PlayServ game ID and runtime credential.
+- A PlayServ public runtime client token (`pk_*`).
 - `com.unity.nuget.newtonsoft-json` 3.2.2. Unity Package Manager installs this
   dependency automatically for UPM installations.
 
@@ -69,19 +72,19 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.4.1",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.4.1",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.4.1",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.4.1",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.4.1",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.4.1",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.4.1",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.4.1",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.4.1",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.4.1",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.4.1",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.4.1",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.4.1"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.0",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.5.0",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.5.0",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.5.0",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.5.0",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.5.0",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.5.0",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.0",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.5.0",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.5.0",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.5.0",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.5.0",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.5.0"
   }
 }
 ```
@@ -123,7 +126,8 @@ project `Library` directory, and reopens the project.
 ## Configure
 
 Open `Tools` -> `PlayServ` -> `Settings`, select an environment and configure the
-game ID, user ID, game version, and runtime credential.
+public client token, game version, and backend endpoint. The token selects the
+project; automatic authentication creates or restores the player session.
 
 ```csharp
 using Playserv.Wrapper;
@@ -131,14 +135,23 @@ using Playserv.Wrapper;
 PlayServ.Config(new PlayServSettings
 {
     ClientToken = "pk_...",
-    GameId = "your-game-id",
-    UserId = "player-id",
     GameVersion = "1.0.0",
     BackendServerAddress = "wss://your-playserv-endpoint/ws"
 });
 
 bool connected = await PlayServ.Connect();
 ```
+
+### Migrating legacy connection identity
+
+`PlayServSettings.GameId`, `PlayServSettings.UserId`, and the matching
+positional `Config` arguments are no longer part of the runtime API. Remove
+them from bootstrap code: the `pk_*` client token selects the project and the
+authenticated JWT selects the player. Read the verified player identifier from
+`PlayServAuth.PlayerId` or `PlayServAuth.CurrentSession` after authentication.
+If Editor deployment/version tools still need the old deployment identifier,
+move only that value to `PlayServSettings.DeploymentGameId`; it is never sent
+over the runtime WebSocket.
 
 With a public `pk_*` client token and no custom runtime token provider,
 `Connect()` automatically creates or restores an anonymous player. Promote that
@@ -165,6 +178,13 @@ conflict-driven `MergeIdentityAsync` manage additional identities without
 requiring game code to construct arbitrary player-ID pairs. Linked providers
 from the current managed JWT are available through
 `PlayServAuth.CurrentSession.LinkedProviders`.
+
+After sign-in, `await PlayServAuth.GetCurrentPlayerProfileAsync()` reads the
+caller's safe runtime profile (display name, status, linked providers and public
+timestamps). Repeated calls use the cached profile; use
+`RefreshCurrentPlayerProfileAsync()` when fresh backend state is required. The
+runtime projection never exposes moderation details, IP addresses or fingerprint
+hashes.
 
 Use `PlayServExternalLoginMode.RecoverProviderAccount` on a new installation to
 recover the provider-owned account instead of preserving the current anonymous
@@ -311,6 +331,11 @@ replaying them. All SDK error surfaces expose a common `PlayServError` through
 `UnifiedError`; existing auth, RPC, transport, records, and subscription error
 types remain supported.
 
+Built-in desktop and WebGL WebSocket transports enforce the backend's 1 MiB
+message limit in both directions. Oversized outbound messages fail before I/O;
+oversized inbound messages terminate the connection with close code `1009` and
+surface `PlayServWebSocketPayloadException` without retaining the payload.
+
 Collection, typed-record, and legacy shared-entity handles implement
 `IPlayServRefreshableSubscription`. `RefreshAsync(ct)` waits for the correlated
 server snapshot to be applied without opening or closing the subscription. A
@@ -352,9 +377,69 @@ Find, Join, and Launch operational failures use
 and normalized `UnifiedError`. Caller cancellation and invalid API arguments
 keep their existing exception behavior.
 
-The Unity facade intentionally excludes room heartbeat, close, listing, and
-reservation consumption endpoints because they require `sk_*`. Use the
-PlayServ C# server SDK for that game-server lifecycle.
+### Room browser and direct join
+
+`BrowseRoomsAsync` and `JoinRoomAsync` use the new `/rooms` namespace and require
+the backend from **PSV-2600**. This SDK increment is tested against HTTP fixtures;
+it does not establish backend integration before that dependency lands. There is
+no fallback to the deprecated matchmaking routes or to `find { room_name }`.
+
+```csharp
+var page = await PlayServMatchmaking.BrowseRoomsAsync("tank-room",
+    new PlayServRoomBrowseQuery
+    {
+        PlacementState = "open",
+        Region = "eu-west",
+        Attributes = new System.Collections.Generic.Dictionary<string, string>
+        {
+            ["map"] = "arena"
+        },
+        Limit = 50
+    }, ct: destroyCancellationToken);
+
+// Render page.Rooms in your server browser; this example selects its first row.
+if (page.Rooms.Count > 0)
+{
+    var chosenRoom = page.Rooms[0];
+    PlayServMatchResult selected = await PlayServMatchmaking.JoinRoomAsync(
+        "tank-room", chosenRoom.RoomName, ct: destroyCancellationToken);
+    PlayServRoomConnect endpoint = selected.Reservation.Connect;
+    System.TimeSpan? remaining = selected.Reservation.RemainingLifetime;
+    // Hand endpoint and ReservationToken to your own admission/networking code.
+    // Never log the reservation token. The SDK does not dial or interpret endpoint.
+}
+// When page.HasMore, request the next page with Cursor = page.CursorNext,
+// retaining the same filters and limit.
+```
+
+Browse defaults to 50 rows (range 1–200), accepts at most four string-form
+`attributes.<key>=<value>` equality filters, and preserves server ordering. Rows
+contain only client metadata; no drain or instance internals. Unfiltered results
+can include `session_closing` rooms (visible but unjoinable), reservation-only
+rooms with null `Connect`, and `Players > Capacity` after a capacity reduction.
+A listing is not a promise of admission: the server decides when JoinRoom runs.
+
+Direct join performs one bodyless POST, without placement, launch, polling or
+automatic retry. It returns the same result type as `FindMatchAsync`; only a
+matched reservation is valid. Catch `PlayServMatchmakingException` and switch on
+`RoomFailureCode` (`RoomNotFound`, `RoomFull`, `RoomClosed`, `RoomTypeNotFound`,
+`RoomRefused`, `RoomUnreachable`, or `Unknown`). `UnifiedError.SourceCode`
+preserves the backend code; its `Message` contains the credential-filtered
+Problem Details reason, including `draining` or a room's refusal detail.
+`RoomRefused` and retryable `RoomUnreachable` are prepared for **PSV-2601**.
+
+Find and Join reservations additively expose `Connect`, `Region`, `Attributes`
+and `ExpiresIn`. `Connect` is nullable and its host, port, transport and optional
+connect string are passed through verbatim. `RemainingLifetime` counts down from
+`ExpiresIn` on a monotonic clock, never by comparing `ExpiresAt` with the device
+clock. It floors at zero; null means unknown on older FindMatch responses, not
+an unlimited lifetime. Server admission remains authoritative. Existing Find
+outcomes and `JoinGameAsync` re-entry on `room_closed` are unchanged.
+
+The player facade still excludes server room heartbeat, close, administrative
+listing and reservation consumption. Use `com.playserv.game-server` for those
+`sk_*` operations; its uplink work (PSV-2556) and existing launch/server route
+migration (PSV-2602) are separate increments.
 
 ## Cloud functions
 

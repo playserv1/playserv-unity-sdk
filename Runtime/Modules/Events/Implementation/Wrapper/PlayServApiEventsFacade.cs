@@ -49,38 +49,33 @@ namespace Playserv.Wrapper
 
         public void Publish<T>(T @event)
         {
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
             if (_runtimeAccess.LocalExecution.TryPublish(@event, _runtimeAccess.HasCurrentInstance))
                 return;
-
-            var services = _runtimeAccess.GetServicesForFireAndForget("event publish");
-            if (services == null)
-                return;
-
-            GetEventsAdapter(services).Publish(@event);
+            throw PlayServEventPublishingException.Broadcast();
         }
 
         public void PublishForGroup<T>(string groupName, T @event)
         {
+            if (string.IsNullOrWhiteSpace(groupName))
+                throw new ArgumentException("Group name is required.", nameof(groupName));
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
             if (_runtimeAccess.LocalExecution.TryPublishForGroup(groupName, @event, _runtimeAccess.HasCurrentInstance))
                 return;
-
-            var services = _runtimeAccess.GetServicesForFireAndForget("group event publish");
-            if (services == null)
-                return;
-
-            GetEventsAdapter(services).PublishForGroup(groupName, @event);
+            throw PlayServEventPublishingException.Group(groupName.Trim());
         }
 
         public void PublishForUser<T>(string userId, T @event)
         {
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("User id is required.", nameof(userId));
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
             if (_runtimeAccess.LocalExecution.TryPublishForUser(userId, @event, _runtimeAccess.HasCurrentInstance))
                 return;
-
-            var services = _runtimeAccess.GetServicesForFireAndForget("user event publish");
-            if (services == null)
-                return;
-
-            GetEventsAdapter(services).PublishForUser(userId, @event);
+            throw PlayServEventPublishingException.User(userId.Trim());
         }
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)

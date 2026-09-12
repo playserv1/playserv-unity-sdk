@@ -35,7 +35,7 @@ namespace Playserv.Analytics
                 PlayServHttpAnalyticsProvider.CreateDefault());
             _client = new PlayServAnalyticsClient(
                 provider,
-                () => runtimeIdentity == null ? string.Empty : runtimeIdentity.UserId,
+                () => runtimeIdentity == null ? string.Empty : runtimeIdentity.PlayerId,
                 PlayServLog.ForCategory(PlayServLogCategory.Analytics),
                 SdkInfo.Version,
                 Application.version,

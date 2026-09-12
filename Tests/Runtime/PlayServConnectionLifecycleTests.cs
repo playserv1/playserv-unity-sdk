@@ -151,7 +151,7 @@ namespace Playserv.Tests.Runtime
             return new PlayServSettings
             {
                 DeployApiServerAddress = "https://deploy.example.test",
-                GameId = "test-game",
+                DeploymentGameId = "test-game",
                 TimeoutSeconds = 30
             };
         }

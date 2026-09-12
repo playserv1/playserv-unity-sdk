@@ -45,6 +45,9 @@ namespace Playserv.Wrapper
 
         public PlayServSessionInfo CurrentSession => _playerAuthCoordinator.CurrentSession;
 
+        public PlayServPlayerProfile CurrentPlayerProfile =>
+            _playerAuthCoordinator.CurrentPlayerProfile;
+
         public event Action<PlayServSessionLostInfo> SessionLost
         {
             add => _playerAuthCoordinator.SessionLost += value;
@@ -54,6 +57,14 @@ namespace Playserv.Wrapper
         public Task<PlayServAuthProvidersResult> GetProvidersAsync(
             CancellationToken cancellationToken = default) =>
             _playerAuthCoordinator.GetProvidersAsync(cancellationToken);
+
+        public Task<PlayServPlayerProfileResult> GetCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.GetCurrentPlayerProfileAsync(cancellationToken);
+
+        public Task<PlayServPlayerProfileResult> RefreshCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default) =>
+            _playerAuthCoordinator.RefreshCurrentPlayerProfileAsync(cancellationToken);
 
         public Task<PlayServAuthResult> LinkIdentityAsync(
             PlayServExternalIdentityProof proof,
@@ -123,13 +134,11 @@ namespace Playserv.Wrapper
 
         public void Config(
             string clientToken,
-            string gameId,
-            string userId,
             string gameVersion,
             string sdkVersion = null)
         {
             _playerAuthCoordinator.StopRefreshLoop();
-            _configFacade.Config(clientToken, gameId, userId, gameVersion, sdkVersion);
+            _configFacade.Config(clientToken, gameVersion, sdkVersion);
         }
 
         public void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider)
@@ -159,8 +168,8 @@ namespace Playserv.Wrapper
         public void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
             _configFacade.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
-        public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
-            _configFacade.GetLatestVersionAsync(gameId, ct);
+        public Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default) =>
+            _configFacade.GetLatestVersionAsync(deploymentId, ct);
 
         public ITransportImplementation GetTransportImplementation() =>
             RequiredSession.GetTransportImplementation();

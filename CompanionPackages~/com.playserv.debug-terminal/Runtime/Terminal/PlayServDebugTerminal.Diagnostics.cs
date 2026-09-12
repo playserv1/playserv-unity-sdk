@@ -65,7 +65,7 @@ namespace Playserv.DebugTerminal
             }
 
             AddLog(
-                $"SDK {PlayServ.SdkVersion}; state={PlayServ.State}; game={settings.GameId}; " +
+                $"SDK {PlayServ.SdkVersion}; state={PlayServ.State}; deployment={settings.DeploymentGameId}; " +
                 $"version={settings.GameVersion}; endpoint={settings.BackendServerAddress}");
             AddLog(
                 $"multipleConnections={settings.AllowMultipleConnections}; " +
@@ -91,17 +91,19 @@ namespace Playserv.DebugTerminal
             }
         }
 
-        private async Task PrintLatestVersionAsync(string gameId)
+        private async Task PrintLatestVersionAsync(string deploymentId)
         {
-            gameId = string.IsNullOrWhiteSpace(gameId) ? PlayServ.Settings?.GameId : gameId.Trim();
-            if (string.IsNullOrWhiteSpace(gameId))
+            deploymentId = string.IsNullOrWhiteSpace(deploymentId)
+                ? PlayServ.Settings?.DeploymentGameId
+                : deploymentId.Trim();
+            if (string.IsNullOrWhiteSpace(deploymentId))
             {
-                AddLog("Game ID is required. Usage: sdk latest [gameId]");
+                AddLog("Deployment ID is required. Usage: sdk latest [deploymentId]");
                 return;
             }
 
-            var version = await PlayServ.GetLatestVersionAsync(gameId);
-            _status = $"Latest version for '{gameId}' is '{version}'";
+            var version = await PlayServ.GetLatestVersionAsync(deploymentId);
+            _status = $"Latest version for deployment '{deploymentId}' is '{version}'";
             AddLog(_status);
         }
 

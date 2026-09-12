@@ -27,8 +27,8 @@ namespace Playserv.Wrapper
         [FormerlySerializedAs("authorization")]
         [SerializeField, HideInInspector] private string legacyAuthorizationForMigration;
 #endif
-        [SerializeField] private string gameId;
-        [SerializeField] private string userId;
+        [FormerlySerializedAs("gameId")]
+        [SerializeField] private string deploymentGameId;
         [SerializeField] private string gameVersion = "1.0.0";
         [SerializeField] private string sdkVersion = SdkInfo.Version;
         [SerializeField] private bool allowMultipleConnections = true;
@@ -64,18 +64,9 @@ namespace Playserv.Wrapper
         public string GameAccessToken => clientToken;
 
         /// <summary>
-        /// Game identifier.
+        /// Optional deployment identifier. It is not part of runtime admission.
         /// </summary>
-        public string GameId => gameId;
-
-        /// <summary>
-        /// User/player identifier.
-        /// </summary>
-        public string UserId
-        {
-            get => userId;
-            set => userId = value;
-        }
+        public string DeploymentGameId => deploymentGameId;
 
         /// <summary>
         /// Game client version.
@@ -160,8 +151,7 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 ClientToken = clientToken,
-                GameId = gameId,
-                UserId = userId,
+                DeploymentGameId = deploymentGameId,
                 GameVersion = gameVersion,
                 SdkVersion = sdkVersion,
                 AllowMultipleConnections = allowMultipleConnections,
@@ -189,8 +179,7 @@ namespace Playserv.Wrapper
 
             var changed = false;
             changed |= AssignIfDifferent(ref clientToken, settings.ClientToken);
-            changed |= AssignIfDifferent(ref gameId, settings.GameId);
-            changed |= AssignIfDifferent(ref userId, settings.UserId);
+            changed |= AssignIfDifferent(ref deploymentGameId, settings.DeploymentGameId);
             changed |= AssignIfDifferent(ref gameVersion, settings.GameVersion);
             changed |= AssignIfDifferent(ref sdkVersion, settings.SdkVersion);
             changed |= AssignIfDifferent(ref allowMultipleConnections, settings.AllowMultipleConnections);

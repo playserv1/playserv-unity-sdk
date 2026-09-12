@@ -145,17 +145,7 @@ namespace Playserv.Data
             ParameterExpression parameter,
             out string field)
         {
-            field = null;
-            expression = StripConvert(expression);
-            if (!(expression is MemberExpression member))
-                return false;
-
-            var owner = StripConvert(member.Expression);
-            if (owner != parameter)
-                return false;
-
-            field = PlayServRecordWireNames.FromMember(member.Member, nameof(expression));
-            return true;
+            return PlayServRecordWireNames.TryGetFilterPath(expression, parameter, out field);
         }
 
         private static object EvaluateValue(

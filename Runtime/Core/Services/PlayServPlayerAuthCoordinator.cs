@@ -31,6 +31,9 @@ namespace Playserv.Wrapper
         private readonly object _pendingCloseGate = new object();
         private PlayServTransportCloseInfo _pendingTerminalClose;
         private bool _disposed;
+        private readonly object _profileGate = new object();
+        private PlayServPlayerProfile _cachedProfile;
+        private string _cachedProfileEtag = string.Empty;
 
         public PlayServPlayerAuthCoordinator(
             Func<PlayServSettings, IPlayServRuntimeHttpClient> createHttpClient,
@@ -52,6 +55,21 @@ namespace Playserv.Wrapper
 
         public event Action<PlayServSessionLostInfo> SessionLost;
 
+        public PlayServPlayerProfile CurrentPlayerProfile
+        {
+            get
+            {
+                var playerId = CurrentSession.PlayerId;
+                lock (_profileGate)
+                {
+                    return _cachedProfile != null &&
+                           string.Equals(_cachedProfile.Id, playerId, StringComparison.Ordinal)
+                        ? _cachedProfile
+                        : null;
+                }
+            }
+        }
+
         public PlayServSessionInfo CurrentSession
         {
             get
@@ -63,7 +81,7 @@ namespace Playserv.Wrapper
                 if (settings != null &&
                     (settings.RuntimeTokenProvider != null || !string.IsNullOrWhiteSpace(settings.PlayerAccessToken)))
                 {
-                    return new PlayServSessionInfo(settings.UserId, PlayServSessionKind.Unmanaged);
+                    return new PlayServSessionInfo(settings.PlayerId, PlayServSessionKind.Unmanaged);
                 }
 
                 return new PlayServSessionInfo(string.Empty, PlayServSessionKind.None);
@@ -90,7 +108,7 @@ namespace Playserv.Wrapper
             if (string.IsNullOrWhiteSpace(session.PlayerId))
                 throw new InvalidOperationException("PlayServ player authentication did not resolve a player ID.");
 
-            settings.UserId = session.PlayerId;
+            settings.PlayerId = session.PlayerId;
             Volatile.Write(ref _terminalSessionLossStarted, 0);
             return settings;
         }
@@ -120,6 +138,129 @@ namespace Playserv.Wrapper
                 _createHttpClient(settings),
                 store);
             return await discoverySession.GetProvidersAsync(cancellationToken);
+        }
+
+        public Task<PlayServPlayerProfileResult> GetCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
+            var cached = CurrentPlayerProfile;
+            if (cached != null)
+            {
+                lock (_profileGate)
+                {
+                    return Task.FromResult(new PlayServPlayerProfileResult(
+                        cached,
+                        _cachedProfileEtag,
+                        true,
+                        null));
+                }
+            }
+
+            return RefreshCurrentPlayerProfileAsync(cancellationToken);
+        }
+
+        public async Task<PlayServPlayerProfileResult> RefreshCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            cancellationToken.ThrowIfCancellationRequested();
+            var settings = _getSettings();
+            var invalid = ValidatePublicClientOperation(settings);
+            if (invalid != null)
+                return new PlayServPlayerProfileResult(null, null, false, invalid);
+
+            var session = CurrentSession;
+            if (!session.IsLoggedIn)
+            {
+                return new PlayServPlayerProfileResult(
+                    null,
+                    null,
+                    false,
+                    PlayServPlayerSession.CreateAuthError(
+                        PlayServAuthErrorCode.Unauthorized,
+                        "Sign in a player before loading the current player profile.",
+                        null));
+            }
+
+            try
+            {
+                string bearer = null;
+                if (settings.RuntimeTokenProvider != null)
+                    bearer = await settings.RuntimeTokenProvider.GetTokenAsync(cancellationToken);
+                else if (!string.IsNullOrWhiteSpace(settings.PlayerAccessToken))
+                    bearer = settings.PlayerAccessToken;
+                if (string.IsNullOrWhiteSpace(bearer))
+                    throw new InvalidOperationException("The current player session did not provide an access token.");
+
+                var response = await _createHttpClient(settings).SendDataAsync(
+                    new PlayServRuntimeDataRequest
+                    {
+                        Method = "GET",
+                        RelativePath = "data/players/" + Uri.EscapeDataString(session.PlayerId),
+                        ClientToken = settings.ClientToken,
+                        BearerToken = bearer
+                    },
+                    cancellationToken);
+                var dto = PlayServJsonCompositionRoot.CreateDefaultJsonCodec()
+                    .Deserialize<PlayServPlayerProfileDto>(response.Body);
+                var profile = ToPlayerProfile(dto, session.PlayerId);
+                lock (_profileGate)
+                {
+                    _cachedProfile = profile;
+                    _cachedProfileEtag = response.ETag ?? string.Empty;
+                }
+                return new PlayServPlayerProfileResult(profile, response.ETag, false, null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new PlayServPlayerProfileResult(
+                    null,
+                    null,
+                    false,
+                    PlayServPlayerSession.CreateAuthError(exception));
+            }
+        }
+
+        private static PlayServPlayerProfile ToPlayerProfile(
+            PlayServPlayerProfileDto dto,
+            string expectedPlayerId)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.id) ||
+                !string.Equals(dto.id, expectedPlayerId, StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(dto.kind) || string.IsNullOrWhiteSpace(dto.name) ||
+                string.IsNullOrWhiteSpace(dto.status) || string.IsNullOrWhiteSpace(dto.joined) ||
+                !DateTimeOffset.TryParse(dto.created_at, out var createdAt) ||
+                !DateTimeOffset.TryParse(dto.updated_at, out var updatedAt))
+            {
+                throw new InvalidOperationException("Current player profile response was malformed or belonged to another player.");
+            }
+
+            DateTimeOffset? lastSeenAt = null;
+            if (!string.IsNullOrWhiteSpace(dto.last_seen))
+            {
+                if (!DateTimeOffset.TryParse(dto.last_seen, out var parsedLastSeen))
+                    throw new InvalidOperationException("Current player profile contained an invalid last_seen timestamp.");
+                lastSeenAt = parsedLastSeen;
+            }
+
+            return new PlayServPlayerProfile(
+                dto.id,
+                dto.kind,
+                dto.name,
+                dto.email,
+                dto.status,
+                dto.sso,
+                dto.country,
+                lastSeenAt,
+                dto.joined,
+                createdAt,
+                updatedAt);
         }
 
         public Task<PlayServAuthResult> LinkIdentityAsync(
@@ -158,7 +299,7 @@ namespace Playserv.Wrapper
             try
             {
                 var result = await session.UnlinkIdentityAsync(providerId.Trim(), cancellationToken);
-                settings.UserId = session.PlayerId;
+                settings.PlayerId = session.PlayerId;
                 if (result.Error?.Exception is PlayServSessionRejectedException rejected)
                 {
                     await HandleTerminalSessionLossAsync(
@@ -276,7 +417,7 @@ namespace Playserv.Wrapper
             try
             {
                 var result = await session.LoginExternalAsync(proof, mode, cancellationToken);
-                settings.UserId = session.PlayerId;
+                settings.PlayerId = session.PlayerId;
 
                 if (result.Error?.Exception is PlayServSessionRejectedException rejected)
                 {
@@ -396,7 +537,7 @@ namespace Playserv.Wrapper
             try
             {
                 var result = await operation(session, cancellationToken);
-                settings.UserId = session.PlayerId;
+                settings.PlayerId = session.PlayerId;
                 if (result.Error?.Exception is PlayServSessionRejectedException rejected)
                 {
                     await HandleTerminalSessionLossAsync(
@@ -524,7 +665,7 @@ namespace Playserv.Wrapper
                     _disconnectTransport();
 
                 var result = await session.LogoutAsync(cancellationToken);
-                settings.UserId = session.PlayerId;
+                settings.PlayerId = session.PlayerId;
                 if (session.CurrentSession.IsLoggedIn)
                     Volatile.Write(ref _terminalSessionLossStarted, 0);
                 var reconnected = false;
@@ -805,6 +946,9 @@ namespace Playserv.Wrapper
 
             if (!transportAlreadyDisconnected)
                 _disconnectTransport();
+            var settings = TryGetSettings();
+            if (settings != null)
+                settings.PlayerId = string.Empty;
             SessionLost?.Invoke(new PlayServSessionLostInfo(
                 reason,
                 previousSession ?? new PlayServSessionInfo(string.Empty, PlayServSessionKind.None),
@@ -884,6 +1028,8 @@ namespace Playserv.Wrapper
 
             if (settings != null && ReferenceEquals(settings.RuntimeTokenProvider, _session))
                 settings.RuntimeTokenProvider = null;
+            if (settings != null)
+                settings.PlayerId = string.Empty;
 
             _session.Dispose();
             _session = null;

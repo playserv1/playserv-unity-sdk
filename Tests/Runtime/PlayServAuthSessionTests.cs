@@ -426,6 +426,90 @@ namespace Playserv.Tests.Runtime
         }
 
         [Test]
+        public void Coordinator_CurrentPlayerProfileUsesOwnRuntimeRouteAndCachesEtag()
+        {
+            var http = new FakeHttpClient();
+            http.DataResponses.Enqueue(new PlayServRuntimeDataResponse(
+                200,
+                RuntimePlayerJson("player-anonymous-1", "First name"),
+                "\"profile-1\"",
+                null));
+            var store = new FakeSessionStore();
+            var settings = Settings();
+            using var coordinator = new PlayServPlayerAuthCoordinator(
+                _ => http,
+                store,
+                () => settings,
+                () => PlayServState.Offline,
+                (_, __) => Task.FromResult(true),
+                () => { },
+                () => Task.FromResult(true));
+            coordinator.PrepareSettingsForConnectAsync(settings).GetAwaiter().GetResult();
+
+            var loaded = coordinator.GetCurrentPlayerProfileAsync().GetAwaiter().GetResult();
+            var cached = coordinator.GetCurrentPlayerProfileAsync().GetAwaiter().GetResult();
+
+            Assert.That(loaded.IsSuccess, Is.True);
+            Assert.That(loaded.IsFromCache, Is.False);
+            Assert.That(loaded.Profile.Name, Is.EqualTo("First name"));
+            Assert.That(loaded.Profile.LinkedProviders, Is.EqualTo(new[] { "google" }));
+            Assert.That(loaded.Profile.JoinedDate, Is.EqualTo("2026-08-01"));
+            Assert.That(loaded.ETag, Is.EqualTo("\"profile-1\""));
+            Assert.That(cached.IsFromCache, Is.True);
+            Assert.That(cached.Profile, Is.SameAs(loaded.Profile));
+            Assert.That(coordinator.CurrentPlayerProfile, Is.SameAs(loaded.Profile));
+            Assert.That(http.DataRequests, Has.Count.EqualTo(1));
+            Assert.That(http.DataRequests[0].RelativePath,
+                Is.EqualTo("data/players/player-anonymous-1"));
+            Assert.That(http.DataRequests[0].ClientToken, Is.EqualTo("pk_public"));
+            Assert.That(http.DataRequests[0].BearerToken, Is.EqualTo("access-anonymous-1"));
+        }
+
+        [Test]
+        public void Coordinator_ProfileRefreshReplacesCacheAndMapsBackendFailure()
+        {
+            var http = new FakeHttpClient();
+            http.DataResponses.Enqueue(new PlayServRuntimeDataResponse(
+                200,
+                RuntimePlayerJson("player-anonymous-1", "First name"),
+                "\"profile-1\"",
+                null));
+            http.DataResponses.Enqueue(new PlayServRuntimeDataResponse(
+                200,
+                RuntimePlayerJson("player-anonymous-1", "Updated name"),
+                "\"profile-2\"",
+                null));
+            http.DataExceptions.Enqueue(new PlayServRuntimeHttpException(
+                "HTTP 403 player_read_forbidden",
+                403,
+                "{\"code\":\"player_read_forbidden\"}",
+                "player_read_forbidden",
+                false));
+            var store = new FakeSessionStore();
+            var settings = Settings();
+            using var coordinator = new PlayServPlayerAuthCoordinator(
+                _ => http,
+                store,
+                () => settings,
+                () => PlayServState.Offline,
+                (_, __) => Task.FromResult(true),
+                () => { },
+                () => Task.FromResult(true));
+            coordinator.PrepareSettingsForConnectAsync(settings).GetAwaiter().GetResult();
+
+            coordinator.GetCurrentPlayerProfileAsync().GetAwaiter().GetResult();
+            var refreshed = coordinator.RefreshCurrentPlayerProfileAsync().GetAwaiter().GetResult();
+            var failed = coordinator.RefreshCurrentPlayerProfileAsync().GetAwaiter().GetResult();
+
+            Assert.That(refreshed.Profile.Name, Is.EqualTo("Updated name"));
+            Assert.That(refreshed.ETag, Is.EqualTo("\"profile-2\""));
+            Assert.That(failed.IsSuccess, Is.False);
+            Assert.That(failed.Error.Code, Is.EqualTo(PlayServAuthErrorCode.Forbidden));
+            Assert.That(failed.UnifiedError.SourceCode, Is.EqualTo("player_read_forbidden"));
+            Assert.That(coordinator.CurrentPlayerProfile, Is.SameAs(refreshed.Profile));
+        }
+
+        [Test]
         public void Coordinator_ConflictDoesNotTouchOnlineTransport()
         {
             var http = new FakeHttpClient
@@ -475,7 +559,6 @@ namespace Playserv.Tests.Runtime
             var settings = Settings();
             var customProvider = new PlayServDelegateRuntimeTokenProvider(
                 _ => Task.FromResult("application-managed-jwt"));
-            settings.UserId = "player-external";
             settings.RuntimeTokenProvider = customProvider;
             using var coordinator = new PlayServPlayerAuthCoordinator(
                 _ => http,
@@ -493,7 +576,7 @@ namespace Playserv.Tests.Runtime
                 .GetAwaiter().GetResult();
 
             Assert.That(before.Kind, Is.EqualTo(PlayServSessionKind.Unmanaged));
-            Assert.That(before.PlayerId, Is.EqualTo("player-external"));
+            Assert.That(before.PlayerId, Is.Empty);
             Assert.That(result.Status, Is.EqualTo(PlayServAuthOperationStatus.Failed));
             Assert.That(result.Error.Code, Is.EqualTo(PlayServAuthErrorCode.InvalidConfiguration));
             Assert.That(settings.RuntimeTokenProvider, Is.SameAs(customProvider));
@@ -1466,7 +1549,7 @@ namespace Playserv.Tests.Runtime
         private static PlayServSettings Settings() => new PlayServSettings
         {
             ClientToken = "pk_public",
-            GameId = "test-game",
+            DeploymentGameId = "test-game",
             GameVersion = "1.0.0",
             BackendServerAddress = "wss://example.test/ws",
             EnableAutomaticPlayerFingerprint = false
@@ -1474,6 +1557,13 @@ namespace Playserv.Tests.Runtime
 
         private static PlayServExternalIdentityProof Proof() =>
             PlayServExternalIdentityProof.FromProviderToken("google", "provider-id-token");
+
+        private static string RuntimePlayerJson(string playerId, string name) =>
+            "{\"id\":\"" + playerId + "\",\"kind\":\"anonymous\",\"name\":\"" + name +
+            "\",\"email\":null,\"status\":\"active\",\"sso\":[\"google\"]," +
+            "\"country\":\"UA\",\"last_seen\":\"2026-08-28T10:00:00Z\"," +
+            "\"joined\":\"2026-08-01\",\"created_at\":\"2026-08-01T00:00:00Z\"," +
+            "\"updated_at\":\"2026-08-28T10:00:00Z\"}";
 
         private static PlayServRuntimeHttpException ConflictException() =>
             new PlayServRuntimeHttpException(
@@ -1704,6 +1794,14 @@ namespace Playserv.Tests.Runtime
             public Queue<Func<PlayerRefreshResponseDto>> RefreshResponses { get; } =
                 new Queue<Func<PlayerRefreshResponseDto>>();
 
+            public Queue<PlayServRuntimeDataResponse> DataResponses { get; } =
+                new Queue<PlayServRuntimeDataResponse>();
+
+            public Queue<Exception> DataExceptions { get; } = new Queue<Exception>();
+
+            public List<PlayServRuntimeDataRequest> DataRequests { get; } =
+                new List<PlayServRuntimeDataRequest>();
+
             public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
                 Task.FromResult("1.0.0");
 
@@ -1826,6 +1924,12 @@ namespace Playserv.Tests.Runtime
                 PlayServRuntimeDataRequest request,
                 CancellationToken ct = default)
             {
+                ct.ThrowIfCancellationRequested();
+                DataRequests.Add(request);
+                if (DataResponses.Count > 0)
+                    return Task.FromResult(DataResponses.Dequeue());
+                if (DataExceptions.Count > 0)
+                    throw DataExceptions.Dequeue();
                 throw new NotSupportedException();
             }
         }

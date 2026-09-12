@@ -15,7 +15,7 @@ namespace Playserv.Data
         string rootFieldName,
         CancellationToken ct);
 
-    public sealed class PlayServRecordSet<T>
+    public sealed partial class PlayServRecordSet<T>
     {
         private readonly PlayServRecordsClient _client;
         private readonly string _explicitEntityId;
@@ -64,14 +64,29 @@ namespace Playserv.Data
             return entity.Capabilities;
         }
 
+        /// <summary>Creates a record with a new SDK-generated idempotency key.</summary>
+        public Task<PlayServRecord<T>> CreateAsync(T value, CancellationToken ct) =>
+            CreateAsync(value, ct, null);
+
+        /// <summary>
+        /// Creates a record. Reuse a caller-provided key only for an identical request in the
+        /// same caller context, within the backend's idempotency retention window.
+        /// Null generates a new key per call; no automatic retry or key persistence is performed.
+        /// </summary>
+        /// <param name="value">The record fields to create.</param>
+        /// <param name="ct">Cancels waiting; cancellation does not roll back an accepted write.</param>
+        /// <param name="idempotencyKey">Optional non-blank key of at most 128 characters, without control characters.</param>
         public async Task<PlayServRecord<T>> CreateAsync(
             T value,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            string idempotencyKey = null)
         {
+            ct.ThrowIfCancellationRequested();
+            PlayServRecordsClient.ValidateCreateIdempotencyKey(idempotencyKey);
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
             var entity = await ResolveForAccessAsync(false, PlayServDataAccessOperation.Write, ct);
-            return await _client.CreateAsync(this, entity, value, ct);
+            return await _client.CreateAsync(this, entity, value, ct, idempotencyKey);
         }
 
         public async Task<PlayServRecord<T>> LoadAsync(
@@ -83,6 +98,61 @@ namespace Playserv.Data
                 throw new ArgumentException("Record ID is required.", nameof(recordId));
             var entity = await ResolveForAccessAsync(false, PlayServDataAccessOperation.Read, ct);
             return await _client.LoadAsync(this, entity, recordId, options, ct);
+        }
+
+        /// <summary>Loads one record through the backend's indexed natural-key endpoint.</summary>
+        public async Task<PlayServRecord<T>> LoadByNaturalKeyAsync(
+            PlayServNaturalKey<T> naturalKey,
+            PlayServLoadOptions options = null,
+            CancellationToken ct = default)
+        {
+            if (naturalKey == null)
+                throw new ArgumentNullException(nameof(naturalKey));
+            var entity = await ResolveForAccessAsync(false, PlayServDataAccessOperation.Read, ct);
+            var record = await _client.FindByNaturalKeyAsync(this, entity, naturalKey, ct, options);
+            if (record == null)
+            {
+                throw new PlayServRecordNotFoundException(
+                    $"No record matched natural key '{naturalKey.Field}'.",
+                    "not_found",
+                    new Dictionary<string, object>
+                    {
+                        ["field"] = naturalKey.Field,
+                        ["value"] = naturalKey.Value
+                    },
+                    null);
+            }
+            return record;
+        }
+
+        /// <summary>Creates 1-200 records atomically and returns their server-minted IDs.</summary>
+        public Task<PlayServBulkCreateResult> BulkCreateAsync(
+            IEnumerable<T> values,
+            IReadOnlyDictionary<string, object> defaults,
+            CancellationToken ct) => BulkCreateAsync(values, defaults, ct, null);
+
+        /// <summary>
+        /// Creates 1-200 records in one atomic request. Reuse a key only with the same rows,
+        /// row order and defaults in the same caller context, within backend retention.
+        /// Null generates a new key per call; no automatic retry or key persistence is performed.
+        /// </summary>
+        /// <param name="values">The ordered record fields to create.</param>
+        /// <param name="defaults">Optional default fields for every row.</param>
+        /// <param name="ct">Cancels waiting; cancellation does not roll back an accepted write.</param>
+        /// <param name="idempotencyKey">Optional non-blank key of at most 128 characters, without control characters.</param>
+        public async Task<PlayServBulkCreateResult> BulkCreateAsync(
+            IEnumerable<T> values,
+            IReadOnlyDictionary<string, object> defaults = null,
+            CancellationToken ct = default,
+            string idempotencyKey = null)
+        {
+            ct.ThrowIfCancellationRequested();
+            PlayServRecordsClient.ValidateCreateIdempotencyKey(idempotencyKey);
+            if (values == null)
+                throw new ArgumentNullException(nameof(values));
+            var snapshot = values.ToList();
+            var entity = await ResolveForAccessAsync(false, PlayServDataAccessOperation.Write, ct);
+            return await _client.BulkCreateAsync(entity, snapshot, defaults, ct, idempotencyKey);
         }
 
         public async Task<PlayServLoadOrCreateResult<T>> LoadOrCreateAsync(
@@ -146,6 +216,25 @@ namespace Playserv.Data
                         ["field"] = naturalKey.Field
                     });
             }
+        }
+
+        /// <summary>
+        /// Reads a known saved View using its server-defined filters, sorting and hidden columns.
+        /// Pagination defaults to 50 records (1–200). Every returned handle is partial: explicitly
+        /// call ReloadAsync before editing/saving. No hydration, realtime View or View management is performed.
+        /// Server and acting-player callers retain server-authorized read access.
+        /// </summary>
+        public async Task<PlayServRecordPage<T>> QueryViewAsync(
+            string viewId,
+            PlayServPagination pagination = null,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(viewId) || viewId.Any(char.IsControl))
+                throw new ArgumentException("A non-empty View ID without control characters is required.", nameof(viewId));
+            pagination = pagination ?? new PlayServPagination();
+            var entity = await ResolveForAccessAsync(false, PlayServDataAccessOperation.Read, ct);
+            return await _client.QueryViewAsync(this, entity, viewId, pagination, ct);
         }
 
         public async Task<PlayServRecordPage<T>> QueryAsync(
@@ -212,7 +301,7 @@ namespace Playserv.Data
             return new PlayServLoadAllResult<T>(records, false, null);
         }
 
-        /// <summary>Loads record IDs concurrently while preserving input order.</summary>
+        /// <summary>Batch-queries IDs while preserving order and per-item failures. Projections use point loads.</summary>
         public Task<PlayServBulkResult<PlayServRecord<T>>> LoadManyAsync(
             IEnumerable<string> recordIds,
             PlayServLoadOptions options = null,
@@ -220,12 +309,12 @@ namespace Playserv.Data
             CancellationToken ct = default)
         {
             var ids = ValidateRecordIds(recordIds, nameof(recordIds));
-            return ExecuteBulkAsync(
-                ids,
-                id => id,
-                (id, token) => LoadAsync(id, options, token),
-                maxConcurrency,
-                ct);
+            if ((options?.Fields?.Count ?? 0) > 0 || (options?.Expand?.Count ?? 0) > 0)
+            {
+                return ExecuteBulkAsync(ids, id => id,
+                    (id, token) => LoadAsync(id, options, token), maxConcurrency, ct);
+            }
+            return LoadManyBatchedAsync(ids, maxConcurrency, ct);
         }
 
         /// <summary>
@@ -238,7 +327,7 @@ namespace Playserv.Data
             CancellationToken ct = default) =>
             LoadAsync(relationRecordId, options, ct);
 
-        /// <summary>Populates relation target IDs with bounded point-GET fan-out.</summary>
+        /// <summary>Populates relation target IDs through the same bounded batch-read pipeline.</summary>
         public Task<PlayServBulkResult<PlayServRecord<T>>> PopulateManyAsync(
             IEnumerable<string> relationRecordIds,
             PlayServLoadOptions options = null,
@@ -351,6 +440,43 @@ namespace Playserv.Data
             }
 
             return await BulkDeleteAsync(loaded.Records, maxConcurrency, ct);
+        }
+
+        /// <summary>
+        /// Deletes the complete matching set in one backend transaction. The backend caps a
+        /// single transaction at 200 records and refuses filters it cannot serve from an index.
+        /// </summary>
+        public async Task<PlayServDeleteByFilterResult> DeleteMatchingAsync(
+            PlayServRecordQuery<T> query,
+            PlayServDeleteAllConfirmation confirmation,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            query = query ?? new PlayServRecordQuery<T>();
+            var snapshot = query.Snapshot();
+            QueryBuilder.ValidateRestCapabilities(snapshot);
+            if (snapshot.Sort.Count > 0 || !string.IsNullOrWhiteSpace(snapshot.Cursor) ||
+                snapshot.HiddenColumns.Count > 0 || snapshot.SelectedFields.Count > 0 ||
+                snapshot.Includes.Count > 0)
+            {
+                throw new ArgumentException(
+                    "Atomic delete accepts only Search and Where filters; sorting, cursors, projection and Include do not define a delete set.",
+                    nameof(query));
+            }
+
+            var restricted = snapshot.Filters.Count > 0 || !string.IsNullOrWhiteSpace(snapshot.SearchText);
+            var expected = restricted
+                ? PlayServDeleteAllConfirmation.MatchingRecords
+                : PlayServDeleteAllConfirmation.AllRecords;
+            if (confirmation != expected)
+            {
+                throw new InvalidOperationException(restricted
+                    ? "A filtered atomic delete requires MatchingRecords confirmation."
+                    : "Deleting every record atomically requires explicit AllRecords confirmation.");
+            }
+
+            var entity = await ResolveForAccessAsync(false, PlayServDataAccessOperation.Write, ct);
+            return await _client.DeleteByFilterAsync(entity, query, !restricted, ct);
         }
 
         /// <summary>

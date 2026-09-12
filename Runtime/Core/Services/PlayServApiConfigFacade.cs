@@ -62,35 +62,19 @@ namespace Playserv.Wrapper
                 throw new ArgumentNullException(nameof(settings));
 
             _settings = settings.Clone();
-            if (ShouldDeferAutomaticPlayerAuthentication(_settings))
-            {
-                PlayServRuntimeSettingsService.EnsureConfigured(_settings, allowMissingUserId: true);
-                return;
-            }
-
             ApplySettings(_settings);
         }
 
         public void Config(
             string clientToken,
-            string gameId,
-            string userId,
             string gameVersion,
             string sdkVersion = null)
         {
-            if (string.IsNullOrWhiteSpace(gameId))
-                throw new ArgumentException("Game ID is required.", nameof(gameId));
-
-            if (string.IsNullOrWhiteSpace(userId))
-                throw new ArgumentException("User ID is required.", nameof(userId));
-
             if (string.IsNullOrWhiteSpace(gameVersion))
                 throw new ArgumentException("Game version is required.", nameof(gameVersion));
 
             var settings = GetOrCreateSettings();
             settings.ClientToken = clientToken ?? string.Empty;
-            settings.GameId = gameId;
-            settings.UserId = userId;
             settings.GameVersion = gameVersion;
 
             if (!string.IsNullOrWhiteSpace(sdkVersion))
@@ -116,11 +100,11 @@ namespace Playserv.Wrapper
                 Disconnect();
         }
 
-        public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
+        public Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default)
         {
 #if UNITY_5_3_OR_NEWER
             var settings = GetOrCreateSettings();
-            return GetLatestVersionOrFallbackAsync(settings, gameId, ct);
+            return GetLatestVersionOrFallbackAsync(settings, deploymentId, ct);
 #else
             return Task.FromException<string>(
                 new PlatformNotSupportedException("Latest version lookup requires Unity runtime."));
@@ -212,20 +196,10 @@ namespace Playserv.Wrapper
             return string.Equals(uri.Scheme, WebRtcScheme, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool ShouldDeferAutomaticPlayerAuthentication(PlayServSettings settings)
-        {
-            return settings != null &&
-                   settings.EnableAutomaticPlayerAuthentication &&
-                   string.IsNullOrWhiteSpace(settings.UserId) &&
-                   !string.IsNullOrWhiteSpace(settings.ClientToken) &&
-                   settings.RuntimeTokenProvider == null &&
-                   string.IsNullOrWhiteSpace(settings.PlayerAccessToken);
-        }
-
 #if UNITY_5_3_OR_NEWER
         private static async Task<string> GetLatestVersionOrFallbackAsync(
             PlayServSettings settings,
-            string gameId,
+            string deploymentId,
             CancellationToken ct = default)
         {
             if (settings == null)
@@ -239,7 +213,7 @@ namespace Playserv.Wrapper
                     new PlayServHttpModuleContext(
                         settings.ToRuntimeSettings(),
                         PlayServJsonCompositionRoot.CreateDefaultJsonCodec()));
-                var latestVersion = await httpClient.GetLatestVersionAsync(gameId, ct);
+                var latestVersion = await httpClient.GetLatestVersionAsync(deploymentId, ct);
                 PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version resolved from deployment API: {latestVersion}");
                 return latestVersion;
             }
@@ -247,7 +221,7 @@ namespace Playserv.Wrapper
             {
                 PlayServLog.TraceWarning(
                     PlayServLogCategory.Http,
-                    $"Failed to fetch latest game version for gameId={gameId}. " +
+                    $"Failed to fetch latest game version for deploymentId={deploymentId}. " +
                     $"Falling back to configured GameVersion={fallbackVersion}. Error: {ex.Message}");
                 return fallbackVersion;
             }
@@ -267,7 +241,7 @@ namespace Playserv.Wrapper
 #else
         private static Task<string> GetLatestVersionOrFallbackAsync(
             PlayServSettings settings,
-            string gameId,
+            string deploymentId,
             CancellationToken ct = default)
         {
             return Task.FromException<string>(

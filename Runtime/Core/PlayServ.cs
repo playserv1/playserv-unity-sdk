@@ -74,11 +74,9 @@ namespace Playserv.Wrapper
         /// </summary>
         public static void Config(
             string clientToken,
-            string gameId,
-            string userId,
             string gameVersion,
             string sdkVersion = null) =>
-            ConnectionApi.Config(clientToken, gameId, userId, gameVersion, sdkVersion);
+            ConnectionApi.Config(clientToken, gameVersion, sdkVersion);
 
         /// <summary>
         /// Sets the runtime-only provider used to obtain the current player JWT.
@@ -114,10 +112,10 @@ namespace Playserv.Wrapper
             ConnectionApi.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
         /// <summary>
-        /// Requests latest deployed game version from deployment API by game identifier.
+        /// Requests latest deployed game version from the Editor deployment API.
         /// </summary>
-        public static Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
-            ConnectionApi.GetLatestVersionAsync(gameId, ct);
+        public static Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default) =>
+            ConnectionApi.GetLatestVersionAsync(deploymentId, ct);
 
         /// <summary>
         /// Returns low-level transport implementation used by SDK.

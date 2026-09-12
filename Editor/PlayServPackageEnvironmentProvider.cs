@@ -151,7 +151,7 @@ namespace Playserv.Editor
                 return;
 
             AssignIfSet(value => target.ClientToken = value, defaults.ClientToken);
-            AssignIfSet(value => target.GameId = value, defaults.GameId);
+            AssignIfSet(value => target.DeploymentGameId = value, defaults.DeploymentGameId);
             AssignIfSet(value => target.BackendServerAddress = value, defaults.BackendServerAddress);
             AssignIfSet(value => target.WebRtcSignalingServerAddress = value, defaults.WebRtcSignalingServerAddress);
             AssignIfSet(value => target.WebRtcDataChannelLabel = value, defaults.WebRtcDataChannelLabel);
@@ -178,7 +178,10 @@ namespace Playserv.Editor
                 return;
 
             AssignIfMissing(value => target.ClientToken = value, target.ClientToken, defaults.ClientToken);
-            AssignIfMissing(value => target.GameId = value, target.GameId, defaults.GameId);
+            AssignIfMissing(
+                value => target.DeploymentGameId = value,
+                target.DeploymentGameId,
+                defaults.DeploymentGameId);
             AssignIfMissing(
                 value => target.BackendServerAddress = value,
                 target.BackendServerAddress,

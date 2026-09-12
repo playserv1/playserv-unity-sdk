@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-12
+
+- Aligned the package and internal PlayServ dependency versions with `0.5.0`.
+
+- Removed legacy runtime game/user identity inputs from the connection popup;
+  the optional deployment ID is retained only for Editor version tooling.
+
 ## [0.4.1] - 2026-08-23
 
 - Aligned the package, core SDK, Analytics, and Game Server dependency versions

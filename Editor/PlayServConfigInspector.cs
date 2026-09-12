@@ -10,8 +10,7 @@ namespace Playserv.Editor
         private static readonly string[] EditablePropertyOrder =
         {
             "clientToken",
-            "gameId",
-            "userId",
+            "deploymentGameId",
             "gameVersion",
             "allowMultipleConnections",
             "keepAlivePingIntervalMs",

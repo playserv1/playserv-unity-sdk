@@ -289,7 +289,6 @@ namespace Playserv.DebugTerminal.GameServer
                         var connected = await PlayServGameServer.Realtime.ConnectAsync(
                             new PlayServGameServerRealtimeOptions
                             {
-                                GameId = arguments.Get("game-id"),
                                 InstanceId = arguments.Get("instance-id"),
                                 GameVersion = arguments.Get("game-version"),
                                 KeepAliveInterval = TimeSpan.FromSeconds(keepalive),

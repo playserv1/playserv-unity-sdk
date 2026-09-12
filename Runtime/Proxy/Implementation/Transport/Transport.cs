@@ -29,9 +29,16 @@ namespace Playserv.Proxy.Implementation
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
 
-            var envelopeCodec = new MessageEnvelopeCodec(ResolveEnvelopeJsonCodec(serializer));
+            var jsonCodec = ResolveEnvelopeJsonCodec(serializer);
+            var envelopeCodec = new MessageEnvelopeCodec(jsonCodec);
+            var logRedactor = new TransportLogRedactor(jsonCodec);
             _channelRegistry = new TransportChannelRegistry();
-            _receiver = new TransportReceiver(serializer, envelopeCodec, logger, _channelRegistry);
+            _receiver = new TransportReceiver(
+                serializer,
+                envelopeCodec,
+                logger,
+                _channelRegistry,
+                logRedactor);
             _connectionLifecycle = new TransportConnectionLifecycle(
                 implementation,
                 logger,
@@ -43,7 +50,8 @@ namespace Playserv.Proxy.Implementation
                 serializer,
                 envelopeCodec,
                 logger,
-                () => _isDisposed);
+                () => _isDisposed,
+                logRedactor);
         }
 
         public System.Threading.Tasks.Task<bool> Connect()

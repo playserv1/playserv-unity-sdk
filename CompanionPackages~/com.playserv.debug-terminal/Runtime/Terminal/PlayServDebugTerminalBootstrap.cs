@@ -40,7 +40,7 @@ namespace Playserv.DebugTerminal
         private string _popupError = string.Empty;
         private PlayServSettings _projectDefaults;
         private string _draftClientToken = string.Empty;
-        private string _draftGameId = string.Empty;
+        private string _draftDeploymentGameId = string.Empty;
         private string _draftGameVersion = string.Empty;
         private string _draftBackendServerAddress = string.Empty;
         private bool _draftAllowMultipleConnections = true;
@@ -194,8 +194,8 @@ namespace Playserv.DebugTerminal
                     fieldStyle);
                 rowY += FieldRowHeight;
                 DrawTextField(
-                    "Game ID",
-                    ref _draftGameId,
+                    "Deployment ID (optional)",
+                    ref _draftDeploymentGameId,
                     contentX,
                     inputX,
                     rowY,
@@ -368,7 +368,7 @@ namespace Playserv.DebugTerminal
             error = string.Empty;
 
             var clientToken = _draftClientToken?.Trim() ?? string.Empty;
-            var gameId = _draftGameId?.Trim() ?? string.Empty;
+            var deploymentGameId = _draftDeploymentGameId?.Trim() ?? string.Empty;
             var gameVersion = _draftGameVersion?.Trim() ?? string.Empty;
             var backendServerAddress = _draftBackendServerAddress?.Trim() ?? string.Empty;
 
@@ -390,12 +390,6 @@ namespace Playserv.DebugTerminal
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(gameId))
-            {
-                error = "Game ID is required.";
-                return false;
-            }
-
             if (string.IsNullOrWhiteSpace(gameVersion))
             {
                 error = "Game Version is required.";
@@ -407,7 +401,7 @@ namespace Playserv.DebugTerminal
 
             settings = (_projectDefaults ?? BuildSettingsFromConfig()).Clone();
             settings.ClientToken = clientToken;
-            settings.GameId = gameId;
+            settings.DeploymentGameId = deploymentGameId;
             settings.GameVersion = gameVersion;
             settings.ResolveLatestGameVersionOnConnect = false;
             settings.BackendServerAddress = backendServerAddress;
@@ -415,7 +409,6 @@ namespace Playserv.DebugTerminal
             settings.EnableAutomaticPlayerAuthentication = true;
             settings.RuntimeTokenProvider = null;
             settings.PlayerAccessToken = string.Empty;
-            settings.UserId = string.Empty;
             return true;
         }
 
@@ -426,12 +419,10 @@ namespace Playserv.DebugTerminal
 
             settings = settings.Clone();
             settings.EnableAutomaticPlayerAuthentication = true;
-            settings.UserId = string.Empty;
-
             PlayServ.Config(settings);
             ApplyResolvedEndpointsPreview(settings);
             Debug.Log(
-                $"[PlayServ][Sample] Configured. gameId={settings.GameId}, source={source}, backend={settings.BackendServerAddress}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
+                $"[PlayServ][Sample] Configured. source={source}, backend={settings.BackendServerAddress}, pingInterval={settings.KeepAlivePingIntervalMs}ms, pongTimeout={settings.KeepAlivePongTimeoutMs}ms");
         }
 
         private void LoadPopupDefaults(PlayServSettings settings)
@@ -440,7 +431,7 @@ namespace Playserv.DebugTerminal
                 settings = new PlayServSettings();
 
             _draftClientToken = settings.ClientToken ?? string.Empty;
-            _draftGameId = settings.GameId ?? string.Empty;
+            _draftDeploymentGameId = settings.DeploymentGameId ?? string.Empty;
             _draftGameVersion = settings.GameVersion ?? string.Empty;
             _draftBackendServerAddress = settings.BackendServerAddress ?? string.Empty;
             _draftAllowMultipleConnections = settings.AllowMultipleConnections;

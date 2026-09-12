@@ -5,6 +5,23 @@ Each sample can be launched as a standalone scene and then adapted to your game 
 
 ## What is included
 
+For typed function/RPC response contracts, opt into strict JSON types per call:
+
+```csharp
+var code = await PlayServCode.CallAsync<RewardResponse>("reward", new { round = 1 },
+    new PlayServFunctionCallOptions { StrictResponseTypes = true });
+var rpc = await PlayServRpc.InvokeAsync<MatchRequest, MatchResponse>(
+    "MatchService", "Find", request,
+    new PlayServRpcInvokeOptions { StrictResponseTypes = true });
+```
+
+`RewardResponse`, `MatchRequest` and `MatchResponse` are game-owned DTOs. Import
+`Playserv.Wrapper`, `Playserv.Code` and `Playserv.RPC`. Handle `IsSuccess` before
+using `Value`. Strict mismatches return `Deserialization` (Code) or
+`DeserializationFailed` (RPC), without field values in error diagnostics. Use a
+JSON string, not plain text, for strict string results. The default remains
+compatible/coercing. Unsupported converters/codecs fail before a request is sent.
+
 - `Identity/PlayServIdentityLifecycleSample.cs` - provider discovery, safe
   link/conflict/merge flow, unlink, automatic mobile fingerprint configuration,
   and custom fingerprint fallback construction.
@@ -13,6 +30,8 @@ Each sample can be launched as a standalone scene and then adapted to your game 
   verified natural-key load-or-create, cursor-based LoadAll, bounded LoadMany,
   typed realtime collection subscriptions, and backend-wins synchronization
   for individual record handles.
+  `LoadSavedViewAsync` demonstrates paged saved-View reads; `RenameViewItemAsync`
+  reloads the partial View handle before editing so hidden fields are not lost.
 - `Commerce/PlayServCommerceSample.cs` - paged live storefront discovery and
   typed catalog item loading over the runtime HTTP API.
 - `Status/PlayServStatusSample.cs` - credential-free current health, daily
@@ -90,33 +109,28 @@ Shows event channels for global, group, and user-targeted scenarios.
 ### What it demonstrates
 - Subscription: `PlayServEvents.Subscribe<SampleChatEvent>(...)`.
 - Group membership: `PlayServEvents.SubscribeGroupAsync(groupName)` and `PlayServEvents.UnsubscribeGroupAsync(groupName)`.
-- Publishing:
-  - `PlayServEvents.Publish(...)`,
-  - `PlayServEvents.PublishForGroup(...)`,
-  - `PlayServEvents.PublishForUser(...)`.
+- Typed capability rejection for the legacy `PlayServEvents.Publish*` methods;
+  the current backend supports subscriptions but not client event publishing.
 - Safe unsubscription via `Dispose()`.
 
 ### How to use
 1. Connect to SDK.
 2. Click `Subscribe`.
 3. Click `Join Group` if you want to receive group-scoped events for the configured group.
-4. Send events with:
+4. The legacy publish buttons demonstrate the immediate typed capability error;
+   use RPC, Code or Records for client-to-server messages.
    - `Publish Global`,
    - `Publish Group`,
    - `Publish User`.
 5. Check incoming messages in `Logs`.
 6. Click `Leave Group` and `Unsubscribe` when done.
 
-Important:
-- Group event delivery requires both:
-  - `PlayServEvents.Subscribe<SampleChatEvent>(...)`
-  - `PlayServEvents.SubscribeGroupAsync(groupName)`
-- Publishing to a group does not automatically join that group.
+Important: group event delivery requires both the typed event subscription and
+`PlayServEvents.SubscribeGroupAsync(groupName)`.
 
 ### What you can build with it
-- Chat, notifications, and system alerts.
-- Group broadcasts (lobby, match, clan).
-- User-targeted messaging.
+- Receive backend-originated notifications and system events.
+- Observe group-scoped lobby, match or clan events.
 
 ---
 

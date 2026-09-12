@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -239,7 +240,33 @@ namespace Playserv.Wrapper
             var authority = Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
                 ? uri.Authority
                 : endpoint;
-            return $"{settings.GameId?.Trim()}.{authority}";
+            var legacyScope = settings.DeploymentGameId?.Trim();
+            if (!string.IsNullOrWhiteSpace(legacyScope))
+                return $"{legacyScope}.{authority}";
+
+            // The public client token identifies the backend project. Keep the token
+            // itself out of PlayerPrefs keys while separating projects on one host.
+            var token = settings.ClientToken?.Trim() ?? string.Empty;
+            return $"{ComputeSessionScopeHash(token)}.{authority}";
+        }
+
+        private static string ComputeSessionScopeHash(string clientToken)
+        {
+            byte[] digest;
+            using (var sha256 = SHA256.Create())
+            {
+                digest = sha256.ComputeHash(
+                    Encoding.UTF8.GetBytes("playserv-session-scope-v1\0" + clientToken));
+            }
+
+            var result = new char[digest.Length * 2];
+            const string hex = "0123456789abcdef";
+            for (var index = 0; index < digest.Length; index++)
+            {
+                result[index * 2] = hex[digest[index] >> 4];
+                result[index * 2 + 1] = hex[digest[index] & 0x0f];
+            }
+            return new string(result);
         }
 
         public void Dispose()

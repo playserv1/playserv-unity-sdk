@@ -20,7 +20,7 @@ using Playserv.Wrapper;
 
 namespace Playserv.Tests.Runtime
 {
-    public sealed class PlayServTypedRecordsTests
+    public sealed partial class PlayServTypedRecordsTests
     {
         [Test]
         public void PublicCatalogueMetadataLookupAndRecordsResolutionShareOneSnapshot()
@@ -103,6 +103,104 @@ namespace Playserv.Tests.Runtime
             Assert.That(fake.Requests[1].JsonBody, Does.Not.Contain("client-id-must-not-be-sent"));
             Assert.That(fake.Requests[1].JsonBody, Does.Not.Contain("Ignored"));
             Assert.That(fake.Requests[1].IdempotencyKey, Is.Not.Empty);
+        }
+
+        [Test]
+        public void Bulk_create_uses_atomic_endpoint_and_preserves_server_id_order()
+        {
+            var fake = new FakeDataHttpClient();
+            fake.EnqueueJson(200, "{\"ids\":[\"rec_first\",\"rec_second\"],\"created\":2}");
+            var set = CreateSet<InventoryItem>(fake, "ent_inventory");
+
+            var result = set.BulkCreateAsync(
+                new[]
+                {
+                    new InventoryItem { Code = "sword", DisplayName = "Sword" },
+                    new InventoryItem { Code = "shield", DisplayName = "Shield" }
+                },
+                new Dictionary<string, object> { ["rarity"] = "common" })
+                .GetAwaiter().GetResult();
+
+            Assert.That(result.CreatedCount, Is.EqualTo(2));
+            Assert.That(result.RecordIds, Is.EqualTo(new[] { "rec_first", "rec_second" }));
+            Assert.That(fake.Requests, Has.Count.EqualTo(1));
+            Assert.That(fake.Requests[0].Method, Is.EqualTo("POST"));
+            Assert.That(fake.Requests[0].RelativePath,
+                Is.EqualTo("data/tables/ent_inventory/records:bulk-create"));
+            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"defaults\":{\"rarity\":\"common\"}"));
+            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"records\":["));
+            Assert.That(fake.Requests[0].IdempotencyKey, Is.Not.Empty);
+        }
+
+        [Test]
+        public void Bulk_create_rejects_invalid_batch_before_io()
+        {
+            var fake = new FakeDataHttpClient();
+            var set = CreateSet<InventoryItem>(fake, "ent_inventory");
+
+            CaptureExceptionAsync<ArgumentOutOfRangeException>(() =>
+                set.BulkCreateAsync(Array.Empty<InventoryItem>())).GetAwaiter().GetResult();
+
+            Assert.That(fake.Requests, Is.Empty);
+        }
+
+        [Test]
+        public void Natural_key_load_uses_indexed_endpoint_with_projection_and_expand()
+        {
+            var fake = new FakeDataHttpClient();
+            fake.EnqueueJson(200, RecordJson("rec_server", "two words", "Sword"), "\"a1\"");
+            var set = CreateSet<InventoryItem>(fake, "ent_inventory");
+
+            var record = set.LoadByNaturalKeyAsync(
+                PlayServNaturalKey<InventoryItem>.For(item => item.Code, "two words"),
+                new PlayServLoadOptions
+                {
+                    Fields = new[] { "code_wire" },
+                    Expand = new[] { "owner_relation" }
+                })
+                .GetAwaiter().GetResult();
+
+            Assert.That(record.Id, Is.EqualTo("rec_server"));
+            Assert.That(record.IsPartial, Is.True);
+            Assert.That(fake.Requests[0].Method, Is.EqualTo("GET"));
+            Assert.That(fake.Requests[0].RelativePath, Is.EqualTo(
+                "data/tables/ent_inventory/records:by-natural-key?field=code_wire&value=two%20words&fields=code_wire&expand=owner_relation"));
+        }
+
+        [Test]
+        public void Delete_matching_uses_one_atomic_filtered_request()
+        {
+            var fake = new FakeDataHttpClient();
+            fake.EnqueueJson(200, "{\"ids\":[\"rec_first\",\"rec_second\"],\"deleted\":2}");
+            var set = CreateSet<InventoryItem>(fake, "ent_inventory");
+            var query = new PlayServRecordQuery<InventoryItem>()
+                .Where(item => item.Code, PlayServQueryOperator.Eq, "obsolete");
+
+            var result = set.DeleteMatchingAsync(
+                query,
+                PlayServDeleteAllConfirmation.MatchingRecords).GetAwaiter().GetResult();
+
+            Assert.That(result.DeletedCount, Is.EqualTo(2));
+            Assert.That(result.RecordIds, Is.EqualTo(new[] { "rec_first", "rec_second" }));
+            Assert.That(fake.Requests, Has.Count.EqualTo(1));
+            Assert.That(fake.Requests[0].Method, Is.EqualTo("POST"));
+            Assert.That(fake.Requests[0].RelativePath,
+                Is.EqualTo("data/tables/ent_inventory/records:delete-by-filter"));
+            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"field\":\"code_wire\""));
+            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"all\":null"));
+        }
+
+        [Test]
+        public void Delete_matching_requires_explicit_all_confirmation_before_io()
+        {
+            var fake = new FakeDataHttpClient();
+            var set = CreateSet<InventoryItem>(fake, "ent_inventory");
+
+            CaptureExceptionAsync<InvalidOperationException>(() => set.DeleteMatchingAsync(
+                null,
+                PlayServDeleteAllConfirmation.MatchingRecords)).GetAwaiter().GetResult();
+
+            Assert.That(fake.Requests, Is.Empty);
         }
 
         [Test]
@@ -249,7 +347,7 @@ namespace Playserv.Tests.Runtime
                 "ent_inventory", "InventoryItem", false, "owner", true, false);
             fake.EnqueueCatalogueJson(readOnly);
             fake.EnqueueCatalogueJson(readOnly);
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
             var factoryCalls = 0;
 
@@ -264,7 +362,7 @@ namespace Playserv.Tests.Runtime
 
             Assert.That(factoryCalls, Is.Zero);
             Assert.That(fake.Requests.Count, Is.EqualTo(1));
-            Assert.That(fake.Requests[0].RelativePath, Does.EndWith("/records:query"));
+            Assert.That(fake.Requests[0].RelativePath, Does.Contain("/records:by-natural-key?"));
         }
 
         [Test]
@@ -498,12 +596,7 @@ namespace Playserv.Tests.Runtime
         public void Load_many_preserves_input_order_and_returns_typed_item_failures()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, RecordJson("rec_1", "sword", "Sword"), "\"a1\"");
-            fake.EnqueueException(HttpError(
-                404,
-                "record_not_found",
-                "{\"code\":\"record_not_found\"}"));
-            fake.EnqueueJson(200, RecordJson("rec_3", "bow", "Bow"), "\"a3\"");
+            fake.EnqueueJson(200, QueryPageJson(RecordJson("rec_3", "bow", "Bow"), RecordJson("rec_1", "sword", "Sword")));
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
 
             var result = set.LoadManyAsync(
@@ -603,8 +696,7 @@ namespace Playserv.Tests.Runtime
         public void Populate_many_uses_target_record_set_and_bounded_load_many_pipeline()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, RecordJson("rec_owner_1", "ada", "Ada"), "\"o1\"");
-            fake.EnqueueJson(200, RecordJson("rec_owner_2", "lin", "Lin"), "\"o2\"");
+            fake.EnqueueJson(200, QueryPageJson(RecordJson("rec_owner_1", "ada", "Ada"), RecordJson("rec_owner_2", "lin", "Lin")));
             var targetSet = CreateSet<InventoryItem>(fake, "ent_inventory");
 
             var result = targetSet.PopulateManyAsync(
@@ -1037,7 +1129,7 @@ namespace Playserv.Tests.Runtime
         public void Load_or_create_does_not_call_factory_for_existing_record()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson(RecordJson("rec_existing", "sword", "Sword")));
+            fake.EnqueueJson(200, RecordJson("rec_existing", "sword", "Sword"), "\"a1\"");
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
             var calls = 0;
 
@@ -1052,17 +1144,16 @@ namespace Playserv.Tests.Runtime
             Assert.That(result.WasCreated, Is.False);
             Assert.That(result.Record.Id, Is.EqualTo("rec_existing"));
             Assert.That(calls, Is.Zero);
-            Assert.That(fake.Requests[0].RelativePath, Is.EqualTo("data/tables/ent_inventory/records:query"));
-            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"field\":\"code_wire\""));
-            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"op\":\"eq\""));
-            Assert.That(fake.Requests[0].JsonBody, Does.Contain("\"limit\":2"));
+            Assert.That(fake.Requests[0].Method, Is.EqualTo("GET"));
+            Assert.That(fake.Requests[0].RelativePath,
+                Is.EqualTo("data/tables/ent_inventory/records:by-natural-key?field=code_wire&value=sword"));
         }
 
         [Test]
         public void Load_or_create_verifies_created_server_id()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             fake.EnqueueJson(201, RecordJson("rec_created", "sword", "Mine"), "\"a1\"");
             fake.EnqueueJson(200, RecordJson("rec_created", "sword", "Mine"), "\"a2\"");
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
@@ -1084,10 +1175,10 @@ namespace Playserv.Tests.Runtime
         public void Load_or_create_recovers_phantom_create_with_second_query()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             fake.EnqueueJson(201, RecordJson("rec_phantom", "sword", "Mine"), "\"a1\"");
             fake.EnqueueException(HttpError(404, "record_not_found", "{}"));
-            fake.EnqueueJson(200, QueryPageJson(RecordJson("rec_racer", "sword", "Racer")));
+            fake.EnqueueJson(200, RecordJson("rec_racer", "sword", "Racer"), "\"a2\"");
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
 
             var result = set.LoadOrCreateAsync(
@@ -1097,17 +1188,17 @@ namespace Playserv.Tests.Runtime
             Assert.That(result.WasCreated, Is.False);
             Assert.That(result.Record.Id, Is.EqualTo("rec_racer"));
             Assert.That(fake.Requests.Count, Is.EqualTo(4));
-            Assert.That(fake.Requests[3].RelativePath, Is.EqualTo("data/tables/ent_inventory/records:query"));
+            Assert.That(fake.Requests[3].RelativePath, Does.Contain("/records:by-natural-key?"));
         }
 
         [Test]
         public void Load_or_create_reports_created_record_not_persisted_when_recovery_is_empty()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             fake.EnqueueJson(201, RecordJson("rec_phantom", "sword", "Mine"), "\"a1\"");
             fake.EnqueueException(HttpError(404, "record_not_found", "{}"));
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
 
             var exception = CaptureExceptionAsync<PlayServDataException>(() =>
@@ -1122,16 +1213,17 @@ namespace Playserv.Tests.Runtime
         }
 
         [Test]
-        public void Load_or_create_rejects_non_unique_query_result()
+        public void Load_or_create_surfaces_non_unique_natural_key_conflict()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson(
-                RecordJson("rec_1", "sword", "One"),
-                RecordJson("rec_2", "sword", "Two")));
+            fake.EnqueueException(HttpError(
+                409,
+                "natural_key_not_unique",
+                "{\"code\":\"natural_key_not_unique\",\"detail\":\"duplicate natural key\"}"));
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
             var calls = 0;
 
-            var exception = CaptureExceptionAsync<PlayServDataException>(() =>
+            var exception = CaptureExceptionAsync<PlayServRecordConflictException>(() =>
                 set.LoadOrCreateAsync(
                     PlayServNaturalKey<InventoryItem>.For(item => item.Code, "sword"),
                     () =>
@@ -1149,7 +1241,7 @@ namespace Playserv.Tests.Runtime
         public void Load_or_create_rejects_factory_natural_key_mismatch_before_create()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
 
             CaptureExceptionAsync<InvalidOperationException>(() =>
@@ -1164,7 +1256,7 @@ namespace Playserv.Tests.Runtime
         public void Load_or_create_does_not_mask_unrelated_conflict()
         {
             var fake = new FakeDataHttpClient();
-            fake.EnqueueJson(200, QueryPageJson());
+            fake.EnqueueException(HttpError(404, "not_found", "{}"));
             fake.EnqueueException(HttpError(409, "conflict", "{\"code\":\"conflict\"}"));
             var set = CreateSet<InventoryItem>(fake, "ent_inventory");
 
@@ -1722,6 +1814,7 @@ namespace Playserv.Tests.Runtime
 
         private sealed class FakeDataHttpClient : IPlayServRuntimeHttpClient
         {
+            public Func<PlayServRuntimeDataRequest, CancellationToken, Task<PlayServRuntimeDataResponse>> DataHandler;
             private readonly Queue<Func<PlayServRuntimeDataResponse>> _responses =
                 new Queue<Func<PlayServRuntimeDataResponse>>();
             private readonly Queue<Func<PlayServRuntimeDataResponse>> _catalogueResponses =
@@ -1762,6 +1855,7 @@ namespace Playserv.Tests.Runtime
                 if (request.RelativePath == "data/tables" && _catalogueResponses.Count > 0)
                     return Task.FromResult(_catalogueResponses.Dequeue()());
                 Requests.Add(request);
+                if (DataHandler != null) return DataHandler(request, ct);
                 return Task.FromResult(_responses.Dequeue()());
             }
 

@@ -35,9 +35,10 @@ namespace Playserv.Wrapper
             Message = message;
             UnifiedError = PlayServError.FromTransport(
                 (int)code,
-                code.ToString(),
+                code == TransportErrorCode.GroupSubscriptionLimitReached
+                    ? "group_subscription_limit_reached" : code.ToString(),
                 message,
-                retryable,
+                code != TransportErrorCode.GroupSubscriptionLimitReached && retryable,
                 rawDetails);
         }
 
@@ -54,6 +55,15 @@ namespace Playserv.Wrapper
             TransportErrorCode.ConnectionLimitReached => new TransportError(code, "Connection limit reached. Please try again later.", retryable: true),
             TransportErrorCode.SessionForceRejected => new TransportError(code, "Connection rejected. Server is in maintenance mode."),
             TransportErrorCode.ForcedDisconnect => new TransportError(code, "Connection was terminated by the server."),
+            TransportErrorCode.PlayerCredentialRequired => new TransportError(
+                code,
+                "A signed-in player credential is required to open this connection."),
+            TransportErrorCode.GroupOutsideProject => new TransportError(
+                code,
+                "That group belongs to another project."),
+            TransportErrorCode.GroupSubscriptionLimitReached => new TransportError(
+                code,
+                "The server's group subscription count or group-key length limit was exceeded."),
             _ => new TransportError(code, "Unknown transport error occurred.")
         };
 

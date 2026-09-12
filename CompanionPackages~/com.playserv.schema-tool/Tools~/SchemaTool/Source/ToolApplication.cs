@@ -30,6 +30,7 @@ internal sealed class ToolApplication
             "generate" => Generate("generate", _options.Check),
             "validate" => Generate("validate", checkOnly: true),
             "sync" => Generate("sync", _options.Check),
+            "push" => Push(),
             "watch" => Watch(),
             "doctor" => Doctor(),
             _ => throw new ArgumentException($"Unknown command: {_options.Command}")
@@ -119,6 +120,71 @@ internal sealed class ToolApplication
         return 0;
     }
 
+    private int Push()
+    {
+        var configuration = ProjectConfiguration.Load(_options.ProjectRoot);
+        var generation = SchemaGenerator.Build(_options.ProjectRoot, configuration);
+        if (HasErrors(generation.Analysis.Diagnostics))
+        {
+            var failedResult = ResultFromAnalysis("push", generation.Analysis);
+            failedResult.Success = false;
+            failedResult.Message = "Schema analysis failed. Nothing was pushed.";
+            WriteResult(failedResult, writeHumanDiagnostics: true);
+            return 1;
+        }
+
+        var result = ResultFromAnalysis("push", generation.Analysis);
+        result.PushedSchemaCount = generation.Analysis.Contracts.Count;
+        result.DryRun = _options.DryRun;
+        if (_options.DryRun)
+        {
+            // This builds the exact wire payload without reading credentials or
+            // performing network I/O.
+            SchemaPushPayloadBuilder.Build(
+                generation.Analysis.Contracts,
+                "dry-run-revision");
+            result.Success = true;
+            result.Message =
+                $"Validated code-first push bundle with {result.PushedSchemaCount} schemas; no network request was sent.";
+            WriteResult(result, writeHumanDiagnostics: true);
+            return 0;
+        }
+
+        var endpoint = FirstNonEmpty(
+            _options.Endpoint,
+            configuration.Service.Endpoint,
+            Environment.GetEnvironmentVariable("PLAYSERV_API_URL"));
+        var keyVariable = string.IsNullOrWhiteSpace(
+            configuration.Service.ServerKeyEnvironmentVariable)
+            ? "PLAYSERV_SERVER_KEY"
+            : configuration.Service.ServerKeyEnvironmentVariable.Trim();
+        var serverKey = Environment.GetEnvironmentVariable(keyVariable);
+        if (string.IsNullOrWhiteSpace(serverKey))
+        {
+            throw new InvalidOperationException(
+                $"Set {keyVariable} to an sk_* server key before pushing schemas. " +
+                "Credentials are intentionally not accepted as command-line arguments or config values.");
+        }
+
+        using var client = new SchemaPushClient(
+            TimeSpan.FromSeconds(_options.TimeoutSeconds));
+        var outcome = client.Push(
+            endpoint,
+            serverKey,
+            configuration.Service.ProjectId,
+            configuration.Service.Environment,
+            generation.Analysis.Contracts);
+        result.Success = true;
+        result.PushedSchemaCount = outcome.SchemaCount;
+        result.PreviousRevision = outcome.PreviousRevision;
+        result.Revision = outcome.Revision;
+        result.Message =
+            $"Pushed {outcome.SchemaCount} code schemas atomically; revision " +
+            $"{outcome.PreviousRevision} -> {outcome.Revision}.";
+        WriteResult(result, writeHumanDiagnostics: true);
+        return 0;
+    }
+
     private int Doctor()
     {
         var result = BaseResult("doctor");
@@ -195,6 +261,12 @@ internal sealed class ToolApplication
             string.Equals(diagnostic.Severity, "error", StringComparison.OrdinalIgnoreCase));
     }
 
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ??
+               string.Empty;
+    }
+
     private static void WriteHelp()
     {
         Console.WriteLine(
@@ -211,6 +283,7 @@ internal sealed class ToolApplication
               generate   Generate configured outputs and lock file.
               validate   Fail when generated outputs differ from source.
               sync       Generate locally; remote sync activates with the service protocol.
+              push       Atomically push attributed schemas through the Schema Service.
               watch      Watch C# sources and regenerate incrementally.
               doctor     Report runtime and configuration diagnostics.
               version    Print tool and protocol versions.
@@ -220,6 +293,9 @@ internal sealed class ToolApplication
               --changed <path>   IDE hint for a changed file.
               --json             Emit machine-readable JSON.
               --check            Do not write; fail when outputs are stale.
+              --dry-run          Validate a push bundle without credentials or network I/O.
+              --endpoint <url>   Override service.endpoint or PLAYSERV_API_URL.
+              --timeout-seconds  HTTP timeout from 1 through 300 (default 30).
             """);
     }
 }

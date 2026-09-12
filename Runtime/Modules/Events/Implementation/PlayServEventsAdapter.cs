@@ -82,14 +82,7 @@ namespace Playserv.Events
         {
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
-
-            var eventClrType = @event.GetType();
-            _eventTypeRegistry.Register(eventClrType);
-            var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
-            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
-
-            var message = new EventMessage(eventType, payload);
-            _ = _transport.Send(message, EventsModuleName);
+            throw PlayServEventPublishingException.Broadcast();
         }
 
         public void PublishForGroup<T>(string groupName, T @event)
@@ -99,14 +92,7 @@ namespace Playserv.Events
 
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
-
-            var eventClrType = @event.GetType();
-            _eventTypeRegistry.Register(eventClrType);
-            var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
-            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
-
-            var message = new GroupEventMessage(groupName, eventType, payload);
-            _ = _transport.Send(message, EventsModuleName);
+            throw PlayServEventPublishingException.Group(groupName.Trim());
         }
 
         public void PublishForUser<T>(string userId, T @event)
@@ -116,45 +102,42 @@ namespace Playserv.Events
 
             if (@event == null)
                 throw new ArgumentNullException(nameof(@event));
-
-            var eventClrType = @event.GetType();
-            _eventTypeRegistry.Register(eventClrType);
-            var payload = _jsonCodec.Serialize(@event, EventJsonOptions);
-            var eventType = EventTypeRegistry.GetCanonicalName(eventClrType);
-
-            var message = new UserEventMessage(userId, eventType, payload);
-            _ = _transport.Send(message, EventsModuleName);
+            throw PlayServEventPublishingException.User(userId.Trim());
         }
 
         public Task<bool> SubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
-            if (!string.IsNullOrWhiteSpace(groupName))
-            {
-                lock (_activeGroupsLock)
-                    _activeGroups.Add(groupName);
-            }
-
             return ExecuteGroupCommandAsync<SubscribeGroupRequest, SubscribeGroupResponse>(
                 new SubscribeGroupRequest(groupName),
                 groupName,
                 "subscribe",
+                response => response.GroupName,
                 response => response.success,
+                response => response.errorCode,
+                response => response.errorMessage,
+                () =>
+                {
+                    lock (_activeGroupsLock)
+                        _activeGroups.Add(groupName);
+                },
                 ct);
         }
 
         public Task<bool> UnsubscribeGroupAsync(string groupName, CancellationToken ct = default)
         {
-            if (!string.IsNullOrWhiteSpace(groupName))
-            {
-                lock (_activeGroupsLock)
-                    _activeGroups.Remove(groupName);
-            }
-
             return ExecuteGroupCommandAsync<UnsubscribeGroupRequest, UnsubscribeGroupResponse>(
                 new UnsubscribeGroupRequest(groupName),
                 groupName,
                 "unsubscribe",
+                response => response.GroupName,
                 response => response.success,
+                response => response.errorCode,
+                response => response.errorMessage,
+                () =>
+                {
+                    lock (_activeGroupsLock)
+                        _activeGroups.Remove(groupName);
+                },
                 ct);
         }
 
@@ -358,7 +341,11 @@ namespace Playserv.Events
             TRequest request,
             string groupName,
             string operationName,
+            Func<TResponse, string> getGroupName,
             Func<TResponse, bool> getSuccess,
+            Func<TResponse, int> getErrorCode,
+            Func<TResponse, string> getErrorMessage,
+            Action onSuccess,
             CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(groupName))
@@ -367,8 +354,11 @@ namespace Playserv.Events
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
 
-            if (getSuccess == null)
-                throw new ArgumentNullException(nameof(getSuccess));
+            if (getGroupName == null) throw new ArgumentNullException(nameof(getGroupName));
+            if (getSuccess == null) throw new ArgumentNullException(nameof(getSuccess));
+            if (getErrorCode == null) throw new ArgumentNullException(nameof(getErrorCode));
+            if (getErrorMessage == null) throw new ArgumentNullException(nameof(getErrorMessage));
+            if (onSuccess == null) throw new ArgumentNullException(nameof(onSuccess));
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(GroupCommandTimeout);
@@ -379,7 +369,18 @@ namespace Playserv.Events
                 var completion = new TaskCompletionSource<GroupCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
                 using var responseSubscription = _transport.OnReceive<TResponse>().Subscribe(
-                    response => completion.TrySetResult(GroupCommandResult.FromResponse(getSuccess(response))),
+                    response =>
+                    {
+                        var responseGroup = getGroupName(response);
+                        if (!string.IsNullOrWhiteSpace(responseGroup) &&
+                            !string.Equals(responseGroup, groupName, StringComparison.Ordinal))
+                            return;
+
+                        completion.TrySetResult(GroupCommandResult.FromResponse(
+                            getSuccess(response),
+                            getErrorCode(response),
+                            getErrorMessage(response)));
+                    },
                     ex => completion.TrySetException(ex),
                     () => completion.TrySetException(
                         new InvalidOperationException($"Transport completed while waiting for {typeof(TResponse).Name}.")));
@@ -392,11 +393,17 @@ namespace Playserv.Events
 
                 var result = await completion.Task;
                 if (result.Success)
+                {
+                    onSuccess();
                     _logger.Log($"Group {operationName} successful: groupName={groupName}");
-                else
-                    _logger.LogWarning($"Group {operationName} returned unsuccessful response: groupName={groupName}");
+                    return true;
+                }
 
-                return result.Success;
+                throw new PlayServGroupSubscriptionException(
+                    groupName,
+                    operationName,
+                    result.ErrorCode,
+                    result.ErrorMessage);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -413,16 +420,19 @@ namespace Playserv.Events
         private sealed class GroupCommandResult
         {
             public bool Success { get; }
+            public int ErrorCode { get; }
+            public string ErrorMessage { get; }
 
-            private GroupCommandResult(bool success)
+            private GroupCommandResult(bool success, int errorCode, string errorMessage)
             {
                 Success = success;
+                ErrorCode = errorCode;
+                ErrorMessage = errorMessage;
             }
 
-            public static GroupCommandResult FromResponse(bool success)
-            {
-                return new GroupCommandResult(success);
-            }
+            public static GroupCommandResult FromResponse(bool success, int errorCode, string errorMessage) =>
+                new GroupCommandResult(success, errorCode, errorMessage);
+
         }
     }
 }

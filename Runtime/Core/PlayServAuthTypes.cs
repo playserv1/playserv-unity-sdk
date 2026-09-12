@@ -366,6 +366,92 @@ namespace Playserv.Wrapper
         public PlayServError UnifiedError => Error?.UnifiedError;
     }
 
+    /// <summary>
+    /// Safe runtime projection of the currently authenticated player. Operator-only
+    /// moderation, IP, fingerprint and merge-forensics fields are never exposed here.
+    /// </summary>
+    public sealed class PlayServPlayerProfile
+    {
+        internal PlayServPlayerProfile(
+            string id,
+            string kind,
+            string name,
+            string email,
+            string status,
+            IEnumerable<string> linkedProviders,
+            string country,
+            DateTimeOffset? lastSeenAt,
+            string joinedDate,
+            DateTimeOffset createdAt,
+            DateTimeOffset updatedAt)
+        {
+            Id = id ?? string.Empty;
+            Kind = kind ?? string.Empty;
+            Name = name ?? string.Empty;
+            Email = email;
+            Status = status ?? string.Empty;
+            LinkedProviders = (linkedProviders ?? Array.Empty<string>()).ToArray();
+            Country = country;
+            LastSeenAt = lastSeenAt;
+            JoinedDate = joinedDate ?? string.Empty;
+            CreatedAt = createdAt;
+            UpdatedAt = updatedAt;
+        }
+
+        public string Id { get; }
+        public string Kind { get; }
+        public string Name { get; }
+        public string Email { get; }
+        public string Status { get; }
+        public IReadOnlyList<string> LinkedProviders { get; }
+        public string Country { get; }
+        public DateTimeOffset? LastSeenAt { get; }
+
+        /// <summary>Backend ISO-8601 calendar date (<c>yyyy-MM-dd</c>).</summary>
+        public string JoinedDate { get; }
+
+        public DateTimeOffset CreatedAt { get; }
+        public DateTimeOffset UpdatedAt { get; }
+    }
+
+    public sealed class PlayServPlayerProfileResult
+    {
+        internal PlayServPlayerProfileResult(
+            PlayServPlayerProfile profile,
+            string etag,
+            bool isFromCache,
+            PlayServAuthError error)
+        {
+            Profile = profile;
+            ETag = etag ?? string.Empty;
+            IsFromCache = isFromCache;
+            Error = error;
+        }
+
+        public bool IsSuccess => Error == null && Profile != null;
+        public PlayServPlayerProfile Profile { get; }
+        public string ETag { get; }
+        public bool IsFromCache { get; }
+        public PlayServAuthError Error { get; }
+        public PlayServError UnifiedError => Error?.UnifiedError;
+    }
+
+    [Serializable]
+    internal sealed class PlayServPlayerProfileDto
+    {
+        public string id;
+        public string kind;
+        public string name;
+        public string email;
+        public string status;
+        public string[] sso;
+        public string country;
+        public string last_seen;
+        public string joined;
+        public string created_at;
+        public string updated_at;
+    }
+
     public sealed class PlayServSessionLostInfo
     {
         internal PlayServSessionLostInfo(

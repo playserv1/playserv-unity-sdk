@@ -35,7 +35,7 @@ namespace Playserv.Spawn
 
         public void OnConnected()
         {
-            _spawnService.Initialize(_eventsAdapter, () => _runtimeIdentity?.UserId ?? string.Empty);
+            _spawnService.Initialize(_eventsAdapter, () => _runtimeIdentity?.PlayerId ?? string.Empty);
         }
 
         public Task<GameObject> SpawnAsync(string assetName, Vector3 position, Quaternion rotation)

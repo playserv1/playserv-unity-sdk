@@ -8,6 +8,7 @@ using Playserv.Proxy.Common;
 using Playserv.Proxy.Interfaces;
 using Playserv.Proxy.Logging;
 using Playserv.Runtime.Abstractions;
+using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Implementation
 {
@@ -119,6 +120,10 @@ namespace Playserv.Proxy.Implementation
             if (data == null)
                 throw new ArgumentNullException(nameof(data));
 
+            PlayServWebSocketPayloadLimits.EnsureAllowed(
+                data.LongLength,
+                PlayServWebSocketPayloadDirection.Outbound);
+
             if (_isDisposed)
                 throw new ObjectDisposedException(nameof(WebGLWebSocketTransportImplementation));
 
@@ -229,6 +234,20 @@ namespace Playserv.Proxy.Implementation
         {
             if (data == null)
                 return;
+
+            var byteCount = Encoding.UTF8.GetByteCount(data);
+            if (byteCount > PlayServWebSocketPayloadLimits.MaxMessageBytes)
+            {
+                var exception = new PlayServWebSocketPayloadException(
+                    PlayServWebSocketPayloadDirection.Inbound,
+                    byteCount);
+                _logger.LogError(exception.Message);
+                _isConnected = false;
+                Closed?.Invoke(new PlayServTransportCloseInfo(1009, "message too large"));
+                _channel.Error(exception);
+                TryCloseSocket();
+                return;
+            }
 
             var bytes = Encoding.UTF8.GetBytes(data);
             _channel.Next(bytes);

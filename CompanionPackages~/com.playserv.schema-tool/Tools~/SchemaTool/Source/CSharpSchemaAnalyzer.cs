@@ -130,6 +130,20 @@ internal static class CSharpSchemaAnalyzer
             authority = NormalizeEnumValue(authority).ToLowerInvariant();
 
             var version = ReadNamedString(schemaAttribute, "Version");
+            var description = ReadNamedString(schemaAttribute, "Description");
+            var declaredKind = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "Kind"));
+            var singleton = ReadNamedBoolean(schemaAttribute, "Singleton");
+            var displayField = ReadNamedString(schemaAttribute, "DisplayField");
+            var ownedBy = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "OwnedBy"));
+            var readPolicy = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "Read"));
+            var onPlayerDelete = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "OnPlayerDelete"));
+            var allowRawFields = ReadNamedBoolean(schemaAttribute, "AllowRawFields");
+            var clientRead = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "ClientRead"));
+            var clientWrite = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "ClientWrite"));
+            var serverRead = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "ServerRead"));
+            var serverWrite = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "ServerWrite"));
+            var backendRead = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "BackendRead"));
+            var backendWrite = NormalizeEnumValue(ReadNamedValue(schemaAttribute, "BackendWrite"));
             var line = declaration.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
             var formerNames = ReadFormerNames(declaration.AttributeLists);
 
@@ -143,6 +157,7 @@ internal static class CSharpSchemaAnalyzer
                     Kind = "enum",
                     Authority = authority,
                     Version = version,
+                    Description = description,
                     SourceId = sourceId,
                     SourcePath = relativePath,
                     SourceLine = line,
@@ -155,14 +170,33 @@ internal static class CSharpSchemaAnalyzer
             }
 
             var members = ReadMembers(declaration, relativePath, diagnostics);
+            var kind = declaredKind switch
+            {
+                "Entity" => "object",
+                "Part" => "struct",
+                _ => declaration is StructDeclarationSyntax ? "struct" : "object"
+            };
             contracts.Add(new SchemaContract
             {
                 Id = id.Trim(),
                 Name = declaration.Identifier.ValueText,
                 FullName = fullName,
-                Kind = declaration is StructDeclarationSyntax ? "struct" : "object",
+                Kind = kind,
                 Authority = authority,
                 Version = version,
+                Description = description,
+                Singleton = singleton,
+                DisplayField = displayField,
+                OwnedBy = ownedBy,
+                ReadPolicy = readPolicy,
+                OnPlayerDelete = onPlayerDelete,
+                AllowRawFields = allowRawFields,
+                ClientRead = clientRead,
+                ClientWrite = clientWrite,
+                ServerRead = serverRead,
+                ServerWrite = serverWrite,
+                BackendRead = backendRead,
+                BackendWrite = backendWrite,
                 SourceId = sourceId,
                 SourcePath = relativePath,
                 SourceLine = line,
@@ -280,7 +314,20 @@ internal static class CSharpSchemaAnalyzer
             Name = name.Trim(),
             SourceName = sourceName,
             TypeName = type.WithoutTrivia().ToString(),
+            FieldType = fieldAttribute == null
+                ? string.Empty
+                : NormalizeEnumValue(ReadNamedValue(fieldAttribute, "Type")),
             Required = required,
+            CodeKey = fieldAttribute == null ? string.Empty : ReadNamedString(fieldAttribute, "CodeKey"),
+            Primary = fieldAttribute != null && ReadNamedBoolean(fieldAttribute, "Primary"),
+            Unique = fieldAttribute != null && ReadNamedBoolean(fieldAttribute, "Unique"),
+            Indexed = fieldAttribute != null && ReadNamedBoolean(fieldAttribute, "Indexed"),
+            Default = fieldAttribute == null ? string.Empty : ReadNamedString(fieldAttribute, "Default"),
+            Target = fieldAttribute == null ? string.Empty : ReadNamedString(fieldAttribute, "Target"),
+            Cardinality = fieldAttribute == null
+                ? string.Empty
+                : NormalizeEnumValue(ReadNamedValue(fieldAttribute, "Cardinality")),
+            Ordered = fieldAttribute != null && ReadNamedBoolean(fieldAttribute, "Ordered"),
             FormerNames = ReadFormerNames(attributes)
         };
     }
@@ -338,6 +385,12 @@ internal static class CSharpSchemaAnalyzer
         var argument = attribute.ArgumentList?.Arguments.FirstOrDefault(candidate =>
             string.Equals(candidate.NameEquals?.Name.Identifier.ValueText, name, StringComparison.Ordinal));
         return argument?.Expression.WithoutTrivia().ToString() ?? string.Empty;
+    }
+
+    private static bool ReadNamedBoolean(AttributeSyntax attribute, string name)
+    {
+        var value = ReadNamedValue(attribute, name);
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ReadStringExpression(ExpressionSyntax expression)

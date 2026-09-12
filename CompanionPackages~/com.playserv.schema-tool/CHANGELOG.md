@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-12
+
+- Aligned the package and internal PlayServ dependency versions with `0.5.0`.
+
+- Added atomic code-first schema pushes with server-key CLI exchange,
+  whole-schema revision preflight, offline dry-run validation, and expanded
+  entity/field metadata attributes matching the shipped Schema Service.
+
 ## [0.4.1] - 2026-08-23
 
 - Restored Unity 2021.3 Linux compatibility by targeting its bundled .NET 5

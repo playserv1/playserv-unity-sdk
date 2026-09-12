@@ -54,10 +54,12 @@ namespace Playserv.Editor
                 return;
             }
 
-            var gameId = context.GameIdProperty != null ? context.GameIdProperty.stringValue : null;
+            var gameId = context.DeploymentGameIdProperty != null
+                ? context.DeploymentGameIdProperty.stringValue
+                : null;
             if (string.IsNullOrWhiteSpace(gameId))
             {
-                Debug.LogError("[PlayServ] GameId is empty. Please set it in PlayServ Config.");
+                Debug.LogError("[PlayServ] Deployment Game ID is empty. Please set it in PlayServ Config.");
                 return;
             }
 
@@ -70,7 +72,7 @@ namespace Playserv.Editor
 
             if (!EditorUtility.DisplayDialog(
                     "Deploy",
-                    $"Upload {files.Count} file(s) for GameId '{gameId}'?\n\nEndpoint:\n{ResolveDeployEndpointForDisplay(context.Config)}",
+                    $"Upload {files.Count} file(s) for deployment '{gameId}'?\n\nEndpoint:\n{ResolveDeployEndpointForDisplay(context.Config)}",
                     "Deploy",
                     "Cancel"))
             {
@@ -144,10 +146,12 @@ namespace Playserv.Editor
                 return;
             }
 
-            var gameId = context.GameIdProperty != null ? context.GameIdProperty.stringValue : null;
+            var gameId = context.DeploymentGameIdProperty != null
+                ? context.DeploymentGameIdProperty.stringValue
+                : null;
             if (string.IsNullOrWhiteSpace(gameId))
             {
-                Debug.LogError("[PlayServ] GameId is empty. Please set it in PlayServ Config.");
+                Debug.LogError("[PlayServ] Deployment Game ID is empty. Please set it in PlayServ Config.");
                 return;
             }
 
@@ -160,7 +164,7 @@ namespace Playserv.Editor
 
             if (promptForConfirmation && !EditorUtility.DisplayDialog(
                     "Sync Version",
-                    $"Compare RPC code hash against remote for GameId '{gameId}'?",
+                    $"Compare RPC code hash against deployment '{gameId}'?",
                     "Sync",
                     "Cancel"))
             {

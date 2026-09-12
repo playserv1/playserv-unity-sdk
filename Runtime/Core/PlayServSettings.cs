@@ -94,14 +94,12 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
-        /// Game identifier.
+        /// Optional legacy deployment identifier used only by deployment-version tooling.
+        /// It is never sent in the runtime handshake.
         /// </summary>
-        public string GameId { get; set; } = string.Empty;
+        public string DeploymentGameId { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Current player/user identifier.
-        /// </summary>
-        public string UserId { get; set; } = string.Empty;
+        internal string PlayerId { get; set; } = string.Empty;
 
         /// <summary>
         /// Current game client version.
@@ -211,8 +209,8 @@ namespace Playserv.Wrapper
                 PlayerSessionStore = PlayerSessionStore,
                 EnableAutomaticPlayerFingerprint = EnableAutomaticPlayerFingerprint,
                 PlayerFingerprintProvider = PlayerFingerprintProvider,
-                GameId = GameId,
-                UserId = UserId,
+                DeploymentGameId = DeploymentGameId,
+                PlayerId = PlayerId,
                 GameVersion = GameVersion,
                 ResolveLatestGameVersionOnConnect = ResolveLatestGameVersionOnConnect,
                 SdkVersion = SdkVersion,
@@ -238,8 +236,8 @@ namespace Playserv.Wrapper
                 ClientToken = ClientToken,
                 RuntimeTokenProvider = RuntimeTokenProvider,
                 PlayerAccessToken = PlayerAccessToken,
-                GameId = GameId,
-                UserId = UserId,
+                DeploymentGameId = DeploymentGameId,
+                PlayerId = PlayerId,
                 GameVersion = GameVersion,
                 SdkVersion = SdkVersion,
                 AllowMultipleConnections = AllowMultipleConnections,

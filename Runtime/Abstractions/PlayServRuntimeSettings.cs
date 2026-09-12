@@ -24,10 +24,10 @@ namespace Playserv.Runtime.Abstractions
             set => ClientToken = value;
         }
 
-        public string GameId { get; set; } = string.Empty;
-        public string UserId { get; set; } = string.Empty;
+        public string DeploymentGameId { get; set; } = string.Empty;
+        public string PlayerId { get; set; } = string.Empty;
         public string GameVersion { get; set; } = "1.0.0";
-        public string SdkVersion { get; set; } = "0.4.1";
+        public string SdkVersion { get; set; } = "0.5.0";
         public bool AllowMultipleConnections { get; set; } = true;
         public int KeepAlivePingIntervalMs { get; set; } = 30000;
         public int KeepAlivePongTimeoutMs { get; set; } = 10000;
@@ -50,8 +50,8 @@ namespace Playserv.Runtime.Abstractions
                 ClientToken = ClientToken,
                 RuntimeTokenProvider = RuntimeTokenProvider,
                 PlayerAccessToken = PlayerAccessToken,
-                GameId = GameId,
-                UserId = UserId,
+                DeploymentGameId = DeploymentGameId,
+                PlayerId = PlayerId,
                 GameVersion = GameVersion,
                 SdkVersion = SdkVersion,
                 AllowMultipleConnections = AllowMultipleConnections,

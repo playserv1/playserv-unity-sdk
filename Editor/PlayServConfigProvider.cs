@@ -220,8 +220,8 @@ namespace Playserv.Editor
                 var merged = config.ToSettings();
                 if (string.IsNullOrWhiteSpace(merged.ClientToken))
                     merged.ClientToken = bakedSettings.ClientToken;
-                if (string.IsNullOrWhiteSpace(merged.GameId))
-                    merged.GameId = bakedSettings.GameId;
+                if (string.IsNullOrWhiteSpace(merged.DeploymentGameId))
+                    merged.DeploymentGameId = bakedSettings.DeploymentGameId;
                 if (string.IsNullOrWhiteSpace(merged.BackendServerAddress))
                     merged.BackendServerAddress = bakedSettings.BackendServerAddress;
                 if (string.IsNullOrWhiteSpace(merged.DeployApiServerAddress))

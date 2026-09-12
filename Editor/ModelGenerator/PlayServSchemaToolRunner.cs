@@ -39,7 +39,11 @@ namespace Playserv.Editor
         public int protocolVersion;
         public int sourceFileCount;
         public int schemaCount;
+        public int pushedSchemaCount;
         public bool generatedFilesChanged;
+        public string previousRevision;
+        public string revision;
+        public bool dryRun;
         public string message;
         public string[] outputs;
     }

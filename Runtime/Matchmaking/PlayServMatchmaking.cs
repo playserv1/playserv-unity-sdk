@@ -9,6 +9,22 @@ namespace Playserv.Wrapper
     public static class PlayServMatchmaking
     {
         /// <summary>
+        /// Reads the public room browser with a player session. Requires the /rooms API (PSV-2600).
+        /// The caller chooses a room and explicitly requests any subsequent cursor page.
+        /// </summary>
+        public static Task<PlayServRoomBrowsePage> BrowseRoomsAsync(
+            string functionSlug, PlayServRoomBrowseQuery query = null, CancellationToken ct = default) =>
+            PlayServMatchmakingClient.CreateDefault().BrowseRoomsAsync(functionSlug, query, ct);
+
+        /// <summary>
+        /// Requests one reservation for the named room. Requires the /rooms API (PSV-2600).
+        /// Does not place, launch, poll, retry or connect a game transport.
+        /// </summary>
+        public static Task<PlayServMatchResult> JoinRoomAsync(
+            string functionSlug, string roomName, CancellationToken ct = default) =>
+            PlayServMatchmakingClient.CreateDefault().JoinRoomAsync(functionSlug, roomName, ct);
+
+        /// <summary>
         /// Executes one placement request. The HTTP deadline is derived from
         /// <paramref name="waitMs"/> and includes a five-second network margin.
         /// </summary>

@@ -89,11 +89,12 @@ namespace Playserv.Wrapper
 
                 _resetShutdownState();
                 var settings = _getOrCreateSettings();
-                _logTrace($"[PlayServ] Connect started. state={state}, gameId={settings.GameId}, endpoint={settings.Endpoint}");
+                _logTrace($"[PlayServ] Connect started. state={state}, endpoint={settings.Endpoint}");
                 settings = await _refreshConfiguredGameVersionAsync(settings, CancellationToken.None);
                 _logTrace($"[PlayServ] Connect continue after version refresh. resolvedGameVersion={settings.GameVersion}");
                 settings = await _preparePlayerAuthenticationAsync(settings, CancellationToken.None);
-                _logTrace($"[PlayServ] Player authentication prepared. userId={settings.UserId}");
+                _logTrace(
+                    $"[PlayServ] Player authentication prepared. playerIdKnown={!string.IsNullOrWhiteSpace(settings.PlayerId)}");
                 _applySettings(settings);
                 _logTrace("[PlayServ] Connect applied settings. Starting transport connect.");
 

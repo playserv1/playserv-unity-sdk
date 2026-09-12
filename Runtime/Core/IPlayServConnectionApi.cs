@@ -26,8 +26,6 @@ namespace Playserv.Wrapper
 
         void Config(
             string clientToken,
-            string gameId,
-            string userId,
             string gameVersion,
             string sdkVersion = null);
 
@@ -44,7 +42,7 @@ namespace Playserv.Wrapper
 
         void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory);
 
-        Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default);
+        Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default);
 
         Proxy.Interfaces.ITransportImplementation GetTransportImplementation();
 

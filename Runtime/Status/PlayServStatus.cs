@@ -9,6 +9,11 @@ namespace Playserv.Wrapper
     /// </summary>
     public static class PlayServStatus
     {
+        /// <summary>Returns public function/deployment health for a project, optionally filtered by environment.</summary>
+        public static Task<PlayServProjectStatus> GetProjectAsync(
+            string projectSlug, string environment = null, CancellationToken cancellationToken = default) =>
+            PlayServStatusClient.CreateDefault().GetProjectAsync(projectSlug, environment, cancellationToken);
+
         /// <summary>Returns the current status of every reported PoP/system pair.</summary>
         public static Task<PlayServPlatformStatus> GetCurrentAsync(
             CancellationToken cancellationToken = default) =>

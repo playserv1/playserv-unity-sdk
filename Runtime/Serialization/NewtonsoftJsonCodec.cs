@@ -12,7 +12,7 @@ using Newtonsoft.Json.Serialization;
 namespace Playserv.Serialization
 {
 #if PLAYSERV_HAS_NEWTONSOFT_JSON
-    public sealed class NewtonsoftJsonCodec : IJsonCodec
+    public sealed partial class NewtonsoftJsonCodec : IJsonCodec
     {
         private static readonly IContractResolver ContractResolver = new PlayServJsonNameContractResolver();
 

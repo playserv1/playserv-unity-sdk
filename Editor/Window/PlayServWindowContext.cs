@@ -49,7 +49,7 @@ namespace Playserv.Editor
 
         public SerializedProperty ClientTokenProperty => State.ClientTokenProperty;
 
-        public SerializedProperty GameIdProperty => State.GameIdProperty;
+        public SerializedProperty DeploymentGameIdProperty => State.DeploymentGameIdProperty;
 
         public SerializedProperty GameVersionProperty => State.GameVersionProperty;
 

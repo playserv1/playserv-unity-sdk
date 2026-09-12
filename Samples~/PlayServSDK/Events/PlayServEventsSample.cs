@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Playserv.Events;
 using Playserv.Wrapper;
 using UnityEngine;
 
 namespace Playserv.Samples
 {
     /// <summary>
-    /// Simple publish/subscribe sample for PlayServ events API.
+    /// Subscription and unsupported-publish behavior for the PlayServ events API.
     /// </summary>
     public sealed class PlayServEventsSample : MonoBehaviour
     {
@@ -95,35 +96,39 @@ namespace Playserv.Samples
         [ContextMenu("Publish Global")]
         public void PublishGlobal()
         {
-            PlayServEvents.Publish(BuildEvent());
-            _status = "Published global event";
-            AddMessage($"Sent global: {messageText}");
+            ReportUnsupportedPublish(() => PlayServEvents.Publish(BuildEvent()));
         }
 
         [ContextMenu("Publish Group")]
         public void PublishGroup()
         {
-            PlayServEvents.PublishForGroup(groupName, BuildEvent());
-            _status = $"Published group event ({groupName})";
-            AddMessage($"Sent group({groupName}): {messageText}");
-
-            if (!_isGroupJoined)
-                AddMessage($"Note: this client is not joined to group '{groupName}', so it will not receive its own group event.");
+            ReportUnsupportedPublish(() => PlayServEvents.PublishForGroup(groupName, BuildEvent()));
         }
 
         [ContextMenu("Publish User")]
         public void PublishUser()
         {
-            PlayServEvents.PublishForUser(targetUserId, BuildEvent());
-            _status = $"Published user event ({targetUserId})";
-            AddMessage($"Sent user({targetUserId}): {messageText}");
+            ReportUnsupportedPublish(() => PlayServEvents.PublishForUser(targetUserId, BuildEvent()));
+        }
+
+        private void ReportUnsupportedPublish(Action publish)
+        {
+            try
+            {
+                publish();
+            }
+            catch (PlayServEventPublishingException exception)
+            {
+                _status = exception.UnifiedError.SourceCode;
+                AddMessage(exception.Message);
+            }
         }
 
         private SampleChatEvent BuildEvent()
         {
             return new SampleChatEvent
             {
-                SenderId = PlayServ.Settings.UserId,
+                SenderId = PlayServAuth.PlayerId,
                 Text = messageText,
                 SentAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
@@ -186,6 +191,11 @@ namespace Playserv.Samples
 
                 if (_subscription == null)
                     AddMessage("Note: group membership alone is not enough. Subscribe to SampleChatEvent to receive group events.");
+            }
+            catch (Playserv.Events.PlayServGroupSubscriptionException ex)
+            {
+                _status = $"Group subscription refused: {ex.UnifiedError.SourceCode} ({ex.UnifiedError.TransportCode:D5}).";
+                AddMessage(_status);
             }
             catch (Exception ex)
             {

@@ -151,7 +151,6 @@ server Records handle:
 await PlayServGameServer.Realtime.ConnectAsync(
     new PlayServGameServerRealtimeOptions
     {
-        GameId = "arena-server",
         InstanceId = roomProcessId,
         GameVersion = Application.version
     });
@@ -163,8 +162,8 @@ var liveJob = await (await jobs.LoadAsync("rec_01...")).SubscribeAsync();
 await liveQueue.RefreshAsync();
 ```
 
-The handshake contains `Authorization: Bearer sk_*` and no public client key
-or player JWT. The key provider is called again on reconnect, active handles
+The handshake contains `Authorization: Bearer sk_*` and no public client key,
+player JWT, legacy game ID, or user ID. The key provider is called again on reconnect, active handles
 use the standard refcount/replay/refresh/close lifecycle, and
 `ShutdownAsync` closes the realtime session.
 

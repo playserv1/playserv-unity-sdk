@@ -17,6 +17,12 @@ namespace Playserv.Code
     /// <summary>Optional settings for a typed POST cloud-function call.</summary>
     public sealed class PlayServFunctionCallOptions
     {
+        /// <summary>
+        /// Reject JSON type coercion in typed responses. Defaults to false. Requires a strict-capable
+        /// codec and a supported DTO contract; these are checked before I/O. Strings must be JSON strings.
+        /// </summary>
+        public bool StrictResponseTypes { get; set; }
+
         /// <summary>Optional live tagged deploy selected by the gateway.</summary>
         public string Version { get; set; }
 

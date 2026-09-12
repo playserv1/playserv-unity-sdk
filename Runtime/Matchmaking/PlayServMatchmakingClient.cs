@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Http.Common;
@@ -10,7 +12,7 @@ using Playserv.Wrapper;
 
 namespace Playserv.Matchmaking
 {
-    internal sealed class PlayServMatchmakingClient
+    internal sealed partial class PlayServMatchmakingClient
     {
         internal const int NetworkMarginMs = 5_000;
         internal const int DefaultRequestTimeoutSeconds = 10;
@@ -21,19 +23,22 @@ namespace Playserv.Matchmaking
         private readonly IJsonCodec _json;
         private readonly Func<DateTimeOffset> _utcNow;
         private readonly Func<int, CancellationToken, Task> _delay;
+        private readonly Func<double> _monotonicSeconds;
 
         internal PlayServMatchmakingClient(
             PlayServSettings settings,
             IPlayServRuntimeHttpClient http,
             IJsonCodec json,
             Func<DateTimeOffset> utcNow = null,
-            Func<int, CancellationToken, Task> delay = null)
+            Func<int, CancellationToken, Task> delay = null,
+            Func<double> monotonicSeconds = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _http = http ?? throw new ArgumentNullException(nameof(http));
             _json = json ?? throw new ArgumentNullException(nameof(json));
             _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
             _delay = delay ?? ((milliseconds, ct) => Task.Delay(milliseconds, ct));
+            _monotonicSeconds = monotonicSeconds ?? (() => (double)Stopwatch.GetTimestamp() / Stopwatch.Frequency);
         }
 
         internal static PlayServMatchmakingClient CreateDefault()
@@ -120,27 +125,7 @@ namespace Playserv.Matchmaking
                 functionSlug,
                 ct);
 
-            if (response == null || string.IsNullOrWhiteSpace(response.Body))
-                throw InvalidResponse(operation, functionSlug, "matchmaking_empty_response", "Matchmaking response body is empty.");
-
-            FindMatchResponseWire wire;
-            try
-            {
-                wire = _json.Deserialize<FindMatchResponseWire>(response.Body);
-            }
-            catch (Exception exception)
-            {
-                throw InvalidResponse(
-                    operation,
-                    functionSlug,
-                    "matchmaking_invalid_response",
-                    "Matchmaking response could not be parsed.",
-                    exception);
-            }
-            if (wire == null)
-                throw InvalidResponse(operation, functionSlug, "matchmaking_invalid_response", "Matchmaking response could not be parsed.");
-
-            return ToResult(wire, operation, functionSlug);
+            return ReadMatchResponse(response, operation, functionSlug, _monotonicSeconds());
         }
 
         internal Task<PlayServJoinGameResult> JoinGameAsync(
@@ -268,14 +253,13 @@ namespace Playserv.Matchmaking
             {
                 wire = _json.Deserialize<LaunchServerResponseWire>(response.Body);
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 throw InvalidResponse(
                     PlayServMatchmakingOperation.LaunchServer,
                     functionSlug,
                     "matchmaking_invalid_response",
-                    "Game-server launch response could not be parsed.",
-                    exception);
+                    "Game-server launch response could not be parsed.");
             }
             if (wire == null || string.IsNullOrWhiteSpace(wire.deployment_id))
                 throw InvalidResponse(
@@ -363,12 +347,20 @@ namespace Playserv.Matchmaking
             }
         }
 
-        private static PlayServMatchResult ToResult(
+        private PlayServMatchResult ToResult(
             FindMatchResponseWire wire,
             PlayServMatchmakingOperation operation,
-            string functionSlug)
+            string functionSlug,
+            double receivedAt)
         {
             var status = NormalizeOptional(wire.status) ?? "matched";
+            if (operation == PlayServMatchmakingOperation.JoinRoom && status != "matched")
+                throw InvalidResponse(operation, functionSlug, "matchmaking_unsupported_status",
+                    "Direct room join must return a matched reservation.");
+            if (wire.expires_in < 0 ||
+                (operation == PlayServMatchmakingOperation.JoinRoom && !wire.expires_in.HasValue))
+                throw InvalidResponse(operation, functionSlug, "matchmaking_incomplete_reservation",
+                    "Room reservation did not contain a valid lifetime.");
             switch (status.ToLowerInvariant())
             {
                 case "matched":
@@ -388,7 +380,9 @@ namespace Playserv.Matchmaking
                         new PlayServMatchReservation(
                             wire.room_name,
                             wire.reservation_token,
-                            wire.expires_at.Value),
+                            wire.expires_at.Value,
+                            ToConnect(wire.connect), wire.region, FreezeAttributes(wire.attributes),
+                            wire.expires_in, _monotonicSeconds, receivedAt),
                         wire.retry_after_ms);
 
                 case "searching":
@@ -408,7 +402,7 @@ namespace Playserv.Matchmaking
                         operation,
                         functionSlug,
                         "matchmaking_unsupported_status",
-                        $"Matchmaking returned unsupported status '{status}'.");
+                        "Matchmaking returned an unsupported status.");
             }
         }
 
@@ -420,24 +414,18 @@ namespace Playserv.Matchmaking
         {
             try
             {
+                ct.ThrowIfCancellationRequested();
                 var response = await _http.SendDataAsync(request, ct);
+                ct.ThrowIfCancellationRequested();
                 if (response != null && (response.StatusCode < 200 || response.StatusCode > 299))
                 {
-                    throw new PlayServMatchmakingException(
-                        operation,
-                        functionSlug,
-                        PlayServError.FromHttp(
-                            response.StatusCode,
-                            TryReadProblemCode(response.Body),
-                            "PlayServ matchmaking rejected the request.",
-                            false,
-                            false,
-                            response.Body,
-                            TryReadRetryable(response.Body)));
+                    throw HttpFailure(request, operation, functionSlug, response.StatusCode,
+                        TryReadProblemCode(response.Body), ReadProblemDetail(response.Body),
+                        false, false, TryReadRetryable(response.Body));
                 }
                 return response;
             }
-            catch (OperationCanceledException exception) when (!ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 throw new PlayServMatchmakingException(
                     operation,
@@ -447,34 +435,26 @@ namespace Playserv.Matchmaking
                         "matchmaking_timeout",
                         "The PlayServ matchmaking request timed out.",
                         retryable: true),
-                    exception);
+                    null);
             }
             catch (OperationCanceledException)
             {
-                throw;
+                throw new OperationCanceledException("The PlayServ matchmaking request was canceled.", ct);
             }
             catch (PlayServRuntimeHttpException exception)
             {
                 var timeout = IsTimeout(exception);
                 var retryable = TryReadRetryable(exception.ResponseBody);
-                throw new PlayServMatchmakingException(
-                    operation,
-                    functionSlug,
-                    PlayServError.FromHttp(
-                        exception.StatusCode,
-                        exception.BackendCode,
-                        FirstNonEmpty(exception.ProblemDetail, exception.Message, "PlayServ matchmaking failed."),
-                        exception.IsNetworkError,
-                        timeout,
-                        exception.ResponseBody,
-                        retryable),
-                    exception);
+                throw HttpFailure(request, operation, functionSlug, exception.StatusCode,
+                    FirstNonEmpty(exception.BackendCode, TryReadProblemCode(exception.ResponseBody), null),
+                    FirstNonEmpty(exception.ProblemDetail, ReadProblemDetail(exception.ResponseBody), "PlayServ matchmaking failed."),
+                    exception.IsNetworkError, timeout, retryable);
             }
             catch (PlayServMatchmakingException)
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 throw new PlayServMatchmakingException(
                     operation,
@@ -485,7 +465,7 @@ namespace Playserv.Matchmaking
                         "The PlayServ matchmaking request failed to reach the network.",
                         true,
                         false),
-                    exception);
+                    null);
             }
         }
 
@@ -493,8 +473,7 @@ namespace Playserv.Matchmaking
             PlayServMatchmakingOperation operation,
             string functionSlug,
             string sourceCode,
-            string message,
-            Exception innerException = null) =>
+            string message) =>
             new PlayServMatchmakingException(
                 operation,
                 functionSlug,
@@ -502,7 +481,7 @@ namespace Playserv.Matchmaking
                     PlayServErrorCode.InvalidResponse,
                     sourceCode,
                     message),
-                innerException);
+                null); // Serializer/transport exceptions can embed response bodies or admission tokens.
 
         private bool? TryReadRetryable(string responseBody)
         {
@@ -582,7 +561,11 @@ namespace Playserv.Matchmaking
             public string room_name;
             public string reservation_token;
             public DateTimeOffset? expires_at;
+            public int? expires_in;
             public int? retry_after_ms;
+            public RoomConnectWire connect;
+            public string region;
+            public Dictionary<string, object> attributes;
         }
 
         [Serializable]

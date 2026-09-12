@@ -8,6 +8,7 @@
     "Playserv.Runtime.Modules",
     "Playserv.Runtime.Abstractions",
     "Playserv.Runtime.Serialization",
+    "Playserv.Runtime.Http",
     "Playserv.Runtime.Modules.DataSubscription"
   ],
   "optionalUnityReferences": [

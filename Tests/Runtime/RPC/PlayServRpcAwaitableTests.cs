@@ -15,6 +15,76 @@ namespace Playserv.Tests.Runtime.RPC
     public sealed class PlayServRpcAwaitableTests
     {
         [UnityTest]
+        public IEnumerator StrictResponses_AreCapturedAndCorrelatedIndependently()
+        {
+            var runtime = new FakeRuntimeAccess();
+            var facade = new PlayServApiRpcFacade(runtime);
+            var options = Options("strict");
+            options.StrictResponseTypes = true;
+            var strict = facade.InvokeAsync<FindMatchRequest, FindMatchResponse>("RoomService", "FindMatch", new FindMatchRequest(), options, default);
+            options.StrictResponseTypes = false;
+            options.RequestId = "compatible";
+            var compatible = facade.InvokeAsync<FindMatchRequest, FindMatchResponse>("RoomService", "FindMatch", new FindMatchRequest(), options, default);
+            runtime.EmitResponse(ResponseFor(runtime.SentRequests[1], "{\"MatchId\":42}"));
+            runtime.EmitResponse(ResponseFor(runtime.SentRequests[0], "{\"MatchId\":42}"));
+            yield return Await(strict);
+            yield return Await(compatible);
+            Assert.That(compatible.Result.Value.MatchId, Is.EqualTo("42"));
+            Assert.That(strict.Result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.DeserializationFailed));
+            Assert.That(strict.Result.Error.Message, Does.Contain("$.MatchId").And.Not.Contain("42"));
+            Assert.That(strict.Result.Error.UnifiedError.RawDetails, Is.Null.Or.Empty);
+        }
+
+        [UnityTest]
+        public IEnumerator StrictResponses_EmptyBodyFailsButValidResponseSucceeds()
+        {
+            var runtime = new FakeRuntimeAccess();
+            var facade = new PlayServApiRpcFacade(runtime);
+            var options = new PlayServRpcInvokeOptions { StrictResponseTypes = true };
+            var empty = facade.InvokeAsync<object, FindMatchResponse>("RoomService", "FindMatch", new object(), options, default);
+            runtime.EmitResponse(ResponseFor(runtime.SentRequests[0], ""));
+            yield return Await(empty);
+            Assert.That(empty.Result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.DeserializationFailed));
+            var valid = facade.InvokeAsync<object, FindMatchResponse>("RoomService", "FindMatch", new object(), options, default);
+            runtime.EmitResponse(ResponseFor(runtime.SentRequests[1], "{\"MatchId\":\"match-42\"}"));
+            yield return Await(valid);
+            Assert.That(valid.Result.Value.MatchId, Is.EqualTo("match-42"));
+        }
+
+        [Test]
+        public void StrictResponses_UnsupportedContractDoesNotSend()
+        {
+            var runtime = new FakeRuntimeAccess();
+            var facade = new PlayServApiRpcFacade(runtime);
+            var result = facade.InvokeAsync<object, Dictionary<int, string>>("RoomService", "FindMatch", new object(),
+                new PlayServRpcInvokeOptions { StrictResponseTypes = true }, default).GetAwaiter().GetResult();
+            Assert.That(result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.DeserializationFailed));
+            Assert.That(runtime.SentRequests, Is.Empty);
+        }
+
+        [UnityTest]
+        public IEnumerator StrictResponses_PreserveCancellationAndTimeout()
+        {
+            var runtime = new FakeRuntimeAccess();
+            var facade = new PlayServApiRpcFacade(runtime);
+            var options = new PlayServRpcInvokeOptions { StrictResponseTypes = true, Timeout = TimeSpan.FromMilliseconds(20) };
+            using var ct = new CancellationTokenSource();
+            ct.Cancel();
+            var before = facade.InvokeAsync<object, int>("RoomService", "FindMatch", new object(), options, ct.Token);
+            yield return Await(before);
+            Assert.That(before.Result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.Canceled));
+            Assert.That(runtime.SentRequests, Is.Empty);
+            using var during = new CancellationTokenSource();
+            var canceled = facade.InvokeAsync<object, int>("RoomService", "FindMatch", new object(), options, during.Token);
+            during.Cancel();
+            yield return Await(canceled);
+            Assert.That(canceled.Result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.Canceled));
+            var timedOut = facade.InvokeAsync<object, int>("RoomService", "FindMatch", new object(), options, default);
+            yield return Await(timedOut);
+            Assert.That(timedOut.Result.Error.Code, Is.EqualTo(PlayServRpcErrorCode.Timeout));
+        }
+
+        [UnityTest]
         public IEnumerator InvokeAsync_DeserializesTypedResponseAndSendsRequestId()
         {
             var runtime = new FakeRuntimeAccess();

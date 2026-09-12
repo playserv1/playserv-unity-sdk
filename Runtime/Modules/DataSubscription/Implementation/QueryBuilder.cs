@@ -210,7 +210,10 @@ namespace Playserv.DataSubscription
             string variableName,
             IDictionary<string, object> variables)
         {
-            ValidateIdentifier(filter.Field, "filter field");
+            var segments = (filter.Field ?? string.Empty).Split('.');
+            if (segments.Length > 8)
+                throw new ArgumentException("Realtime filter paths support at most eight segments.");
+            foreach (var segment in segments) ValidateIdentifier(segment, "filter field segment");
             variables[variableName] = filter.Value;
             return filter.Field + ": { " +
                    PlayServRecordWireNames.OperatorToWire(filter.Operator) +

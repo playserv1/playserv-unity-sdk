@@ -29,18 +29,35 @@ namespace Playserv.Tests.Editor
             var schema = new PlayServSchemaAttribute("player.profile")
             {
                 Authority = PlayServSchemaAuthority.Client,
-                Version = "2"
+                Version = "2",
+                Description = "Player profile",
+                Kind = PlayServSchemaKind.Entity,
+                OwnedBy = PlayServSchemaOwner.Player,
+                Read = PlayServSchemaReadPolicy.Owner,
+                OnPlayerDelete = PlayServPlayerDeletePolicy.CascadeDelete,
+                ClientRead = PlayServSchemaAccess.Allow,
+                ClientWrite = PlayServSchemaAccess.Allow
             };
             var field = new PlayServFieldAttribute("playerId")
             {
-                Required = PlayServRequiredMode.Required
+                Required = PlayServRequiredMode.Required,
+                Type = PlayServSchemaFieldType.Uuid,
+                CodeKey = "player.profile.id",
+                Primary = true,
+                Indexed = true
             };
 
             Assert.That(schema.Id, Is.EqualTo("player.profile"));
             Assert.That(schema.Authority, Is.EqualTo(PlayServSchemaAuthority.Client));
             Assert.That(schema.Version, Is.EqualTo("2"));
+            Assert.That(schema.Kind, Is.EqualTo(PlayServSchemaKind.Entity));
+            Assert.That(schema.OwnedBy, Is.EqualTo(PlayServSchemaOwner.Player));
+            Assert.That(schema.ClientWrite, Is.EqualTo(PlayServSchemaAccess.Allow));
             Assert.That(field.Name, Is.EqualTo("playerId"));
             Assert.That(field.Required, Is.EqualTo(PlayServRequiredMode.Required));
+            Assert.That(field.Type, Is.EqualTo(PlayServSchemaFieldType.Uuid));
+            Assert.That(field.CodeKey, Is.EqualTo("player.profile.id"));
+            Assert.That(field.Primary, Is.True);
         }
 
         [Test]
@@ -52,7 +69,7 @@ namespace Playserv.Tests.Editor
 
             var result = RunTool(dotnetPath, toolPath, "version --json");
             Assert.That(result.ExitCode, Is.EqualTo(0), result.Error);
-            StringAssert.Contains("\"version\": \"0.4.1\"", result.Output);
+            StringAssert.Contains("\"version\": \"0.5.0\"", result.Output);
             StringAssert.Contains("\"protocolVersion\": 1", result.Output);
         }
 
@@ -156,6 +173,14 @@ namespace Playserv.Tests.Editor
                         projectRoot,
                         "Assets/PlayServ/Generated/Schemas/playserv.schema.json")),
                     Is.True);
+
+                var dryRun = RunTool(
+                    dotnetPath,
+                    toolPath,
+                    $"push --dry-run --project \"{projectRoot}\" --json");
+                Assert.That(dryRun.ExitCode, Is.EqualTo(0), dryRun.Error);
+                StringAssert.Contains("\"dryRun\": true", dryRun.Output);
+                StringAssert.Contains("\"pushedSchemaCount\": 1", dryRun.Output);
             }
             finally
             {

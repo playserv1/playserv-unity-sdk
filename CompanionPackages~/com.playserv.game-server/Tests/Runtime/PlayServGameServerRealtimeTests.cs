@@ -40,7 +40,6 @@ namespace Playserv.Tests.Runtime.GameServer
             var connected = PlayServGameServer.Realtime.ConnectAsync(
                     new PlayServGameServerRealtimeOptions
                     {
-                        GameId = "game_server",
                         InstanceId = "instance_42",
                         GameVersion = "1.2.3"
                     })
@@ -51,8 +50,8 @@ namespace Playserv.Tests.Runtime.GameServer
             var handshake = _transports.Single().SentJson.Single(x => x.Contains("HandshakeRequest"));
             Assert.That(handshake, Does.Contain("\"GameAccessToken\":\"sk_realtime\""));
             Assert.That(handshake, Does.Contain("\"Authorization\":\"Bearer sk_realtime\""));
-            Assert.That(handshake, Does.Contain("\"GameId\":\"game_server\""));
-            Assert.That(handshake, Does.Contain("\"UserId\":\"instance_42\""));
+            Assert.That(handshake, Does.Not.Contain("\"GameId\""));
+            Assert.That(handshake, Does.Not.Contain("\"UserId\""));
             Assert.That(handshake, Does.Not.Contain("pk_"));
         }
 

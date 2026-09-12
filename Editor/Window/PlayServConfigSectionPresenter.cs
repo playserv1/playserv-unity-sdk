@@ -50,7 +50,7 @@ namespace Playserv.Editor
                     context.SerializedObject.Update();
 
                     EditorGUILayout.PropertyField(context.ClientTokenProperty);
-                    EditorGUILayout.PropertyField(context.GameIdProperty);
+                    EditorGUILayout.PropertyField(context.DeploymentGameIdProperty);
                     EditorGUILayout.PropertyField(context.GameVersionProperty);
                     EditorGUILayout.PropertyField(context.AllowMultipleConnectionsProperty);
 

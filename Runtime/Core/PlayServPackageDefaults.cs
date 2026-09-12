@@ -13,7 +13,8 @@ namespace Playserv.Wrapper
     {
         [FormerlySerializedAs("gameAccessToken")]
         [SerializeField] private string clientToken = string.Empty;
-        [SerializeField] private string gameId = string.Empty;
+        [FormerlySerializedAs("gameId")]
+        [SerializeField] private string deploymentGameId = string.Empty;
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
         [SerializeField] private string webRtcSignalingServerAddress = PlayServSettings.DefaultWebRtcSignalingServerAddress;
         [SerializeField] private string webRtcDataChannelLabel = PlayServSettings.DefaultWebRtcDataChannelLabel;
@@ -29,7 +30,7 @@ namespace Playserv.Wrapper
 
         public string ClientToken => clientToken;
         public string GameAccessToken => clientToken;
-        public string GameId => gameId;
+        public string DeploymentGameId => deploymentGameId;
         public string BackendServerAddress => backendServerAddress;
         public string WebRtcSignalingServerAddress => webRtcSignalingServerAddress;
         public string WebRtcDataChannelLabel => webRtcDataChannelLabel;
@@ -48,7 +49,7 @@ namespace Playserv.Wrapper
             return new PlayServSettings
             {
                 ClientToken = ResolveOptionalText(clientToken),
-                GameId = ResolveOptionalText(gameId),
+                DeploymentGameId = ResolveOptionalText(deploymentGameId),
                 BackendServerAddress = ResolveText(backendServerAddress, PlayServSettings.DefaultBackendServerAddress),
                 WebRtcSignalingServerAddress = ResolveText(webRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress),
                 WebRtcDataChannelLabel = ResolveText(webRtcDataChannelLabel, PlayServSettings.DefaultWebRtcDataChannelLabel),
@@ -70,7 +71,7 @@ namespace Playserv.Wrapper
                 throw new ArgumentNullException(nameof(settings));
 
             clientToken = ResolveOptionalText(settings.ClientToken);
-            gameId = ResolveOptionalText(settings.GameId);
+            deploymentGameId = ResolveOptionalText(settings.DeploymentGameId);
             backendServerAddress = ResolveText(settings.BackendServerAddress, PlayServSettings.DefaultBackendServerAddress);
             webRtcSignalingServerAddress = ResolveText(settings.WebRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress);
             webRtcDataChannelLabel = ResolveText(settings.WebRtcDataChannelLabel, PlayServSettings.DefaultWebRtcDataChannelLabel);

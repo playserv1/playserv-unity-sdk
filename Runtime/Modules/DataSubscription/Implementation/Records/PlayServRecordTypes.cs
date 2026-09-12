@@ -192,6 +192,35 @@ namespace Playserv.Data
         public int FailedCount => Items.Count - SucceededCount;
     }
 
+    /// <summary>Result of one atomic server-side bulk create transaction.</summary>
+    public sealed class PlayServBulkCreateResult
+    {
+        internal PlayServBulkCreateResult(IReadOnlyList<string> recordIds, int createdCount)
+        {
+            RecordIds = recordIds ?? Array.Empty<string>();
+            CreatedCount = createdCount;
+        }
+
+        /// <summary>Server-minted IDs in the same order as the submitted values.</summary>
+        public IReadOnlyList<string> RecordIds { get; }
+
+        public int CreatedCount { get; }
+    }
+
+    /// <summary>Result of one atomic server-side delete-by-filter transaction.</summary>
+    public sealed class PlayServDeleteByFilterResult
+    {
+        internal PlayServDeleteByFilterResult(IReadOnlyList<string> recordIds, int deletedCount)
+        {
+            RecordIds = recordIds ?? Array.Empty<string>();
+            DeletedCount = deletedCount;
+        }
+
+        public IReadOnlyList<string> RecordIds { get; }
+
+        public int DeletedCount { get; }
+    }
+
     /// <summary>Required destructive intent for <c>DeleteAllAsync</c>.</summary>
     public enum PlayServDeleteAllConfirmation
     {
@@ -255,7 +284,7 @@ namespace Playserv.Data
             PlayServQueryOperator op,
             object value = null,
             object value2 = null) =>
-            Where(PlayServRecordWireNames.FromSelector(selector), op, value, value2);
+            Where(PlayServRecordWireNames.FromFilterSelector(selector), op, value, value2);
 
         public PlayServRecordQuery<T> Where(
             string field,
@@ -922,6 +951,35 @@ namespace Playserv.Data
 
             members.Reverse();
             return members.Select(member => FromMember(member, nameof(selector))).ToArray();
+        }
+
+        internal static string FromFilterSelector<T, TField>(Expression<Func<T, TField>> selector)
+        {
+            if (selector == null) throw new ArgumentNullException(nameof(selector));
+            if (!TryGetFilterPath(selector.Body, selector.Parameters[0], out var field))
+                throw new ArgumentException("Filter selector must reference a model field path.", nameof(selector));
+            return field;
+        }
+
+        internal static bool TryGetFilterPath(Expression expression, ParameterExpression parameter, out string field)
+        {
+            field = null;
+            var members = new List<MemberInfo>();
+            while (true)
+            {
+                while (expression is UnaryExpression unary &&
+                    (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked))
+                    expression = unary.Operand;
+                if (!(expression is MemberExpression member)) break;
+                members.Add(member.Member);
+                expression = member.Expression;
+            }
+            if (expression != parameter || members.Count == 0) return false;
+            if (members.Count > 8)
+                throw new ArgumentException("Record filter paths support at most eight segments.", nameof(expression));
+            members.Reverse();
+            field = string.Join(".", members.Select(member => FromMember(member, nameof(expression))));
+            return true;
         }
 
         internal static string FromMember(MemberInfo member, string argumentName = "member")

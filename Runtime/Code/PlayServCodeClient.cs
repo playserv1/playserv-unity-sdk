@@ -344,6 +344,23 @@ namespace Playserv.Code
             CancellationToken cancellationToken)
         {
             options = options ?? new PlayServFunctionCallOptions();
+            var strict = options.StrictResponseTypes;
+            IPlayServStrictJsonCodec strictCodec = null;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (strict)
+            {
+                try
+                {
+                    strictCodec = _json as IPlayServStrictJsonCodec;
+                    if (strictCodec == null)
+                        throw new PlayServStrictResponseException("$", "strict-capable codec", "unsupported codec");
+                    strictCodec.ValidateResponseType(typeof(TResponse));
+                }
+                catch (Exception error)
+                {
+                    return new PlayServFunctionResult<TResponse>(default, null, StrictResponseError(error));
+                }
+            }
             var raw = await InvokeAsync(new PlayServFunctionRequest
             {
                 Slug = slug,
@@ -363,7 +380,7 @@ namespace Playserv.Code
                     raw.Error);
             }
 
-            if (typeof(TResponse) == typeof(string))
+            if (!strict && typeof(TResponse) == typeof(string))
             {
                 return new PlayServFunctionResult<TResponse>(
                     (TResponse)(object)(raw.Response?.Body ?? string.Empty),
@@ -371,7 +388,7 @@ namespace Playserv.Code
                     PlayServError.None);
             }
 
-            if (string.IsNullOrWhiteSpace(raw.Response?.Body))
+            if (!strict && string.IsNullOrWhiteSpace(raw.Response?.Body))
             {
                 return new PlayServFunctionResult<TResponse>(
                     default,
@@ -382,7 +399,7 @@ namespace Playserv.Code
             try
             {
                 return new PlayServFunctionResult<TResponse>(
-                    _json.Deserialize<TResponse>(raw.Response.Body),
+                    strict ? strictCodec.DeserializeStrict<TResponse>(raw.Response?.Body) : _json.Deserialize<TResponse>(raw.Response.Body),
                     raw.Response,
                     PlayServError.None);
             }
@@ -391,13 +408,18 @@ namespace Playserv.Code
                 return new PlayServFunctionResult<TResponse>(
                     default,
                     raw.Response,
-                    new PlayServError(
+                    strict ? StrictResponseError(exception) : new PlayServError(
                         PlayServErrorCode.Deserialization,
                         "function_response_deserialization_failed",
                         $"Cloud-function response could not be deserialized as {typeof(TResponse).Name}.",
                         rawDetails: exception.Message));
             }
         }
+
+        private static PlayServError StrictResponseError(Exception error) => new PlayServError(
+            PlayServErrorCode.Deserialization,
+            "function_response_deserialization_failed",
+            PlayServStrictResponseException.Sanitize(error).Message);
 
         private async Task<string> ResolvePlayerTokenAsync(CancellationToken cancellationToken)
         {

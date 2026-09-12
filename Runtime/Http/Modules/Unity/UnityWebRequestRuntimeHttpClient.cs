@@ -301,29 +301,7 @@ namespace Playserv.Http.Modules.Unity
                 };
             }
 
-            if (!string.IsNullOrWhiteSpace(clientToken))
-                req.SetRequestHeader(ClientHeaderName, clientToken);
-            if (!string.IsNullOrWhiteSpace(request.BearerToken))
-                req.SetRequestHeader(
-                    "Authorization",
-                    PlayServCredentialPolicy.NormalizePlayerAuthorization(request.BearerToken));
-            if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
-                req.SetRequestHeader("Idempotency-Key", request.IdempotencyKey.Trim());
-            if (!string.IsNullOrWhiteSpace(request.IfMatch))
-                req.SetRequestHeader("If-Match", request.IfMatch.Trim());
-            if (!string.IsNullOrWhiteSpace(request.FunctionVersion))
-            {
-                ValidateHeaderValue(FunctionVersionHeaderName, request.FunctionVersion);
-                req.SetRequestHeader(FunctionVersionHeaderName, request.FunctionVersion.Trim());
-            }
-            if (request.Headers != null)
-            {
-                foreach (var header in request.Headers)
-                {
-                    ValidateCustomHeader(header.Key, header.Value);
-                    req.SetRequestHeader(header.Key.Trim(), header.Value);
-                }
-            }
+            ApplyRuntimeRequestHeaders(req, request, clientToken);
 
             await SendRequestAsync(req, ct, request.TimeoutSeconds);
             var responseHeaders = req.GetResponseHeaders();
@@ -432,7 +410,7 @@ namespace Playserv.Http.Modules.Unity
                     PlayServCredentialPolicy.NormalizePlayerAuthorization(request.BearerToken));
             }
             if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
-                req.SetRequestHeader("Idempotency-Key", request.IdempotencyKey.Trim());
+                req.SetRequestHeader("Idempotency-Key", request.IdempotencyKey);
             if (!string.IsNullOrWhiteSpace(request.IfMatch))
                 req.SetRequestHeader("If-Match", request.IfMatch.Trim());
             if (!string.IsNullOrWhiteSpace(request.FunctionVersion))

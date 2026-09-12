@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Playserv.Wrapper;
 
 namespace Playserv.Matchmaking
@@ -60,21 +61,55 @@ namespace Playserv.Matchmaking
     /// <summary>A room reservation minted by the PlayServ matchmaking runtime.</summary>
     public sealed class PlayServMatchReservation
     {
+        private readonly Func<double> _monotonicSeconds;
+        private readonly double _receivedAt;
+
         internal PlayServMatchReservation(
             string roomName,
             string reservationToken,
             DateTimeOffset expiresAt)
+            : this(roomName, reservationToken, expiresAt, null, null, null, null, null, 0)
+        {
+        }
+
+        internal PlayServMatchReservation(
+            string roomName, string reservationToken, DateTimeOffset expiresAt,
+            PlayServRoomConnect connect, string region, IReadOnlyDictionary<string, object> attributes,
+            int? expiresIn, Func<double> monotonicSeconds, double receivedAt)
         {
             RoomName = roomName ?? string.Empty;
             ReservationToken = reservationToken ?? string.Empty;
             ExpiresAt = expiresAt;
+            Connect = connect;
+            Region = region;
+            Attributes = attributes;
+            ExpiresIn = expiresIn;
+            _monotonicSeconds = monotonicSeconds;
+            _receivedAt = receivedAt;
         }
 
         public string RoomName { get; }
 
+        /// <summary>Secret admission ticket. Pass to the game transport; never log it.</summary>
         public string ReservationToken { get; }
 
+        /// <summary>Server timestamp for compatibility, not a local expiry clock.</summary>
         public DateTimeOffset ExpiresAt { get; }
+
+        public PlayServRoomConnect Connect { get; }
+        public string Region { get; }
+        public IReadOnlyDictionary<string, object> Attributes { get; }
+
+        /// <summary>Seconds remaining at response time; null on older backends.</summary>
+        public int? ExpiresIn { get; }
+
+        /// <summary>
+        /// Local monotonic countdown, floored at zero. Null means unknown, not unlimited.
+        /// This is advisory; the server remains authoritative for admission.
+        /// </summary>
+        public TimeSpan? RemainingLifetime => ExpiresIn.HasValue
+            ? TimeSpan.FromSeconds(Math.Max(0, ExpiresIn.Value - Math.Max(0, _monotonicSeconds() - _receivedAt)))
+            : (TimeSpan?)null;
     }
 
     public enum PlayServMatchStatus
@@ -156,7 +191,21 @@ namespace Playserv.Matchmaking
     {
         FindMatch,
         JoinGame,
-        LaunchServer
+        LaunchServer,
+        BrowseRooms,
+        JoinRoom
+    }
+
+    /// <summary>Known room refusals; unknown backend codes remain in UnifiedError.SourceCode.</summary>
+    public enum PlayServRoomFailureCode
+    {
+        Unknown,
+        RoomNotFound,
+        RoomFull,
+        RoomClosed,
+        RoomTypeNotFound,
+        RoomRefused,
+        RoomUnreachable
     }
 
     /// <summary>Normalized operational failure from player matchmaking.</summary>
@@ -182,5 +231,22 @@ namespace Playserv.Matchmaking
         public string FunctionSlug { get; }
 
         public PlayServError UnifiedError { get; }
+
+        /// <summary>Typed room refusal without changing the shared error category.</summary>
+        public PlayServRoomFailureCode RoomFailureCode => MapRoomFailure(UnifiedError.SourceCode);
+
+        internal static PlayServRoomFailureCode MapRoomFailure(string code)
+        {
+            switch (code)
+            {
+                case "room_not_found": return PlayServRoomFailureCode.RoomNotFound;
+                case "room_full": return PlayServRoomFailureCode.RoomFull;
+                case "room_closed": return PlayServRoomFailureCode.RoomClosed;
+                case "room_type_not_found": return PlayServRoomFailureCode.RoomTypeNotFound;
+                case "room_refused": return PlayServRoomFailureCode.RoomRefused;
+                case "room_unreachable": return PlayServRoomFailureCode.RoomUnreachable;
+                default: return PlayServRoomFailureCode.Unknown;
+            }
+        }
     }
 }

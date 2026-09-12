@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.RPC;
+using Playserv.Serialization;
 
 namespace Playserv.Wrapper
 {
@@ -63,6 +64,7 @@ namespace Playserv.Wrapper
                 request,
                 coalesceKey,
                 timeout,
+                options?.StrictResponseTypes ?? false,
                 cancellationToken);
         }
 
@@ -121,6 +123,7 @@ namespace Playserv.Wrapper
             TRequest requestPayload,
             string coalesceKey,
             TimeSpan timeout,
+            bool strictResponseTypes,
             CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -145,6 +148,23 @@ namespace Playserv.Wrapper
                     PlayServRpcErrorCode.SerializationFailed,
                     "Failed to serialize the RPC request payload.",
                     exception: ex);
+            }
+
+            IPlayServStrictJsonCodec strictCodec = null;
+            if (strictResponseTypes)
+            {
+                try
+                {
+                    strictCodec = jsonCodec as IPlayServStrictJsonCodec;
+                    if (strictCodec == null)
+                        throw new PlayServStrictResponseException("$", "strict-capable codec", "unsupported codec");
+                    strictCodec.ValidateResponseType(typeof(TResponse));
+                }
+                catch (Exception error)
+                {
+                    return Failure<TResponse>(requestId, PlayServRpcErrorCode.DeserializationFailed,
+                        PlayServStrictResponseException.Sanitize(error).Message);
+                }
             }
 
             PendingRpcRequest pending;
@@ -192,7 +212,7 @@ namespace Playserv.Wrapper
             if (completedTask != responseTask)
             {
                 if (!_pendingRequests.TryRemove(pending))
-                    return ConvertResponse<TResponse>(requestId, await responseTask, jsonCodec);
+                    return ConvertResponse<TResponse>(requestId, await responseTask, jsonCodec, strictCodec);
 
                 if (cancellationToken.IsCancellationRequested)
                 {
@@ -208,13 +228,14 @@ namespace Playserv.Wrapper
                     $"RPC invocation timed out after {timeout.TotalSeconds:0.###} seconds.");
             }
 
-            return ConvertResponse<TResponse>(requestId, await responseTask, jsonCodec);
+            return ConvertResponse<TResponse>(requestId, await responseTask, jsonCodec, strictCodec);
         }
 
         private static PlayServRpcResult<TResponse> ConvertResponse<TResponse>(
             string requestId,
             InvokeRpcResponse response,
-            Playserv.Serialization.IJsonCodec jsonCodec)
+            Playserv.Serialization.IJsonCodec jsonCodec,
+            IPlayServStrictJsonCodec strictCodec)
         {
             if (response == null)
             {
@@ -236,7 +257,7 @@ namespace Playserv.Wrapper
                     response);
             }
 
-            if (string.IsNullOrWhiteSpace(response.Result))
+            if (strictCodec == null && string.IsNullOrWhiteSpace(response.Result))
             {
                 return new PlayServRpcResult<TResponse>(
                     requestId,
@@ -250,7 +271,9 @@ namespace Playserv.Wrapper
 
             try
             {
-                var value = jsonCodec.Deserialize<TResponse>(response.Result);
+                var value = strictCodec != null
+                    ? strictCodec.DeserializeStrict<TResponse>(response.Result)
+                    : jsonCodec.Deserialize<TResponse>(response.Result);
                 return new PlayServRpcResult<TResponse>(
                     requestId,
                     value,
@@ -262,6 +285,10 @@ namespace Playserv.Wrapper
             }
             catch (Exception ex)
             {
+                if (strictCodec != null)
+                    return Failure<TResponse>(requestId, PlayServRpcErrorCode.DeserializationFailed,
+                        PlayServStrictResponseException.Sanitize(ex).Message, response.Status, response,
+                        redactPayload: true);
                 return Failure<TResponse>(
                     requestId,
                     PlayServRpcErrorCode.DeserializationFailed,
@@ -278,7 +305,8 @@ namespace Playserv.Wrapper
             string message,
             string status = null,
             InvokeRpcResponse response = null,
-            Exception exception = null)
+            Exception exception = null,
+            bool redactPayload = false)
         {
             return new PlayServRpcResult<T>(
                 requestId,
@@ -292,7 +320,7 @@ namespace Playserv.Wrapper
                     message,
                     status ?? response?.Status,
                     exception,
-                    response?.Result));
+                    redactPayload ? null : response?.Result));
         }
 
         private static bool IsSuccessStatus(string status)

@@ -39,6 +39,27 @@ namespace Playserv.Status
         internal Task<PlayServPlatformStatus> GetCurrentAsync(CancellationToken cancellationToken) =>
             GetAsync<PlayServPlatformStatus>("status", cancellationToken);
 
+        internal async Task<PlayServProjectStatus> GetProjectAsync(
+            string projectSlug, string environment, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(projectSlug) || projectSlug.Any(char.IsControl) ||
+                projectSlug.Trim() == "." || projectSlug.Trim() == "..")
+                throw new ArgumentException("A project slug without control characters is required.", nameof(projectSlug));
+            if (environment != null && environment.Any(char.IsControl))
+                throw new ArgumentException("Environment cannot contain control characters.", nameof(environment));
+            var path = "status/" + Uri.EscapeDataString(projectSlug.Trim());
+            if (!string.IsNullOrWhiteSpace(environment))
+                path += "?env=" + Uri.EscapeDataString(environment.Trim());
+            var result = await GetAsync<PlayServProjectStatus>(path, cancellationToken);
+            if (string.IsNullOrWhiteSpace(result.ProjectSlug) || result.GeneratedAt == default || result.Functions == null ||
+                result.Functions.Any(function => function == null || string.IsNullOrWhiteSpace(function.FunctionId) ||
+                    string.IsNullOrWhiteSpace(function.Slug) || string.IsNullOrWhiteSpace(function.Environment) ||
+                    string.IsNullOrWhiteSpace(function.Kind)))
+                throw InvalidResponse("status_project_response_invalid", "Project status response is missing required metadata.");
+            return result;
+        }
+
         internal Task<PlayServPlatformStatusHistory> GetHistoryAsync(
             string pop,
             int days,

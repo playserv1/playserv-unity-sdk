@@ -43,9 +43,11 @@ namespace Playserv.Editor
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     PlayServWindowChrome.DrawOverviewCard(
-                        "Game ID",
-                        string.IsNullOrWhiteSpace(context.Config != null ? context.Config.GameId : null) ? "Not configured" : context.Config.GameId,
-                        "Runtime identity");
+                        "Deployment ID",
+                        string.IsNullOrWhiteSpace(context.Config != null ? context.Config.DeploymentGameId : null)
+                            ? "Not configured"
+                            : context.Config.DeploymentGameId,
+                        "Editor deployment only");
 
                     GUILayout.Space(8f);
 

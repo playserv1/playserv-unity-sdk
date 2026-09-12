@@ -47,11 +47,9 @@ namespace Playserv.Wrapper
 
         public static void Config(
             string clientToken,
-            string gameId,
-            string userId,
             string gameVersion,
             string sdkVersion = null) =>
-            Api.Config(clientToken, gameId, userId, gameVersion, sdkVersion);
+            Api.Config(clientToken, gameVersion, sdkVersion);
 
         public static void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider) =>
             Api.SetRuntimeTokenProvider(tokenProvider);
@@ -68,8 +66,8 @@ namespace Playserv.Wrapper
         public static void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
             Api.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
-        public static Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
-            Api.GetLatestVersionAsync(gameId, ct);
+        public static Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default) =>
+            Api.GetLatestVersionAsync(deploymentId, ct);
 
         public static Playserv.Proxy.Interfaces.ITransportImplementation GetTransportImplementation() =>
             Api.GetTransportImplementation();

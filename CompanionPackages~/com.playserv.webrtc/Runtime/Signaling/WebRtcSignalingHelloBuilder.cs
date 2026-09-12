@@ -30,8 +30,6 @@ namespace Playserv.Proxy.WebRtc
                 MessageType = WebRtcSignalMessageTypes.Hello,
                 SessionId = _sessionId,
                 GameAccessToken = ResolveWireCredential(_settings.ClientToken, runtimeAuthorization),
-                GameId = _settings.GameId ?? string.Empty,
-                UserId = _settings.UserId ?? string.Empty,
                 GameVersion = _settings.GameVersion ?? string.Empty,
                 SdkVersion = _settings.SdkVersion ?? string.Empty,
                 ChannelLabel = _settings.WebRtcDataChannelLabel ?? string.Empty,
@@ -56,8 +54,6 @@ namespace Playserv.Proxy.WebRtc
             public string MessageType { get; set; }
             public string SessionId { get; set; }
             public string GameAccessToken { get; set; }
-            public string GameId { get; set; }
-            public string UserId { get; set; }
             public string GameVersion { get; set; }
             public string SdkVersion { get; set; }
             public string ChannelLabel { get; set; }

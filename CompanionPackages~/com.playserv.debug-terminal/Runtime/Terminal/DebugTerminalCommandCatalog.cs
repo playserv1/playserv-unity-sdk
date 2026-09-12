@@ -13,7 +13,7 @@ namespace Playserv.DebugTerminal
             Entry("state", "state"),
             Entry("sdk info", "sdk info"),
             Entry("sdk modules", "sdk modules"),
-            Entry("sdk latest", "sdk latest [gameId]"),
+            Entry("sdk latest", "sdk latest [deploymentId]"),
             Entry("auth", "auth"),
             Entry("auth refresh", "auth refresh"),
             Entry("providers", "providers"),

@@ -43,7 +43,10 @@ namespace Playserv.Wrapper
                 options,
                 cancellationToken);
 
-        /// <summary>POSTs an optional JSON body and deserializes the response.</summary>
+        /// <summary>
+        /// POSTs an optional JSON body and deserializes the response. Set options.StrictResponseTypes
+        /// to reject response type coercion; unsupported contracts fail before I/O as Deserialization.
+        /// </summary>
         public static Task<PlayServFunctionResult<TResponse>> CallAsync<TResponse>(
             string slug,
             object body = null,

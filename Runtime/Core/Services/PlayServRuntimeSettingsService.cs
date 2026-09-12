@@ -63,8 +63,7 @@ namespace Playserv.Wrapper
 
             instance.SetConfig(
                 settings.ClientToken,
-                settings.GameId,
-                settings.UserId,
+                settings.PlayerId,
                 settings.GameVersion,
                 settings.SdkVersion,
                 settings.AllowMultipleConnections,
@@ -87,7 +86,7 @@ namespace Playserv.Wrapper
 
             if (!settings.ResolveLatestGameVersionOnConnect ||
                 string.IsNullOrWhiteSpace(settings.DeployApiServerAddress) ||
-                string.IsNullOrWhiteSpace(settings.GameId))
+                string.IsNullOrWhiteSpace(settings.DeploymentGameId))
             {
                 return settings;
             }
@@ -100,16 +99,19 @@ namespace Playserv.Wrapper
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
             _logTrace(
-                $"[PlayServ] Refreshing game version before connect. gameId={settings.GameId}, deployApi={settings.DeployApiServerAddress}, timeout={timeoutSeconds}s");
+                $"[PlayServ] Refreshing game version before connect. deploymentGameId={settings.DeploymentGameId}, deployApi={settings.DeployApiServerAddress}, timeout={timeoutSeconds}s");
 
-            var latestVersion = await _resolveLatestVersion(settings, settings.GameId, timeoutCts.Token);
+            var latestVersion = await _resolveLatestVersion(
+                settings,
+                settings.DeploymentGameId,
+                timeoutCts.Token);
             settings.GameVersion = latestVersion;
             _syncLoadedConfigGameVersion(latestVersion);
 #endif
             return settings;
         }
 
-        public static void EnsureConfigured(PlayServSettings settings, bool allowMissingUserId = false)
+        public static void EnsureConfigured(PlayServSettings settings)
         {
             if (!HasHandshakeCredential(settings))
             {
@@ -118,12 +120,6 @@ namespace Playserv.Wrapper
             }
 
             PlayServCredentialPolicy.NormalizeClientToken(settings.ClientToken);
-
-            if (string.IsNullOrWhiteSpace(settings.GameId))
-                throw new InvalidOperationException("Game ID is required. Call Config(...) first.");
-
-            if (!allowMissingUserId && string.IsNullOrWhiteSpace(settings.UserId))
-                throw new InvalidOperationException("User ID is required. Call Config(...) first.");
 
             if (string.IsNullOrWhiteSpace(settings.GameVersion))
                 throw new InvalidOperationException("Game version is required. Call Config(...) first.");

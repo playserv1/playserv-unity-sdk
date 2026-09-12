@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-12
+
+- Aligned the package and internal PlayServ dependency versions with `0.5.0`.
+
+- **Breaking:** removed the legacy `GameId` field from dedicated-server
+  realtime options; the rotating `sk_*` credential identifies the project.
+
 ## [0.4.1] - 2026-08-23
 
 - Aligned the package, core SDK, and Analytics dependency versions with `0.4.1`.

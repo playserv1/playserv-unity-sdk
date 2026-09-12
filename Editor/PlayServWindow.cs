@@ -216,7 +216,8 @@ namespace Playserv.Editor
             _state.SerializedObject = new SerializedObject(_state.Config);
 
             _state.ClientTokenProperty = _state.SerializedObject.FindProperty("clientToken");
-            _state.GameIdProperty = _state.SerializedObject.FindProperty("gameId");
+            _state.DeploymentGameIdProperty =
+                _state.SerializedObject.FindProperty("deploymentGameId");
             _state.GameVersionProperty = _state.SerializedObject.FindProperty("gameVersion");
             _state.SdkVersionProperty = _state.SerializedObject.FindProperty("sdkVersion");
             _state.AllowMultipleConnectionsProperty = _state.SerializedObject.FindProperty("allowMultipleConnections");

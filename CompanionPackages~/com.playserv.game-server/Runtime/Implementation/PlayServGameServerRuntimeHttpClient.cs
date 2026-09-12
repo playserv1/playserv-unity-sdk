@@ -74,17 +74,21 @@ namespace Playserv.GameServer
             if (method != "POST" && method != "PATCH" && method != "DELETE")
                 return false;
 
-            var path = (request.RelativePath ?? string.Empty).TrimStart('/');
+            var path = (request.RelativePath ?? string.Empty).TrimStart('/').Split('?')[0];
             if (!path.StartsWith("data/tables/", StringComparison.Ordinal))
                 return false;
 
             if (method == "POST")
             {
-                var recordsSuffix = path.EndsWith("/records", StringComparison.Ordinal);
-                return recordsSuffix && !path.EndsWith("/records:query", StringComparison.Ordinal);
+                return path.EndsWith("/records", StringComparison.Ordinal) ||
+                    path.EndsWith("/records:bulk-create", StringComparison.Ordinal) ||
+                    path.EndsWith("/records:delete-by-filter", StringComparison.Ordinal) ||
+                    path.EndsWith("/records:upsert", StringComparison.Ordinal) ||
+                    path.EndsWith("/records:bulk-upsert", StringComparison.Ordinal);
             }
 
-            return path.IndexOf("/records/", StringComparison.Ordinal) >= 0;
+            return path.IndexOf("/records/", StringComparison.Ordinal) >= 0 ||
+                path.EndsWith("/records:by-natural-key", StringComparison.Ordinal);
         }
 
         private static PlayServRuntimeDataRequest WithActingPlayer(

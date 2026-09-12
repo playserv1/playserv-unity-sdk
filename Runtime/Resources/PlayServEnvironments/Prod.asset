@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Prod
   m_EditorClassIdentifier: 
   clientToken: 
-  gameId: 
+  deploymentGameId:
   backendServerAddress: wss://proxy.playserv.io/ws
   webRtcSignalingServerAddress: 
   webRtcDataChannelLabel: playserv

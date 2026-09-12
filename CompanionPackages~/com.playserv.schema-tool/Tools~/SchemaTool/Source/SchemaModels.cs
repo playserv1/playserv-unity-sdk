@@ -4,7 +4,7 @@ namespace PlayServ.Schema.Tool;
 
 internal static class ToolConstants
 {
-    public const string Version = "0.4.1";
+    public const string Version = "0.5.0";
     public const int ProtocolVersion = 1;
     public const int ConfigurationVersion = 1;
     public const int LockVersion = 1;
@@ -41,6 +41,7 @@ internal sealed class SchemaServiceConfiguration
     public string Endpoint { get; set; } = string.Empty;
     public string Environment { get; set; } = string.Empty;
     public string ProjectId { get; set; } = string.Empty;
+    public string ServerKeyEnvironmentVariable { get; set; } = "PLAYSERV_SERVER_KEY";
 }
 
 internal sealed class SchemaContract
@@ -51,6 +52,19 @@ internal sealed class SchemaContract
     public string Kind { get; init; } = "object";
     public string Authority { get; init; } = "contract";
     public string Version { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public bool Singleton { get; init; }
+    public string DisplayField { get; init; } = string.Empty;
+    public string OwnedBy { get; init; } = string.Empty;
+    public string ReadPolicy { get; init; } = string.Empty;
+    public string OnPlayerDelete { get; init; } = string.Empty;
+    public bool AllowRawFields { get; init; }
+    public string ClientRead { get; init; } = string.Empty;
+    public string ClientWrite { get; init; } = string.Empty;
+    public string ServerRead { get; init; } = string.Empty;
+    public string ServerWrite { get; init; } = string.Empty;
+    public string BackendRead { get; init; } = string.Empty;
+    public string BackendWrite { get; init; } = string.Empty;
     public string SourceId { get; init; } = string.Empty;
     public string SourcePath { get; init; } = string.Empty;
     public int SourceLine { get; init; }
@@ -64,7 +78,16 @@ internal sealed class SchemaMember
     public string Name { get; init; } = string.Empty;
     public string SourceName { get; init; } = string.Empty;
     public string TypeName { get; init; } = string.Empty;
+    public string FieldType { get; init; } = string.Empty;
     public bool Required { get; init; }
+    public string CodeKey { get; init; } = string.Empty;
+    public bool Primary { get; init; }
+    public bool Unique { get; init; }
+    public bool Indexed { get; init; }
+    public string Default { get; init; } = string.Empty;
+    public string Target { get; init; } = string.Empty;
+    public string Cardinality { get; init; } = string.Empty;
+    public bool Ordered { get; init; }
     public IReadOnlyList<string> FormerNames { get; init; } = Array.Empty<string>();
 }
 
@@ -141,4 +164,8 @@ internal sealed class ToolResult
     public string Message { get; set; } = string.Empty;
     public List<string> Outputs { get; set; } = new();
     public List<SchemaDiagnostic> Diagnostics { get; set; } = new();
+    public int PushedSchemaCount { get; set; }
+    public string PreviousRevision { get; set; } = string.Empty;
+    public string Revision { get; set; } = string.Empty;
+    public bool DryRun { get; set; }
 }

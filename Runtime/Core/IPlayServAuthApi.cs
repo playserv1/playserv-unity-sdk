@@ -15,9 +15,17 @@ namespace Playserv.Wrapper
 
         PlayServSessionInfo CurrentSession { get; }
 
+        PlayServPlayerProfile CurrentPlayerProfile { get; }
+
         event Action<PlayServSessionLostInfo> SessionLost;
 
         Task<PlayServAuthProvidersResult> GetProvidersAsync(
+            CancellationToken cancellationToken = default);
+
+        Task<PlayServPlayerProfileResult> GetCurrentPlayerProfileAsync(
+            CancellationToken cancellationToken = default);
+
+        Task<PlayServPlayerProfileResult> RefreshCurrentPlayerProfileAsync(
             CancellationToken cancellationToken = default);
 
         Task<PlayServAuthResult> LoginExternalAsync(

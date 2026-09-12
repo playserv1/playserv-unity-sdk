@@ -65,6 +65,18 @@ namespace Playserv.Wrapper
             CancellationToken ct = default) =>
             Records<T>().LoadAsync(recordId, options, ct);
 
+        public static Task<PlayServRecord<T>> LoadByNaturalKeyAsync<T>(
+            PlayServNaturalKey<T> naturalKey,
+            PlayServLoadOptions options = null,
+            CancellationToken ct = default) =>
+            Records<T>().LoadByNaturalKeyAsync(naturalKey, options, ct);
+
+        public static Task<PlayServBulkCreateResult> BulkCreateAsync<T>(
+            IEnumerable<T> values,
+            IReadOnlyDictionary<string, object> defaults = null,
+            CancellationToken ct = default) =>
+            Records<T>().BulkCreateAsync(values, defaults, ct);
+
         public static Task<PlayServLoadOrCreateResult<T>> LoadOrCreateAsync<T>(
             PlayServNaturalKey<T> naturalKey,
             Func<T> factory,
@@ -161,6 +173,12 @@ namespace Playserv.Wrapper
                 maxRecords,
                 maxConcurrency,
                 ct);
+
+        public static Task<PlayServDeleteByFilterResult> DeleteMatchingAsync<T>(
+            PlayServRecordQuery<T> query,
+            PlayServDeleteAllConfirmation confirmation,
+            CancellationToken ct = default) =>
+            Records<T>().DeleteMatchingAsync(query, confirmation, ct);
 
         public static Task<PlayServSingleton<T>> GetSingletonAsync<T>(
             PlayServLoadOptions options = null,

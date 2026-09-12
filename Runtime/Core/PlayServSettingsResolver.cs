@@ -81,8 +81,8 @@ namespace Playserv.Wrapper
             var merged = settings.Clone();
             if (string.IsNullOrWhiteSpace(merged.ClientToken))
                 merged.ClientToken = packageDefaults.ClientToken;
-            if (string.IsNullOrWhiteSpace(merged.GameId))
-                merged.GameId = packageDefaults.GameId;
+            if (string.IsNullOrWhiteSpace(merged.DeploymentGameId))
+                merged.DeploymentGameId = packageDefaults.DeploymentGameId;
             if (string.IsNullOrWhiteSpace(merged.BackendServerAddress))
                 merged.BackendServerAddress = packageDefaults.BackendServerAddress;
             if (string.IsNullOrWhiteSpace(merged.WebRtcSignalingServerAddress))

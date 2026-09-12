@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Playserv.Proxy.Common;
 using Playserv.Serialization;
+using Playserv.Wrapper;
 
 namespace Playserv.Tests.Runtime
 {
@@ -63,6 +65,34 @@ namespace Playserv.Tests.Runtime
             var codec = new NewtonsoftJsonCodec();
 
             Assert.Throws<JsonCodecException>(() => codec.Deserialize<Payload>("{"));
+        }
+
+        [Test]
+        public void HandshakeRequest_DoesNotSerializeLegacyGameOrUserIdentity()
+        {
+            var codec = new NewtonsoftJsonCodec();
+            var request = new HandshakeRequest
+            {
+                ClientToken = "pk_project",
+                Authorization = "Bearer player-jwt",
+                GameVersion = "1.2.3",
+                SdkVersion = "0.5.0"
+            };
+
+            var json = codec.Serialize(request);
+
+            Assert.That(json, Does.Contain("pk_project"));
+            Assert.That(json, Does.Contain("player-jwt"));
+            Assert.That(json, Does.Not.Contain("GameId"));
+            Assert.That(json, Does.Not.Contain("UserId"));
+        }
+
+        [Test]
+        public void RuntimeSettings_DoNotExposeCallerSuppliedGameOrUserIdentity()
+        {
+            Assert.That(typeof(PlayServSettings).GetProperty("GameId"), Is.Null);
+            Assert.That(typeof(PlayServSettings).GetProperty("UserId"), Is.Null);
+            Assert.That(typeof(PlayServSettings).GetProperty("DeploymentGameId"), Is.Not.Null);
         }
     }
 }
