@@ -231,7 +231,7 @@ namespace Playserv.Matchmaking
                 new PlayServRuntimeDataRequest
                 {
                     Method = "POST",
-                    RelativePath = $"matchmaking/{Uri.EscapeDataString(functionSlug.Trim())}/servers:launch",
+                    RelativePath = $"rooms/{Uri.EscapeDataString(functionSlug.Trim())}/servers:launch",
                     ClientToken = _settings.ClientToken,
                     BearerToken = bearer,
                     JsonBody = body,
@@ -354,11 +354,12 @@ namespace Playserv.Matchmaking
             double receivedAt)
         {
             var status = NormalizeOptional(wire.status) ?? "matched";
-            if (operation == PlayServMatchmakingOperation.JoinRoom && status != "matched")
+            var namedReservation = operation == PlayServMatchmakingOperation.JoinRoom || operation == PlayServMatchmakingOperation.HostRoom;
+            if (namedReservation && status != "matched")
                 throw InvalidResponse(operation, functionSlug, "matchmaking_unsupported_status",
                     "Direct room join must return a matched reservation.");
             if (wire.expires_in < 0 ||
-                (operation == PlayServMatchmakingOperation.JoinRoom && !wire.expires_in.HasValue))
+                (namedReservation && !wire.expires_in.HasValue))
                 throw InvalidResponse(operation, functionSlug, "matchmaking_incomplete_reservation",
                     "Room reservation did not contain a valid lifetime.");
             switch (status.ToLowerInvariant())
@@ -381,7 +382,7 @@ namespace Playserv.Matchmaking
                             wire.room_name,
                             wire.reservation_token,
                             wire.expires_at.Value,
-                            ToConnect(wire.connect), wire.region, FreezeAttributes(wire.attributes),
+                            ToConnect(wire.connect), wire.region, FreezeAttributes(wire.attributes, operation == PlayServMatchmakingOperation.HostRoom),
                             wire.expires_in, _monotonicSeconds, receivedAt),
                         wire.retry_after_ms);
 
@@ -419,9 +420,11 @@ namespace Playserv.Matchmaking
                 ct.ThrowIfCancellationRequested();
                 if (response != null && (response.StatusCode < 200 || response.StatusCode > 299))
                 {
-                    throw HttpFailure(request, operation, functionSlug, response.StatusCode,
+                    var error = HttpFailure(request, operation, functionSlug, response.StatusCode,
                         TryReadProblemCode(response.Body), ReadProblemDetail(response.Body),
                         false, false, TryReadRetryable(response.Body));
+                    error.RetryAfter = ReadRetryAfter(response.Headers);
+                    throw error;
                 }
                 return response;
             }
@@ -445,10 +448,12 @@ namespace Playserv.Matchmaking
             {
                 var timeout = IsTimeout(exception);
                 var retryable = TryReadRetryable(exception.ResponseBody);
-                throw HttpFailure(request, operation, functionSlug, exception.StatusCode,
+                var error = HttpFailure(request, operation, functionSlug, exception.StatusCode,
                     FirstNonEmpty(exception.BackendCode, TryReadProblemCode(exception.ResponseBody), null),
                     FirstNonEmpty(exception.ProblemDetail, ReadProblemDetail(exception.ResponseBody), "PlayServ matchmaking failed."),
                     exception.IsNetworkError, timeout, retryable);
+                error.RetryAfter = ReadRetryAfter(exception.ResponseHeaders);
+                throw error;
             }
             catch (PlayServMatchmakingException)
             {

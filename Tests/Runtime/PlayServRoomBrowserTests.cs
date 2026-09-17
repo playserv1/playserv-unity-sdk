@@ -17,6 +17,25 @@ namespace Playserv.Tests.Runtime
         private const string Reservation = "{\"status\":\"matched\",\"room_name\":\"room:one\",\"reservation_token\":\"rsv_secret\",\"expires_at\":\"2000-01-01T00:00:00Z\",\"expires_in\":10,\"connect\":{\"host\":\"Game.Example.com\",\"port\":7777,\"transport\":\"udp\",\"connect_string\":\"opaque ? text\",\"region\":\"eu\"},\"region\":\"eu\",\"attributes\":{\"map\":\"arena\",\"nested\":{\"flags\":[true,2]}}}";
 
         [Test]
+        public void Named_join_snapshots_parameters_and_identity_before_await()
+        {
+            var http = new HttpFixture(); http.Enqueue(Reservation);
+            var token = new TaskCompletionSource<string>();
+            var parameters = new Dictionary<string, object> { ["team"] = "blue" };
+            var request = new PlayServJoinRoomRequest { FunctionSlug = "arena", RoomName = "room:one", Params = parameters };
+            var pending = Create(http, token: _ => token.Task).JoinRoomAsync(request, default);
+            parameters["team"] = "red"; request.RoomName = "changed";
+            token.SetResult("player.jwt.value"); pending.GetAwaiter().GetResult();
+            Assert.That(http.Requests, Has.Count.EqualTo(1));
+            Assert.That(http.Requests[0].JsonBody, Is.EqualTo("{\"params\":{\"team\":\"blue\"}}"));
+            Assert.That(http.Requests[0].RelativePath, Is.EqualTo("rooms/arena/room%3Aone:join"));
+            Assert.That(http.Requests[0].Method, Is.EqualTo("POST"));
+            Assert.That(http.Requests[0].BearerToken, Is.EqualTo("player.jwt.value"));
+            Assert.Throws<ArgumentException>(() => Create(http).JoinRoomAsync(new PlayServJoinRoomRequest
+                { FunctionSlug = "arena", RoomName = "room", Params = new[] { 1 } }, default).GetAwaiter().GetResult());
+        }
+
+        [Test]
         public void Browse_snapshots_filters_before_token_resolution_and_pages_without_followup_io()
         {
             var http = new HttpFixture();
@@ -388,10 +407,74 @@ namespace Playserv.Tests.Runtime
         }
 
         private static PlayServMatchmakingClient Create(HttpFixture http, Func<double> monotonic = null,
-            Func<DateTimeOffset> utc = null, Func<CancellationToken, Task<string>> token = null) =>
+            Func<DateTimeOffset> utc = null, Func<CancellationToken, Task<string>> token = null,
+            Func<int, CancellationToken, Task> delay = null) =>
             new PlayServMatchmakingClient(new PlayServSettings {
                 ClientToken = "pk_public", RuntimeTokenProvider = new PlayServDelegateRuntimeTokenProvider(token ?? (_ => Task.FromResult("player.jwt.value")))
-            }, http, new NewtonsoftJsonCodec(), utcNow: utc, monotonicSeconds: monotonic);
+            }, http, new NewtonsoftJsonCodec(), utcNow: utc, monotonicSeconds: monotonic, delay: delay);
+
+        [TestCase(false)][TestCase(true)]
+        public void JoinFlowBoundsRetriesAndPreservesRetryAfterForBothHttpPaths(bool throwing)
+        {
+            var http = new HttpFixture(); var now = 0d; var calls = 0;
+            var headers = new Dictionary<string, string> { ["Retry-After"] = "3" };
+            http.Handler = (_, __) =>
+            {
+                if (calls++ > 0) return Task.FromResult(Response(Reservation));
+                const string body = "{\"code\":\"room_unreachable\"}";
+                if (throwing) throw new PlayServRuntimeHttpException("safe", 503, body, "room_unreachable", false, null, null, null, null, headers);
+                return Task.FromResult(new PlayServRuntimeDataResponse(503, body, null, null, headers: headers));
+            };
+            var client = Create(http, monotonic: () => now, delay: (ms, ct) => { now += ms / 1000d; return Task.CompletedTask; });
+            var result = client.JoinRoomAndConnectAsync(new PlayServJoinRoomRequest { FunctionSlug = "arena", RoomName = "room:one", Params = new { team = "blue" } }, null, null, default).GetAwaiter().GetResult();
+            Assert.That(result.ReservationToken, Is.EqualTo("rsv_secret"));
+            Assert.That(now, Is.EqualTo(3)); Assert.That(calls, Is.EqualTo(2));
+            Assert.That(http.Requests[0].JsonBody, Is.EqualTo(http.Requests[1].JsonBody));
+        }
+
+        private sealed class InlineDelivery : SynchronizationContext
+        { public override void Post(SendOrPostCallback callback, object state) => callback(state); }
+
+        [Test] public void ConnectorFailureIsNotRetriedAndExpiredTicketIsRefreshed()
+        {
+            var old = SynchronizationContext.Current;
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(new InlineDelivery());
+                var http = new HttpFixture(); http.Enqueue(Reservation.Replace("\"expires_in\":10", "\"expires_in\":0")); http.Enqueue(Reservation);
+                var now = 0d; var connected = 0;
+                var client = Create(http, monotonic: () => now, delay: (ms, ct) => { now += ms / 1000d; return Task.CompletedTask; });
+                Assert.Throws<InvalidOperationException>(() => client.JoinRoomAndConnectAsync(
+                    new PlayServJoinRoomRequest { FunctionSlug = "arena", RoomName = "room" }, null,
+                    (ticket, ct) => { connected++; throw new InvalidOperationException("game failure"); }, default).GetAwaiter().GetResult());
+                Assert.That(connected, Is.EqualTo(1)); Assert.That(http.Requests, Has.Count.EqualTo(2));
+            }
+            finally { SynchronizationContext.SetSynchronizationContext(old); }
+        }
+
+        [Test] public void JoinFlowExpiresNullConnectAndDoesNotRetryNetworkFailure()
+        {
+            var http = new HttpFixture(); var now = 0d;
+            http.Handler = (_, __) => Task.FromResult(Response(Reservation.Replace("\"connect\":{", "\"unused\":{") ));
+            var client = Create(http, monotonic: () => now, delay: (ms, ct) => { now += ms / 1000d; return Task.CompletedTask; });
+            var request = new PlayServJoinRoomRequest { FunctionSlug = "arena", RoomName = "room" };
+            var error = Assert.Throws<PlayServMatchmakingException>(() => client.JoinRoomAndConnectAsync(request,
+                new PlayServRoomJoinOptions { ConnectTimeout = TimeSpan.FromSeconds(2) }, null, default).GetAwaiter().GetResult());
+            Assert.That(error.UnifiedError.Code, Is.EqualTo(PlayServErrorCode.Timeout)); Assert.That(now, Is.EqualTo(2));
+            http.Requests.Clear(); http.Handler = (_, __) => throw new Exception("private");
+            Assert.Throws<PlayServMatchmakingException>(() => client.JoinRoomAndConnectAsync(request, null, null, default).GetAwaiter().GetResult());
+            Assert.That(http.Requests, Has.Count.EqualTo(1));
+        }
+        [Test] public void JoinFlowChecksMonotonicBudgetAfterReceivingATicket()
+        {
+            var http = new HttpFixture(); var now = 0d;
+            http.Handler = (_, __) => { now = 46; return Task.FromResult(Response(Reservation)); };
+            var client = Create(http, monotonic: () => now);
+            var error = Assert.Throws<PlayServMatchmakingException>(() => client.JoinRoomAndConnectAsync(
+                new PlayServJoinRoomRequest { FunctionSlug = "arena", RoomName = "room" }, null, null, default).GetAwaiter().GetResult());
+            Assert.That(error.UnifiedError.Code, Is.EqualTo(PlayServErrorCode.Timeout));
+            Assert.That(http.Requests, Has.Count.EqualTo(1));
+        }
 
         private static PlayServRuntimeDataResponse Response(string body, int status = 200) => new PlayServRuntimeDataResponse(status, body, null, null);
 

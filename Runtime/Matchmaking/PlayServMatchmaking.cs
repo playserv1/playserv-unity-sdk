@@ -9,6 +9,16 @@ namespace Playserv.Wrapper
     public static class PlayServMatchmaking
     {
         /// <summary>
+        /// Requests a platform-named room and its hosting player's reservation using the signed-in player.
+        /// Attributes are wishes; the returned server-approved attributes are authoritative.
+        /// Performs one bounded request with no automatic retry, launch, additional join or transport connection.
+        /// Call on the Unity context to resume there. Cancellation after sending cannot undo room creation.
+        /// </summary>
+        public static Task<PlayServMatchResult> HostRoomAsync(PlayServHostRoomRequest request,
+            PlayServRoomHostOptions options = null, CancellationToken ct = default) =>
+            PlayServMatchmakingClient.CreateDefault().HostRoomAsync(request, options, ct);
+
+        /// <summary>
         /// Reads the public room browser with a player session. Requires the /rooms API (PSV-2600).
         /// The caller chooses a room and explicitly requests any subsequent cursor page.
         /// </summary>
@@ -23,6 +33,16 @@ namespace Playserv.Wrapper
         public static Task<PlayServMatchResult> JoinRoomAsync(
             string functionSlug, string roomName, CancellationToken ct = default) =>
             PlayServMatchmakingClient.CreateDefault().JoinRoomAsync(functionSlug, roomName, ct);
+
+        /// <summary>Requests one named-room reservation with snapshotted admission parameters. No automatic retries.</summary>
+        public static Task<PlayServMatchResult> JoinRoomAsync(PlayServJoinRoomRequest request, CancellationToken ct = default) =>
+            PlayServMatchmakingClient.CreateDefault().JoinRoomAsync(request, ct);
+
+        /// <summary>Opt-in bounded named join. When provided, connector must be supplied from Unity's synchronization context.</summary>
+        public static Task<PlayServMatchReservation> JoinRoomAndConnectAsync(PlayServJoinRoomRequest request,
+            PlayServRoomJoinOptions options = null, Func<PlayServMatchReservation, CancellationToken, Task> connector = null,
+            CancellationToken ct = default) =>
+            PlayServMatchmakingClient.CreateDefault().JoinRoomAndConnectAsync(request, options, connector, ct);
 
         /// <summary>
         /// Executes one placement request. The HTTP deadline is derived from

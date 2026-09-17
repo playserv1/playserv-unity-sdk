@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Wrapper;
@@ -22,6 +26,31 @@ namespace Playserv.GameServer
         private PlayServError _lastError = PlayServError.None;
         private Task _loopTask;
         private Task<PlayServGameRoomCloseResult> _closeTask;
+        private readonly HashSet<string> _roster = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _admissionIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        internal object AdmissionLock => _sync;
+        internal bool CanAdmit => _state == PlayServGameRoomState.Active || _state == PlayServGameRoomState.Degraded;
+        /// <summary>Local pushed-ticket admission. Subscribe to AdmissionRejected before accepting game connections.</summary>
+        public PlayServRoomAdmission Admission { get; }
+        private PlayServRoomConnectionTracker _connectionTracker;
+        /// <summary>Creates this room's opt-in pushed-admission tracker. Connection IDs must identify a unique connection generation.</summary>
+        public PlayServRoomConnectionTracker CreateConnectionTracker(TimeSpan? reconnectGrace = null)
+        {
+            lock (_sync)
+            {
+                ThrowIfClosedOrTerminated();
+                if (_connectionTracker != null) throw new InvalidOperationException("A connection tracker already exists for this room.");
+                if (PlayServGameServer.Uplink.AdmissionMode != PlayServAdmissionMode.Push)
+                    throw UplinkErrors.Exception("admission_mode_mismatch");
+                return _connectionTracker = new PlayServRoomConnectionTracker(this, _context, reconnectGrace ?? TimeSpan.FromSeconds(30));
+            }
+        }
+        private Task _presenceTask = Task.CompletedTask;
+        private int _queuedPresence, _mismatches;
+        private bool _divergenceReported;
+        private PlayServRoomConfiguration _configuration;
+        private readonly double _startedAt;
+        private double _emptySince;
 
         internal PlayServGameRoomHandle(
             PlayServGameServerContext context,
@@ -35,7 +64,9 @@ namespace Playserv.GameServer
             _desiredSnapshot = desiredSnapshot;
             _registryKey = registryKey;
             _remove = remove;
+            Admission = new PlayServRoomAdmission(this);
             _state = PlayServGameRoomState.Active;
+            _startedAt = _emptySince = context.MonotonicSeconds();
         }
 
         /// <summary>Raised after a heartbeat failure has updated <see cref="State"/>.</summary>
@@ -44,6 +75,164 @@ namespace Playserv.GameServer
         public event Action<PlayServGameRoomHandle, PlayServRoomPlacementAcknowledgment> PlacementChanged;
         /// <summary>Raised once after a non-retryable heartbeat failure terminates the handle.</summary>
         public event Action<PlayServGameRoomHandle, PlayServError> Terminated;
+        /// <summary>Raised once per unresolved roster-repair episode, after two subsequent mismatches.</summary>
+        public event Action<PlayServGameRoomHandle> PresenceDiverged;
+        /// <summary>Raised after a platform lifetime/idle timer closes the room.</summary>
+        public event Action<PlayServGameRoomHandle, string> LifetimeClosed;
+        public PlayServRoomConfiguration Configuration { get { lock (_sync) return _configuration; } }
+
+        /// <summary>Reports a game-admitted player. Call only for non-bot players, after the game's admission decision.</summary>
+        public void ReportJoin(string playerId, bool isBot = false)
+        {
+            if (isBot) return;
+            var push = PlayServGameServer.Uplink.AdmissionMode == PlayServAdmissionMode.Push;
+            playerId = PlayServGameServer.ValidateOptionalAnalyticsPlayerId(playerId);
+            if (playerId == null) throw new ArgumentException("A player ID is required.", nameof(playerId));
+            lock (_sync)
+            {
+                ThrowIfClosedOrTerminated();
+                if (!_context.EnableUplink) throw new InvalidOperationException("Presence requires the server uplink.");
+                if (_roster.Contains(playerId)) return;
+                if (push) throw UplinkErrors.Exception("admission_mode_mismatch");
+                _roster.Add(playerId);
+                EnqueuePresence(new { type = "room_presence", room_name = RoomName, @event = "join",
+                    seq = _context.NextPresenceSequence(RoomName), player_id = playerId });
+            }
+        }
+
+        /// <summary>Reports the game's removal decision, not a raw transport disconnect or reconnect grace period.</summary>
+        public void ReportLeave(string playerId)
+        {
+            playerId = PlayServGameServer.ValidateOptionalAnalyticsPlayerId(playerId);
+            if (playerId == null) throw new ArgumentException("A player ID is required.", nameof(playerId));
+            lock (_sync)
+            {
+                ThrowIfClosedOrTerminated();
+                if (!_context.EnableUplink) throw new InvalidOperationException("Presence requires the server uplink.");
+                if (!_roster.Remove(playerId)) return;
+                _admissionIds.Remove(playerId);
+                if (_roster.Count == 0) _emptySince = _context.MonotonicSeconds();
+                EnqueuePresence(new { type = "room_presence", room_name = RoomName, @event = "leave",
+                    seq = _context.NextPresenceSequence(RoomName), player_id = playerId });
+            }
+        }
+        /// <summary>Reports a kick already decided/enforced by the game. Does not control the game's network transport.</summary>
+        public void Kick(string playerId) => ReportLeave(playerId);
+
+        // Called in room -> admission lock order. No callbacks are delivered under either lock.
+        internal bool AddAdmittedPlayer(string player, string admissionId, string replacingAdmissionId = null)
+        {
+            lock (_sync)
+            {
+                if (!CanAdmit || _queuedPresence >= 256) return false;
+                if (_roster.Contains(player))
+                {
+                    if (replacingAdmissionId == null || !_admissionIds.TryGetValue(player, out var current) || current != replacingAdmissionId) return false;
+                }
+                else _roster.Add(player);
+                _admissionIds[player] = admissionId;
+                return true;
+            }
+        }
+        internal bool RemoveAdmittedPlayer(string player, string admissionId)
+        {
+            lock (_sync)
+            {
+                if (!_admissionIds.TryGetValue(player, out var current) || current != admissionId) return false;
+                _admissionIds.Remove(player); _roster.Remove(player);
+                if (_roster.Count == 0) _emptySince = _context.MonotonicSeconds();
+                if (CanAdmit) EnqueuePresence(new { type = "room_presence", room_name = RoomName, @event = "leave",
+                    seq = _context.NextPresenceSequence(RoomName), player_id = player });
+                return true;
+            }
+        }
+        internal void QueueAdmissionJoin(Func<Task> send)
+        {
+            lock (_sync)
+            {
+                _queuedPresence++;
+                _presenceTask = _presenceTask.ContinueWith(async _ =>
+                {
+                    try { await send().ConfigureAwait(false); }
+                    finally { lock (_sync) _queuedPresence--; }
+                }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
+            }
+        }
+
+        internal string[] RosterSnapshot() { lock (_sync) return _roster.OrderBy(id => id, StringComparer.Ordinal).ToArray(); }
+        internal static string ComputeRosterHash(IEnumerable<string> players)
+        {
+            using var sha = SHA256.Create();
+            var bytes = Encoding.UTF8.GetBytes(string.Join("\n", players.Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal)));
+            return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+        }
+        internal void RepairRoster()
+        {
+            lock (_sync)
+            {
+                if (_state == PlayServGameRoomState.Closed || _state == PlayServGameRoomState.Terminated) return;
+                EnqueuePresence(new { type = "room_presence", room_name = RoomName, @event = "roster",
+                    seq = _context.NextPresenceSequence(RoomName), players = RosterSnapshot().Select(id => new { player_id = id }).ToArray() });
+            }
+        }
+        private void EnqueuePresence(object frame)
+        {
+            var uplink = PlayServGameServer.Uplink;
+            if (uplink.State != PlayServUplinkState.Connected || _queuedPresence >= 256) return;
+            _queuedPresence++;
+            _presenceTask = _presenceTask.ContinueWith(async _ =>
+            {
+                try { await uplink.SendAsync(frame, _loopCancellation.Token).ConfigureAwait(false); }
+                catch (PlayServGameServerException ex) { uplink.Report(ex.UnifiedError); }
+                catch (OperationCanceledException) { }
+                finally { lock (_sync) _queuedPresence--; }
+            }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default).Unwrap();
+        }
+        internal Task DrainPresenceForTesting() { lock (_sync) return _presenceTask; }
+        internal void ApplyConfiguration(PlayServRoomConfiguration configuration)
+        {
+            if (!_context.EnableUplink || configuration == null) return;
+            lock (_sync)
+            {
+                if (_configuration != null && _configuration.Version >= configuration.Version) return;
+                _configuration = configuration;
+                _desiredSnapshot = _desiredSnapshot.WithCapacity(configuration.Capacity);
+            }
+        }
+        internal void TerminateFromUplink(PlayServError error) => ApplyHeartbeatFailure(error);
+
+        internal async Task EvaluateLifetimeAsync()
+        {
+            _connectionTracker?.Evaluate();
+            string reason = null;
+            lock (_sync)
+            {
+                if (_configuration == null || _state == PlayServGameRoomState.Closed ||
+                    _state == PlayServGameRoomState.Terminated || _closeTask != null) return;
+                var now = _context.MonotonicSeconds();
+                if (_configuration.RoomLifetimeSeconds > 0 && now - _startedAt >= _configuration.RoomLifetimeSeconds)
+                    reason = "room_lifetime_expired";
+                else if (_configuration.RoomIdleTimeoutSeconds > 0 && _roster.Count == 0 &&
+                    now - _emptySince >= _configuration.RoomIdleTimeoutSeconds.Value) reason = "room_idle_timeout";
+            }
+            if (reason == null) return;
+            await CloseAsync().ConfigureAwait(false);
+            _context.Post(() => LifetimeClosed?.Invoke(this, reason));
+        }
+
+        private async Task RunLifetimeAsync()
+        {
+            try
+            {
+                while (!_loopCancellation.IsCancellationRequested)
+                {
+                    await _context.Delay(TimeSpan.FromMilliseconds(250), _loopCancellation.Token).ConfigureAwait(false);
+                    await EvaluateLifetimeAsync().ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch { PlayServGameServer.Uplink.Report(UplinkErrors.Exception("room_lifetime_close_failed").UnifiedError); }
+        }
 
         public string FunctionSlug { get; }
 
@@ -112,7 +301,7 @@ namespace Playserv.GameServer
                 ThrowIfClosedOrTerminated();
                 if (!string.Equals(_desiredSnapshot.RoomName.Trim(), snapshot.RoomName.Trim(), StringComparison.Ordinal))
                     throw new ArgumentException("A room handle cannot change its room name.", nameof(snapshot));
-                _desiredSnapshot = snapshot;
+                _desiredSnapshot = _configuration == null ? snapshot : snapshot.WithCapacity(_configuration.Capacity);
             }
         }
 
@@ -172,6 +361,13 @@ namespace Playserv.GameServer
         public Task<PlayServGameRoomCloseResult> CloseAsync(
             CancellationToken cancellationToken = default)
         {
+            var task = BeginClose(cancellationToken);
+            _connectionTracker?.Dispose();
+            return task;
+        }
+
+        private Task<PlayServGameRoomCloseResult> BeginClose(CancellationToken cancellationToken)
+        {
             lock (_sync)
             {
                 if (_state == PlayServGameRoomState.Closed)
@@ -224,12 +420,14 @@ namespace Playserv.GameServer
                     _state == PlayServGameRoomState.Terminated)
                     return;
                 _loopTask = RunHeartbeatLoopAsync(_loopCancellation.Token);
+                if (_context.EnableUplink) _ = RunLifetimeAsync();
             }
         }
 
         internal void CancelHeartbeatLoop()
         {
             _loopCancellation.Cancel();
+            _connectionTracker?.Dispose();
         }
 
         internal void CancelLocally()
@@ -240,6 +438,7 @@ namespace Playserv.GameServer
                 if (_state != PlayServGameRoomState.Terminated)
                     _state = PlayServGameRoomState.Closed;
             }
+            _connectionTracker?.Dispose();
         }
 
         private async Task RunHeartbeatLoopAsync(CancellationToken cancellationToken)
@@ -273,6 +472,23 @@ namespace Playserv.GameServer
 
         private void ApplyHeartbeatSuccess(PlayServRoomUpsertResult result, DateTimeOffset at)
         {
+            ApplyConfiguration(result.RoomConfiguration);
+            if (_context.EnableUplink)
+            {
+                var repair = false;
+                var diverged = false;
+                lock (_sync)
+                {
+                    if (result.RosterCheck == "ok") { _mismatches = 0; _divergenceReported = false; }
+                    else if (result.RosterCheck == "mismatch" && PlayServGameServer.Uplink.State == PlayServUplinkState.Connected)
+                    {
+                        repair = true;
+                        if (++_mismatches >= 3 && !_divergenceReported) { _divergenceReported = true; diverged = true; }
+                    }
+                }
+                if (repair) RepairRoster();
+                if (diverged) _context.Post(() => PresenceDiverged?.Invoke(this));
+            }
             Action<PlayServGameRoomHandle, PlayServRoomPlacementAcknowledgment> changed = null;
             lock (_sync)
             {
@@ -293,7 +509,7 @@ namespace Playserv.GameServer
             {
                 try
                 {
-                    changed(this, result.Placement);
+                    _context.Post(() => changed(this, result.Placement));
                 }
                 catch
                 {
@@ -305,6 +521,7 @@ namespace Playserv.GameServer
         {
             Action<PlayServGameRoomHandle, PlayServError> failed;
             Action<PlayServGameRoomHandle, PlayServError> terminated = null;
+            var terminal = false;
             lock (_sync)
             {
                 if (_state == PlayServGameRoomState.Closed || _state == PlayServGameRoomState.Terminated)
@@ -314,6 +531,7 @@ namespace Playserv.GameServer
                 if (PlayServGameServer.IsTerminalHeartbeatError(error))
                 {
                     _state = PlayServGameRoomState.Terminated;
+                    terminal = true;
                     _loopCancellation.Cancel();
                     terminated = Terminated;
                 }
@@ -327,18 +545,19 @@ namespace Playserv.GameServer
             {
                 try
                 {
-                    failed(this, error);
+                    _context.Post(() => failed(this, error));
                 }
                 catch
                 {
                 }
             }
-            if (terminated != null)
+            if (terminal)
             {
+                _connectionTracker?.Dispose();
                 _remove(_registryKey, this);
                 try
                 {
-                    terminated(this, error);
+                    if (terminated != null) _context.Post(() => terminated(this, error));
                 }
                 catch
                 {

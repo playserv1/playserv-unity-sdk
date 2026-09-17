@@ -63,6 +63,17 @@ namespace Playserv.Data
 
         internal IJsonCodec Json => _json;
 
+        // Only callers owning an isolated transient scope may release it. Do not dispose the
+        // semaphore: an already-cancelled/in-flight reader may still need to release its lease.
+        internal static void ReleaseCatalogueScope(string scope)
+        {
+            lock (CatalogueCacheGate)
+            {
+                CatalogueCache.Remove(scope);
+                CatalogueLocks.Remove(scope);
+            }
+        }
+
         internal PlayServDataSubjectCapabilities SelectCapabilities(
             PlayServDataCapabilities capabilities)
         {
@@ -138,6 +149,21 @@ namespace Playserv.Data
             }
 
             var typeName = typeof(T).Name;
+            var candidates = MatchTypeName(catalogue, typeName);
+            if (candidates.Count == 0)
+            {
+                throw new PlayServDataException(
+                    $"No runtime data entity named '{typeName}' is visible. Pass an explicit ent_* ID when the schema name differs from the CLR type name.",
+                    404,
+                    "entity_not_found");
+            }
+            if (candidates.Count > 1)
+                throw new InvalidOperationException($"More than one runtime entity matches CLR type '{typeName}'. Use the explicit entity ID overload.");
+            return candidates[0];
+        }
+
+        private static List<PlayServEntityBinding> MatchTypeName(PlayServTableCatalogue catalogue, string typeName)
+        {
             var candidates = new List<PlayServEntityBinding>();
             foreach (var binding in catalogue.Entities)
             {
@@ -151,16 +177,7 @@ namespace Playserv.Data
                     candidates.Add(binding);
             }
 
-            if (candidates.Count == 0)
-            {
-                throw new PlayServDataException(
-                    $"No runtime data entity named '{typeName}' is visible. Pass an explicit ent_* ID when the schema name differs from the CLR type name.",
-                    404,
-                    "entity_not_found");
-            }
-            if (candidates.Count > 1)
-                throw new InvalidOperationException($"More than one runtime entity matches CLR type '{typeName}'. Use the explicit entity ID overload.");
-            return candidates[0];
+            return candidates;
         }
 
         private async Task<PlayServTableCatalogue> GetCatalogueAsync(

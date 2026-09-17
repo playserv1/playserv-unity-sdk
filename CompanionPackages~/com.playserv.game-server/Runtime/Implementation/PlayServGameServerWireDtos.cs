@@ -23,6 +23,10 @@ namespace Playserv.GameServer
         public string room_name;
         public string reservation_token;
         public DateTimeOffset? expires_at;
+        public int? expires_in;
+        public RoomConnectWire connect;
+        public string region;
+        public object attributes;
         public int? retry_after_ms;
     }
 
@@ -49,6 +53,11 @@ namespace Playserv.GameServer
         public object attributes;
         public bool? open;
         public DateTimeOffset? created_at;
+        public object connect;
+        public string region;
+        public string instance_id;
+        public string roster_hash;
+        public int? roster_count;
     }
 
     [Serializable]
@@ -56,6 +65,8 @@ namespace Playserv.GameServer
     {
         public bool created;
         public PlacementWire placement;
+        public RoomConfigWire room_config;
+        public string roster_check;
     }
 
     [Serializable]
@@ -72,6 +83,10 @@ namespace Playserv.GameServer
     [Serializable]
     internal sealed class RoomListItemWire
     {
+        public RoomConnectWire connect;
+        public string region;
+        public string instance_id;
+        public object attributes;
         public string room_name;
         public int players;
         public int capacity;

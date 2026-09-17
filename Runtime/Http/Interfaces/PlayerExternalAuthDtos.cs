@@ -11,6 +11,8 @@ namespace Playserv.Http.Interfaces
         public string mode;
         public string nonce;
         public PlayerFingerprintDto fingerprint;
+        /// <summary>Optional creation/first-link name; omit when blank. Wire key is exactly display_name.</summary>
+        public string display_name;
     }
 
     [Serializable]
@@ -24,6 +26,8 @@ namespace Playserv.Http.Interfaces
     public sealed class PlayerAnonymousLoginRequestDto
     {
         public PlayerFingerprintDto fingerprint;
+        /// <summary>Optional name of a newly created player; trim/cap at 64 UTF-16 units and omit when blank.</summary>
+        public string display_name;
     }
 
     [Serializable]
@@ -33,6 +37,8 @@ namespace Playserv.Http.Interfaces
         public string provider_token;
         public string mode;
         public string nonce;
+        /// <summary>Optional first-link profile hint, not a rename. Wire key is exactly display_name.</summary>
+        public string display_name;
     }
 
     [Serializable]

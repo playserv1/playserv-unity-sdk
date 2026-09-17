@@ -123,7 +123,7 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(second.DeploymentId, Is.EqualTo("dep_2"));
             Assert.That(transport.Requests[0].ServerKey, Is.EqualTo("sk_first"));
             Assert.That(transport.Requests[1].ServerKey, Is.EqualTo("sk_second"));
-            Assert.That(transport.Requests[0].RelativePath, Is.EqualTo("matchmaking/arena/servers:launch"));
+            Assert.That(transport.Requests[0].RelativePath, Is.EqualTo("rooms/arena/servers:launch"));
             Assert.That(transport.Requests[0].JsonBody, Does.Contain("\"region\":\"eu\""));
         }
 
@@ -851,7 +851,7 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(shutdown.Rooms[0].IsSuccess, Is.True);
             Assert.That(room.State, Is.EqualTo(PlayServGameRoomState.Closed));
             Assert.That(transport.Requests[1].RelativePath, Is.EqualTo("analytics/events"));
-            Assert.That(transport.Requests[2].RelativePath, Is.EqualTo("matchmaking/arena/rooms/room-1:close"));
+            Assert.That(transport.Requests[2].RelativePath, Is.EqualTo("rooms/arena/room-1:close"));
         }
 
         private static void Configure(
@@ -862,6 +862,7 @@ namespace Playserv.Tests.Runtime.GameServer
                 new PlayServGameServerOptions
                 {
                     BackendServerAddress = "https://api.playserv.test/ws",
+                    EnableUplink = false, // Exercise the explicitly supported REST-only compatibility path.
                     ServerKeyProvider = provider,
                     HeartbeatInterval = TimeSpan.FromSeconds(5),
                     HttpTimeout = TimeSpan.FromSeconds(10)

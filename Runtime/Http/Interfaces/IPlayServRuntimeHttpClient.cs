@@ -39,6 +39,20 @@ namespace Playserv.Http.Interfaces
     }
 
     /// <summary>
+    /// Optional additive capability for anonymous authentication with a game-selected display
+    /// name and fingerprint. The name uses the literal <c>display_name</c> JSON key; trim and cap
+    /// at 64 UTF-16 code units without splitting surrogate pairs, omitting blank names.
+    /// Existing HTTP modules keep working without this capability (the name is then omitted).
+    /// </summary>
+    public interface IPlayServAnonymousLoginHttpClient
+    {
+        Task<PlayerTokenBundleDto> SignInAnonAsync(
+            string clientToken,
+            PlayerAnonymousLoginRequestDto request,
+            CancellationToken ct = default);
+    }
+
+    /// <summary>
     /// Optional additive capability for exact byte uploads, bounded byte responses and
     /// streaming downloads. Existing custom HTTP modules do not need to implement it.
     /// </summary>

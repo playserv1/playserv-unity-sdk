@@ -14,7 +14,7 @@ using UnityEngine.TestTools;
 
 namespace Playserv.Tests.Runtime
 {
-    public sealed class PlayServAuthSessionTests
+    public sealed partial class PlayServAuthSessionTests
     {
         [Test]
         public void Settings_DefaultAutomaticFingerprintIsEnabledAndClonePreservesOptOut()
@@ -1720,7 +1720,7 @@ namespace Playserv.Tests.Runtime
             public void LogWarning(string message) => WarningCount++;
         }
 
-        private sealed class FakeHttpClient :
+        private class FakeHttpClient :
             IPlayServRuntimeHttpClient,
             IPlayServPlayerIdentityHttpClient
         {

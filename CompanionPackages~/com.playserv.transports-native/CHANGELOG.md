@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-17
+
+### Changed
+
+- Aligned the package and internal PlayServ dependency versions with `0.6.0` (PSV-2694).
+
 ## [0.5.1] - 2026-09-12
 
 - Aligned the package and internal PlayServ dependency versions with `0.5.1`.

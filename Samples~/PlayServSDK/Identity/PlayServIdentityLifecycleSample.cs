@@ -13,6 +13,29 @@ namespace Playserv.Samples.Identity
     /// </summary>
     public static class PlayServIdentityLifecycleSample
     {
+        /// <summary>Call before PlayServ.Config; restored players are never renamed.</summary>
+        public static void SetNewAnonymousPlayerName(PlayServSettings settings, string chosenName)
+        {
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+            settings.AnonymousDisplayName = chosenName;
+        }
+
+        /// <summary>
+        /// The game chooses the name; provider profile names are not sent automatically.
+        /// Backend first-link-wins rules apply, so read the profile rather than assuming a rename.
+        /// </summary>
+        public static Task<PlayServAuthResult> LoginWithChosenNameAsync(
+            PlayServExternalIdentityProof proof,
+            string chosenName,
+            CancellationToken cancellationToken = default)
+        {
+            if (proof == null)
+                throw new ArgumentNullException(nameof(proof));
+            return PlayServAuth.LoginExternalAsync(proof.WithDisplayName(chosenName),
+                cancellationToken: cancellationToken);
+        }
+
         public static void EnableAutomaticMobileFingerprint(PlayServSettings settings)
         {
             if (settings == null)

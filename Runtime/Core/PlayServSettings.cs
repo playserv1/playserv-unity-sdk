@@ -65,6 +65,14 @@ namespace Playserv.Wrapper
         public bool EnableAutomaticPlayerAuthentication { get; set; } = true;
 
         /// <summary>
+        /// Optional runtime-only name for newly created anonymous players, including anonymous
+        /// fallback sessions. Trimmed and capped at 64 UTF-16 code units without splitting emoji.
+        /// Does not rename a restored player and is not persisted in credentials or config assets.
+        /// A legacy custom HTTP module without anonymous-profile support ignores it with a warning.
+        /// </summary>
+        public string AnonymousDisplayName { get; set; }
+
+        /// <summary>
         /// Optional runtime-only persistence used by automatic player authentication.
         /// When omitted, the SDK uses a PlayerPrefs-backed store.
         /// </summary>
@@ -206,6 +214,7 @@ namespace Playserv.Wrapper
                 RuntimeTokenProvider = RuntimeTokenProvider,
                 PlayerAccessToken = PlayerAccessToken,
                 EnableAutomaticPlayerAuthentication = EnableAutomaticPlayerAuthentication,
+                AnonymousDisplayName = AnonymousDisplayName,
                 PlayerSessionStore = PlayerSessionStore,
                 EnableAutomaticPlayerFingerprint = EnableAutomaticPlayerFingerprint,
                 PlayerFingerprintProvider = PlayerFingerprintProvider,

@@ -16,7 +16,7 @@ namespace Playserv.GameServer
     /// Process-wide facade for PlayServ operations that require a Unity Dedicated Server
     /// build and an <c>sk_*</c> credential.
     /// </summary>
-    public static class PlayServGameServer
+    public static partial class PlayServGameServer
     {
         internal const int NetworkMarginMs = 5_000;
         internal const int DefaultHttpTimeoutSeconds = 10;
@@ -33,6 +33,19 @@ namespace Playserv.GameServer
 
         private static PlayServGameServerContext _context;
         private static bool? _supportedBuildOverrideForTesting;
+        private static readonly string ProcessInstanceId = Guid.NewGuid().ToString("N");
+
+        /// <summary>Process-owned room uplink, independent of the opt-in Records /ws connection.</summary>
+        public static PlayServGameServerUplink Uplink { get; private set; } = new PlayServGameServerUplink();
+
+        /// <summary>Server-to-client events sent over the explicitly connected uplink.</summary>
+        public static PlayServGameServerEvents Events { get; } = new PlayServGameServerEvents();
+
+        /// <summary>Legacy project-level scores and Top queries on the connected uplink.</summary>
+        public static PlayServGameServerLeaderboards Leaderboards { get; } = new PlayServGameServerLeaderboards();
+
+        /// <summary>Opt-in structured server logs. Never captures Debug.Log or Analytics automatically.</summary>
+        public static PlayServGameServerLogs Logs { get; } = new PlayServGameServerLogs();
 
         /// <summary>Server-authorized Cloud Functions facade.</summary>
         public static PlayServGameServerCode Code { get; } = new PlayServGameServerCode();
@@ -80,6 +93,14 @@ namespace Playserv.GameServer
             if (string.IsNullOrWhiteSpace(entityId))
                 throw new ArgumentException("Entity ID is required.", nameof(entityId));
             return CreateRecordSet<T>(entityId.Trim());
+        }
+
+        /// <summary>Explicit server-authorized table presence advisory. NotVisible may mean an ACL restriction.</summary>
+        public static Task<IReadOnlyList<PlayServSchemaAdvisory>> CheckSchemaAsync(
+            IEnumerable<Type> entityTypes, CancellationToken ct = default)
+        {
+            EnsureSupportedBuild();
+            return CreateRecordsClient().CheckSchemaAsync(entityTypes, ct);
         }
 
         /// <summary>Returns the cached server-visible runtime table catalogue.</summary>
@@ -151,7 +172,12 @@ namespace Playserv.GameServer
 
             var context = GetContext();
             var slug = ValidateFunctionSlug(request.FunctionSlug);
+            if (context.ShuttingDown) throw UplinkErrors.Exception("instance_draining");
             ValidateSnapshot(request.Snapshot, nameof(request));
+            if (context.EnableUplink) await Uplink.ConnectForRoomAsync(slug, cancellationToken);
+            var config = context.EnableUplink ? Uplink.RoomConfiguration : null;
+            if (context.EnableUplink && config == null) throw UplinkErrors.Exception("room_configuration_missing");
+            var initialSnapshot = config == null ? request.Snapshot : request.Snapshot.WithCapacity(config.Capacity);
             var key = BuildRoomKey(slug, request.Snapshot.RoomName.Trim());
             lock (Sync)
             {
@@ -162,17 +188,16 @@ namespace Playserv.GameServer
                 }
 
                 StartingRooms.Add(key);
+                if (config != null && Rooms.Count + StartingRooms.Count > config.MaxRooms)
+                {
+                    StartingRooms.Remove(key);
+                    throw UplinkErrors.Exception("room_quota_exceeded");
+                }
             }
 
             try
             {
-                var initial = await UpsertRoomCoreAsync(context, slug, request.Snapshot, cancellationToken);
-                var handle = new PlayServGameRoomHandle(context, slug, request.Snapshot, key, RemoveRoom);
-                handle.ApplyInitialHeartbeat(initial, context.UtcNow());
-                lock (Sync)
-                    Rooms.Add(key, handle);
-                handle.StartHeartbeatLoop();
-                return handle;
+                return await RegisterPreparedRoomAsync(context, slug, initialSnapshot, cancellationToken);
             }
             finally
             {
@@ -181,7 +206,54 @@ namespace Playserv.GameServer
             }
         }
 
-        /// <summary>Runs server-authorized matchmaking for an explicit player ID.</summary>
+        internal static async Task<PlayServGameRoomHandle> RegisterPreparedRoomAsync(PlayServGameServerContext context,
+            string slug, PlayServGameRoomSnapshot snapshot, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (context.ShuttingDown) throw UplinkErrors.Exception("instance_draining");
+            Uplink.PrepareAdmissionRoom(snapshot.RoomName);
+            try
+            {
+                var initial = await UpsertRoomCoreAsync(context, slug, snapshot, ct);
+                ct.ThrowIfCancellationRequested();
+                var key = BuildRoomKey(slug, snapshot.RoomName.Trim());
+                PlayServGameRoomHandle handle;
+                lock (Sync)
+                {
+                    if (!ReferenceEquals(_context, context) || context.ShuttingDown)
+                        throw UplinkErrors.Exception("room_registration_outcome_unknown");
+                    handle = new PlayServGameRoomHandle(context, slug, snapshot, key, RemoveRoom);
+                    Rooms.Add(key, handle);
+                }
+                handle.ApplyConfiguration(Uplink.RoomConfiguration);
+                Uplink.AttachAdmissionRoom(snapshot.RoomName, handle);
+                handle.ApplyInitialHeartbeat(initial, context.UtcNow());
+                handle.StartHeartbeatLoop();
+                return handle;
+            }
+            catch { Uplink.ClearAdmissionRoom(snapshot.RoomName); throw; }
+        }
+
+        internal static bool TryReserveRequestedRoom(PlayServGameServerContext context, string slug,
+            string name, int maxRooms, out string refusal)
+        {
+            lock (Sync)
+            {
+                var key = BuildRoomKey(slug, name);
+                if (Rooms.ContainsKey(key) || StartingRooms.Contains(key)) refusal = "room_name_conflict";
+                else if (!ReferenceEquals(_context, context) || context.ShuttingDown)
+                    refusal = "instance_draining";
+                else if (Rooms.Count + StartingRooms.Count >= maxRooms) refusal = "room_quota_exceeded";
+                else { StartingRooms.Add(key); refusal = null; return true; }
+                return false;
+            }
+        }
+        internal static void ReleaseRequestedRoom(PlayServGameServerContext context, string slug, string name)
+        {
+            lock (Sync) { if (ReferenceEquals(_context, context)) StartingRooms.Remove(BuildRoomKey(slug, name)); }
+        }
+
+        /// <summary>Runs server-authorized matchmaking for an explicit player ID, including endpoint metadata and an advisory monotonic reservation lifetime.</summary>
         public static async Task<PlayServServerMatchResult> FindMatchForPlayerAsync(
             PlayServServerFindMatchRequest request,
             CancellationToken cancellationToken = default)
@@ -216,8 +288,51 @@ namespace Playserv.GameServer
                 "server matchmaking",
                 includeRawDetails: true,
                 cancellationToken);
+            return ReadServerReservation(context, response, false);
+        }
+
+        /// <summary>Requests a named-room reservation for an explicit player using server credentials. No find, launch or retry.</summary>
+        public static async Task<PlayServServerMatchResult> JoinRoomForPlayerAsync(
+            string functionSlug, string roomName, string playerId, object parameters = null,
+            CancellationToken ct = default)
+        {
+            EnsureSupportedBuild();
+            ct.ThrowIfCancellationRequested();
+            var context = GetContext();
+            var slug = ValidateFunctionSlug(functionSlug);
+            var name = ValidateRoomName(roomName, nameof(roomName));
+            var player = ValidatePlayerId(playerId, nameof(playerId));
+            var snapshot = PlayServGameServerJson.SerializeOptionalObject(parameters, nameof(parameters));
+            var body = snapshot == null
+                ? PlayServGameServerJson.Serialize(new { player_id = player })
+                : PlayServGameServerJson.Serialize(new { player_id = player, @params = PlayServGameServerJson.ParseOptionalObject(snapshot) });
+            var response = await SendAsync(context, "POST", "rooms/" + Escape(slug) + "/" + Escape(name) + ":join",
+                body, context.HttpTimeout, "server room join", includeRawDetails: false, ct);
+            return ReadServerReservation(context, response, true);
+        }
+
+        private static PlayServServerMatchResult ReadServerReservation(
+            PlayServGameServerContext context, PlayServGameServerHttpResponse response, bool requireMatched)
+        {
+            var monotonicSeconds = context.MonotonicSeconds;
+            var receivedAt = monotonicSeconds();
+            // The wire TTL is an integer, never Newtonsoft's coerced string or rounded fraction.
+            var plain = GameServerServiceValues.Object(response.Body);
+            if (plain != null)
+            {
+                foreach (var field in plain)
+                {
+                    if (!string.Equals(field.Key, "expires_in", StringComparison.OrdinalIgnoreCase) || field.Value == null)
+                        continue;
+                    var seconds = field.Value is long number ? number : field.Value is int integer ? integer : -1L;
+                    if (seconds < 0 || seconds > int.MaxValue)
+                        throw InvalidResponse("server matchmaking");
+                }
+            }
             var wire = DeserializeRequired<FindMatchResponseWire>(response.Body, "server matchmaking");
             var status = NormalizeOptional(wire.status) ?? "matched";
+            if (requireMatched && (!string.Equals(wire.status, "matched", StringComparison.OrdinalIgnoreCase) || !wire.expires_in.HasValue))
+                throw InvalidResponse("server room join");
             if (string.Equals(status, "matched", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.IsNullOrWhiteSpace(wire.room_name) ||
@@ -227,13 +342,21 @@ namespace Playserv.GameServer
                     throw InvalidResponse("server matchmaking");
                 }
 
-                return new PlayServServerMatchResult(
-                    "matched",
-                    new PlayServServerReservation(
-                        wire.room_name,
-                        wire.reservation_token,
-                        wire.expires_at.Value),
-                    wire.retry_after_ms);
+                try
+                {
+                    return new PlayServServerMatchResult(
+                        "matched",
+                        new PlayServServerReservation(
+                            wire.room_name, wire.reservation_token, wire.expires_at.Value,
+                            wire.connect?.ToModel(), wire.region, wire.attributes, wire.expires_in,
+                            monotonicSeconds, receivedAt),
+                        wire.retry_after_ms);
+                }
+                catch (Exception)
+                {
+                    // Response conversion failures must not expose the reservation or raw metadata.
+                    throw InvalidResponse("server matchmaking");
+                }
             }
 
             if (string.Equals(status, "searching", StringComparison.OrdinalIgnoreCase))
@@ -259,7 +382,7 @@ namespace Playserv.GameServer
             var response = await SendAsync(
                 context,
                 "POST",
-                "matchmaking/" + Escape(slug) + "/servers:launch",
+                "rooms/" + Escape(slug) + "/servers:launch",
                 PlayServGameServerJson.Serialize(new LaunchServerRequestWire { region = normalizedRegion }),
                 context.HttpTimeout,
                 "game server launch",
@@ -283,7 +406,7 @@ namespace Playserv.GameServer
             var response = await SendAsync(
                 context,
                 "GET",
-                "matchmaking/" + Escape(slug) + "/rooms",
+                "rooms/" + Escape(slug),
                 null,
                 context.HttpTimeout,
                 "room list",
@@ -306,14 +429,14 @@ namespace Playserv.GameServer
                     room.placement_state,
                     room.open,
                     room.drain_until,
-                    room.drain_cause);
+                    room.drain_cause, room.connect?.ToModel(), room.region, room.instance_id, room.attributes);
             }
 
             return result;
         }
 
         /// <summary>Creates or refreshes a room snapshot without creating a managed handle.</summary>
-        public static Task<PlayServRoomUpsertResult> UpsertRoomAsync(
+        public static async Task<PlayServRoomUpsertResult> UpsertRoomAsync(
             string functionSlug,
             PlayServGameRoomSnapshot snapshot,
             CancellationToken cancellationToken = default)
@@ -323,7 +446,12 @@ namespace Playserv.GameServer
             var context = GetContext();
             var slug = ValidateFunctionSlug(functionSlug);
             ValidateSnapshot(snapshot, nameof(snapshot));
-            return UpsertRoomCoreAsync(context, slug, snapshot, cancellationToken);
+            if (context.EnableUplink)
+            {
+                await Uplink.ConnectForRoomAsync(slug, cancellationToken);
+                if (Uplink.RoomConfiguration == null) throw UplinkErrors.Exception("room_configuration_missing");
+            }
+            return await UpsertRoomCoreAsync(context, slug, snapshot, cancellationToken);
         }
 
         /// <summary>Closes a managed or unmanaged room and stops its local heartbeat when present.</summary>
@@ -363,6 +491,8 @@ namespace Playserv.GameServer
             var context = GetContext();
             var slug = ValidateFunctionSlug(functionSlug);
             var reservationToken = ValidateSecretToken(token, nameof(token));
+            if (Uplink.AdmissionMode == PlayServAdmissionMode.Push)
+                throw UplinkErrors.Exception("admission_mode_mismatch");
             var player = ValidatePlayerId(playerId, nameof(playerId));
             var room = roomName == null ? null : ValidateRoomName(roomName, nameof(roomName));
             var body = PlayServGameServerJson.Serialize(new ConsumeReservationRequestWire
@@ -429,6 +559,9 @@ namespace Playserv.GameServer
         {
             EnsureSupportedBuild();
             cancellationToken.ThrowIfCancellationRequested();
+            lock (Sync) { if (_context != null) _context.ShuttingDown = true; }
+            Uplink.CancelRoomCreation();
+            await Uplink.DrainRoomCreationAsync();
             await Realtime.DisconnectAsync(cancellationToken);
             PlayServGameRoomHandle[] handles;
             PlayServGameServerContext context;
@@ -442,18 +575,21 @@ namespace Playserv.GameServer
             if (context == null)
             {
                 Analytics.ResetForConfiguration();
+                Logs.ResetForConfiguration();
                 return new PlayServGameServerShutdownResult(
                     Array.Empty<PlayServGameRoomCloseResult>(),
                     PlayServError.None);
             }
 
             var analyticsError = await Analytics.FlushForShutdownAsync(cancellationToken);
+            var logsError = await Logs.FlushForShutdownAsync(cancellationToken);
 
             var tasks = new Task<PlayServGameRoomCloseResult>[handles.Length];
             for (var i = 0; i < handles.Length; i++)
                 tasks[i] = handles[i].CloseAsync(cancellationToken);
 
             var results = await Task.WhenAll(tasks);
+            await Uplink.DisconnectAsync(cancellationToken);
             lock (Sync)
             {
                 if (ReferenceEquals(_context, context))
@@ -462,8 +598,9 @@ namespace Playserv.GameServer
             }
 
             Analytics.ResetForConfiguration();
+            Logs.ResetForConfiguration();
 
-            return new PlayServGameServerShutdownResult(results, analyticsError);
+            return new PlayServGameServerShutdownResult(results, analyticsError, logsError);
         }
 
         internal static TimeSpan ResolveFindMatchTimeout(int waitMs)
@@ -480,6 +617,7 @@ namespace Playserv.GameServer
             Func<TimeSpan, CancellationToken, Task> delay)
         {
             ConfigureCore(options, transport, utcNow, delay);
+            _context.Dispatch = action => action();
         }
 
         internal static void SetSupportedBuildForTesting(bool? supported)
@@ -570,20 +708,32 @@ namespace Playserv.GameServer
             PlayServGameRoomSnapshot snapshot,
             CancellationToken cancellationToken)
         {
+            PlayServGameRoomHandle handle;
+            bool starting;
+            lock (Sync)
+            {
+                var key = BuildRoomKey(functionSlug, snapshot.RoomName.Trim());
+                Rooms.TryGetValue(key, out handle); starting = StartingRooms.Contains(key);
+            }
+            var roster = context.EnableUplink ? handle?.RosterSnapshot() ?? (starting ? Array.Empty<string>() : null) : null;
             var body = PlayServGameServerJson.Serialize(new UpsertRoomRequestWire
             {
                 room_name = snapshot.RoomName.Trim(),
                 players = snapshot.Players,
-                capacity = snapshot.Capacity,
+                capacity = context.EnableUplink && Uplink.RoomConfiguration != null ? Uplink.RoomConfiguration.Capacity : snapshot.Capacity,
                 state = NormalizeOptional(snapshot.State),
                 attributes = PlayServGameServerJson.ParseOptionalObject(snapshot.AttributesJson),
-                open = snapshot.Open,
-                created_at = snapshot.CreatedAt
+                open = snapshot.Open && (!context.EnableUplink || snapshot.Players < (Uplink.RoomConfiguration?.Capacity ?? snapshot.Capacity)),
+                created_at = snapshot.CreatedAt,
+                connect = snapshot.Connect?.ToWire(), region = snapshot.Region,
+                instance_id = context.EnableUplink && context.UplinkStarted ? context.InstanceId : null,
+                roster_hash = roster == null ? null : PlayServGameRoomHandle.ComputeRosterHash(roster),
+                roster_count = roster?.Length
             });
             var response = await SendAsync(
                 context,
                 "POST",
-                "matchmaking/" + Escape(functionSlug) + "/rooms/upsert",
+                "rooms/" + Escape(functionSlug) + ":upsert",
                 body,
                 context.HttpTimeout,
                 "room heartbeat",
@@ -592,6 +742,7 @@ namespace Playserv.GameServer
             var wire = DeserializeRequired<UpsertRoomResponseWire>(response.Body, "room heartbeat");
             if (wire.placement == null)
                 throw InvalidResponse("room heartbeat");
+            if (context.UplinkStarted) Uplink.ApplyConfiguration(wire.room_config);
             return new PlayServRoomUpsertResult(
                 wire.created,
                 new PlayServRoomPlacementAcknowledgment(
@@ -600,7 +751,8 @@ namespace Playserv.GameServer
                     wire.placement.draining,
                     wire.placement.drain_cause,
                     wire.placement.drain_until,
-                    wire.placement.open_refused));
+                    wire.placement.open_refused))
+            { RoomConfiguration = context.UplinkStarted ? Uplink.RoomConfiguration : null, RosterCheck = wire.roster_check };
         }
 
         internal static async Task CloseRoomCoreAsync(
@@ -612,7 +764,7 @@ namespace Playserv.GameServer
             await SendAsync(
                 context,
                 "POST",
-                "matchmaking/" + Escape(functionSlug) + "/rooms/" + Escape(roomName) + ":close",
+                "rooms/" + Escape(functionSlug) + "/" + Escape(roomName) + ":close",
                 null,
                 context.HttpTimeout,
                 "room close",
@@ -627,8 +779,8 @@ namespace Playserv.GameServer
             ValidateRoomName(snapshot.RoomName, parameterName);
             if (snapshot.Capacity <= 0)
                 throw new ArgumentOutOfRangeException(parameterName, "Room capacity must be greater than zero.");
-            if (snapshot.Players < 0 || snapshot.Players > snapshot.Capacity)
-                throw new ArgumentOutOfRangeException(parameterName, "Room player count must be between zero and capacity.");
+            if (snapshot.Players < 0)
+                throw new ArgumentOutOfRangeException(parameterName, "Room player count cannot be negative.");
             if (snapshot.State != null && snapshot.State.Length > 256)
                 throw new ArgumentOutOfRangeException(parameterName, "Room state must be at most 256 characters.");
         }
@@ -640,6 +792,8 @@ namespace Playserv.GameServer
 
         internal static void CancelForModuleShutdown()
         {
+            Logs.ResetForConfiguration();
+            Uplink.CancelForModuleShutdown();
             Realtime.CancelForModuleShutdown();
             Analytics.ResetForConfiguration();
             PlayServGameRoomHandle[] handles;
@@ -658,18 +812,17 @@ namespace Playserv.GameServer
 
         internal static void OnApplicationQuitting()
         {
+            Uplink.CancelRoomCreation();
             PlayServGameRoomHandle[] handles;
             lock (Sync)
             {
+                if (_context != null) _context.ShuttingDown = true;
                 handles = new PlayServGameRoomHandle[Rooms.Count];
                 Rooms.Values.CopyTo(handles, 0);
             }
 
             for (var i = 0; i < handles.Length; i++)
                 handles[i].CancelHeartbeatLoop();
-
-            if (handles.Length == 0)
-                return;
 
             ObserveBestEffort(CleanupOnQuitAsync(handles));
         }
@@ -680,7 +833,8 @@ namespace Playserv.GameServer
             var tasks = new Task<PlayServGameRoomCloseResult>[handles.Length];
             for (var i = 0; i < handles.Length; i++)
                 tasks[i] = handles[i].CloseAsync(cleanup.Token);
-            await Task.WhenAll(tasks);
+            try { await Logs.FlushForShutdownAsync(cleanup.Token); await Task.WhenAll(tasks); }
+            finally { Logs.ResetForConfiguration(); await Uplink.DisconnectAsync(); }
         }
 
         private static async void ObserveBestEffort(Task task)
@@ -709,13 +863,22 @@ namespace Playserv.GameServer
                     nameof(options),
                     "HeartbeatInterval must be between 1 and 10 seconds.");
             }
-            if (options.HttpTimeout <= TimeSpan.Zero)
-                throw new ArgumentOutOfRangeException(nameof(options), "HttpTimeout must be greater than zero.");
+            if (options.HttpTimeout <= TimeSpan.Zero || options.HttpTimeout.TotalMilliseconds > int.MaxValue)
+                throw new ArgumentOutOfRangeException(nameof(options), "HttpTimeout must be a positive supported duration.");
+            if (options.LogQueueCapacity < 1 || options.LogQueueMaxBytes < 1)
+                throw new ArgumentOutOfRangeException(nameof(options), "Log queue limits must be positive.");
+            if (options.AdmissionEntryLimit < 1 || options.AdmissionByteLimit < 1)
+                throw new ArgumentOutOfRangeException(nameof(options), "Admission limits must be positive.");
+            if (options.RoomCreateTimeout <= TimeSpan.Zero || options.RoomCreateTimeout.TotalMilliseconds > int.MaxValue)
+                throw new ArgumentOutOfRangeException(nameof(options), "RoomCreateTimeout must be a positive supported duration.");
 
             var address = NormalizeOptional(options.BackendServerAddress) ??
                           NormalizeOptional(Environment.GetEnvironmentVariable(ApiUrlEnvironmentVariable));
             var baseAddress = NormalizeBackendAddress(address);
             var provider = options.ServerKeyProvider ?? new EnvironmentServerKeyProvider();
+            var instanceId = options.InstanceId ?? ProcessInstanceId;
+            if (!System.Text.RegularExpressions.Regex.IsMatch(instanceId, "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"))
+                throw new ArgumentException("InstanceId must contain 1–64 protocol-safe characters.", nameof(options));
             var context = new PlayServGameServerContext(
                 provider,
                 transport ?? new PlayServUnityGameServerTransport(baseAddress),
@@ -723,16 +886,32 @@ namespace Playserv.GameServer
                 options.HeartbeatInterval,
                 options.HttpTimeout,
                 utcNow ?? (() => DateTimeOffset.UtcNow),
-                delay ?? ((duration, ct) => Task.Delay(duration, ct)));
+                delay ?? ((duration, ct) => Task.Delay(duration, ct)))
+            {
+                EnableUplink = options.EnableUplink, InstanceId = instanceId,
+                RpcMethods = options.RpcRegistry?.Snapshot(),
+                EnablePushedAdmission = options.EnablePushedAdmission,
+                TicketOfferHandler = options.TicketOfferHandler,
+                AdmissionEntryLimit = options.AdmissionEntryLimit, AdmissionByteLimit = options.AdmissionByteLimit,
+                ExecutorSlug = NormalizeOptional(options.ExecutorSlug) ?? NormalizeOptional(Environment.GetEnvironmentVariable("PLAYSERV_EXECUTOR_SLUG")),
+                UplinkCredentialProvider = options.UplinkCredentialProvider,
+                RoomFactory = options.RoomFactory, RoomCreateTimeout = options.RoomCreateTimeout,
+                LogQueueCapacity = options.LogQueueCapacity, LogQueueMaxBytes = options.LogQueueMaxBytes
+            };
+            var delivery = SynchronizationContext.Current;
+            context.Dispatch = action => { if (delivery == null) action(); else delivery.Post(_ => action(), null); };
 
             lock (Sync)
             {
                 if (Rooms.Count != 0 || StartingRooms.Count != 0)
                     throw new InvalidOperationException("Close all active PlayServ rooms before reconfiguring the game server client.");
+                if (Uplink.State != PlayServUplinkState.Disconnected)
+                    throw new InvalidOperationException("Disconnect the uplink before reconfiguring the game server.");
                 _context = context;
             }
 
             Analytics.ResetForConfiguration();
+            Logs.ResetForConfiguration(context);
         }
 
         private static async Task<PlayServGameServerHttpResponse> SendAsync(
@@ -749,10 +928,15 @@ namespace Playserv.GameServer
         {
             EnsureSupportedBuild();
             cancellationToken.ThrowIfCancellationRequested();
-            var key = await ResolveServerKeyForRealtimeAsync(context, cancellationToken);
+            var key = context.UplinkStarted
+                ? await Uplink.GetRestCredentialAsync(context, cancellationToken)
+                : await ResolveServerKeyForRealtimeAsync(context, cancellationToken);
             try
             {
-                var response = await context.Transport.SendAsync(
+                var response = await context.InvokeAsync(() =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return context.Transport.SendAsync(
                     new PlayServGameServerHttpRequest
                     {
                         Method = method,
@@ -768,6 +952,7 @@ namespace Playserv.GameServer
                         Operation = operation
                     },
                     cancellationToken);
+                });
                 if (response == null)
                     throw InvalidResponse(operation);
                 if (response.StatusCode >= 200 && response.StatusCode <= 299)
@@ -869,6 +1054,7 @@ namespace Playserv.GameServer
 
         private static void RemoveRoom(string key, PlayServGameRoomHandle handle)
         {
+            Uplink.ClearAdmissionRoom(handle.RoomName);
             lock (Sync)
             {
                 if (Rooms.TryGetValue(key, out var current) && ReferenceEquals(current, handle))
@@ -1035,6 +1221,29 @@ namespace Playserv.GameServer
 
         internal static PlayServGameServerContext GetContextForServices() => GetContext();
 
+        internal static void ReplaceUplinkForShutdown(PlayServGameServerUplink previous)
+        {
+            if (ReferenceEquals(Uplink, previous)) Uplink = new PlayServGameServerUplink();
+        }
+        internal static void ApplyRoomConfiguration(PlayServRoomConfiguration config)
+        {
+            PlayServGameRoomHandle[] rooms;
+            lock (Sync) { rooms = new PlayServGameRoomHandle[Rooms.Count]; Rooms.Values.CopyTo(rooms, 0); }
+            foreach (var room in rooms) room.ApplyConfiguration(config);
+        }
+        internal static void RepairUplinkRosters()
+        {
+            PlayServGameRoomHandle[] rooms;
+            lock (Sync) { rooms = new PlayServGameRoomHandle[Rooms.Count]; Rooms.Values.CopyTo(rooms, 0); }
+            foreach (var room in rooms) room.RepairRoster();
+        }
+        internal static void TerminateUplinkRooms(PlayServError error)
+        {
+            PlayServGameRoomHandle[] rooms;
+            lock (Sync) { rooms = new PlayServGameRoomHandle[Rooms.Count]; Rooms.Values.CopyTo(rooms, 0); }
+            foreach (var room in rooms) room.TerminateFromUplink(error);
+        }
+
         internal static void EnsureSupportedBuildForRealtime() => EnsureSupportedBuild();
 
         internal static void EnsureSupportedBuildForServices() => EnsureSupportedBuild();
@@ -1174,5 +1383,40 @@ namespace Playserv.GameServer
         internal TimeSpan HttpTimeout { get; }
         internal Func<DateTimeOffset> UtcNow { get; }
         internal Func<TimeSpan, CancellationToken, Task> Delay { get; }
+        internal bool EnableUplink;
+        internal bool EnablePushedAdmission;
+        internal PlayServTicketOfferHandler TicketOfferHandler;
+        internal int AdmissionEntryLimit, AdmissionByteLimit;
+        internal bool UplinkStarted;
+        internal string ExecutorSlug, InstanceId;
+        internal IPlayServUplinkCredentialProvider UplinkCredentialProvider;
+        internal PlayServRoomFactory RoomFactory;
+        internal Dictionary<string, PlayServServerRpcRegistry.Method> RpcMethods;
+        internal TimeSpan RoomCreateTimeout;
+        internal int LogQueueCapacity, LogQueueMaxBytes;
+        internal volatile bool ShuttingDown;
+        internal Action<Action> Dispatch;
+        internal Func<double> MonotonicSeconds = () => (double)System.Diagnostics.Stopwatch.GetTimestamp() / System.Diagnostics.Stopwatch.Frequency;
+        private readonly Dictionary<string, long> _presenceSequence = new Dictionary<string, long>(StringComparer.Ordinal);
+        internal long NextPresenceSequence(string room)
+        {
+            lock (_presenceSequence)
+            {
+                _presenceSequence.TryGetValue(room, out var previous);
+                return _presenceSequence[room] = Math.Max(previous + 1, UtcNow().ToUnixTimeMilliseconds());
+            }
+        }
+        internal void Post(Action action) => Dispatch(() => { try { action(); } catch { } });
+        internal Task<T> InvokeAsync<T>(Func<Task<T>> action)
+        {
+            var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Dispatch(async () =>
+            {
+                try { completion.TrySetResult(await action()); }
+                catch (OperationCanceledException) { completion.TrySetCanceled(); }
+                catch (Exception ex) { completion.TrySetException(ex); }
+            });
+            return completion.Task;
+        }
     }
 }

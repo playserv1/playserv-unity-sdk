@@ -111,6 +111,8 @@ namespace Playserv.Tests.Runtime.AppleSignIn
             Assert.That(credential.TryCreateBackendProof(out var proof), Is.True);
             Assert.That(proof.ProviderToken, Is.EqualTo("identity-token"));
             Assert.That(proof.AuthorizationCode, Is.EqualTo(string.Empty));
+            Assert.That(proof.DisplayName, Is.Null, "Profile names require explicit game consent.");
+            Assert.That(proof.WithDisplayName(credential.FullName).DisplayName, Is.EqualTo(credential.FullName.Trim()));
         }
 
         private static PlayServAppleSignInCredential CreateCredential(string userId)

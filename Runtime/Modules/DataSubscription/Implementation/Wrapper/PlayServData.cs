@@ -38,6 +38,11 @@ namespace Playserv.Wrapper
                 Api.SelectTypedRecord<T>);
         }
 
+        /// <summary>Explicit advisory only: checks CLR type names in the visible catalogue, never creates schema.</summary>
+        public static Task<IReadOnlyList<PlayServSchemaAdvisory>> CheckSchemaAsync(
+            IEnumerable<Type> entityTypes, CancellationToken ct = default) =>
+            PlayServRecordsClient.CreateDefault().CheckSchemaAsync(entityTypes, ct);
+
         /// <summary>Returns the cached caller-visible runtime table catalogue.</summary>
         public static Task<IReadOnlyList<PlayServDataTableInfo>> GetTablesAsync(
             CancellationToken ct = default) =>

@@ -14,10 +14,13 @@ namespace Playserv.GameServer
     {
         private const string ActingPlayerHeader = "X-Acting-Player";
         private readonly string _actingPlayerJwt;
+        private readonly Func<PlayServRuntimeDataRequest, CancellationToken, Task<PlayServRuntimeDataResponse>> _sendData;
 
-        internal PlayServGameServerRuntimeHttpClient(string actingPlayerJwt = null)
+        internal PlayServGameServerRuntimeHttpClient(string actingPlayerJwt = null,
+            Func<PlayServRuntimeDataRequest, CancellationToken, Task<PlayServRuntimeDataResponse>> sendData = null)
         {
             _actingPlayerJwt = actingPlayerJwt;
+            _sendData = sendData ?? PlayServGameServer.SendRuntimeDataAsync;
         }
 
         public Task<PlayServRuntimeDataResponse> SendDataAsync(
@@ -27,7 +30,7 @@ namespace Playserv.GameServer
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
 
-            return PlayServGameServer.SendRuntimeDataAsync(
+            return _sendData(
                 ShouldAttachActingPlayer(request)
                     ? WithActingPlayer(request, _actingPlayerJwt)
                     : request,

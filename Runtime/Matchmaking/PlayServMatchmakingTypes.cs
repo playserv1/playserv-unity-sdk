@@ -185,6 +185,7 @@ namespace Playserv.Matchmaking
 
         /// <summary>Normalized representation while preserving <see cref="ErrorCode"/>.</summary>
         public PlayServError UnifiedError { get; }
+
     }
 
     public enum PlayServMatchmakingOperation
@@ -193,7 +194,8 @@ namespace Playserv.Matchmaking
         JoinGame,
         LaunchServer,
         BrowseRooms,
-        JoinRoom
+        JoinRoom,
+        HostRoom
     }
 
     /// <summary>Known room refusals; unknown backend codes remain in UnifiedError.SourceCode.</summary>
@@ -205,7 +207,11 @@ namespace Playserv.Matchmaking
         RoomClosed,
         RoomTypeNotFound,
         RoomRefused,
-        RoomUnreachable
+        RoomUnreachable,
+        RoomQuotaExceeded,
+        RoomHostUnavailable,
+        RoomHostCapacityExhausted,
+        RegionUnavailable
     }
 
     /// <summary>Normalized operational failure from player matchmaking.</summary>
@@ -232,6 +238,9 @@ namespace Playserv.Matchmaking
 
         public PlayServError UnifiedError { get; }
 
+        /// <summary>Optional server retry delay; does not enable low-level automatic retries.</summary>
+        public TimeSpan? RetryAfter { get; internal set; }
+
         /// <summary>Typed room refusal without changing the shared error category.</summary>
         public PlayServRoomFailureCode RoomFailureCode => MapRoomFailure(UnifiedError.SourceCode);
 
@@ -245,6 +254,10 @@ namespace Playserv.Matchmaking
                 case "room_type_not_found": return PlayServRoomFailureCode.RoomTypeNotFound;
                 case "room_refused": return PlayServRoomFailureCode.RoomRefused;
                 case "room_unreachable": return PlayServRoomFailureCode.RoomUnreachable;
+                case "room_quota_exceeded": return PlayServRoomFailureCode.RoomQuotaExceeded;
+                case "room_host_unavailable": return PlayServRoomFailureCode.RoomHostUnavailable;
+                case "room_host_capacity_exhausted": return PlayServRoomFailureCode.RoomHostCapacityExhausted;
+                case "region_unavailable": return PlayServRoomFailureCode.RegionUnavailable;
                 default: return PlayServRoomFailureCode.Unknown;
             }
         }

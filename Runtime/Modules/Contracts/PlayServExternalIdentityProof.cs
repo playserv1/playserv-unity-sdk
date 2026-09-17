@@ -275,6 +275,32 @@ namespace Playserv.Identity
 
         public string Nonce { get; }
 
+        /// <summary>
+        /// Optional, game-selected cosmetic name for login or first provider link. Not a rename
+        /// operation, not trusted identity, and never included in merge requests.
+        /// </summary>
+        public string DisplayName { get; }
+
+        /// <summary>
+        /// Returns an independent proof with an explicitly selected name. Trims and truncates to
+        /// 64 UTF-16 code units without splitting a surrogate pair; blank removes the name.
+        /// Provider companions do not automatically copy profile names into a proof.
+        /// </summary>
+        public PlayServExternalIdentityProof WithDisplayName(string displayName) =>
+            new PlayServExternalIdentityProof(this,
+                Playserv.Runtime.Abstractions.PlayServDisplayNamePolicy.Normalize(displayName));
+
+        private PlayServExternalIdentityProof(PlayServExternalIdentityProof source, string displayName)
+        {
+            ProviderId = source.ProviderId;
+            IdToken = source.IdToken;
+            AuthorizationCode = source.AuthorizationCode;
+            ProviderToken = source.ProviderToken;
+            Mode = source.Mode;
+            Nonce = source.Nonce;
+            DisplayName = displayName;
+        }
+
         public bool HasIdToken => !string.IsNullOrWhiteSpace(IdToken);
 
         public bool HasAuthorizationCode => !string.IsNullOrWhiteSpace(AuthorizationCode);

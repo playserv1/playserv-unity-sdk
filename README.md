@@ -7,24 +7,107 @@ and the built-in HTTP/WebSocket transport. Analytics, identity providers,
 native transports, WebRTC, Pulse, schema tooling, and Dedicated Server runtime
 operations are optional companion packages.
 
-## Install from GitHub
+## Install with OpenUPM (recommended for Package Manager updates)
 
-This checkout targets SDK `0.5.1`. In Unity, open `Window` ->
+See [Rooms runtime integration](Documentation~/rooms-runtime-parity.md) for admission parameters and dedicated-server integration helpers.
+
+The core package is available on [OpenUPM](https://openupm.com/packages/com.playserv.sdk/).
+Install it from the registry to browse and select published versions in Unity
+Package Manager. No GitHub credentials or SSH key are needed for this method.
+
+This checkout prepares **0.6.0**. The examples below target that version, but do
+not mean it has been published to OpenUPM or GitHub yet. Until the distribution
+tag and OpenUPM build are published, select an already published version or use
+this checkout as a local package. Version preparation does not publish a release.
+
+1. Open `Edit` -> `Project Settings` -> `Package Manager`.
+2. Add a scoped registry, or add the scope to your existing OpenUPM entry:
+
+   - **Name:** `OpenUPM`
+   - **URL:** `https://package.openupm.com`
+   - **Scope:** `com.playserv.sdk`
+
+3. Click `Save` / `Apply`.
+4. Open `Window` -> `Package Manager`, choose `+` -> `Add package by name`
+   (`Install package by name` in some Unity versions), enter `com.playserv.sdk`
+   and version `0.6.0`, then install. You can also find it under `My Registries`.
+
+Alternatively, merge this configuration into the game project's
+`Packages/manifest.json`. Keep existing dependencies and scoped registries; do
+not replace the whole file:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": ["com.playserv.sdk"]
+    }
+  ],
+  "dependencies": {
+    "com.playserv.sdk": "0.6.0"
+  }
+}
+```
+
+### Switch an existing Git installation to OpenUPM
+
+Adding the registry alone does not convert an existing Git dependency. After
+adding the registry above, replace the **existing** `com.playserv.sdk` Git URL
+in `Packages/manifest.json` with the version string `"0.6.0"`; do not add a
+second entry. A local or embedded copy must also be removed from the resolution
+path before the registry package can be used (back up any local edits first).
+Let Unity resolve packages, then commit `Packages/manifest.json` and
+`Packages/packages-lock.json`. Do not manually edit or delete the lock file.
+
+### Update an OpenUPM installation
+
+New releases become selectable after OpenUPM has successfully built and
+published the corresponding distribution Git tag. A source commit or an
+unprocessed tag is not yet a registry release; check the package's OpenUPM page.
+
+Refresh Package Manager, select **PlayServ SDK** under `In Project` or
+`My Registries`, then select the desired published version and click `Update` /
+`Install`. Depending on the Unity version, use the version dropdown or
+`Version History`. You can also use `Add package by name` with an explicit
+version, or change the version string in the manifest. Keep the manifest and
+lock file in version control after the update.
+
+**Updates are available through Package Manager, not silently installed.** The
+project stays on its selected version until you choose another. Git-tag installs
+remain pinned to their tag and do not gain registry version selection just
+because OpenUPM is configured. Unity requires an exact version here, not
+`latest`, `^0.6.0`, or `*`.
+
+The scope above covers only the core package. It does not publish or migrate
+the optional companion packages. Until a companion has its own OpenUPM listing,
+install it with the Git URL below and keep its tag aligned with the core version;
+updating core alone does not update Git-installed companions. The PlayServ
+module-settings installer still uses Git URLs for companions.
+
+See the [OpenUPM setup guide](https://openupm.com/docs/getting-started.html) and
+[Unity's package update guide](https://docs.unity3d.com/6000.0/Documentation/Manual/upm-ui-update.html).
+
+## Install from GitHub (alternative)
+
+This checkout targets SDK `0.6.0`. In Unity, open `Window` ->
 `Package Manager`, choose `Add package from git URL`, and paste this pinned core
 package URL:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.5.1
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.0
 ```
 
-The Git URLs below require the `0.5.1` distribution tag to be published first;
+The Git URLs below require the `0.6.0` distribution tag to be published first;
 changing the version in the source repository does not publish that tag.
 
-The distribution repository is private. The operating-system account running
-Unity must have GitHub access and an SSH key that can clone
-`playserv1/playserv-unity-sdk`; verify that access with `ssh -T git@github.com`
-before asking Package Manager to install it. Unity uses the machine's Git/SSH
-credentials. PlayServ does not read or store that key.
+The distribution repository is public. The SSH URLs shown here still require
+GitHub SSH authentication on the operating-system account running Unity; verify
+it with `ssh -T git@github.com`. To clone without SSH credentials, use
+`https://github.com/playserv1/playserv-unity-sdk.git#0.6.0` instead. The same
+HTTPS substitution works for companion URLs, retaining `?path=...#<version>`.
+Unity uses the machine's Git credentials; PlayServ does not read or store them.
 
 The same dependency can be added directly to the game project's
 `Packages/manifest.json`:
@@ -32,7 +115,7 @@ The same dependency can be added directly to the game project's
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.1"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.6.0"
   }
 }
 ```
@@ -72,19 +155,19 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.5.1",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.5.1",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.5.1",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.5.1",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.5.1",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.5.1",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.5.1",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.1",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.5.1",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.5.1",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.5.1",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.5.1",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.5.1"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.6.0",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.6.0",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.6.0",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.6.0",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.6.0",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.6.0",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.6.0",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.0",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.6.0",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.6.0",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.6.0",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.6.0",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.6.0"
   }
 }
 ```
@@ -124,6 +207,11 @@ corrupted Unity cache: after confirmation it closes Unity, deletes the complete
 project `Library` directory, and reopens the project.
 
 ## Configure
+
+Optional player names are explicit: set runtime `PlayServSettings.AnonymousDisplayName`
+for new anonymous players, or use `proof.WithDisplayName(chosenName)` for external
+login/link. Names are trimmed and capped at 64 UTF-16 code units, not a rename API.
+See [Player authentication](Documentation~/playserv-sdk.md#player-authentication).
 
 Open `Tools` -> `PlayServ` -> `Settings`, select an environment and configure the
 public client token, game version, and backend endpoint. The token selects the
@@ -368,7 +456,7 @@ PlayServJoinGameResult join = await PlayServMatchmaking.JoinGameAsync(
 `FindMatchAsync(PlayServFindMatchRequest, ...)` additionally exposes explicit
 `SearchAgeMs`. Existing positional Find/Join overloads remain available.
 Games can request an orchestrated server through
-`LaunchServerAsync(functionSlug, region)`. A successful result means the
+`LaunchServerAsync(functionSlug, region)` via `POST /rooms/{slug}/servers:launch`. A successful result means the
 deployment was accepted; the room becomes available only after the server
 self-registers.
 
@@ -377,11 +465,58 @@ Find, Join, and Launch operational failures use
 and normalized `UnifiedError`. Caller cancellation and invalid API arguments
 keep their existing exception behavior.
 
+### Host a room
+
+`HostRoomAsync` (PSV-2694) asks an already connected server to create a room through
+`POST /rooms/{slug}:host`. It requires the configured client key and a signed-in
+player JWT, just like Join. It does not launch a server or connect a game transport.
+
+```csharp
+PlayServMatchResult hosted = await PlayServMatchmaking.HostRoomAsync(
+    new PlayServHostRoomRequest
+    {
+        FunctionSlug = "tank-room",
+        Attributes = new { title = "Friends", max_players = 8, bots = 2 }
+    },
+    new PlayServRoomHostOptions { Timeout = System.TimeSpan.FromSeconds(45) },
+    ct: destroyCancellationToken);
+
+var reservation = hosted.Reservation;
+// Share reservation.RoomName as the invite code, not the display title.
+// Render reservation.Attributes: the server may change or refuse the requested values.
+// Pass Connect and ReservationToken to your own game networking/admission code.
+// Connect can be null; Host does not poll, join again, or dial an endpoint.
+```
+
+Attributes are an optional flat JSON object of at most 2048 UTF-8 bytes; nested
+objects and arrays are rejected locally. They are a **wish**, not trusted room
+configuration. The platform mints the room name; the request has no `RoomName`.
+Optional `Region` is passed to the platform. Request/options are snapshotted
+before authentication can yield; response attributes are immutable snapshots.
+
+The configurable 45-second default budget includes token resolution and HTTP.
+There is exactly one Host request: no retry, placement, launch or join fallback.
+A timeout/cancellation after sending does **not** prove that no room was created;
+repeating Host may create another room. A successful reservation already belongs
+to the hosting player, so do not perform a separate Join just to enter it.
+
+Catch `PlayServMatchmakingException` and distinguish `RoomQuotaExceeded`,
+`RoomHostUnavailable`, `RoomRefused` (safe reason in `UnifiedError.Message`) and
+`RoomUnreachable` (`RetryAfter` when supplied). The current backend can also return
+`RoomHostCapacityExhausted` and `RegionUnavailable`. `UnifiedError.SourceCode`
+preserves unknown codes. No refusal triggers automatic retry. An unavailable host
+means there is nowhere to play now, not that the client should launch infrastructure.
+Some placement refusals are aggregated by the backend into `room_host_unavailable`;
+the SDK preserves that response and cannot recover a discarded content-refusal detail.
+
+Backend Host is implemented by PSV-2626. SDK tests use HTTP fixtures, not a live
+multi-player or deployed-server integration check.
+
 ### Room browser and direct join
 
-`BrowseRoomsAsync` and `JoinRoomAsync` use the new `/rooms` namespace and require
-the backend from **PSV-2600**. This SDK increment is tested against HTTP fixtures;
-it does not establish backend integration before that dependency lands. There is
+`BrowseRoomsAsync` and `JoinRoomAsync` use the `/rooms` namespace, implemented in
+the backend by **PSV-2600**. Unity HTTP fixtures verify the served contract but
+do not establish deployed end-to-end integration. There is
 no fallback to the deprecated matchmaking routes or to `find { room_name }`.
 
 ```csharp
@@ -438,8 +573,11 @@ outcomes and `JoinGameAsync` re-entry on `room_closed` are unchanged.
 
 The player facade still excludes server room heartbeat, close, administrative
 listing and reservation consumption. Use `com.playserv.game-server` for those
-`sk_*` operations; its uplink work (PSV-2556) and existing launch/server route
-migration (PSV-2602) are separate increments.
+server-authorized operations. **Unreleased, 2026-09-12 (PSV-2602):** client/server
+launch and companion list, registration/heartbeat and close use `/rooms/...`.
+Algorithmic `find` and reservation `consume` stay on `/matchmaking/...`; no
+deprecated-route fallback is added. Server reservations now expose the same
+endpoint metadata and monotonic lifetime semantics as client reservations.
 
 ## Cloud functions
 
@@ -617,3 +755,7 @@ them with Unity Test Framework. The complete guide contains batch-mode commands.
 
 PlayServ SDK is available under the [MIT License](LICENSE.md). Third-party
 components are listed in [Third Party Notices](Third%20Party%20Notices.md).
+Runtime schema presence can be checked explicitly with `PlayServData.CheckSchemaAsync(types, ct)`. A table missing from the caller-visible catalogue may be ACL-hidden; this does not validate field compatibility or modify schema.
+The optional Game Server companion now supports explicit typed inbound uplink RPC;
+see its `RpcRegistry` guide and preserved dedicated-server sample. Client RPC APIs
+and room creation remain independent and unchanged.

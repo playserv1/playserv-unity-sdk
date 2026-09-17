@@ -17,6 +17,7 @@ namespace Playserv.Http.Modules.Unity
     internal sealed class UnityWebRequestRuntimeHttpClient :
         IPlayServRuntimeHttpClient,
         IPlayServRuntimeBinaryHttpClient,
+        IPlayServAnonymousLoginHttpClient,
         IPlayServPlayerIdentityHttpClient
     {
         private const string ApiPath = "/api";
@@ -77,17 +78,18 @@ namespace Playserv.Http.Modules.Unity
         public async Task<PlayerTokenBundleDto> SignInAnonAsync(
             string clientToken,
             PlayerFingerprintDto fingerprint,
+            CancellationToken ct = default) =>
+            await SignInAnonAsync(clientToken,
+                new PlayerAnonymousLoginRequestDto { fingerprint = fingerprint }, ct);
+
+        public async Task<PlayerTokenBundleDto> SignInAnonAsync(
+            string clientToken,
+            PlayerAnonymousLoginRequestDto request,
             CancellationToken ct = default)
         {
-            var normalizedClientToken = NormalizePublicClientToken(clientToken);
-
-            var url = BuildAuthUrl(_settings.BackendServerAddress, AnonSignInPath);
-            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting anonymous player sign-in. url={url}");
-
-            var body = fingerprint == null
-                ? "{}"
-                : SerializeJson(new PlayerAnonymousLoginRequestDto { fingerprint = fingerprint });
-            using var req = CreateAuthPostRequest(url, normalizedClientToken, body);
+            ct.ThrowIfCancellationRequested();
+            using var req = CreateAnonymousSignInRequest(clientToken, request);
+            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting anonymous player sign-in. url={req.url}");
             await SendRequestAsync(req, ct);
 
             var bundle = ParseJsonResponse<PlayerTokenBundleDto>(req, "Anonymous sign-in");
@@ -139,24 +141,9 @@ namespace Playserv.Http.Modules.Unity
             string playerAccessToken = null,
             CancellationToken ct = default)
         {
-            var normalizedClientToken = NormalizePublicClientToken(clientToken);
-            if (request == null)
-                throw new ArgumentNullException(nameof(request));
-
-            if (string.IsNullOrWhiteSpace(request.provider))
-                throw new ArgumentException("External identity provider is required.", nameof(request));
-
-            if (string.IsNullOrWhiteSpace(request.provider_token))
-                throw new ArgumentException("External provider token is required.", nameof(request));
-
-            var url = BuildAuthUrl(_settings.BackendServerAddress, ExternalLoginPath);
-            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting external player login. provider={request.provider}, url={url}");
-
-            using var req = CreateAuthPostRequest(
-                url,
-                normalizedClientToken,
-                SerializeJson(request),
-                playerAccessToken);
+            ct.ThrowIfCancellationRequested();
+            using var req = CreateExternalLoginRequest(clientToken, request, playerAccessToken);
+            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting external player login. provider={request.provider}, url={req.url}");
             await SendRequestAsync(req, ct);
 
             var bundle = ParseJsonResponse<PlayerTokenBundleDto>(req, "External player login");
@@ -169,6 +156,47 @@ namespace Playserv.Http.Modules.Unity
             }
 
             return bundle;
+        }
+
+        private UnityWebRequest CreateAnonymousSignInRequest(string clientToken, PlayerAnonymousLoginRequestDto request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+            var normalizedClientToken = NormalizePublicClientToken(clientToken);
+            var fields = new Dictionary<string, object>();
+            if (request.fingerprint != null)
+                fields["fingerprint"] = request.fingerprint;
+            var body = SerializeNamedAuthBody(fields, request.display_name);
+            return CreateAuthPostRequest(BuildAuthUrl(_settings.BackendServerAddress, AnonSignInPath),
+                normalizedClientToken, body);
+        }
+
+        private UnityWebRequest CreateExternalLoginRequest(
+            string clientToken, PlayerExternalLoginRequestDto request, string playerAccessToken)
+        {
+            var normalizedClientToken = NormalizePublicClientToken(clientToken);
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            if (string.IsNullOrWhiteSpace(request.provider))
+                throw new ArgumentException("External identity provider is required.", nameof(request));
+
+            if (string.IsNullOrWhiteSpace(request.provider_token))
+                throw new ArgumentException("External provider token is required.", nameof(request));
+
+            var url = BuildAuthUrl(_settings.BackendServerAddress, ExternalLoginPath);
+            return CreateAuthPostRequest(
+                url,
+                normalizedClientToken,
+                SerializeNamedAuthBody(new Dictionary<string, object>
+                {
+                    ["provider"] = request.provider,
+                    ["provider_token"] = request.provider_token,
+                    ["mode"] = request.mode,
+                    ["nonce"] = request.nonce,
+                    ["fingerprint"] = request.fingerprint
+                }, request.display_name),
+                playerAccessToken);
         }
 
         public async Task<PlayerAuthProvidersProbeDto> GetAuthProvidersAsync(
@@ -191,15 +219,38 @@ namespace Playserv.Http.Modules.Unity
             string playerAccessToken,
             CancellationToken ct = default)
         {
-            ValidateIdentityRequest(request?.provider, request?.provider_token, request);
-            var url = BuildAuthUrl(_settings.BackendServerAddress, LinkPath);
-            using var req = CreateAuthPostRequest(
-                url,
-                NormalizePublicClientToken(clientToken),
-                SerializeJson(request),
-                RequirePlayerAccessToken(playerAccessToken));
+            ct.ThrowIfCancellationRequested();
+            using var req = CreateLinkIdentityRequest(clientToken, request, playerAccessToken);
             await SendRequestAsync(req, ct);
             return ParseTokenBundle(req, "Provider link");
+        }
+
+        private UnityWebRequest CreateLinkIdentityRequest(
+            string clientToken, PlayerLinkRequestDto request, string playerAccessToken)
+        {
+            ValidateIdentityRequest(request?.provider, request?.provider_token, request);
+            var url = BuildAuthUrl(_settings.BackendServerAddress, LinkPath);
+            return CreateAuthPostRequest(
+                url,
+                NormalizePublicClientToken(clientToken),
+                SerializeNamedAuthBody(new Dictionary<string, object>
+                {
+                    ["provider"] = request.provider,
+                    ["provider_token"] = request.provider_token,
+                    ["mode"] = request.mode,
+                    ["nonce"] = request.nonce
+                }, request.display_name),
+                RequirePlayerAccessToken(playerAccessToken));
+        }
+
+        private string SerializeNamedAuthBody(Dictionary<string, object> fields, string displayName)
+        {
+            var name = PlayServDisplayNamePolicy.Normalize(displayName);
+            // Omit only this new optional field, even when the configured codec includes nulls.
+            // Keep existing fields/nulls and use an explicit key, independent of DTO naming policy.
+            if (name != null)
+                fields["display_name"] = name;
+            return fields.Count == 0 ? "{}" : SerializeJson(fields);
         }
 
         public async Task UnlinkIdentityAsync(
@@ -531,7 +582,7 @@ namespace Playserv.Http.Modules.Unity
                     isNetworkError,
                     problemTitle: problem?.title,
                     problemDetail: problem?.detail,
-                    responseBytes: bodyBytes);
+                    innerException: null, responseBytes: bodyBytes, responseHeaders: req.GetResponseHeaders());
             }
         }
 
@@ -751,7 +802,7 @@ namespace Playserv.Http.Modules.Unity
                     isNetworkError,
                     problemTitle: problem?.title,
                     problemDetail: problem?.detail,
-                    responseBytes: req.downloadHandler?.data);
+                    innerException: null, responseBytes: req.downloadHandler?.data, responseHeaders: req.GetResponseHeaders());
             }
         }
 

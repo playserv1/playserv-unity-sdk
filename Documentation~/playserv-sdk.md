@@ -22,21 +22,21 @@ This document contains practical examples for the public runtime API exposed by:
 
 ### GitHub UPM (recommended)
 
-The private distribution repository contains the core package at its root and
+The distribution repository contains the core package at its root and
 all optional companion packages under `CompanionPackages~`. After configuring
 GitHub SSH access for the operating-system account that runs Unity, open
 `Window` -> `Package Manager` -> `Add package from git URL` and install the
-current stable core package:
+prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.5.1
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.0
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.5.1
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.0
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -51,6 +51,10 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 ```
 
 ### OpenUPM
+
+Version **0.6.0 is prepared in this checkout**, not asserted to be available in
+the registry. The examples below require its separate publication. Until then,
+select an existing published release; the unpinned CLI installs a published version.
 
 Install via OpenUPM CLI:
 
@@ -74,7 +78,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.5.1"
+    "com.playserv.sdk": "0.6.0"
   }
 }
 ```
@@ -83,9 +87,9 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.5.1`).
+- A source release tag uses `unity-<version>` (for example `unity-0.6.0`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.5.1`) atomically.
+  the matching plain-SemVer tag (for example `0.6.0`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
@@ -762,6 +766,48 @@ background flushes. In both cases the unsent events remain queued.
 
 ## Player authentication
 
+### Optional display names
+
+Before configuring a managed session, set `settings.AnonymousDisplayName = chosenName`
+to name a **new** anonymous player. This runtime-only setting also applies when the
+existing lifecycle creates a replacement anonymous player (for example after logout).
+It is not saved to config assets or the credential store, and changing it does not
+rename a restored player or force creation of another account.
+
+For provider login/link, choose a name explicitly on the immutable proof:
+
+```csharp
+var proof = PlayServExternalIdentityProof
+    .FromGoogleIdToken(googleIdToken, expectedNonce)
+    .WithDisplayName(chosenName);
+var login = await PlayServAuth.LoginExternalAsync(proof);
+// Alternatively, explicitly link this proof to the current player:
+// var linked = await PlayServAuth.LinkIdentityAsync(proof);
+```
+
+Google/Apple companions do **not** copy `DisplayName`/`FullName` automatically. After
+`TryCreateBackendProof`, the game may explicitly call `.WithDisplayName(...)` with
+a consented provider name or its own nickname. Existing proof factories remain unchanged.
+
+The SDK trims names, truncates to 64 UTF-16 code units without splitting an emoji's
+surrogate pair, trims any newly exposed trailing whitespace, and omits blank names.
+It sends exactly `display_name` on `/auth/players/anon`, `/login` and `/link` only.
+The name is cosmetic, not authenticated identity; it is not sent on merge or refresh.
+The standard Unity HTTP module supports it. A custom module should implement the
+additive `IPlayServAnonymousLoginHttpClient` and serialize the new login/link DTO field;
+legacy anonymous modules continue signing in without a name with one warning per session.
+
+This is **not a rename API**. The backend applies names on player creation/first
+provider link (first-link-wins); an already-linked returning login does not fill an
+empty name or overwrite an existing one. A name set during anonymous creation may
+therefore remain after provider linking. Do not optimistically set the profile from
+the requested name; read the authoritative value with
+`await PlayServAuth.RefreshCurrentPlayerProfileAsync()`.
+
+The request-shape and lifecycle tests use local fixtures, not live backend integration.
+
+### Managed sessions
+
 When `PlayServSettings` contains a public `pk_*` client token and does not
 contain `PlayerAccessToken` or an application-supplied `RuntimeTokenProvider`,
 `PlayServ.Connect()` automatically creates or restores a managed anonymous
@@ -1415,6 +1461,27 @@ evidence, not zero activity or a successful probe. Failures use
 Current/history/federation APIs are unchanged.
 
 ## Player matchmaking
+
+`PlayServMatchmaking.HostRoomAsync(request, options, ct)` adds explicit player-requested
+hosting (PSV-2694) via `POST /rooms/{slug}:host`. `PlayServHostRoomRequest` contains
+`FunctionSlug`, optional flat `Attributes` (2048 UTF-8 bytes maximum) and `Region`;
+it deliberately has no `RoomName`. `PlayServRoomHostOptions.Timeout` defaults to
+45 seconds across authentication and HTTP. Request values are snapshotted before
+the first await; the result resumes on the caller's Unity context.
+
+Success is a matched `PlayServMatchResult`: its reservation contains the minted
+invite code, ticket, nullable connect metadata and immutable **server-approved**
+attributes. Requested values are wishes, not authoritative room settings. The game
+owns travel and must not issue a second Join for the hosting player's ticket.
+Host performs no automatic retry, polling, launch or networking connection;
+timeout/cancellation after sending can leave a room created on the server.
+
+`PlayServMatchmakingException.RoomFailureCode` distinguishes `RoomQuotaExceeded`,
+`RoomHostUnavailable`, `RoomRefused`, `RoomUnreachable`, `RoomHostCapacityExhausted`
+and `RegionUnavailable`; `UnifiedError.SourceCode` retains unknown backend codes,
+`UnifiedError.Message` carries the credential-filtered reason and `RetryAfter`
+preserves the optional server delay. Backend-aggregated refusals are not rewritten.
+See the README's **Host a room** example. Coverage uses fixtures, not live integration.
 
 `PlayServMatchmaking` calls the existing player-authenticated runtime
 matchmaking endpoint. Configure or establish a player session first; the SDK

@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Playserv.Http.Interfaces;
+using Playserv.Serialization;
 using Playserv.Wrapper;
 
 namespace Playserv.Matchmaking
@@ -58,18 +59,32 @@ namespace Playserv.Matchmaking
             }
         }
 
-        internal async Task<PlayServMatchResult> JoinRoomAsync(string functionSlug, string roomName, CancellationToken ct)
+        internal Task<PlayServMatchResult> JoinRoomAsync(string functionSlug, string roomName, CancellationToken ct) =>
+            JoinRoomAsync(new PlayServJoinRoomRequest { FunctionSlug = functionSlug, RoomName = roomName }, ct);
+
+        internal Task<PlayServMatchResult> JoinRoomAsync(PlayServJoinRoomRequest request, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
+            if (request == null) throw new ArgumentNullException(nameof(request));
+            var functionSlug = request.FunctionSlug;
+            var roomName = request.RoomName;
             ValidateRoomType(functionSlug);
             if (roomName == null || !RoomNamePattern.IsMatch(roomName))
                 throw new ArgumentException("Room name must match the room API's 1–64 character identifier.", nameof(roomName));
+            var parameters = SnapshotParameters(request.Params, nameof(request));
+            var body = parameters == null ? null : _json.Serialize(new { @params = parameters });
+            return JoinRoomCoreAsync(functionSlug, roomName, body, ct);
+        }
+
+        private async Task<PlayServMatchResult> JoinRoomCoreAsync(string functionSlug, string roomName, string body, CancellationToken ct)
+        {
             var bearer = await ResolvePlayerTokenAsync(ct);
             var response = await SendMatchmakingAsync(new PlayServRuntimeDataRequest
             {
                 Method = "POST",
                 RelativePath = $"rooms/{Uri.EscapeDataString(functionSlug)}/{Uri.EscapeDataString(roomName)}:join",
                 ClientToken = _settings.ClientToken, BearerToken = bearer,
+                JsonBody = body,
                 TimeoutSeconds = DefaultRequestTimeoutSeconds
             }, PlayServMatchmakingOperation.JoinRoom, functionSlug, ct);
             return ReadMatchResponse(response, PlayServMatchmakingOperation.JoinRoom, functionSlug, _monotonicSeconds());
@@ -83,11 +98,16 @@ namespace Playserv.Matchmaking
             try
             {
                 // Newtonsoft ordinarily coerces strings/fractions to integers. TTL is an integer on the wire.
-                var plain = _json.ParseToPlainValue(response.Body);
+                var plain = operation == PlayServMatchmakingOperation.HostRoom
+                    ? _json.ToPlainValue(_json.Deserialize<object>(response.Body, new JsonCodecOptions { ParseDates = false, IgnoreMetadataProperties = true }))
+                    : _json.ParseToPlainValue(response.Body);
+                if (operation == PlayServMatchmakingOperation.HostRoom) ValidateHostReservation(plain);
                 if (_json.TryGetProperty(plain, "expires_in", true, out var ttl) && ttl != null &&
                     !(ttl is long) && !(ttl is int) && !(ttl is short) && !(ttl is byte))
                     throw new FormatException();
-                var wire = _json.Deserialize<FindMatchResponseWire>(response.Body);
+                var wire = _json.Deserialize<FindMatchResponseWire>(response.Body,
+                    operation == PlayServMatchmakingOperation.HostRoom
+                        ? new JsonCodecOptions { ParseDates = false, IgnoreMetadataProperties = true } : null);
                 if (wire == null) throw new FormatException();
                 return ToResult(wire, operation, slug, receivedAt);
             }
@@ -144,9 +164,16 @@ namespace Playserv.Matchmaking
             return new PlayServRoomConnect(wire.host, wire.port.Value, wire.transport, wire.connect_string, wire.region);
         }
 
-        private IReadOnlyDictionary<string, object> FreezeAttributes(Dictionary<string, object> attributes) =>
-            // Dictionary cloning can retain nested codec-specific tokens; normalize the entire JSON tree.
-            attributes == null ? null : (IReadOnlyDictionary<string, object>)Freeze(_json.ParseToPlainValue(_json.Serialize(attributes)));
+        private IReadOnlyDictionary<string, object> FreezeAttributes(Dictionary<string, object> attributes, bool preserveJsonValues = false)
+        {
+            if (attributes == null) return null;
+            // Normalize codec-specific values without changing Host's literal strings or attribute names.
+            var json = _json.Serialize(attributes);
+            var plain = preserveJsonValues
+                ? _json.ToPlainValue(_json.Deserialize<object>(json, new JsonCodecOptions { ParseDates = false, IgnoreMetadataProperties = true }))
+                : _json.ParseToPlainValue(json);
+            return (IReadOnlyDictionary<string, object>)Freeze(plain);
+        }
 
         private static object Freeze(object value)
         {
@@ -182,7 +209,8 @@ namespace Playserv.Matchmaking
             code = SafeDiagnostic(code, request);
             detail = SafeDiagnostic(detail, request);
             var roomCode = PlayServMatchmakingException.MapRoomFailure(code);
-            if (roomCode != PlayServRoomFailureCode.Unknown)
+            if (roomCode != PlayServRoomFailureCode.Unknown &&
+                roomCode <= PlayServRoomFailureCode.RoomUnreachable)
                 retryable = roomCode == PlayServRoomFailureCode.RoomUnreachable;
             // Do not retain arbitrary response bodies or an inner HTTP exception: either can echo a ticket.
             return new PlayServMatchmakingException(operation, slug, PlayServError.FromHttp(status, code,

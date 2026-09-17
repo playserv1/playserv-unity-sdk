@@ -259,7 +259,7 @@ namespace Playserv.Tests.Runtime
             Assert.That(result.Region, Is.EqualTo("eu-west"));
             var request = fake.Requests[0];
             Assert.That(request.Method, Is.EqualTo("POST"));
-            Assert.That(request.RelativePath, Is.EqualTo("matchmaking/tank%20room/servers:launch"));
+            Assert.That(request.RelativePath, Is.EqualTo("rooms/tank%20room/servers:launch"));
             Assert.That(request.ClientToken, Is.EqualTo("pk_public"));
             Assert.That(request.BearerToken, Is.EqualTo("player.jwt.value"));
             Assert.That(request.JsonBody, Does.Contain("\"region\":\"eu-west\""));

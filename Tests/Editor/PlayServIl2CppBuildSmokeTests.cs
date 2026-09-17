@@ -33,10 +33,12 @@ namespace Playserv.Tests.Editor
                 Assert.Fail($"Active build target {target} has no build target group.");
 
             var previousBackend = PlayerSettings.GetScriptingBackend(targetGroup);
+            var previousStripping = PlayerSettings.GetManagedStrippingLevel(targetGroup);
             try
             {
                 EnsureTestScene();
                 PlayerSettings.SetScriptingBackend(targetGroup, ScriptingImplementation.IL2CPP);
+                PlayerSettings.SetManagedStrippingLevel(targetGroup, ManagedStrippingLevel.High);
 
                 var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
@@ -58,6 +60,7 @@ namespace Playserv.Tests.Editor
             finally
             {
                 PlayerSettings.SetScriptingBackend(targetGroup, previousBackend);
+                PlayerSettings.SetManagedStrippingLevel(targetGroup, previousStripping);
                 AssetDatabase.DeleteAsset(TestRootAssetPath);
             }
         }

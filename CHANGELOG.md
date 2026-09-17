@@ -6,6 +6,89 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-17
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+- 2026-09-14: Opt-in typed inbound server RPC registry, authenticated caller metadata, bounded serial dispatch, cancellation and AOT-preserved sample. No implicit Records authority or automatic replay.
+
+- 2026-09-14: Explicit runtime schema advisory for caller-visible table presence; no schema mutations or initialization gate.
+
+### Added
+
+- 2026-09-17 (PSV-2694): Player `HostRoomAsync` with flat requested attributes,
+  authoritative matched reservation, typed hosting refusals and Retry-After.
+  A configurable total budget covers authentication and HTTP; no automatic
+  retry, launch, additional join or networking connection is performed.
+
+- 2026-09-17 (PSV-2556): Game Server companion `Uplink.Data` exposes typed single-key
+  queries and send-only upsert/increment/delete, with scoped catalogue checks,
+  immutable send snapshots, bounded correlation and connection-specific cleanup.
+  Existing Records APIs are unchanged. Mutation acknowledgements and data-subscription
+  routing remain outstanding; local ACL checks do not replace backend enforcement.
+
+- 2026-09-16: Optional game-selected display names for anonymous sign-in, external
+  login and first provider link (`display_name`). Names are trimmed and capped at
+  64 UTF-16 code units without splitting surrogate pairs. Provider profile names
+  are never copied automatically; existing players are not renamed. Legacy custom
+  HTTP modules can continue anonymous sign-in without the optional name.
+
+- 2026-09-15 (PSV-2628): Game Server room factories receive optional requested
+  attributes as independent snapshots and may apply, alter, ignore or refuse them
+  with `ContentRefused`. The existing callback signature and no-attributes path
+  remain compatible; no requested values are automatically merged into registration.
+
+- 2026-09-14: Explicit provider-neutral launch room and public endpoint helpers; no networking or infrastructure discovery side effects.
+
+- 2026-09-14: Server room configuration REST reads and ordered uplink state/configuration notifications.
+
+- 2026-09-14: Opt-in game connection tracking with pushed-ticket reconnect grace, generation-specific rejection and single leave on expiry.
+
+- 2026-09-14: Opt-in bounded named-room join/connection flow with Retry-After, address readiness and monotonic ticket expiry checks.
+
+- 2026-09-14: Named-room join parameters and server-authorized direct join for an explicit player; existing join calls keep their no-body, no-retry behavior.
+
+- 2026-09-13: Game Server pushed-ticket admission (PSV-2556 stage two), enabled
+  by default. Existing consume-based games must migrate or set
+  `EnablePushedAdmission = false`; see the companion migration guide.
+
+- 2026-09-12 (PSV-2602): Server reservations expose endpoint/region/attribute
+  snapshots and an optional monotonic TTL, with strict wire integer validation.
+
+- 2026-09-12: Dedicated Server structured logs with pre-enqueue credential
+  redaction, bounded memory and best-effort shutdown flush reporting.
+
+- 2026-09-12: Dedicated Server score submission and immutable leaderboard reads,
+  with bounded correlated requests and disconnect/timeout/cancellation cleanup.
+
+- 2026-09-12: Dedicated Server event publishing over uplink with explicit group
+  scope, reliable-lane selection and no automatic reconnect replay.
+
+- 2026-09-12: Dedicated Server online player-session verification, including
+  revocation/status verdicts and credential-safe diagnostics.
+
+- Dedicated Server companion: stage-one dial-in uplink, session-authorized REST,
+  platform-owned room configuration and explicit non-bot roster updates.
+- Dedicated Server companion: optional platform-requested room creation factory;
+  backend dispatch is still gated on PSV-2590.
+
+### Changed
+
+- 2026-09-17 (PSV-2694): Synchronized all thirteen packages, internal dependencies,
+  runtime version reporting and the rebuilt Schema Tool to `0.6.0`.
+
+- 2026-09-12 (PSV-2602): Client/server launch and companion room list,
+  registration/heartbeat and close use the served `/rooms/...` namespace.
+  Algorithmic find and reservation consume retain their routes; no fallback added.
+
+### Fixed
+
+- 2026-09-14: Game Server room creation now distinguishes temporary
+  `room_quota_exceeded` from `instance_draining` and sends `room_create_failed` for
+  factory exceptions with only a bounded type name. Quota/factory failure keeps
+  the instance eligible for later requests; timeout and registration errors do
+  not produce late or duplicate results.
+
 ## [0.5.1] - 2026-09-12
 
 - Fixed first-connection RPC responses being dropped by attaching command routes

@@ -38,6 +38,8 @@ namespace Playserv.Wrapper
         private readonly IPlayServPlayerFingerprintProvider _fingerprintProvider;
         private readonly bool _automaticFingerprintEnabled;
         private readonly string _clientToken;
+        private readonly string _anonymousDisplayName;
+        private int _anonymousNameWarningLogged;
         private readonly SynchronizationContext _unityContext;
         private readonly int _unityThreadId;
         private readonly SemaphoreSlim _operationGate = new SemaphoreSlim(1, 1);
@@ -67,6 +69,7 @@ namespace Playserv.Wrapper
                 ?? throw new InvalidOperationException(
                     "A public PlayServ client token is required for automatic player authentication.");
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _anonymousDisplayName = PlayServDisplayNamePolicy.Normalize(settings.AnonymousDisplayName);
             _sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
             _configuredFingerprintProvider = settings.PlayerFingerprintProvider;
             _automaticFingerprintEnabled = settings.EnableAutomaticPlayerFingerprint;
@@ -227,6 +230,8 @@ namespace Playserv.Wrapper
                    ReferenceEquals(_sessionStore, sessionStore) &&
                    ReferenceEquals(_configuredFingerprintProvider, settings.PlayerFingerprintProvider) &&
                    _automaticFingerprintEnabled == settings.EnableAutomaticPlayerFingerprint &&
+                   string.Equals(_anonymousDisplayName,
+                       PlayServDisplayNamePolicy.Normalize(settings.AnonymousDisplayName), StringComparison.Ordinal) &&
                    ScopeKey == BuildScopeKey(settings) &&
                    string.Equals(_clientToken, settings.ClientToken?.Trim(), StringComparison.Ordinal);
         }
@@ -410,7 +415,8 @@ namespace Playserv.Wrapper
                             provider_token = proof.ProviderToken,
                             mode = EmptyToNull(proof.Mode),
                             nonce = EmptyToNull(proof.Nonce),
-                            fingerprint = fingerprint
+                            fingerprint = fingerprint,
+                            display_name = proof.DisplayName
                         },
                         authorization,
                         cancellationToken);
@@ -539,7 +545,8 @@ namespace Playserv.Wrapper
                             provider = proof.ProviderId,
                             provider_token = proof.ProviderToken,
                             mode = EmptyToNull(proof.Mode),
-                            nonce = EmptyToNull(proof.Nonce)
+                            nonce = EmptyToNull(proof.Nonce),
+                            display_name = proof.DisplayName
                         },
                         authorization,
                         cancellationToken);
@@ -1227,9 +1234,26 @@ namespace Playserv.Wrapper
             PlayerFingerprintDto collectedFingerprint = null,
             bool fingerprintWasCollected = false)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var fingerprint = fingerprintWasCollected
                 ? collectedFingerprint
                 : await CollectFingerprintAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_anonymousDisplayName != null)
+            {
+                if (_httpClient is IPlayServAnonymousLoginHttpClient namedAnonymousClient)
+                    return await namedAnonymousClient.SignInAnonAsync(_clientToken,
+                        new PlayerAnonymousLoginRequestDto
+                        {
+                            fingerprint = fingerprint,
+                            display_name = _anonymousDisplayName
+                        }, cancellationToken);
+
+                if (Interlocked.Exchange(ref _anonymousNameWarningLogged, 1) == 0)
+                    PlayServLog.Warning(PlayServLogCategory.General,
+                        "The custom HTTP module does not support anonymous display names; signing in without a name. " +
+                        "Implement IPlayServAnonymousLoginHttpClient to enable this optional field.");
+            }
             if (fingerprint == null)
                 return await _httpClient.SignInAnonAsync(_clientToken, cancellationToken);
             return await RequireIdentityHttpClient()

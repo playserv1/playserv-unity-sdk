@@ -20,13 +20,19 @@ namespace Playserv.GameServer
         private readonly string _attributesJson;
 
         public PlayServGameRoomSnapshot(
+            string roomName, int players, int capacity, string state, object attributes, bool open, DateTimeOffset? createdAt)
+            : this(roomName, players, capacity, state, attributes, open, createdAt, null, null) { }
+
+        public PlayServGameRoomSnapshot(
             string roomName,
             int players,
             int capacity,
             string state = null,
             object attributes = null,
             bool open = true,
-            DateTimeOffset? createdAt = null)
+            DateTimeOffset? createdAt = null,
+            PlayServGameRoomConnect connect = null,
+            string region = null)
         {
             RoomName = roomName;
             Players = players;
@@ -34,6 +40,8 @@ namespace Playserv.GameServer
             State = state;
             Open = open;
             CreatedAt = createdAt;
+            Connect = connect;
+            Region = region;
             _attributesJson = PlayServGameServerJson.SerializeOptionalObject(attributes, nameof(attributes));
         }
 
@@ -44,6 +52,11 @@ namespace Playserv.GameServer
         public object Attributes => PlayServGameServerJson.ParseOptionalObject(_attributesJson);
         public bool Open { get; }
         public DateTimeOffset? CreatedAt { get; }
+        public PlayServGameRoomConnect Connect { get; }
+        public string Region { get; }
+
+        internal PlayServGameRoomSnapshot WithCapacity(int capacity) => new PlayServGameRoomSnapshot(
+            RoomName, Players, capacity, State, Attributes, Open, CreatedAt, Connect, Region);
 
         internal string AttributesJson => _attributesJson;
     }
@@ -75,16 +88,45 @@ namespace Playserv.GameServer
     /// <summary>Short-lived room admission credential returned by matchmaking.</summary>
     public sealed class PlayServServerReservation
     {
+        private readonly string _attributesJson;
+        private readonly Func<double> _monotonicSeconds;
+        private readonly double _receivedAt;
+
         internal PlayServServerReservation(string roomName, string token, DateTimeOffset expiresAt)
+            : this(roomName, token, expiresAt, null, null, null, null, null, 0) { }
+
+        internal PlayServServerReservation(
+            string roomName, string token, DateTimeOffset expiresAt,
+            PlayServGameRoomConnect connect, string region, object attributes,
+            int? expiresIn, Func<double> monotonicSeconds, double receivedAt)
         {
             RoomName = roomName;
             Token = token;
             ExpiresAt = expiresAt;
+            Connect = connect;
+            Region = region;
+            _attributesJson = PlayServGameServerJson.SerializeOptionalObject(attributes, nameof(attributes));
+            ExpiresIn = expiresIn;
+            _monotonicSeconds = monotonicSeconds;
+            _receivedAt = receivedAt;
         }
 
         public string RoomName { get; }
+        /// <summary>Secret admission ticket. Pass to the game transport; never log it.</summary>
         public string Token { get; }
+        /// <summary>Server timestamp retained for compatibility; not a local expiry clock.</summary>
         public DateTimeOffset ExpiresAt { get; }
+        /// <summary>Optional opaque endpoint; no DNS resolution or transport setup is performed.</summary>
+        public PlayServGameRoomConnect Connect { get; }
+        public string Region { get; }
+        /// <summary>Optional JSON object. Each access returns a copy of the response snapshot.</summary>
+        public object Attributes => PlayServGameServerJson.ParseOptionalObject(_attributesJson);
+        /// <summary>Seconds remaining at response time; null means unknown on older backends.</summary>
+        public int? ExpiresIn { get; }
+        /// <summary>Advisory monotonic countdown, floored at zero. The backend remains authoritative for admission.</summary>
+        public TimeSpan? RemainingLifetime => ExpiresIn.HasValue
+            ? TimeSpan.FromSeconds(Math.Max(0, ExpiresIn.Value - Math.Max(0, _monotonicSeconds() - _receivedAt)))
+            : (TimeSpan?)null;
     }
 
     /// <summary>Matchmaking placement result for a server caller.</summary>
@@ -132,7 +174,11 @@ namespace Playserv.GameServer
             string placementState,
             bool open,
             DateTimeOffset? drainUntil,
-            string drainCause)
+            string drainCause,
+            PlayServGameRoomConnect connect = null,
+            string region = null,
+            string instanceId = null,
+            object attributes = null)
         {
             RoomName = roomName;
             Players = players;
@@ -144,6 +190,8 @@ namespace Playserv.GameServer
             Open = open;
             DrainUntil = drainUntil;
             DrainCause = drainCause;
+            Connect = connect; Region = region; InstanceId = instanceId;
+            _attributesJson = PlayServGameServerJson.SerializeOptionalObject(attributes, nameof(attributes));
         }
 
         public string RoomName { get; }
@@ -156,6 +204,11 @@ namespace Playserv.GameServer
         public bool Open { get; }
         public DateTimeOffset? DrainUntil { get; }
         public string DrainCause { get; }
+        private readonly string _attributesJson;
+        public PlayServGameRoomConnect Connect { get; }
+        public string Region { get; }
+        public string InstanceId { get; }
+        public object Attributes => PlayServGameServerJson.ParseOptionalObject(_attributesJson);
     }
 
     /// <summary>Backend placement state acknowledged by the latest room upsert.</summary>
@@ -207,6 +260,8 @@ namespace Playserv.GameServer
 
         public bool Created { get; }
         public PlayServRoomPlacementAcknowledgment Placement { get; }
+        public PlayServRoomConfiguration RoomConfiguration { get; internal set; }
+        public string RosterCheck { get; internal set; }
     }
 
     /// <summary>Backend decision for a reservation admission attempt.</summary>
@@ -288,21 +343,30 @@ namespace Playserv.GameServer
         internal PlayServGameServerShutdownResult(
             IReadOnlyList<PlayServGameRoomCloseResult> rooms,
             Playserv.Wrapper.PlayServError analyticsError)
+            : this(rooms, analyticsError, Playserv.Wrapper.PlayServError.None) { }
+
+        internal PlayServGameServerShutdownResult(
+            IReadOnlyList<PlayServGameRoomCloseResult> rooms,
+            Playserv.Wrapper.PlayServError analyticsError,
+            Playserv.Wrapper.PlayServError logsError)
         {
             var results = rooms == null
                 ? Array.Empty<PlayServGameRoomCloseResult>()
                 : new List<PlayServGameRoomCloseResult>(rooms).ToArray();
             Rooms = Array.AsReadOnly(results);
             AnalyticsError = analyticsError ?? Playserv.Wrapper.PlayServError.None;
+            LogsError = logsError ?? Playserv.Wrapper.PlayServError.None;
         }
 
         public IReadOnlyList<PlayServGameRoomCloseResult> Rooms { get; }
         public Playserv.Wrapper.PlayServError AnalyticsError { get; }
+        /// <summary>Best-effort log flush failure, independent of room-close and analytics results.</summary>
+        public Playserv.Wrapper.PlayServError LogsError { get; }
         public bool IsSuccess
         {
             get
             {
-                if (AnalyticsError.IsError)
+                if (AnalyticsError.IsError || LogsError.IsError)
                     return false;
 
                 for (var i = 0; i < Rooms.Count; i++)
