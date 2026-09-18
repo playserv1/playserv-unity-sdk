@@ -16,6 +16,7 @@ namespace Playserv.Editor
 
         private static ListRequest _listRequest;
         private static AddRequest _addRequest;
+        private static readonly object OperationOwner = new object();
 
         static PlayServPackageDependencyInstaller()
         {
@@ -25,7 +26,7 @@ namespace Playserv.Editor
         [MenuItem("Tools/PlayServ/Dependencies/Install Newtonsoft Json")]
         public static void InstallNewtonsoftJson()
         {
-            StartInstall(force: true);
+            StartInstall();
         }
 
         private static void EnsureAssetsModeDependencies()
@@ -33,24 +34,46 @@ namespace Playserv.Editor
             if (SessionState.GetBool(AutoInstallSessionKey, false))
                 return;
 
-            SessionState.SetBool(AutoInstallSessionKey, true);
-
             if (!IsAssetsModeSdk())
                 return;
 
-            StartInstall(force: false);
+            QueueAutomaticInstall();
         }
 
-        private static void StartInstall(bool force)
+        internal static void QueueAutomaticInstall()
+        {
+            if (SessionState.GetBool(AutoInstallSessionKey, false)) return;
+            EditorApplication.update -= TryAutomaticInstall;
+            EditorApplication.update += TryAutomaticInstall;
+            TryAutomaticInstall();
+        }
+
+        internal static void TryAutomaticInstall()
+        {
+            if (!SessionState.GetBool(AutoInstallSessionKey, false))
+            {
+                if (!StartInstall()) return;
+                SessionState.SetBool(AutoInstallSessionKey, true);
+            }
+            EditorApplication.update -= TryAutomaticInstall;
+        }
+
+        private static bool StartInstall()
         {
             if (_listRequest != null || _addRequest != null)
-                return;
+                return true;
 
-            if (!force && !IsAssetsModeSdk())
-                return;
-
-            _listRequest = Client.List(false, true);
+            if (!PlayServPackageOperationGate.Shared.TryAcquire(OperationOwner))
+                return false;
+            try { _listRequest = Client.List(false, true); }
+            catch (Exception)
+            {
+                PlayServPackageOperationGate.Shared.Release(OperationOwner);
+                Debug.LogWarning("[PlayServ] Package Manager could not start dependency inspection.");
+                return true;
+            }
             EditorApplication.update += WaitForListRequest;
+            return true;
         }
 
         private static void WaitForListRequest()
@@ -67,6 +90,7 @@ namespace Playserv.Editor
                     if (string.Equals(package.name, PackageName, StringComparison.Ordinal))
                     {
                         _listRequest = null;
+                        PlayServPackageOperationGate.Shared.Release(OperationOwner);
                         return;
                     }
                 }
@@ -78,7 +102,13 @@ namespace Playserv.Editor
 
             _listRequest = null;
             Debug.Log($"[PlayServ] Installing required Unity package {PackageName}@{PackageVersion}.");
-            _addRequest = Client.Add($"{PackageName}@{PackageVersion}");
+            try { _addRequest = Client.Add($"{PackageName}@{PackageVersion}"); }
+            catch (Exception)
+            {
+                PlayServPackageOperationGate.Shared.Release(OperationOwner);
+                Debug.LogWarning("[PlayServ] Package Manager could not start dependency installation.");
+                return;
+            }
             EditorApplication.update += WaitForAddRequest;
         }
 
@@ -101,6 +131,7 @@ namespace Playserv.Editor
             }
 
             _addRequest = null;
+            PlayServPackageOperationGate.Shared.Release(OperationOwner);
         }
 
         private static bool IsAssetsModeSdk()

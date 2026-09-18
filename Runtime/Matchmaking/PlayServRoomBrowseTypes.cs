@@ -15,7 +15,7 @@ namespace Playserv.Matchmaking
         public int Limit { get; set; } = 50;
     }
 
-    /// <summary>Opaque game-transport endpoint. The SDK neither resolves nor connects to it.</summary>
+    /// <summary>Endpoint metadata returned unchanged by matchmaking. Connecting requires an explicit game-owned action.</summary>
     public sealed class PlayServRoomConnect
     {
         internal PlayServRoomConnect(string host, int port, string transport, string connectString, string region)

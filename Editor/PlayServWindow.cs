@@ -93,10 +93,12 @@ namespace Playserv.Editor
 
             EnsureConfig();
             UpdateWindowTitle();
+            PlayServSdkUpdates.WindowOpened();
         }
 
         private void OnDisable()
         {
+            PlayServSdkUpdates.WindowClosed();
             _connectionController?.Dispose();
             _deploymentSection.Dispose();
             _modelSection.Dispose();

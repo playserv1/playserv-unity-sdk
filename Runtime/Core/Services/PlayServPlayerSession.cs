@@ -121,6 +121,14 @@ namespace Playserv.Wrapper
                 cancellationToken);
         }
 
+        internal Task<string> GetExistingPlayerTokenAsync(CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            return RunOnUnityThreadAsync(
+                () => ResolveAccessTokenAsync(forceRefresh: false, allowAnonymousFallback: false, cancellationToken),
+                cancellationToken);
+        }
+
         public Task<PlayServAuthResult> LoginExternalAsync(
             PlayServExternalIdentityProof proof,
             PlayServExternalLoginMode mode,

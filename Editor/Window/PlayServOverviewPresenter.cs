@@ -53,11 +53,31 @@ namespace Playserv.Editor
 
                     var sdkVersion = PlayServPackageVersionProvider.ResolveInstalledVersion(
                         context.Config != null ? context.Config.SdkVersion : null);
-                    PlayServWindowChrome.DrawOverviewCard(
-                        "SDK Version",
-                        string.IsNullOrWhiteSpace(sdkVersion) ? "Not configured" : sdkVersion,
-                        "Installed package");
+                    DrawSdkVersion(sdkVersion);
                 }
+            }
+        }
+
+        private static void DrawSdkVersion(string sdkVersion)
+        {
+            var updater = PlayServSdkUpdates.Controller;
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.MetricCardStyle, GUILayout.MinHeight(62f)))
+            {
+                GUILayout.Label("SDK Version", PlayServWindowTheme.MetricLabelStyle);
+                GUILayout.Label(string.IsNullOrWhiteSpace(sdkVersion) ? "Not configured" : sdkVersion, PlayServWindowTheme.MetricValueStyle);
+                GUILayout.Label(string.IsNullOrEmpty(updater.Message) ? "Installed package" : updater.Message,
+                    PlayServWindowTheme.MetricCaptionStyle);
+                GUILayout.Space(6f);
+                using (new EditorGUI.DisabledScope(!PlayServSdkUpdates.CanStart))
+                {
+                    if (PlayServWindowChrome.DrawActionButton("Check for updates", PlayServWindowButtonTone.Secondary))
+                        PlayServSdkUpdates.Check();
+                    if (!string.IsNullOrEmpty(updater.AvailableVersion) &&
+                        PlayServWindowChrome.DrawActionButton("Update to " + updater.AvailableVersion, PlayServWindowButtonTone.Primary))
+                        PlayServSdkUpdates.Update();
+                }
+                if (PlayServWindowChrome.DrawActionButton("Open Package Manager", PlayServWindowButtonTone.Ghost))
+                    PlayServSdkUpdates.OpenPackageManager();
             }
         }
 

@@ -6,6 +6,36 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-18
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Fixed
+
+- 2026-09-18: Isolate WebGL WebSocket instances and connection attempts. Parallel
+  platform/game sockets no longer replace each other; send, close, reset and
+  timeout are connection-local. Disposal completes pending connects and releases
+  bridge objects, browser handlers and registry entries without accepting stale
+  callbacks. The single-session facade and 1 MiB text-message limit are unchanged.
+
+### Added
+
+- 2026-09-18: Add an opt-in independent game-server WebSocket connector with the
+  existing C# handshake, current-player credentials and refresh without anonymous
+  fallback. Expose text messages and lifecycle on the Unity context, bounded
+  connect/send, explicit WSS endpoints and safe normalized errors. HandshakeSent
+  means only open plus send, not admission. No server protocol, automatic reconnect,
+  ticket replay or gameplay integration is added.
+
+- 2026-09-18: Add SDK Version update controls to PlayServ Editor: project-cached
+  registry checks, explicit confirmation, and one source-preserving UPM update
+  for core and installed official companions, including Schema Tool. Validate
+  target compatibility and dependencies before submission, coordinate package
+  operations, and verify installed results across domain reload/restart. Local
+  copies and unsupported sources are protected; no automatic install, retry,
+  registry changes or runtime API changes. Install the first release containing
+  these controls through the ordinary Package Manager.
+
 ## [0.6.1] - 2026-09-18
 
 Release prepared locally; distribution tags and registry publication are separate.

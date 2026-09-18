@@ -9,6 +9,16 @@ namespace Playserv.Wrapper
     public static class PlayServMatchmaking
     {
         /// <summary>
+        /// Creates an independent, single-attempt game WebSocket. Subscribe before ConnectAsync.
+        /// Options are copied now; the existing player session is resolved only when connecting.
+        /// Success means handshake sent, never confirmed admission. Does not touch platform /ws.
+        /// </summary>
+        public static PlayServGameConnection CreateGameConnection(PlayServGameConnectionOptions options = null) =>
+            new PlayServGameConnection(options, () => PlayServ.Settings,
+                Playserv.Proxy.Common.TransportImplementationResolver.Create,
+                new Playserv.Serialization.NewtonsoftJsonCodec(), SynchronizationContext.Current);
+
+        /// <summary>
         /// Requests a platform-named room and its hosting player's reservation using the signed-in player.
         /// Attributes are wishes; the returned server-approved attributes are authoritative.
         /// Performs one bounded request with no automatic retry, launch, additional join or transport connection.

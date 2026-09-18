@@ -12,13 +12,29 @@ using Playserv.Wrapper;
 
 namespace Playserv.Proxy.Implementation
 {
-#if UNITY_WEBGL && !UNITY_EDITOR
+#if UNITY_WEBGL || UNITY_EDITOR
+    internal interface IWebGLWebSocketApi
+    {
+        void Connect(string connectionId, string url);
+        int Send(string connectionId, string message);
+        void Close(string connectionId);
+    }
+
+    /// <summary>
+    /// A text WebSocket transport with an independent browser socket and callback
+    /// target for each connection attempt. Reset and disposal affect only this instance.
+    /// </summary>
+#if UNITY_EDITOR
+    internal sealed class WebGLWebSocketTransportImplementation : ITransportImplementation, IPlayServTransportCloseInfoSource
+#else
     public sealed class WebGLWebSocketTransportImplementation : ITransportImplementation, IPlayServTransportCloseInfoSource
+#endif
     {
         private const int ConnectTimeoutMs = 12000;
 
         private readonly Uri _uri;
         private readonly ILogger _logger;
+        private readonly IWebGLWebSocketApi _api;
         private ObservableByteChannel _channel;
         private readonly List<IObserver<byte[]>> _observers = new List<IObserver<byte[]>>();
         private readonly object _gate = new object();
@@ -34,10 +50,17 @@ namespace Playserv.Proxy.Implementation
 
         public event Action<PlayServTransportCloseInfo> Closed;
 
+        /// <summary>Creates a transport without opening its browser socket.</summary>
         public WebGLWebSocketTransportImplementation(string uri, ILogger logger = null)
+            : this(uri, logger, new NativeApi())
+        {
+        }
+
+        internal WebGLWebSocketTransportImplementation(string uri, ILogger logger, IWebGLWebSocketApi api)
         {
             _uri = new Uri(uri);
             _logger = logger ?? PlayServLog.ForCategory(PlayServLogCategory.Transport);
+            _api = api ?? throw new ArgumentNullException(nameof(api));
             _syncContext = SynchronizationContext.Current ?? new SynchronizationContext();
             _channel = new ObservableByteChannel(_observers, _gate, _syncContext);
         }
@@ -46,17 +69,26 @@ namespace Playserv.Proxy.Implementation
         private static extern void Ws_Connect(string gameObjectName, string url);
 
         [DllImport("__Internal")]
-        private static extern int Ws_Send(string message);
+        private static extern int Ws_Send(string connectionId, [In] byte[] message, int messageByteLength);
 
         [DllImport("__Internal")]
-        private static extern void Ws_Close();
+        private static extern void Ws_Close(string connectionId);
+
+        private sealed class NativeApi : IWebGLWebSocketApi
+        {
+            public void Connect(string connectionId, string url) => Ws_Connect(connectionId, url);
+            public int Send(string connectionId, string message)
+            {
+                var bytes = Encoding.UTF8.GetBytes(message);
+                return Ws_Send(connectionId, bytes, bytes.Length);
+            }
+            public void Close(string connectionId) => Ws_Close(connectionId);
+        }
 
         public Task<bool> Connect()
         {
             if (_isDisposed)
                 throw new ObjectDisposedException(nameof(WebGLWebSocketTransportImplementation));
-
-            EnsureBridgeEventHandlers();
 
             TaskCompletionSource<bool> connectTcs;
             lock (_connectGate)
@@ -94,12 +126,13 @@ namespace Playserv.Proxy.Implementation
 
             try
             {
-                _logger.Log($"Connecting WebGL WebSocket to: {_uri}");
-                Ws_Connect(_bridge.GameObjectName, _uri.ToString());
+                EnsureBridgeEventHandlers();
+                _logger.Log("Connecting WebGL WebSocket.");
+                _api.Connect(_bridge.GameObjectName, _uri.ToString());
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError($"Failed to start WebGL WebSocket connection: {ex.Message}");
+                _logger.LogError("Failed to start WebGL WebSocket connection.");
                 lock (_connectGate)
                 {
                     if (ReferenceEquals(_connectTcs, connectTcs))
@@ -108,6 +141,7 @@ namespace Playserv.Proxy.Implementation
                         _connectTcs = null;
                     }
                 }
+                TryCloseSocket();
                 connectTcs.TrySetResult(false);
             }
 
@@ -136,7 +170,7 @@ namespace Playserv.Proxy.Implementation
             try
             {
                 var message = Encoding.UTF8.GetString(data);
-                var sendResult = Ws_Send(message);
+                var sendResult = _api.Send(_bridge.GameObjectName, message);
                 if (sendResult != 1)
                 {
                     _logger.LogError(
@@ -148,9 +182,9 @@ namespace Playserv.Proxy.Implementation
                         "WebGL WebSocket send failed (socket not open or JS send error).");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError($"Failed to send data via WebGL WebSocket: {ex.Message}");
+                _logger.LogError("Failed to send data via WebGL WebSocket.");
                 _isConnected = false;
                 CompleteAll();
                 TryCloseSocket();
@@ -176,9 +210,9 @@ namespace Playserv.Proxy.Implementation
                 _isConnected = false;
             }
 
-            pendingConnect?.TrySetResult(false);
             TryCloseSocket();
             ResetChannel();
+            pendingConnect?.TrySetResult(false);
             _logger.Log("WebGL WebSocket transport connection state reset.");
         }
 
@@ -189,24 +223,12 @@ namespace Playserv.Proxy.Implementation
             if (_bridgeEventsSubscribed)
                 return;
 
-            _bridge = WebGLWebSocketBridge.Instance;
+            _bridge = WebGLWebSocketBridge.Create();
             _bridge.Opened += OnBridgeOpened;
             _bridge.MessageReceived += OnBridgeMessageReceived;
             _bridge.ErrorReceived += OnBridgeErrorReceived;
             _bridge.Closed += OnBridgeClosed;
             _bridgeEventsSubscribed = true;
-        }
-
-        private void RemoveBridgeEventHandlers()
-        {
-            if (!_bridgeEventsSubscribed || _bridge == null)
-                return;
-
-            _bridge.Opened -= OnBridgeOpened;
-            _bridge.MessageReceived -= OnBridgeMessageReceived;
-            _bridge.ErrorReceived -= OnBridgeErrorReceived;
-            _bridge.Closed -= OnBridgeClosed;
-            _bridgeEventsSubscribed = false;
         }
 
         private void OnBridgeOpened()
@@ -232,7 +254,7 @@ namespace Playserv.Proxy.Implementation
 
         private void OnBridgeMessageReceived(string data)
         {
-            if (data == null)
+            if (data == null || _isDisposed || !_isConnected)
                 return;
 
             var byteCount = Encoding.UTF8.GetByteCount(data);
@@ -243,9 +265,9 @@ namespace Playserv.Proxy.Implementation
                     byteCount);
                 _logger.LogError(exception.Message);
                 _isConnected = false;
-                Closed?.Invoke(new PlayServTransportCloseInfo(1009, "message too large"));
                 _channel.Error(exception);
                 TryCloseSocket();
+                Closed?.Invoke(new PlayServTransportCloseInfo(1009, "message too large"));
                 return;
             }
 
@@ -269,11 +291,11 @@ namespace Playserv.Proxy.Implementation
                 _connectTcs = null;
             }
 
-            _logger.LogError($"WebGL WebSocket error: {error}");
-            pendingConnect?.TrySetResult(false);
-
+            _logger.LogError("WebGL WebSocket connection failed.");
+            TryCloseSocket();
             if (wasConnected)
                 CompleteAll();
+            pendingConnect?.TrySetResult(false);
         }
 
         private void OnBridgeClosed(string reason)
@@ -292,12 +314,18 @@ namespace Playserv.Proxy.Implementation
                 _connectTcs = null;
             }
 
-            _logger.LogWarning($"WebGL WebSocket closed: {reason}");
-            Closed?.Invoke(ParseCloseInfo(reason));
-            pendingConnect?.TrySetResult(false);
-
+            _logger.LogWarning("WebGL WebSocket closed.");
+            TryCloseSocket();
             if (wasConnected)
                 CompleteAll();
+            try
+            {
+                Closed?.Invoke(ParseCloseInfo(reason));
+            }
+            finally
+            {
+                pendingConnect?.TrySetResult(false);
+            }
         }
 
         private static PlayServTransportCloseInfo ParseCloseInfo(string value)
@@ -347,9 +375,17 @@ namespace Playserv.Proxy.Implementation
         }
         private void TryCloseSocket()
         {
+            var bridge = _bridge;
+            _bridge = null;
+            _bridgeEventsSubscribed = false;
+            if (bridge == null)
+                return;
+
+            var connectionId = bridge.GameObjectName;
+            bridge.Retire();
             try
             {
-                Ws_Close();
+                _api.Close(connectionId);
             }
             catch
             {
@@ -361,14 +397,20 @@ namespace Playserv.Proxy.Implementation
             if (_isDisposed)
                 return;
 
-            _isDisposed = true;
-            _isConnected = false;
-            _connecting = false;
+            TaskCompletionSource<bool> pendingConnect;
+            lock (_connectGate)
+            {
+                _isDisposed = true;
+                _isConnected = false;
+                _connecting = false;
+                pendingConnect = _connectTcs;
+                _connectTcs = null;
+            }
 
             TryCloseSocket();
 
-            RemoveBridgeEventHandlers();
             _channel.Complete();
+            pendingConnect?.TrySetResult(false);
         }
     }
 #endif

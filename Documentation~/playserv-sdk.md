@@ -29,14 +29,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.6.1
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.2
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.1
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.2
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -52,7 +52,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.6.1 is prepared in this checkout**, not asserted to be available in
+Version **0.6.2 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -78,7 +78,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.6.1"
+    "com.playserv.sdk": "0.6.2"
   }
 }
 ```
@@ -87,15 +87,24 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.6.1`).
+- A source release tag uses `unity-<version>` (for example `unity-0.6.2`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.6.1`) atomically.
+  the matching plain-SemVer tag (for example `0.6.2`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
 - `CHANGELOG.md` must include a heading for the same package version.
 - The editor window displays the installed package version from Package Manager/package.json.
 - Runtime SDK version constants are synchronized from `package.json` by `Tools/PlayServ/Internal/Sync SDK Version From package.json`.
+
+The **SDK Version** card also provides registry update checks and an explicit,
+confirmed update of core plus installed official companions (including Schema
+Tool). The automatic check is project-cached for 24 hours; **Check for updates**
+forces a refresh. No installation happens on window open. Local copies, forks
+and incompatible package sets require manual resolution; package sources are
+preserved. See [Editor update controls](../README.md#update-from-the-playserv-window)
+for recovery, busy-state restrictions and first-install instructions. This is
+Editor tooling only and does not change runtime configuration or credentials.
 
 ## Migrating legacy module APIs
 
@@ -1525,6 +1534,37 @@ and `RegionUnavailable`; `UnifiedError.SourceCode` retains unknown backend codes
 `UnifiedError.Message` carries the credential-filtered reason and `RetryAfter`
 preserves the optional server delay. Backend-aggregated refusals are not rewritten.
 See the README's **Host a room** example. Coverage uses fixtures, not live integration.
+
+### Direct game-server connection (opt-in)
+
+`PlayServMatchmaking.CreateGameConnection(options)` creates one independent
+`PlayServGameConnection`. Subscribe to `MessageReceived` and `Closed` before
+`ConnectAsync(reservation, ct)`; retain it during gameplay, then `Disconnect()` or
+`Dispose()`. `SendTextAsync` sends game-owned text, not platform RPC frames. The
+platform `/ws` remains connected, including when a direct WebGL socket closes.
+
+Connection uses the current signed-in player and the existing C# game-server
+`playerId` / optional `displayName` / `token` / `reservationToken` handshake.
+`HandshakeSent` confirms only opening and sending, never server admission or
+gameplay readiness. The game defines those messages. There is no automatic retry,
+new Host/Join, ticket replay, or reconnect. Pass `connection.ConnectAsync` as the
+connector callback to `JoinRoomAndConnectAsync`, or connect directly with the
+Host result's reservation without a second Join.
+
+Options are copied at creation: default total `Timeout` is 12 seconds, optional
+`DisplayName` is game-selected, and `AllowInsecureWebSocket` defaults to false.
+WSS is the deployment default; plaintext WS requires explicit development opt-in.
+Use explicit ws/wss connect strings or matching host/port/transport metadata. No
+UDP conversion, address discovery, query credentials or TLS provisioning occurs.
+Managed token refresh cannot create an anonymous replacement player. Identity
+changes fail the attempt; there is no public token getter or persisted connector
+credential. Unknown reservation lifetime is not inferred from `ExpiresAt`; known
+expiry is checked before opening and before the handshake. Timeout after sending
+does not roll back server admission. The handshake is capped at 4096 UTF-8 bytes;
+serialized text sends and received messages at 1 MiB. Call from Unity's context.
+`Closed` carries a safe normalized error, or null for local disconnect. Create a
+new connection instance for another attempt. Fixture coverage is not live server
+admission, a TLS deployment, or an implemented Tanks gameplay protocol.
 
 `PlayServMatchmaking` calls the existing player-authenticated runtime
 matchmaking endpoint. Configure or establish a player session first; the SDK

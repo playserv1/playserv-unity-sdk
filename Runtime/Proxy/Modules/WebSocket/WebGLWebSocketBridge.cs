@@ -1,25 +1,24 @@
-#if UNITY_WEBGL && !UNITY_EDITOR
+#if UNITY_WEBGL || UNITY_EDITOR
 using System;
+using System.Text;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace Playserv.Proxy.Implementation
 {
+    [Preserve]
     internal sealed class WebGLWebSocketBridge : MonoBehaviour
     {
-        private static WebGLWebSocketBridge _instance;
+        private bool _retired;
 
-        public static WebGLWebSocketBridge Instance
+        public static WebGLWebSocketBridge Create()
         {
-            get
-            {
-                if (_instance != null)
-                    return _instance;
-
-                var go = new GameObject("WebGLWebSocketBridge");
-                _instance = go.AddComponent<WebGLWebSocketBridge>();
+            var go = new GameObject("PlayServWebSocket-" + Guid.NewGuid().ToString("N"));
+            go.hideFlags = HideFlags.HideAndDontSave;
+            var bridge = go.AddComponent<WebGLWebSocketBridge>();
+            if (Application.isPlaying)
                 DontDestroyOnLoad(go);
-                return _instance;
-            }
+            return bridge;
         }
 
         public event Action Opened;
@@ -29,36 +28,63 @@ namespace Playserv.Proxy.Implementation
 
         public string GameObjectName => gameObject.name;
 
+        [Preserve]
         public void OnWsOpen(string _)
         {
-            Opened?.Invoke();
+            if (!_retired)
+                Opened?.Invoke();
         }
 
+        [Preserve]
         public void OnWsMessage(string data)
         {
-            MessageReceived?.Invoke(data);
-        }
+            if (_retired)
+                return;
 
-        public void OnWsError(string error)
-        {
-            ErrorReceived?.Invoke(error);
-        }
-
-        public void OnWsClose(string reason)
-        {
-            Closed?.Invoke(reason);
-        }
-
-        private void Awake()
-        {
-            if (_instance != null && _instance != this)
+            string message;
+            try
             {
-                Destroy(gameObject);
+                message = Encoding.UTF8.GetString(Convert.FromBase64String(data ?? string.Empty));
+            }
+            catch (FormatException)
+            {
+                ErrorReceived?.Invoke("WebSocket callback could not be decoded.");
                 return;
             }
 
-            _instance = this;
-            DontDestroyOnLoad(gameObject);
+            MessageReceived?.Invoke(message);
+        }
+
+        [Preserve]
+        public void OnWsError(string error)
+        {
+            if (!_retired)
+                ErrorReceived?.Invoke(error);
+        }
+
+        [Preserve]
+        public void OnWsClose(string reason)
+        {
+            if (!_retired)
+                Closed?.Invoke(reason);
+        }
+
+        public void Retire()
+        {
+            if (_retired)
+                return;
+
+            _retired = true;
+            Opened = null;
+            MessageReceived = null;
+            ErrorReceived = null;
+            Closed = null;
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                DestroyImmediate(gameObject);
+            else
+#endif
+                Destroy(gameObject);
         }
     }
 }

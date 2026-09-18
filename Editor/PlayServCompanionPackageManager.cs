@@ -23,13 +23,14 @@ namespace Playserv.Editor
         private static string _activePackageId = string.Empty;
         private static string _lastErrorPackageId = string.Empty;
         private static string _lastError = string.Empty;
+        private static readonly object OperationOwner = new object();
 
         static PlayServCompanionPackageManager()
         {
             EditorApplication.update += PollRequests;
         }
 
-        public static bool IsBusy => _addRequest != null || _removeRequest != null;
+        public static bool IsBusy => _addRequest != null || _removeRequest != null || PlayServPackageOperationGate.Shared.IsBusy;
 
         public static bool IsBusyFor(string packageId)
         {
@@ -73,7 +74,7 @@ namespace Playserv.Editor
 
             if (IsBusy)
             {
-                reason = $"Package Manager is already updating {_activePackageId}.";
+                reason = "A PlayServ Package Manager operation is already running.";
                 return false;
             }
 
@@ -134,7 +135,7 @@ namespace Playserv.Editor
 
             if (IsBusy)
             {
-                error = $"Package Manager is already updating {_activePackageId}.";
+                error = "A PlayServ Package Manager operation is already running.";
                 return false;
             }
 
@@ -146,9 +147,21 @@ namespace Playserv.Editor
                 return false;
 
             ClearLastError();
+            if (!PlayServPackageOperationGate.Shared.TryAcquire(OperationOwner))
+            {
+                error = "A PlayServ Package Manager operation is already running.";
+                return false;
+            }
             _activePackageId = package.PackageId;
             Debug.Log($"[PlayServ] Installing {package.PackageId} from {installReference}.");
-            _addRequest = Client.Add(installReference);
+            try { _addRequest = Client.Add(installReference); }
+            catch (Exception)
+            {
+                PlayServPackageOperationGate.Shared.Release(OperationOwner);
+                _activePackageId = string.Empty;
+                error = "Package Manager could not start the installation.";
+                return false;
+            }
             return true;
         }
 
@@ -166,7 +179,7 @@ namespace Playserv.Editor
 
             if (IsBusy)
             {
-                error = $"Package Manager is already updating {_activePackageId}.";
+                error = "A PlayServ Package Manager operation is already running.";
                 return false;
             }
 
@@ -195,9 +208,21 @@ namespace Playserv.Editor
             }
 
             ClearLastError();
+            if (!PlayServPackageOperationGate.Shared.TryAcquire(OperationOwner))
+            {
+                error = "A PlayServ Package Manager operation is already running.";
+                return false;
+            }
             _activePackageId = package.PackageId;
             Debug.Log($"[PlayServ] Removing companion package {package.PackageId}.");
-            _removeRequest = Client.Remove(package.PackageId);
+            try { _removeRequest = Client.Remove(package.PackageId); }
+            catch (Exception)
+            {
+                PlayServPackageOperationGate.Shared.Release(OperationOwner);
+                _activePackageId = string.Empty;
+                error = "Package Manager could not start the removal.";
+                return false;
+            }
             return true;
         }
 
@@ -394,6 +419,7 @@ namespace Playserv.Editor
 
             _addRequest = null;
             _activePackageId = string.Empty;
+            PlayServPackageOperationGate.Shared.Release(OperationOwner);
             RepaintAndRefresh();
         }
 
@@ -416,6 +442,7 @@ namespace Playserv.Editor
 
             _removeRequest = null;
             _activePackageId = string.Empty;
+            PlayServPackageOperationGate.Shared.Release(OperationOwner);
             RepaintAndRefresh();
         }
 

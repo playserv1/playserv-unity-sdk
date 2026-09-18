@@ -4,7 +4,8 @@
     "references": [
         "Playserv.Runtime",
         "Playserv.Runtime.Abstractions",
-        "Playserv.Runtime.Modules"
+        "Playserv.Runtime.Modules",
+        "Playserv.Runtime.Serialization"
     ],
     "includePlatforms": [
         "Editor"
