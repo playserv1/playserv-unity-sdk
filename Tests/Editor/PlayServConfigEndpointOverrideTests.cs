@@ -8,8 +8,8 @@ namespace Playserv.Tests.Editor
 {
     public sealed class PlayServConfigEndpointOverrideTests
     {
-        private const string ActiveEnvironmentPrefKey =
-            "PlayServ.PackageEnvironment.Active";
+        private static string ActiveEnvironmentPrefKey =>
+            PlayServEnvironmentClientTokens.ActiveEnvironmentPreference;
 
         [Test]
         public void ResolveEditorSettings_PreservesConfigEndpointOverrides()

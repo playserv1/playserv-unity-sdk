@@ -11,7 +11,6 @@ namespace Playserv.Editor
     {
         private const string ThisScriptSuffix = "/Editor/PlayServPackageEnvironmentProvider.cs";
         private const string EnvironmentAssetsRelativePath = "Runtime/Resources/PlayServEnvironments";
-        private const string ActiveEnvironmentPrefKey = "PlayServ.PackageEnvironment.Active";
 
         private static readonly IPlayServClientProjectSettingsProvider Provider = new PackageEnvironmentProvider();
         private static PlayServPackageRoot _packageRoot;
@@ -34,6 +33,8 @@ namespace Playserv.Editor
 
             settings = config.ToSettings();
             ApplyMissingPackageDefaults(settings, environmentDefaults.ToSettings());
+            if (PlayServEnvironmentClientTokens.IsManaged(config))
+                settings.ClientToken = config.ClientToken;
             return true;
         }
 
@@ -54,13 +55,15 @@ namespace Playserv.Editor
             for (var i = 0; i < environments.Length; i++)
                 labels[i] = AsDisplayEnvironmentLabel(environments[i]);
 
-            var selectedIndex = EditorGUILayout.Popup("Environment", activeIndex, labels);
+            int selectedIndex;
+            using (new EditorGUI.DisabledScope(PlayServEnvironmentClientTokens.TryGetProcessOverride(out _, out _)))
+                selectedIndex = EditorGUILayout.Popup("Environment", activeIndex, labels);
             if (selectedIndex == activeIndex)
                 return true;
 
             var selectedEnvironment = environments[selectedIndex];
-            EditorPrefs.SetString(ActiveEnvironmentPrefKey, selectedEnvironment);
             var config = PlayServConfigProvider.FindExisting();
+            PlayServEnvironmentClientTokens.SelectEnvironment(config, selectedEnvironment);
             if (config != null && TryApplyEnvironmentDefaults(config, selectedEnvironment))
                 AssetDatabase.SaveAssets();
 
@@ -88,8 +91,11 @@ namespace Playserv.Editor
                 return false;
             }
 
+            PlayServEnvironmentClientTokens.SelectEnvironment(config, environmentName);
             var settings = config.ToSettings();
             ApplyEnvironmentDefaults(settings, environmentDefaults.ToSettings());
+            if (PlayServEnvironmentClientTokens.IsManaged(config))
+                settings.ClientToken = config.ClientToken;
             return config.ApplySettings(settings);
         }
 
@@ -235,9 +241,7 @@ namespace Playserv.Editor
 
         private static string ResolveActiveEnvironmentName(string[] environments)
         {
-            var stored = EditorPrefs.GetString(
-                ActiveEnvironmentPrefKey,
-                PlayServPackageDefaultsProvider.DevelopmentEnvironmentName);
+            var stored = PlayServEnvironmentClientTokens.ActiveEnvironment;
 
             if (TryNormalizeEnvironmentName(stored, out var normalized) &&
                 TryGetExistingEnvironmentName(environments, normalized, out var existing))
@@ -277,7 +281,10 @@ namespace Playserv.Editor
             return false;
         }
 
-        private static bool TryNormalizeEnvironmentName(string value, out string normalized)
+        internal static bool IsKnownEnvironment(string environment) =>
+            TryGetExistingEnvironmentName(GetEnvironmentNames(), environment, out _);
+
+        internal static bool TryNormalizeEnvironmentName(string value, out string normalized)
         {
             normalized = string.Empty;
             if (string.IsNullOrWhiteSpace(value))

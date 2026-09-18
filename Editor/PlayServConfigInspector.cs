@@ -9,7 +9,6 @@ namespace Playserv.Editor
     {
         private static readonly string[] EditablePropertyOrder =
         {
-            "clientToken",
             "deploymentGameId",
             "gameVersion",
             "allowMultipleConnections",
@@ -34,7 +33,13 @@ namespace Playserv.Editor
 
         public override void OnInspectorGUI()
         {
+            var config = (PlayServConfig)target;
+            if (PlayServEnvironmentClientTokens.IsManaged(config))
+                PlayServEnvironmentClientTokens.DrawTokenField(config);
             serializedObject.Update();
+
+            if (!PlayServEnvironmentClientTokens.IsManaged(config))
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("clientToken"));
 
             DrawProperties(EditablePropertyOrder, readOnly: false);
             DrawProperties(SdkVersionPropertyOrder, readOnly: !CanEditSdkVersionInClientEditor());

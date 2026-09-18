@@ -49,7 +49,10 @@ namespace Playserv.Editor
 
                     context.SerializedObject.Update();
 
-                    EditorGUILayout.PropertyField(context.ClientTokenProperty);
+                    if (PlayServEnvironmentClientTokens.IsManaged(context.Config))
+                        PlayServEnvironmentClientTokens.DrawTokenField(context.Config);
+                    else
+                        EditorGUILayout.PropertyField(context.ClientTokenProperty);
                     EditorGUILayout.PropertyField(context.DeploymentGameIdProperty);
                     EditorGUILayout.PropertyField(context.GameVersionProperty);
                     EditorGUILayout.PropertyField(context.AllowMultipleConnectionsProperty);

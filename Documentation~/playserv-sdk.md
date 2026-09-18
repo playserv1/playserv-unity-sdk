@@ -29,14 +29,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.6.0
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.1
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.0
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.1
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -52,7 +52,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.6.0 is prepared in this checkout**, not asserted to be available in
+Version **0.6.1 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -78,7 +78,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.6.0"
+    "com.playserv.sdk": "0.6.1"
   }
 }
 ```
@@ -87,9 +87,9 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.6.0`).
+- A source release tag uses `unity-<version>` (for example `unity-0.6.1`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.6.0`) atomically.
+  the matching plain-SemVer tag (for example `0.6.1`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
@@ -805,6 +805,49 @@ the requested name; read the authoritative value with
 `await PlayServAuth.RefreshCurrentPlayerProfileAsync()`.
 
 The request-shape and lifecycle tests use local fixtures, not live backend integration.
+
+### Environment client tokens
+
+In the standard package Editor configuration, Dev and Prod have independent Client
+Token values. Tokens live in local `EditorPrefs`, scoped by project path, config
+asset GUID and environment; the selected environment is project-local too. The
+PlayServ window and config Inspector use this store. `config.ClientToken` and
+`config.ToSettings()` resolve the active token in the Editor without serializing
+it into the project asset. Explicit `PlayServSettings` and custom project settings
+providers retain their existing behavior. Endpoint switching is unchanged.
+
+On first use, the existing serialized token is moved to the currently selected
+environment and cleared from the asset. An existing local value is never
+overwritten. The old global environment preference is used only to initialize the
+project preference. Verify that the migrated token belongs to that environment:
+the SDK cannot infer its intended environment or recover a token overwritten by
+an earlier edit. Other environments start empty, and clearing a token remains
+effective after reload. A new checkout path or another developer must configure
+its own tokens. Migration does not remove values from existing Git history.
+
+Only public `pk_*` keys belong here, never server keys or player JWTs. Local
+preferences are not an encrypted secret store. Switching environments affects the
+next SDK configuration, not an existing connection or authenticated session.
+
+For player builds, the SDK validates and temporarily bakes the active public token
+into configured managed config assets. A missing token blocks builds of the default
+runtime `Resources/PlayServConfig` (including nested Resources locations); blank
+unrelated template configs do not block a build. It restores only the injected token field afterwards,
+preserving other build-tool changes. Recovery also runs when the Editor becomes
+idle or quits and after reopening an interrupted build, using a journal under
+`Library/PlayServ`. Do not delete `Library` before recovery or commit an in-progress
+build snapshot. A conflicting edit to the token is preserved and reported rather
+than silently overwritten. Only the active key is baked; the inactive local key
+is not included. The baked key remains readable by users of the built game.
+
+For CI, set **both** `PLAYSERV_ENVIRONMENT` (for example `Dev` or `Prod`) and
+`PLAYSERV_CLIENT_TOKEN` in the Unity process environment. They override local
+selection/token for that process without modifying the local store. Supplying
+only one, an unknown environment, an empty token or a non-public credential fails
+with a safe error. No token is echoed in diagnostics. These token-selection
+variables do not change explicit endpoint settings; continue configuring the
+build's endpoints through the existing game build setup. Projects using custom
+settings providers remain responsible for their own build configuration.
 
 ### Managed sessions
 

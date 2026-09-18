@@ -6,6 +6,24 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-18
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Fixed
+
+- 2026-09-18: Make interrupted-build token recovery tests deterministic across
+  Editor platforms, covering busy/idle transitions and callback registration
+  without a wall-clock wait. Production recovery still waits for build,
+  compilation and asset import to finish.
+
+- 2026-09-18: Keep Dev/Prod Client Tokens in independent project/config-scoped
+  local Editor storage, including direct config access and one-time migration of
+  the serialized key. Empty environments never reuse another environment's key.
+  Player builds bake only the active public token and restore the asset, with
+  interrupted-build recovery and explicit environment/token overrides for CI.
+  Endpoint settings, custom providers and the runtime authentication API are unchanged.
+
 ## [0.6.0] - 2026-09-17
 
 Release prepared locally; distribution tags and registry publication are separate.

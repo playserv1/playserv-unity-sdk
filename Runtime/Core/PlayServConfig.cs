@@ -16,6 +16,22 @@ namespace Playserv.Wrapper
     [CreateAssetMenu(fileName = "PlayServConfig", menuName = "PlayServ/Config", order = 0)]
     public sealed class PlayServConfig : ScriptableObject
     {
+#if UNITY_EDITOR
+        internal interface IEditorClientTokens
+        {
+            bool TryGet(PlayServConfig config, out string value);
+            bool TrySet(PlayServConfig config, string value, out bool changed);
+        }
+
+        internal static IEditorClientTokens EditorClientTokens;
+        internal string SerializedClientToken => clientToken;
+
+        internal void SetSerializedClientToken(string value)
+        {
+            if (AssignIfDifferent(ref clientToken, value))
+                EditorUtility.SetDirty(this);
+        }
+#endif
         private const string DEFAULT_BACKEND_SERVER_ADDRESS = PlayServSettings.DefaultBackendServerAddress;
         private const string DEFAULT_DEPLOY_API_SERVER_ADDRESS = PlayServSettings.DefaultDeployApiServerAddress;
         private const string DEFAULT_SCHEMA_API_SERVER_ADDRESS = PlayServSettings.DefaultSchemaApiServerAddress;
@@ -55,13 +71,24 @@ namespace Playserv.Wrapper
         
         /// <summary>
         /// Optional public runtime client token (<c>pk_*</c>) used by DataFlow/runtime-auth handshake.
+        /// Managed Editor assets resolve the selected environment's local token; player builds use the baked value.
         /// </summary>
-        public string ClientToken => clientToken;
+        public string ClientToken
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (EditorClientTokens != null && EditorClientTokens.TryGet(this, out var value))
+                    return value;
+#endif
+                return clientToken;
+            }
+        }
 
         /// <summary>
         /// Backward-compatible alias for <see cref="ClientToken"/>.
         /// </summary>
-        public string GameAccessToken => clientToken;
+        public string GameAccessToken => ClientToken;
 
         /// <summary>
         /// Optional deployment identifier. It is not part of runtime admission.
@@ -146,11 +173,12 @@ namespace Playserv.Wrapper
         /// </summary>
         public int TimeoutSeconds => timeoutSeconds;
 
+        /// <summary>Creates a settings snapshot, including the effective local environment token in the Editor.</summary>
         public PlayServSettings ToSettings()
         {
             return new PlayServSettings
             {
-                ClientToken = clientToken,
+                ClientToken = ClientToken,
                 DeploymentGameId = deploymentGameId,
                 GameVersion = gameVersion,
                 SdkVersion = sdkVersion,
@@ -171,14 +199,15 @@ namespace Playserv.Wrapper
 
         /// <summary>
         /// Applies provided settings to this config asset and marks it dirty in editor if changed.
+        /// For managed Editor assets the token is stored locally, not serialized; process token overrides are read-only.
         /// </summary>
         public bool ApplySettings(PlayServSettings settings)
         {
             if (settings == null)
                 return false;
 
-            var changed = false;
-            changed |= AssignIfDifferent(ref clientToken, settings.ClientToken);
+            var tokenChanged = AssignClientToken(settings.ClientToken, out var serializedTokenChanged);
+            var changed = serializedTokenChanged;
             changed |= AssignIfDifferent(ref deploymentGameId, settings.DeploymentGameId);
             changed |= AssignIfDifferent(ref gameVersion, settings.GameVersion);
             changed |= AssignIfDifferent(ref sdkVersion, settings.SdkVersion);
@@ -200,7 +229,7 @@ namespace Playserv.Wrapper
                 EditorUtility.SetDirty(this);
 #endif
 
-            return changed;
+            return changed || tokenChanged;
         }
 
         /// <summary>
@@ -216,15 +245,28 @@ namespace Playserv.Wrapper
         }
 
         /// <summary>
-        /// Updates client token and marks asset dirty in editor.
+        /// Updates the active local environment token for managed Editor assets.
+        /// Other configs retain serialized storage; process token overrides are read-only.
         /// </summary>
         /// <param name="value">New token value.</param>
         public void SetClientToken(string value)
         {
-            clientToken = value;
+            AssignClientToken(value, out var serializedChanged);
 #if UNITY_EDITOR
-            EditorUtility.SetDirty(this);
+            if (serializedChanged)
+                EditorUtility.SetDirty(this);
 #endif
+        }
+
+        private bool AssignClientToken(string value, out bool serializedChanged)
+        {
+            serializedChanged = false;
+#if UNITY_EDITOR
+            if (EditorClientTokens != null && EditorClientTokens.TrySet(this, value, out var changed))
+                return changed;
+#endif
+            serializedChanged = AssignIfDifferent(ref clientToken, value);
+            return serializedChanged;
         }
 
         /// <summary>

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-18
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Changed
+
+- Aligned package and internal PlayServ dependency versions with `0.6.1`; no companion API changes.
+
 ## [0.6.0] - 2026-09-17
 
 ### Changed
