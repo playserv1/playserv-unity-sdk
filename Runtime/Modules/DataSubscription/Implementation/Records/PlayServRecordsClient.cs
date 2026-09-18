@@ -35,12 +35,14 @@ namespace Playserv.Data
             IJsonCodec json,
             bool requiresClientToken = true,
             PlayServDataAccessSubject accessSubject = PlayServDataAccessSubject.Client,
-            string catalogueCacheScope = null)
+            string catalogueCacheScope = null,
+            Func<bool> isReferenceContextCurrent = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _http = http ?? throw new ArgumentNullException(nameof(http));
             _json = json ?? throw new ArgumentNullException(nameof(json));
             _requiresClientToken = requiresClientToken;
+            CaptureReferenceContext(isReferenceContextCurrent);
             _accessSubject = accessSubject;
             _catalogueCacheScope = string.IsNullOrWhiteSpace(catalogueCacheScope)
                 ? string.Concat(
@@ -58,7 +60,8 @@ namespace Playserv.Data
             var json = new NewtonsoftJsonCodec();
             var http = PlayServRuntimeHttpClientResolver.Create(
                 new PlayServHttpModuleContext(settings.ToRuntimeSettings(), json));
-            return new PlayServRecordsClient(settings, http, json);
+            return new PlayServRecordsClient(settings, http, json,
+                isReferenceContextCurrent: () => ReferenceEquals(PlayServ.Settings, settings));
         }
 
         internal IJsonCodec Json => _json;
@@ -601,7 +604,7 @@ namespace Playserv.Data
 
         internal Dictionary<string, object> ToRecordFields<T>(T value)
         {
-            var plain = AsDictionary(_json.ToPlainValue(value));
+            var plain = AsDictionary(_json.ParseToPlainValue(_json.Serialize(value, ReferenceJsonOptions())));
             RemoveSystemFields(plain);
             return plain;
         }
@@ -666,7 +669,7 @@ namespace Playserv.Data
             }
             // Server normalization of fields not edited during I/O remains authoritative.
             // The caller keeps serverSnapshot unchanged, so only unacknowledged edits stay dirty.
-            return merged == null ? serverValue : _json.Convert<T>(merged);
+            return merged == null ? serverValue : ConvertRecordValue<T>(merged);
         }
 
         private async Task<PlayServRuntimeDataResponse> SendAsync(
@@ -679,6 +682,7 @@ namespace Playserv.Data
             string accessEntityId = null)
         {
             ct.ThrowIfCancellationRequested();
+            if (_isReferenceClient) ValidateReferenceContext();
             if (_requiresClientToken && string.IsNullOrWhiteSpace(_settings.ClientToken))
                 throw new InvalidOperationException("PlayServ.Settings.ClientToken must contain a public pk_* token before using records.");
 
@@ -688,9 +692,11 @@ namespace Playserv.Data
             else if (_requiresClientToken && !string.IsNullOrWhiteSpace(_settings.PlayerAccessToken))
                 bearer = _settings.PlayerAccessToken;
 
+            if (_isReferenceClient) ValidateReferenceContext();
+            PlayServRuntimeDataResponse response;
             try
             {
-                return await _http.SendDataAsync(new PlayServRuntimeDataRequest
+                response = await _http.SendDataAsync(new PlayServRuntimeDataRequest
                 {
                     Method = method,
                     RelativePath = path,
@@ -718,6 +724,8 @@ namespace Playserv.Data
                     true,
                     innerException: ex);
             }
+            if (_isReferenceClient) ValidateReferenceContext();
+            return response;
         }
 
         private Exception MapException(
@@ -794,8 +802,7 @@ namespace Playserv.Data
             var updatedAt = GetDate(root, "updated_at");
             var ownerId = GetString(root, "owner");
             RemoveSystemFields(root);
-            var canonical = Canonical(root);
-            var value = _json.Convert<T>(root);
+            var value = ParseReferenceFields<T>(root, out var canonical);
             return new PlayServRecord<T>(
                 owner,
                 this,
@@ -821,8 +828,7 @@ namespace Playserv.Data
             var createdAt = GetDate(root, "created_at");
             var updatedAt = GetDate(root, "updated_at");
             RemoveSystemFields(root);
-            var canonical = Canonical(root);
-            var value = _json.Convert<T>(root);
+            var value = ParseReferenceFields<T>(root, out var canonical);
             return new PlayServSingleton<T>(
                 owner,
                 this,

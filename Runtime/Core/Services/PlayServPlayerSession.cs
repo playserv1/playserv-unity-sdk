@@ -18,7 +18,7 @@ using UnityEngine;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServPlayerSession : IPlayServRuntimeTokenProvider, IDisposable
+    internal sealed partial class PlayServPlayerSession : IPlayServRuntimeTokenProvider, IDisposable
     {
         private static readonly TimeSpan RefreshSkew = TimeSpan.FromSeconds(90);
         private static readonly HashSet<string> ProviderTokenIds = new HashSet<string>(StringComparer.Ordinal)
@@ -1083,7 +1083,8 @@ namespace Playserv.Wrapper
         private async Task ApplyTokenBundleAsync(
             PlayerTokenBundleDto bundle,
             PlayServSessionKind kind,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<bool> mayApply = null)
         {
             if (bundle == null ||
                 string.IsNullOrWhiteSpace(bundle.player_id) ||
@@ -1104,7 +1105,23 @@ namespace Playserv.Wrapper
                 kind,
                 refreshExpiry);
 
-            await SaveSessionAsync(candidate, cancellationToken);
+            var previous = string.IsNullOrEmpty(_refreshToken) ? null : new PlayServPlayerSessionData(PlayerId, _refreshToken, _sessionKind, _refreshTokenExpiresAtUtc);
+            try
+            {
+                await SaveSessionAsync(candidate, cancellationToken);
+                if (mayApply != null && (cancellationToken.IsCancellationRequested || !mayApply()))
+                    throw new OperationCanceledException(cancellationToken);
+            }
+            catch
+            {
+                if (mayApply != null)
+                {
+                    if (previous == null) await _sessionStore.ClearAsync(ScopeKey, CancellationToken.None);
+                    else await _sessionStore.SaveAsync(ScopeKey, previous, CancellationToken.None);
+                }
+                throw;
+            }
+            IdentityRevision++;
             PlayerId = candidate.PlayerId;
             _accessToken = bundle.access_token.Trim();
             _refreshToken = candidate.RefreshToken;
@@ -1226,6 +1243,7 @@ namespace Playserv.Wrapper
 
         private void ClearMemorySession()
         {
+            IdentityRevision++;
             _accessToken = string.Empty;
             _refreshToken = string.Empty;
             _accessTokenExpiresAtUtc = default;

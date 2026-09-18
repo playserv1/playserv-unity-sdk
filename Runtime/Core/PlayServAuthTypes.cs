@@ -39,7 +39,11 @@ namespace Playserv.Wrapper
         LastProviderUnlinkForbidden = 16,
         MergeProviderConflict = 17,
         MergeOutcomeUnknown = 18,
-        SessionRefreshFailed = 19
+        SessionRefreshFailed = 19,
+        BrowserPopupBlocked = 20,
+        BrowserFlowInProgress = 21,
+        BrowserPlayerSwitchRequired = 22,
+        BrowserClaimOutcomeUnknown = 23
     }
 
     public enum PlayServMergeChoice
@@ -184,6 +188,10 @@ namespace Playserv.Wrapper
                 PlayServAuthErrorCode.MergeProviderConflict => PlayServErrorCode.Conflict,
                 PlayServAuthErrorCode.MergeOutcomeUnknown => PlayServErrorCode.Unknown,
                 PlayServAuthErrorCode.SessionRefreshFailed => PlayServErrorCode.Transport,
+                PlayServAuthErrorCode.BrowserPopupBlocked => PlayServErrorCode.InvalidConfiguration,
+                PlayServAuthErrorCode.BrowserFlowInProgress => PlayServErrorCode.Conflict,
+                PlayServAuthErrorCode.BrowserPlayerSwitchRequired => PlayServErrorCode.Conflict,
+                PlayServAuthErrorCode.BrowserClaimOutcomeUnknown => PlayServErrorCode.Unknown,
                 PlayServAuthErrorCode.Network => PlayServErrorCode.Network,
                 PlayServAuthErrorCode.Timeout => PlayServErrorCode.Timeout,
                 PlayServAuthErrorCode.InvalidResponse => PlayServErrorCode.InvalidResponse,

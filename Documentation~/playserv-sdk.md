@@ -18,6 +18,15 @@ This document contains practical examples for the public runtime API exposed by:
 - `Playserv.DataSubscription.ISharedEntity<T>`
 - `Playserv.Spawn` components
 
+See [Browser sign-in](browser-oauth.md) for an explicit browser login button,
+account-switch semantics and platform requirements.
+
+See [WebSocket room sessions](room-session.md) for a reusable Host/Join lifecycle
+and an example game protocol.
+
+See [Typed record references](record-references.md) for relation DTOs, canonical
+loading, batch reads and authorization-context lifetime.
+
 ## Installation
 
 ### GitHub UPM (recommended)
@@ -29,14 +38,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.6.2
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.3
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.2
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.3
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -52,7 +61,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.6.2 is prepared in this checkout**, not asserted to be available in
+Version **0.6.3 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -78,7 +87,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.6.2"
+    "com.playserv.sdk": "0.6.3"
   }
 }
 ```
@@ -87,9 +96,9 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.6.2`).
+- A source release tag uses `unity-<version>` (for example `unity-0.6.3`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.6.2`) atomically.
+  the matching plain-SemVer tag (for example `0.6.3`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.

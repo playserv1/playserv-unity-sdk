@@ -489,6 +489,33 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(transport.Requests[2].ServerKey, Is.EqualTo("sk_save"));
         }
 
+        [UnityEngine.TestTools.UnityTest]
+        public System.Collections.IEnumerator Reference_save_during_server_reconfiguration_never_sends_old_PATCH()
+        {
+            var transport = new FakeTransport();
+            transport.Enqueue(200, "{\"data\":[{\"entity_id\":\"ent_jobs\",\"name\":\"ServerJob\",\"singleton\":false}]}");
+            transport.Enqueue(200, "{\"id\":\"rec_1\",\"state\":\"queued\"}", etag: "\"v1\"");
+            transport.Enqueue(200, "{\"id\":\"rec_1\",\"state\":\"changed\"}", etag: "\"v2\"");
+            var keys = new PendingSaveKey(); Configure(transport, keys);
+            var reference = PlayServGameServer.AsPlayer("aaa.bbb.ccc").Records<ServerJob>().Reference("rec_1");
+            var loading = reference.LoadAsync(); while (!loading.IsCompleted) yield return null;
+            var record = loading.GetAwaiter().GetResult(); record.Value.State = "changed";
+            var saving = record.SaveAsync();
+            Assert.That(keys.Calls, Is.EqualTo(3));
+            Configure(new FakeTransport(), new RotatingKeyProvider("sk_new"));
+            keys.Pending.SetResult("sk_old");
+            while (!saving.IsCompleted) yield return null;
+            Assert.Catch(() => saving.GetAwaiter().GetResult());
+            Assert.That(transport.Requests.Count, Is.EqualTo(2), "The invalidated context must not send PATCH after its credential await.");
+        }
+        private sealed class PendingSaveKey : IPlayServServerKeyProvider
+        {
+            internal int Calls;
+            internal readonly TaskCompletionSource<string> Pending = new TaskCompletionSource<string>();
+            public Task<string> GetServerKeyAsync(CancellationToken ct = default) =>
+                ++Calls <= 2 ? Task.FromResult("sk_old") : Pending.Task;
+        }
+
         [Test]
         public void ServerCatalogueAndRecordsResolutionShareMetadataCache()
         {

@@ -6,6 +6,22 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-09-18
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Added
+
+- Add typed record references with ID-only Records serialization, expanded previews, canonical loads, scoped identity checks, shared concurrent loads and batch reads. Schema Tool recognizes typed relation targets and cardinality.
+
+- Add opt-in WebSocket room sessions with mandatory game-owned admission/readiness, direct Host reservation handoff, bounded fresh-ticket recovery, cancellation and protocol-aware Leave. Includes a small admission/snapshot protocol example.
+
+- Explicit browser sign-in for WebGL, Editor and desktop through platform-completion OAuth with PKCE S256, bounded claim polling, popup handling, cancellation and explicit player-switch permission. Existing sessions stay active while waiting; ambiguous claim loss is reported without an automatic retry.
+
+### Fixed
+
+- Keep SDK Version actions beside the version as compact icon buttons. Status stays on one line with its full text in a tooltip, so update checks and errors do not stretch the overview card.
+
 ## [0.6.2] - 2026-09-18
 
 Release prepared locally; distribution tags and registry publication are separate.

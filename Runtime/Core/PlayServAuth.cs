@@ -31,6 +31,10 @@ namespace Playserv.Wrapper
             remove => Api.SessionLost -= value;
         }
 
+        /// <summary>Call directly from a user click. Browser sign-in does not link or merge player progress.</summary>
+        public static Task<PlayServAuthResult> LoginBrowserAsync(string provider, PlayServBrowserLoginOptions options = null, CancellationToken ct = default) =>
+            Api.LoginBrowserAsync(provider, options, ct);
+
         public static Task<PlayServAuthResult> LoginExternalAsync(
             PlayServExternalIdentityProof proof,
             PlayServExternalLoginMode mode = PlayServExternalLoginMode.PreserveCurrentPlayer,

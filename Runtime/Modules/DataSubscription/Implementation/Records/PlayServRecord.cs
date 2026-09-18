@@ -280,7 +280,7 @@ namespace Playserv.Data
                 return default;
             try
             {
-                return _client.Json.Convert<T>(_client.Json.ToPlainValue(value));
+                return _client.CloneRecordValue(value);
             }
             catch
             {

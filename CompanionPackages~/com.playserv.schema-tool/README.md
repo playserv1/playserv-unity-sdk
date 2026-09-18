@@ -66,3 +66,11 @@ The resulting framework-dependent assembly is launched with the .NET runtime
 bundled in the active Unity editor. The published folder also carries the
 Roslyn runtime dependencies that are newer than the Unity 2021.3 Linux base
 framework.
+
+### Typed record relations (0.6.3)
+
+Code-first fields can use `PlayServRecordRef<Entity>` and arrays/lists of that type,
+including nullable collections. Schema push emits a relation with the discovered
+entity target and one/many cardinality. JSON schema describes ID strings; the
+optional C# contracts target qualifies reference types. Existing ID DTO generation
+is unchanged. See [typed record references](../../Documentation~/record-references.md).

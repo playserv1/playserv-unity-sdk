@@ -69,7 +69,7 @@ namespace Playserv.Tests.Editor
 
             var result = RunTool(dotnetPath, toolPath, "version --json");
             Assert.That(result.ExitCode, Is.EqualTo(0), result.Error);
-            StringAssert.Contains("\"version\": \"0.6.2\"", result.Output);
+            StringAssert.Contains("\"version\": \"0.6.3\"", result.Output);
             StringAssert.Contains("\"protocolVersion\": 1", result.Output);
         }
 
@@ -190,6 +190,94 @@ namespace Playserv.Tests.Editor
         }
 
         [Test]
+        public void ShippedTool_TypedReferencesGenerateIDSchemaAndPushRelationCardinality()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "playserv-ref-schema-" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            var dotnet = PlayServSchemaToolRunner.ResolveBundledDotNet();
+            var tool = ResolveShippedToolPath();
+            try
+            {
+                Assert.That(RunTool(dotnet, tool, $"init --project \"{root}\" --json").ExitCode, Is.Zero);
+                Directory.CreateDirectory(Path.Combine(root, "Assets"));
+                File.WriteAllText(Path.Combine(root, "Assets/Refs.cs"),
+                    "[PlayServSchema(\"child\")] public class Child { public string Name; }\n" +
+                    "[PlayServSchema(\"parent\")] public class Parent { public PlayServRecordRef<Child> Child; public System.Collections.Generic.List<Playserv.Data.PlayServRecordRef<Child>> Children; public PlayServRecordRef<Child>[]? OptionalArray; public System.Collections.Generic.List<PlayServRecordRef<Child>>? OptionalList; }");
+                var generated = RunTool(dotnet, tool, $"generate --project \"{root}\" --json");
+                Assert.That(generated.ExitCode, Is.Zero, generated.Output + generated.Error);
+                var schema = File.ReadAllText(Path.Combine(root, "Assets/PlayServ/Generated/Schemas/playserv.schema.json"));
+                StringAssert.DoesNotContain("x-playserv-unresolved-csharp-type", schema);
+                var definitions = Newtonsoft.Json.Linq.JObject.Parse(schema)["$defs"];
+                Assert.That((string)definitions["parent"]["properties"]["Child"]["type"], Is.EqualTo("string"));
+                Assert.That((string)definitions["parent"]["properties"]["Children"]["items"]["type"], Is.EqualTo("string"));
+
+                var portProbe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+                portProbe.Start(); var port = ((System.Net.IPEndPoint)portProbe.LocalEndpoint).Port; portProbe.Stop();
+                using var listener = new System.Net.HttpListener();
+                listener.Prefixes.Add($"http://127.0.0.1:{port}/"); listener.Start();
+                var serve = System.Threading.Tasks.Task.Run(async () =>
+                {
+                    string payload = null;
+                    for (var index = 0; index < 3; index++)
+                    {
+                        var context = await listener.GetContextAsync();
+                        var reply = index == 0 ? "{\"access_token\":\"fixture\",\"project_id\":\"p\",\"project_slug\":\"p\",\"env\":\"dev\"}" : "{\"revision\":\"v1\"}";
+                        if (index == 2) using (var reader = new StreamReader(context.Request.InputStream)) payload = await reader.ReadToEndAsync();
+                        var bytes = System.Text.Encoding.UTF8.GetBytes(reply);
+                        context.Response.ContentType = "application/json";
+                        await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length); context.Response.Close();
+                    }
+                    return payload;
+                });
+                var push = RunTool(dotnet, tool, $"push --project \"{root}\" --endpoint http://127.0.0.1:{port} --json", "sk_fixture");
+                Assert.That(push.ExitCode, Is.Zero, push.Output + push.Error);
+                Assert.That(serve.Wait(5000), Is.True);
+                var entities = Newtonsoft.Json.Linq.JObject.Parse(serve.Result)["entities"];
+                var parent = System.Linq.Enumerable.Single(entities, e => (string)e["code_key"] == "parent");
+                var fields = parent["entity"]["fields"];
+                Assert.That((string)fields[0]["type"], Is.EqualTo("relation"));
+                Assert.That((string)fields[0]["target"], Is.EqualTo("Child"));
+                Assert.That((string)fields[0]["cardinality"], Is.EqualTo("one"));
+                Assert.That((string)fields[1]["type"], Is.EqualTo("relation"));
+                Assert.That((string)fields[1]["target"], Is.EqualTo("Child"));
+                Assert.That((string)fields[1]["cardinality"], Is.EqualTo("many"));
+                foreach (var index in new[] { 2, 3 })
+                {
+                    Assert.That((string)fields[index]["type"], Is.EqualTo("relation"));
+                    Assert.That((string)fields[index]["target"], Is.EqualTo("Child"));
+                    Assert.That((string)fields[index]["cardinality"], Is.EqualTo("many"));
+                }
+            }
+            finally { Directory.Delete(root, true); }
+        }
+
+        [Test]
+        public void ShippedTool_GeneratedCSharpReferencesResolveWithoutSourceUsings()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "playserv-ref-csharp-" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            var dotnet = PlayServSchemaToolRunner.ResolveBundledDotNet(); var tool = ResolveShippedToolPath();
+            try
+            {
+                Assert.That(RunTool(dotnet, tool, $"init --project \"{root}\" --json").ExitCode, Is.Zero);
+                var configPath = Path.Combine(root, "playserv.schema.json");
+                var config = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(configPath));
+                ((Newtonsoft.Json.Linq.JArray)config["targets"]).Add(new Newtonsoft.Json.Linq.JObject
+                    { ["kind"] = "csharp-contracts", ["output"] = "Generated/Contracts.cs" });
+                File.WriteAllText(configPath, config.ToString());
+                Directory.CreateDirectory(Path.Combine(root, "Assets"));
+                File.WriteAllText(Path.Combine(root, "Assets/Refs.cs"),
+                    "using Playserv.Data; [PlayServSchema(\"child\")] public class Child { public string Name; } " +
+                    "[PlayServSchema(\"parent\")] public class Parent { public PlayServRecordRef<Child> Child; public PlayServRecordRef<Child>[] Children; }");
+                var generate = RunTool(dotnet, tool, $"generate --project \"{root}\" --json");
+                Assert.That(generate.ExitCode, Is.Zero, generate.Output + generate.Error);
+                var code = File.ReadAllText(Path.Combine(root, "Generated/Contracts.cs"));
+                StringAssert.Contains("global::Playserv.Data.PlayServRecordRef<", code);
+            }
+            finally { Directory.Delete(root, true); }
+        }
+
+        [Test]
         public void BundledDotNetCandidates_CoverUnity2021ThroughUnity66Layouts()
         {
             var macCandidates = PlayServSchemaToolRunner.BuildBundledDotNetCandidates(
@@ -248,7 +336,7 @@ namespace Playserv.Tests.Editor
         private static ToolProcessResult RunTool(
             string dotnetPath,
             string toolPath,
-            string arguments)
+            string arguments, string serverKey = null)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -261,6 +349,7 @@ namespace Playserv.Tests.Editor
                 RedirectStandardError = true
             };
 
+            if (serverKey != null) startInfo.EnvironmentVariables["PLAYSERV_SERVER_KEY"] = serverKey;
             using (var process = Process.Start(startInfo))
             {
                 Assert.That(process, Is.Not.Null);

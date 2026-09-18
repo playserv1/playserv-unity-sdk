@@ -28,6 +28,8 @@ namespace Playserv.Wrapper
         Task<PlayServPlayerProfileResult> RefreshCurrentPlayerProfileAsync(
             CancellationToken cancellationToken = default);
 
+        Task<PlayServAuthResult> LoginBrowserAsync(string provider, PlayServBrowserLoginOptions options = null, CancellationToken ct = default);
+
         Task<PlayServAuthResult> LoginExternalAsync(
             PlayServExternalIdentityProof proof,
             PlayServExternalLoginMode mode,

@@ -128,6 +128,7 @@ namespace Playserv.Wrapper
 
         public void Config(PlayServSettings settings)
         {
+            _playerAuthCoordinator.InvalidateBrowserLogin();
             _playerAuthCoordinator.StopRefreshLoop();
             _configFacade.Config(settings);
         }
@@ -137,17 +138,22 @@ namespace Playserv.Wrapper
             string gameVersion,
             string sdkVersion = null)
         {
+            _playerAuthCoordinator.InvalidateBrowserLogin();
             _playerAuthCoordinator.StopRefreshLoop();
             _configFacade.Config(clientToken, gameVersion, sdkVersion);
         }
 
         public void SetRuntimeTokenProvider(IPlayServRuntimeTokenProvider tokenProvider)
         {
+            _playerAuthCoordinator.InvalidateBrowserLogin();
             _playerAuthCoordinator.StopRefreshLoop();
             _configFacade.SetRuntimeTokenProvider(tokenProvider);
         }
 
         public Task<bool> Connect() => _connectionOrchestrator.ConnectAsync();
+
+        public Task<PlayServAuthResult> LoginBrowserAsync(string provider, PlayServBrowserLoginOptions options = null, CancellationToken ct = default) =>
+            _playerAuthCoordinator.LoginBrowserAsync(provider, options, ct);
 
         public Task<PlayServAuthResult> LoginExternalAsync(
             Playserv.Identity.PlayServExternalIdentityProof proof,

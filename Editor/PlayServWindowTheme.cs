@@ -24,6 +24,10 @@ namespace Playserv.Editor
         public static GUIStyle MetricCardStyle { get; private set; }
         public static GUIStyle MetricLabelStyle { get; private set; }
         public static GUIStyle MetricValueStyle { get; private set; }
+        public static GUIStyle MetricHeadingStyle { get; private set; }
+        public static GUIStyle MetricVersionStyle { get; private set; }
+        public static GUIStyle MetricStatusStyle { get; private set; }
+        public static GUIStyle MetricActionStyle { get; private set; }
         public static GUIStyle MetricCaptionStyle { get; private set; }
         public static GUIStyle CardStyle { get; private set; }
         public static GUIStyle CardBodyStyle { get; private set; }
@@ -78,6 +82,11 @@ namespace Playserv.Editor
             MetricLabelStyle = CreateLabelStyle(10, FontStyle.Bold, "#8892A0");
             MetricValueStyle = CreateWrappedLabelStyle(13, FontStyle.Bold, "#F3F5F8");
             MetricCaptionStyle = CreateWrappedLabelStyle(10, FontStyle.Normal, "#7D8693");
+            MetricHeadingStyle = new GUIStyle(MetricLabelStyle) { margin = new RectOffset() };
+            MetricVersionStyle = new GUIStyle(MetricValueStyle) { wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.MiddleLeft, fixedHeight = 22f, margin = new RectOffset() };
+            MetricStatusStyle = new GUIStyle(MetricCaptionStyle) { wordWrap = false, clipping = TextClipping.Clip, fixedHeight = 12f, margin = new RectOffset() };
+            MetricActionStyle = new GUIStyle(EditorStyles.miniButton) { padding = new RectOffset(3, 3, 2, 2), margin = new RectOffset(2, 0, 0, 0), alignment = TextAnchor.MiddleCenter };
+
 
             SectionTitleButtonStyle = new GUIStyle(EditorStyles.label)
             {

@@ -15,7 +15,7 @@ The core package is available on [OpenUPM](https://openupm.com/packages/com.play
 Install it from the registry to browse and select published versions in Unity
 Package Manager. No GitHub credentials or SSH key are needed for this method.
 
-This checkout prepares **0.6.2**. The examples below target that version, but do
+This checkout prepares **0.6.3**. The examples below target that version, but do
 not mean it has been published to OpenUPM or GitHub yet. Until the distribution
 tag and OpenUPM build are published, select an already published version or use
 this checkout as a local package. Version preparation does not publish a release.
@@ -30,7 +30,7 @@ this checkout as a local package. Version preparation does not publish a release
 3. Click `Save` / `Apply`.
 4. Open `Window` -> `Package Manager`, choose `+` -> `Add package by name`
    (`Install package by name` in some Unity versions), enter `com.playserv.sdk`
-   and version `0.6.2`, then install. You can also find it under `My Registries`.
+   and version `0.6.3`, then install. You can also find it under `My Registries`.
 
 Alternatively, merge this configuration into the game project's
 `Packages/manifest.json`. Keep existing dependencies and scoped registries; do
@@ -46,7 +46,7 @@ not replace the whole file:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.6.2"
+    "com.playserv.sdk": "0.6.3"
   }
 }
 ```
@@ -55,7 +55,7 @@ not replace the whole file:
 
 Adding the registry alone does not convert an existing Git dependency. After
 adding the registry above, replace the **existing** `com.playserv.sdk` Git URL
-in `Packages/manifest.json` with the version string `"0.6.2"`; do not add a
+in `Packages/manifest.json` with the version string `"0.6.3"`; do not add a
 second entry. A local or embedded copy must also be removed from the resolution
 path before the registry package can be used (back up any local edits first).
 Let Unity resolve packages, then commit `Packages/manifest.json` and
@@ -78,7 +78,7 @@ lock file in version control after the update.
 project stays on its selected version until you choose another. Git-tag installs
 remain pinned to their tag and do not gain registry version selection just
 because OpenUPM is configured. Unity requires an exact version here, not
-`latest`, `^0.6.2`, or `*`.
+`latest`, `^0.6.3`, or `*`.
 
 The scope above covers only the core package. It does not publish or migrate
 the optional companion packages. Until a companion has its own OpenUPM listing,
@@ -90,6 +90,11 @@ See the [OpenUPM setup guide](https://openupm.com/docs/getting-started.html) and
 [Unity's package update guide](https://docs.unity3d.com/6000.0/Documentation/Manual/upm-ui-update.html).
 
 ### Update from the PlayServ window
+
+The small buttons beside the SDK version check for updates, install an available update,
+and open Package Manager. Hover an icon for its action, or the single-line status for
+the complete message. Checking and installing disable the corresponding actions;
+installing still requires confirmation.
 
 The **SDK Version** card checks the configured registry when you open PlayServ,
 at most once every 24 hours per project. **Check for updates** bypasses that
@@ -135,21 +140,21 @@ remove Unity's unsigned-package warning.
 
 ## Install from GitHub (alternative)
 
-This checkout targets SDK `0.6.2`. In Unity, open `Window` ->
+This checkout targets SDK `0.6.3`. In Unity, open `Window` ->
 `Package Manager`, choose `Add package from git URL`, and paste this pinned core
 package URL:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.6.2
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.3
 ```
 
-The Git URLs below require the `0.6.2` distribution tag to be published first;
+The Git URLs below require the `0.6.3` distribution tag to be published first;
 changing the version in the source repository does not publish that tag.
 
 The distribution repository is public. The SSH URLs shown here still require
 GitHub SSH authentication on the operating-system account running Unity; verify
 it with `ssh -T git@github.com`. To clone without SSH credentials, use
-`https://github.com/playserv1/playserv-unity-sdk.git#0.6.2` instead. The same
+`https://github.com/playserv1/playserv-unity-sdk.git#0.6.3` instead. The same
 HTTPS substitution works for companion URLs, retaining `?path=...#<version>`.
 Unity uses the machine's Git credentials; PlayServ does not read or store them.
 
@@ -159,7 +164,7 @@ The same dependency can be added directly to the game project's
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.6.2"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.6.3"
   }
 }
 ```
@@ -199,19 +204,19 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.6.2",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.6.2",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.6.2",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.6.2",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.6.2",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.6.2",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.6.2",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.2",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.6.2",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.6.2",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.6.2",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.6.2",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.6.2"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.6.3",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.6.3",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.6.3",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.6.3",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.6.3",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.6.3",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.6.3",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.3",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.6.3",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.6.3",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.6.3",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.6.3",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.6.3"
   }
 }
 ```
@@ -392,6 +397,10 @@ Projection loads and queries with hidden columns are partial and must call
 For client-side bulk work, `LoadAllAsync` walks cursors up to an explicit
 record limit, while `LoadManyAsync`, `BulkSaveAsync`, and `BulkDeleteAsync` use
 bounded parallel requests and return an ordered result for every item.
+Optional [`PlayServRecordRef<T>`](Documentation~/record-references.md) values add lazy,
+scoped relation loading and expanded previews while writing only IDs. Load children
+explicitly before editing; saving a parent never saves its children.
+
 `DeleteByIdAsync` avoids creating a handle, and `PopulateAsync` /
 `PopulateManyAsync` load relation target IDs through the target record set.
 These operations use existing point and query routes and are not atomic.

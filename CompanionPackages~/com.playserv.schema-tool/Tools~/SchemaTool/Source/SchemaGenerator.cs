@@ -337,6 +337,11 @@ internal static class SchemaGenerator
         string type,
         IReadOnlyDictionary<string, SchemaContract> contractByType)
     {
+        if (TryGetRecordReferenceType(type, out var targetType))
+        {
+            var target = ResolveRecordReferenceTarget(targetType, contractByType);
+            return new JsonObject { ["type"] = "string", ["x-playserv-relation-target"] = target.Name };
+        }
         var simple = type.Split('.').Last();
         switch (simple)
         {
@@ -396,6 +401,25 @@ internal static class SchemaGenerator
         };
     }
 
+    internal static bool TryGetRecordReferenceType(string type, out string targetType)
+    {
+        if (TryGetGeneric(NormalizeType(type), "PlayServRecordRef", out var arguments) && arguments.Count == 1)
+        {
+            targetType = NormalizeType(arguments[0]);
+            return true;
+        }
+        targetType = string.Empty;
+        return false;
+    }
+
+    internal static SchemaContract ResolveRecordReferenceTarget(string type, IReadOnlyDictionary<string, SchemaContract> contracts)
+    {
+        if (!(contracts.TryGetValue(type, out var target) || contracts.TryGetValue(type.Split('.').Last(), out target)) ||
+            target.Kind != "object" || target.Singleton)
+            throw new InvalidOperationException($"PlayServRecordRef<{type}> must target a discovered non-singleton entity contract.");
+        return target;
+    }
+
     private static Dictionary<string, SchemaContract> BuildContractTypeIndex(
         IReadOnlyList<SchemaContract> contracts)
     {
@@ -450,7 +474,7 @@ internal static class SchemaGenerator
     {
         var openIndex = type.IndexOf('<');
         var closeIndex = type.LastIndexOf('>');
-        if (openIndex <= 0 || closeIndex <= openIndex)
+        if (openIndex <= 0 || closeIndex <= openIndex || closeIndex != type.Length - 1)
         {
             arguments = Array.Empty<string>();
             return false;
@@ -500,7 +524,8 @@ internal static class SchemaGenerator
         var type = NormalizeType(rawType);
         foreach (var pair in generatedNames.OrderByDescending(pair => pair.Key.Length))
             type = type.Replace(pair.Key, pair.Value, StringComparison.Ordinal);
-        return type;
+        return System.Text.RegularExpressions.Regex.Replace(type,
+            @"(?<![\w.])(?:Playserv\.Data\.)?PlayServRecordRef\s*<", "global::Playserv.Data.PlayServRecordRef<");
     }
 
     private static string NormalizeType(string type)

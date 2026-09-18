@@ -306,7 +306,7 @@ either switch to the API above or configure `EnablePushedAdmission = false`.
 `EnableUplink = false` retains REST-only hosting. A legacy backend that negotiates
 `Consume` still requires the old admission path; no hidden HTTP fallback is made
 by `TryAdmit`. In negotiated `Push`, legacy consume and new tokenless joins fail
-locally before HTTP or roster mutation. This checkout prepares package version 0.6.2; publication is separate.
+locally before HTTP or roster mutation. This checkout prepares package version 0.6.3; publication is separate.
 Never log reservation tokens, credentials or arbitrary offer parameters.
 
 ## Served room routes and reservation lifetime (PSV-2602)

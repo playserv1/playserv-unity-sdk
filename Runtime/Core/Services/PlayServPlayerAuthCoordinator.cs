@@ -9,7 +9,7 @@ using Playserv.Runtime.Abstractions;
 
 namespace Playserv.Wrapper
 {
-    internal sealed class PlayServPlayerAuthCoordinator : IDisposable
+    internal sealed partial class PlayServPlayerAuthCoordinator : IDisposable
     {
         private static readonly TimeSpan OfflinePollDelay = TimeSpan.FromSeconds(5);
         private static readonly TimeSpan RefreshRetryDelay = TimeSpan.FromSeconds(15);
@@ -268,6 +268,7 @@ namespace Playserv.Wrapper
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
+            InvalidateBrowserLogin();
             if (proof == null)
                 throw new ArgumentNullException(nameof(proof));
             return CoordinateSessionReplacementAsync(
@@ -282,6 +283,7 @@ namespace Playserv.Wrapper
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
+            InvalidateBrowserLogin();
             if (string.IsNullOrWhiteSpace(providerId))
                 throw new ArgumentException("Identity provider ID is required.", nameof(providerId));
 
@@ -382,6 +384,7 @@ namespace Playserv.Wrapper
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
+            InvalidateBrowserLogin();
             if (conflict == null)
                 throw new ArgumentNullException(nameof(conflict));
             if (proof == null)
@@ -399,6 +402,7 @@ namespace Playserv.Wrapper
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
+            InvalidateBrowserLogin();
             if (proof == null)
                 throw new ArgumentNullException(nameof(proof));
 
@@ -648,6 +652,7 @@ namespace Playserv.Wrapper
         public async Task<PlayServAuthResult> LogoutAsync(CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
+            InvalidateBrowserLogin();
             var settings = _getSettings();
             var invalid = ValidateManagedOperation(settings);
             if (invalid != null)
@@ -820,6 +825,7 @@ namespace Playserv.Wrapper
             if (_disposed)
                 return;
 
+            InvalidateBrowserLogin();
             _disposed = true;
             Interlocked.Exchange(ref _ignoreExpectedSessionMergedClose, 0);
             StopRefreshLoop();
@@ -928,6 +934,7 @@ namespace Playserv.Wrapper
             if (!lossGuardAcquired && Interlocked.Exchange(ref _terminalSessionLossStarted, 1) != 0)
                 return;
 
+            InvalidateBrowserLogin();
             StopRefreshLoop();
             if (_session != null)
             {
@@ -1022,6 +1029,7 @@ namespace Playserv.Wrapper
 
         private void ReleaseAutomaticSession(PlayServSettings settings)
         {
+            InvalidateBrowserLogin();
             StopRefreshLoop();
             if (_session == null)
                 return;

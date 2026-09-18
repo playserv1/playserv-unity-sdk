@@ -61,24 +61,41 @@ namespace Playserv.Editor
         private static void DrawSdkVersion(string sdkVersion)
         {
             var updater = PlayServSdkUpdates.Controller;
+            DrawSdkVersionCard(sdkVersion, updater.Message, updater.AvailableVersion, PlayServSdkUpdates.CanStart);
+        }
+
+        internal static void DrawSdkVersionCard(string sdkVersion, string message, string availableVersion, bool canStart)
+        {
             using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.MetricCardStyle, GUILayout.MinHeight(62f)))
             {
-                GUILayout.Label("SDK Version", PlayServWindowTheme.MetricLabelStyle);
-                GUILayout.Label(string.IsNullOrWhiteSpace(sdkVersion) ? "Not configured" : sdkVersion, PlayServWindowTheme.MetricValueStyle);
-                GUILayout.Label(string.IsNullOrEmpty(updater.Message) ? "Installed package" : updater.Message,
-                    PlayServWindowTheme.MetricCaptionStyle);
-                GUILayout.Space(6f);
-                using (new EditorGUI.DisabledScope(!PlayServSdkUpdates.CanStart))
+                GUILayout.Label("SDK Version", PlayServWindowTheme.MetricHeadingStyle);
+                using (new EditorGUILayout.HorizontalScope(GUILayout.Height(22f)))
                 {
-                    if (PlayServWindowChrome.DrawActionButton("Check for updates", PlayServWindowButtonTone.Secondary))
-                        PlayServSdkUpdates.Check();
-                    if (!string.IsNullOrEmpty(updater.AvailableVersion) &&
-                        PlayServWindowChrome.DrawActionButton("Update to " + updater.AvailableVersion, PlayServWindowButtonTone.Primary))
-                        PlayServSdkUpdates.Update();
+                    GUILayout.Label(string.IsNullOrWhiteSpace(sdkVersion) ? "Not configured" : sdkVersion,
+                        PlayServWindowTheme.MetricVersionStyle, GUILayout.MinWidth(0f), GUILayout.ExpandWidth(true));
+                    using (new EditorGUI.DisabledScope(!canStart))
+                    {
+                        if (DrawVersionAction("Refresh", "↻", "Check for updates"))
+                            PlayServSdkUpdates.Check();
+                        if (!string.IsNullOrEmpty(availableVersion) &&
+                            DrawVersionAction("Download-Available", "↓", "Update to " + availableVersion))
+                            PlayServSdkUpdates.Update();
+                    }
+                    if (DrawVersionAction("Package Manager", "▣", "Open Package Manager"))
+                        PlayServSdkUpdates.OpenPackageManager();
                 }
-                if (PlayServWindowChrome.DrawActionButton("Open Package Manager", PlayServWindowButtonTone.Ghost))
-                    PlayServSdkUpdates.OpenPackageManager();
+                var status = string.IsNullOrEmpty(message) ? "Installed package" : message;
+                GUILayout.Label(new GUIContent(status, status), PlayServWindowTheme.MetricStatusStyle,
+                    GUILayout.MinWidth(0f), GUILayout.ExpandWidth(true));
             }
+        }
+
+        private static bool DrawVersionAction(string iconName, string fallback, string tooltip)
+        {
+            var icon = EditorGUIUtility.IconContent(iconName);
+            return GUILayout.Button(new GUIContent(icon != null ? icon.image : null, tooltip)
+                { text = icon != null && icon.image != null ? string.Empty : fallback },
+                PlayServWindowTheme.MetricActionStyle, GUILayout.Width(24f), GUILayout.Height(22f));
         }
 
         private static Texture FindSettingsIcon()

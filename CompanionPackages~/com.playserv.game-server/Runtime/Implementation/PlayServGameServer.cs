@@ -652,13 +652,24 @@ namespace Playserv.GameServer
                 requiresClientToken: false);
         }
 
-        internal static async Task<PlayServRuntimeDataResponse> SendRuntimeDataAsync(
+        internal static Task<PlayServRuntimeDataResponse> SendRuntimeDataAsync(
             PlayServRuntimeDataRequest request,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken) => SendRuntimeDataAsync(request, cancellationToken, null);
+
+        private static async Task<PlayServRuntimeDataResponse> SendRuntimeDataAsync(
+            PlayServRuntimeDataRequest request,
+            CancellationToken cancellationToken,
+            PlayServGameServerContext recordsContext)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
-            var context = GetContext();
+            var context = recordsContext ?? GetContext();
+            Action validateContext = recordsContext == null ? null : () =>
+            {
+                if (!ReferenceEquals(GetContext(), recordsContext))
+                    throw new InvalidOperationException("The Records context belongs to a previous game-server configuration.");
+            };
+            validateContext?.Invoke();
             var timeout = request.TimeoutSeconds.HasValue
                 ? TimeSpan.FromSeconds(request.TimeoutSeconds.Value)
                 : context.HttpTimeout;
@@ -675,7 +686,8 @@ namespace Playserv.GameServer
                         : "runtime data",
                     includeRawDetails: true,
                     cancellationToken,
-                    runtimeRequest: request);
+                    runtimeRequest: request,
+                    validateContext: validateContext);
                 return new PlayServRuntimeDataResponse(
                     response.StatusCode,
                     response.Body,
@@ -924,7 +936,8 @@ namespace Playserv.GameServer
             bool includeRawDetails,
             CancellationToken cancellationToken,
             bool allowNotFound = false,
-            PlayServRuntimeDataRequest runtimeRequest = null)
+            PlayServRuntimeDataRequest runtimeRequest = null,
+            Action validateContext = null)
         {
             EnsureSupportedBuild();
             cancellationToken.ThrowIfCancellationRequested();
@@ -936,6 +949,7 @@ namespace Playserv.GameServer
                 var response = await context.InvokeAsync(() =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    validateContext?.Invoke();
                     return context.Transport.SendAsync(
                     new PlayServGameServerHttpRequest
                     {
@@ -1210,11 +1224,13 @@ namespace Playserv.GameServer
             var context = GetContext();
             return new PlayServRecordsClient(
                 CreateRuntimeSettings(context),
-                new PlayServGameServerRuntimeHttpClient(actingPlayerJwt),
+                new PlayServGameServerRuntimeHttpClient(actingPlayerJwt,
+                    (request, ct) => SendRuntimeDataAsync(request, ct, context)),
                 new NewtonsoftJsonCodec(),
                 requiresClientToken: false,
                 accessSubject: PlayServDataAccessSubject.Server,
-                catalogueCacheScope: context.CatalogueCacheScope);
+                catalogueCacheScope: context.CatalogueCacheScope,
+                isReferenceContextCurrent: () => ReferenceEquals(GetContext(), context));
         }
 
         internal static PlayServGameServerContext GetContextForRealtime() => GetContext();

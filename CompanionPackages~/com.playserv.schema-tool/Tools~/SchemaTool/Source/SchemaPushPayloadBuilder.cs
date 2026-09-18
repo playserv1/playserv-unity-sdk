@@ -94,9 +94,20 @@ internal static class SchemaPushPayloadBuilder
         SchemaMember member,
         IReadOnlyDictionary<string, SchemaContract> byType)
     {
-        var typeName = UnwrapCollection(member.TypeName, out var many);
+        var typeName = UnwrapCollection(TrimNullable(member.TypeName), out var many);
         typeName = TrimNullable(typeName);
         byType.TryGetValue(typeName, out var targetContract);
+        var typedReference = SchemaGenerator.TryGetRecordReferenceType(typeName, out var referenceType);
+        if (typedReference)
+        {
+            targetContract = SchemaGenerator.ResolveRecordReferenceTarget(referenceType, byType);
+            typeName = referenceType;
+            if ((!string.IsNullOrWhiteSpace(member.Target) && member.Target != targetContract.Name) ||
+                (!string.IsNullOrWhiteSpace(member.FieldType) && member.FieldType != "Auto" && member.FieldType != "Relation") ||
+                (!string.IsNullOrWhiteSpace(member.Cardinality) && member.Cardinality != "Auto" &&
+                 member.Cardinality != (many ? "Many" : "One")))
+                throw new InvalidOperationException($"Field '{owner.Name}.{member.Name}' conflicts with its typed record reference.");
+        }
 
         var fieldType = ResolveFieldType(typeName, targetContract, member);
         var target = !string.IsNullOrWhiteSpace(member.Target)

@@ -8,6 +8,9 @@ namespace Playserv.Wrapper
     /// <summary>Player-facing matchmaking operations over the runtime REST API.</summary>
     public static class PlayServMatchmaking
     {
+        public static PlayServRoomSession CreateRoomSession(Func<IPlayServRoomProtocol> protocolFactory, PlayServRoomSessionOptions options = null) =>
+            new PlayServRoomSession(protocolFactory, options);
+
         /// <summary>
         /// Creates an independent, single-attempt game WebSocket. Subscribe before ConnectAsync.
         /// Options are copied now; the existing player session is resolved only when connecting.

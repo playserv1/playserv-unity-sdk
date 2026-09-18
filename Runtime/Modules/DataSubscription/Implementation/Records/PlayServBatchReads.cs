@@ -90,7 +90,7 @@ namespace Playserv.Data
         {
             var fields = ParseSnapshot(record.CanonicalSnapshot);
             return new PlayServRecord<T>(record.OwnerSet, this, record.Id, record.EntityId,
-                _json.Convert<T>(fields), record.CreatedAt, record.UpdatedAt, record.Owner,
+                ConvertRecordValue<T>(fields), record.CreatedAt, record.UpdatedAt, record.Owner,
                 record.ETag, record.CanonicalSnapshot, record.IsPartial);
         }
     }
