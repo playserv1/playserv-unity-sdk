@@ -38,14 +38,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.6.3
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.4
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.3
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.4
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -61,7 +61,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.6.3 is prepared in this checkout**, not asserted to be available in
+Version **0.6.4 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -87,7 +87,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.6.3"
+    "com.playserv.sdk": "0.6.4"
   }
 }
 ```
@@ -96,9 +96,9 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.6.3`).
+- A source release tag uses `unity-<version>` (for example `unity-0.6.4`).
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.6.3`) atomically.
+  the matching plain-SemVer tag (for example `0.6.4`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.

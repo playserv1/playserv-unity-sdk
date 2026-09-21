@@ -6,6 +6,29 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+### Fixed
+
+- Run Platform Functions async HTTP test scenarios through synchronous NUnit entry
+  points, so Unity 2021.3 executes them instead of rejecting their Task return type.
+- Keep archive-test fixtures in the project's Temp directory so macOS's `/var`
+  symlink does not trigger the packager's source-path safety check.
+
+## [0.6.4] - 2026-09-20
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Added
+
+- Add a separate Platform Functions mode to Editor Deployment for C# cloud functions
+  and game servers: local operator credentials, source preview, portable tar.gz upload,
+  terminal-status polling and deployment-status recovery. Existing RPC deployment and
+  game CI remain available.
+
+### Fixed
+
+- Keep Platform Functions exception assertions compatible with Unity 2021.3's
+  NUnit package; wait for asynchronous failures without blocking the Unity context.
+
 ## [0.6.3] - 2026-09-18
 
 Release prepared locally; distribution tags and registry publication are separate.

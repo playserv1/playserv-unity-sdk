@@ -26,6 +26,7 @@ namespace Playserv.Editor
 
         public void Dispose()
         {
+            _presenter.Dispose();
             _controller?.Dispose();
             _controller = null;
         }

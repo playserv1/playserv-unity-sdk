@@ -69,7 +69,7 @@ namespace Playserv.Tests.Editor
 
             var result = RunTool(dotnetPath, toolPath, "version --json");
             Assert.That(result.ExitCode, Is.EqualTo(0), result.Error);
-            StringAssert.Contains("\"version\": \"0.6.3\"", result.Output);
+            StringAssert.Contains("\"version\": \"0.6.4\"", result.Output);
             StringAssert.Contains("\"protocolVersion\": 1", result.Output);
         }
 
@@ -285,10 +285,10 @@ namespace Playserv.Tests.Editor
                 "dotnet");
             CollectionAssert.Contains(
                 macCandidates,
-                "/Applications/Unity/Unity.app/Contents/NetCoreRuntime/dotnet");
+                Path.Combine("/Applications/Unity/Unity.app/Contents", "NetCoreRuntime", "dotnet"));
             CollectionAssert.Contains(
                 macCandidates,
-                "/Applications/Unity/Unity.app/Contents/Resources/Scripting/NetCoreRuntime/dotnet");
+                Path.Combine("/Applications/Unity/Unity.app/Contents", "Resources", "Scripting", "NetCoreRuntime", "dotnet"));
 
             var windowsCandidates = PlayServSchemaToolRunner.BuildBundledDotNetCandidates(
                 @"C:\Unity\Editor\Data",

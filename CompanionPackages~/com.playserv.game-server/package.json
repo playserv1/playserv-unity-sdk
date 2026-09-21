@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.game-server",
   "displayName": "PlayServ Game Server",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "unity": "2021.3",
   "description": "Dedicated-server matchmaking, Records, Cloud Functions, Analytics, Commerce, room lifecycle, reservation admission, and player lookup for PlayServ.",
   "author": {
@@ -13,8 +13,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "com.playserv.sdk": "0.6.3",
-    "com.playserv.analytics": "0.6.3"
+    "com.playserv.sdk": "0.6.4",
+    "com.playserv.analytics": "0.6.4"
   },
   "samples": [
     {

@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "Playserv.Editor.Core",
+        "Playserv.Editor.Deployment",
         "Playserv.Editor.Migration",
         "Playserv.Editor.ModelSync",
         "Playserv.Runtime",

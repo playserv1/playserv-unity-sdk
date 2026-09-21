@@ -4,9 +4,13 @@ using UnityEngine;
 
 namespace Playserv.Editor
 {
-    internal sealed class PlayServDeploymentSectionPresenter
+    internal sealed class PlayServDeploymentSectionPresenter : IDisposable
     {
         private readonly Func<PlayServWindowContext, PlayServDeploymentController> _getController;
+        private readonly PlatformFunctionPanel _platformFunctions = new PlatformFunctionPanel();
+        private int _mode;
+
+        public void Dispose() => _platformFunctions.Dispose();
 
         public PlayServDeploymentSectionPresenter(Func<PlayServWindowContext, PlayServDeploymentController> getController)
         {
@@ -21,10 +25,19 @@ namespace Playserv.Editor
                 ref state.FoldDeployment,
                 "Server Code",
                 "Deployment",
-                "Preview RPC code closure, sync deployed version, and ship the ZIP package to the active deployment endpoint.");
+                "Deploy legacy RPC code or Platform Functions to their respective deployment APIs.");
 
             if (expanded)
             {
+                using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning || _platformFunctions.Running))
+                    _mode = GUILayout.Toolbar(_mode, new[] { "RPC", "Platform Functions" });
+                if (_mode == 1)
+                {
+                    _platformFunctions.Draw(context.Repaint);
+                    PlayServWindowChrome.EndSectionCard(expanded);
+                    EditorPrefs.SetBool(Const.PrefFoldDeployment, state.FoldDeployment);
+                    return;
+                }
                 DrawDeployCredential(state);
                 GUILayout.Space(6f);
 

@@ -38,7 +38,7 @@ namespace Playserv.DebugTerminal.Tests
 
         private static string ReadGuid(string metaPath)
         {
-            var match = Regex.Match(File.ReadAllText(metaPath), "^guid: ([a-f0-9]+)$", RegexOptions.Multiline);
+            var match = Regex.Match(File.ReadAllText(metaPath), "^guid: ([a-f0-9]+)\\r?$", RegexOptions.Multiline);
             Assert.IsTrue(match.Success, metaPath);
             return match.Groups[1].Value;
         }
