@@ -10,7 +10,7 @@ namespace Playserv.Tests.Editor
 {
     public sealed class PlayServReleaseVersionTests
     {
-        private const string ExpectedVersion = "0.6.8";
+        private const string ExpectedVersion = "0.6.9";
 
         [Test]
         public void CoreAndEveryCompanion_ReportReleaseVersion()

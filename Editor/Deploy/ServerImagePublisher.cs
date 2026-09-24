@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
@@ -97,9 +98,14 @@ namespace Playserv.Editor
             ValidateRegistry(registry, repository);
             if ((string)listing["registry"] != registry || (string)listing["repository"] != repository)
                 throw new InvalidOperationException("The registry target changed. Reconnect and review the project.");
-            if ((string)credentials["username"] != "oauth2accesstoken" || string.IsNullOrEmpty((string)credentials["secret"]) ||
-                !DateTimeOffset.TryParse((string)credentials["expires_at"], out var expires) || expires <= DateTimeOffset.UtcNow)
-                throw new InvalidOperationException("The registry credential is invalid or expired.");
+            if (credentials["username"]?.Type != JTokenType.String || (string)credentials["username"] != "oauth2accesstoken" || string.IsNullOrEmpty((string)credentials["secret"]))
+                throw new InvalidOperationException("The platform returned invalid registry credentials.");
+            var expiration = credentials["expires_at"];
+            if (expiration?.Type != JTokenType.String || !DateTimeOffset.TryParse((string)expiration, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var expires))
+                throw new InvalidOperationException("The platform returned registry credentials with an invalid expiration time.");
+            if (expires <= DateTimeOffset.UtcNow)
+                throw new InvalidOperationException("The registry credential has expired. Publish again to request a fresh credential.");
             var reference = registry + "/" + repository + "/" + server + ":" + tag;
             var config = Path.Combine(Path.GetTempPath(), "playserv-docker-" + Guid.NewGuid().ToString("N"));
             try

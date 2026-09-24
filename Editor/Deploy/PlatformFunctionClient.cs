@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -160,7 +161,18 @@ namespace Playserv.Editor
             return Parse(body);
         }
         private static JObject Parse(string body)
-        { try { return JObject.Parse(body); } catch (JsonException) { throw new InvalidOperationException("Platform API returned an invalid JSON response."); } }
+        {
+            try
+            {
+                using (var reader = new JsonTextReader(new StringReader(body)) { DateParseHandling = DateParseHandling.None })
+                {
+                    var json = JObject.Load(reader);
+                    while (reader.Read()) { }
+                    return json;
+                }
+            }
+            catch (JsonException) { throw new InvalidOperationException("Platform API returned an invalid JSON response."); }
+        }
         private static string Required(JObject json, string key)
         {
             var token = json[key];

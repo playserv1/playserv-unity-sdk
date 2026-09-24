@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -27,6 +28,8 @@ namespace Playserv.Editor.Tests
             internal bool Published, LostCredentials;
             internal int ReadThrottles;
             internal string Registry = "registry.example", Repository = "project/repo";
+            internal JToken CredentialExpiry = DateTime.UtcNow.AddHours(1).ToString("O", CultureInfo.InvariantCulture);
+            internal string CredentialUsername = "oauth2accesstoken", CredentialSecret = "registry-secret";
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage r, CancellationToken ct)
             {
                 ct.ThrowIfCancellationRequested(); Paths.Add(r.RequestUri.AbsolutePath);
@@ -36,7 +39,9 @@ namespace Playserv.Editor.Tests
                 else if (r.RequestUri.AbsolutePath.EndsWith(":credentials"))
                 {
                     if (LostCredentials) throw new HttpRequestException("lost credentials response");
-                    body = new JObject { ["registry"] = Registry, ["repository"] = Repository, ["username"] = "oauth2accesstoken", ["secret"] = "registry-secret", ["expires_at"] = DateTimeOffset.UtcNow.AddHours(1).ToString("O") }.ToString();
+                    var credentials = new JObject { ["registry"] = Registry, ["repository"] = Repository, ["username"] = CredentialUsername, ["secret"] = CredentialSecret };
+                    if (CredentialExpiry != null) credentials["expires_at"] = CredentialExpiry;
+                    body = credentials.ToString();
                 }
                 else
                 {
@@ -71,6 +76,76 @@ namespace Playserv.Editor.Tests
             }
         }
         private static PlatformFunctionClient Api(Http h) => new PlatformFunctionClient("https://platform.example", "sk_key", new HttpClient(h));
+        [Test]
+        public void FreshCredentialsPublishRegardlessOfCultureAndUtcOffset(
+            [Values("en-US", "uk-UA", "ru-RU")] string culture,
+            [Values("Z", "+00:00", "+03:00", "-05:00")] string offset,
+            [Values(false, true)] bool fractionalSeconds) => Run(async () =>
+        {
+            var previousCulture = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = new CultureInfo(culture);
+                var minutes = offset == "+03:00" ? 180 : offset == "-05:00" ? -300 : 0;
+                var expiry = DateTimeOffset.UtcNow.AddHours(1).ToOffset(TimeSpan.FromMinutes(minutes));
+                var timestamp = expiry.ToString(fractionalSeconds ? "yyyy-MM-dd'T'HH:mm:ss.fffffff" : "yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture) + offset;
+                var h = new Http { CredentialExpiry = timestamp };
+                var docker = new Docker { Pushing = () => h.Published = true };
+                using (var api = Api(h))
+                {
+                    await api.ConnectAsync(default);
+                    var publisher = new ServerImagePublisher(api, docker);
+                    await publisher.PublishAsync(new BuiltServerImage(Id, _folder, "Dockerfile"), "tank-room", "reviewed", default);
+                    Assert.That(publisher.LastPublication.Digest, Is.EqualTo(Digest));
+                    Assert.That(docker.Calls.Count(args => args[0] == "push"), Is.EqualTo(1));
+                    Assert.That(h.Paths.Count(path => path.EndsWith(":credentials")), Is.EqualTo(1));
+                    Assert.That(Directory.Exists(docker.Config), Is.False);
+                }
+            }
+            finally { CultureInfo.CurrentCulture = previousCulture; }
+        });
+
+        [TestCase("expired")]
+        [TestCase("expires-now")]
+        [TestCase("missing")]
+        [TestCase("null")]
+        [TestCase("malformed")]
+        [TestCase("object")]
+        [TestCase("number")]
+        [TestCase("username")]
+        [TestCase("secret")]
+        public void InvalidCredentialsAreRejectedBeforeDockerAuthenticationWithoutLeakingSecrets(string scenario) => Run(async () =>
+        {
+            var h = new Http();
+            switch (scenario)
+            {
+                case "expired": h.CredentialExpiry = DateTimeOffset.UtcNow.AddHours(-1).ToOffset(TimeSpan.FromHours(3)).ToString("O", CultureInfo.InvariantCulture); break;
+                case "expires-now": h.CredentialExpiry = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture); break;
+                case "missing": h.CredentialExpiry = null; break;
+                case "null": h.CredentialExpiry = JValue.CreateNull(); break;
+                case "malformed": h.CredentialExpiry = "registry-secret"; break;
+                case "object": h.CredentialExpiry = new JObject { ["secret"] = "registry-secret" }; break;
+                case "number": h.CredentialExpiry = 123; break;
+                case "username": h.CredentialUsername = "registry-secret"; break;
+                case "secret": h.CredentialSecret = ""; break;
+            }
+            var docker = new Docker();
+            using (var api = Api(h))
+            {
+                await api.ConnectAsync(default);
+                var publisher = new ServerImagePublisher(api, docker);
+                var error = Assert.Throws<InvalidOperationException>(() => Run(() => publisher.PublishAsync(new BuiltServerImage(Id, _folder, "Dockerfile"), "tank-room", "reviewed", default)));
+                if (scenario == "expired" || scenario == "expires-now") Assert.That(error.Message, Does.Contain("has expired"));
+                else if (scenario == "username") Assert.That(error.Message, Does.Contain("invalid registry credentials"));
+                else if (scenario != "secret") Assert.That(error.Message, Does.Contain("invalid expiration time"));
+                Assert.That(error.Message, Does.Not.Contain("registry-secret"));
+                Assert.That(error.Message, Does.Not.Contain("operator-secret"));
+                Assert.That(docker.Calls.Any(args => args[0] == "login" || args[0] == "tag" || args[0] == "push"), Is.False);
+                Assert.That(publisher.LastPublication, Is.Null);
+                Assert.That(h.Paths.Count(path => path.EndsWith(":credentials")), Is.EqualTo(1));
+            }
+        });
+
         [Test] public void BuildPinsImageAndPublishesOnlyAfterArchitectureAndManifestVerification() => Run(async () =>
         {
             var h = new Http(); var docker = new Docker { Pushing = () => h.Published = true };

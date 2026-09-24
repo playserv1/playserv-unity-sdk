@@ -6,6 +6,18 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-09-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Fixed
+
+- Preserve the UTC or explicit offset of server-image credential expiration dates.
+  Fresh credentials are no longer rejected because of the Editor's local time zone
+  or regional date format, including Ukrainian and Russian locales.
+- Distinguish malformed registry credentials from expired credentials before
+  Docker login or push, without exposing secrets in error messages.
+
 ## [0.6.8] - 2026-09-24
 
 Release prepared locally; distribution tags and registry publication are separate.

@@ -67,6 +67,13 @@ are removed from child processes and known secrets are redacted from the bounded
 Editor log. No credential is added to Unity assets or player builds. Docker may
 retain ordinary build cache and local image tags.
 
+Credential expiration preserves the API's UTC or explicit time-zone offset and
+is checked against UTC, independently of the Editor's regional date format.
+Malformed expiration data and expired credentials are reported separately before
+Docker login or push. If the credential has expired, **Publish image** requests a
+fresh one for the already built image; rebuilding is unnecessary. An uncertain
+push still requires **Check publication**, not another publication attempt.
+
 Budgets are 30 seconds per HTTP request, 30 minutes each for build and push, and
 60 seconds for publication verification. Polling respects `Retry-After`.
 Creation is never automatically retried. On a conflict the server list is refreshed;
