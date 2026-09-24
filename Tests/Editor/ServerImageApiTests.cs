@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using Newtonsoft.Json.Linq;
 
 namespace Playserv.Editor.Tests
 {
@@ -22,6 +23,69 @@ namespace Playserv.Editor.Tests
         private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) => new HttpResponseMessage(status) { Content = new StringContent(json) };
         private static PlatformFunctionClient Client(Handler h) => new PlatformFunctionClient("https://platform.example", "sk_secret", new HttpClient(h));
         private static void Run(Func<Task> action) => Task.Run(action).GetAwaiter().GetResult();
+        private static Task<string> Create(PlatformFunctionClient client, string name = "Tank Room", string slug = "tank-room", CancellationToken ct = default)
+            => client.CreateGameServerAsync(name, slug, ct);
+        [Test] public void CreateRefreshesScopeAndDeclaresDotnetMultiRoomWithoutDeploying() => Run(async () =>
+        {
+            var h = new Handler(); h.Add(Auth); h.Add(Auth);
+            h.Replies.Enqueue(r =>
+            {
+                Scope(r); Assert.That(r.Method, Is.EqualTo(HttpMethod.Post));
+                Assert.That(r.RequestUri.AbsolutePath, Is.EqualTo("/api/v1/functions"));
+                Assert.That(r.Content.Headers.ContentType.MediaType, Is.EqualTo("application/json"));
+                Assert.That(JToken.DeepEquals(JObject.Parse(r.Content.ReadAsStringAsync().Result),
+                    JObject.Parse("{\"name\":\"Tank Room\",\"slug\":\"tank-room\",\"kind\":\"game_server\",\"runtime\":\"dotnet10\",\"hosting_mode\":\"multi-room\"}")), Is.True);
+                return Json("{\"slug\":\"tank-room\",\"kind\":\"game_server\"}");
+            });
+            using (var c = Client(h)) { await c.ConnectAsync(default); Assert.That(await Create(c), Is.EqualTo("tank-room")); }
+            Assert.That(h.Calls, Is.EqualTo(3));
+        });
+        [TestCase("project_slug", "tanks", "other")]
+        [TestCase("env", "dev", "prod")]
+        public void CreateCannotMoveToAnotherScope(string field, string before, string after) => Run(async () =>
+        {
+            var h = new Handler(); h.Add(Auth); h.Add(Auth.Replace("\"" + field + "\":\"" + before + "\"", "\"" + field + "\":\"" + after + "\""));
+            using (var c = Client(h)) { await c.ConnectAsync(default); Assert.Throws<InvalidOperationException>(() => Run(() => Create(c))); }
+            Assert.That(h.Calls, Is.EqualTo(2));
+        });
+        [TestCase(401)] [TestCase(403)] [TestCase(409)] [TestCase(422)]
+        public void CreateRefusalIsNotRetried(int status) => Run(async () =>
+        {
+            var h = new Handler(); h.Add(Auth); h.Add(Auth); h.Add("{\"detail\":\"refused\"}", (HttpStatusCode)status);
+            using (var c = Client(h))
+            {
+                await c.ConnectAsync(default);
+                var error = Assert.Throws<ServerImageRequestException>(() => Run(() => Create(c)));
+                Assert.That(error.Status, Is.EqualTo(status));
+            }
+            Assert.That(h.Calls, Is.EqualTo(3));
+        });
+        [Test] public void LostCreateResponseIsNotRetried() => Run(async () =>
+        {
+            var h = new Handler(); h.Add(Auth); h.Add(Auth);
+            h.Replies.Enqueue(_ => throw new HttpRequestException("lost response"));
+            using (var c = Client(h)) { await c.ConnectAsync(default); Assert.Throws<HttpRequestException>(() => Run(() => Create(c))); }
+            Assert.That(h.Calls, Is.EqualTo(3));
+        });
+        [TestCase("", "tank-room")] [TestCase("Tank", "")] [TestCase("Tank", "bad/slug")]
+        [TestCase("Tank", "tank-")]
+        public void InvalidDeclarationDoesNotSendRequests(string name, string slug) => Run(async () =>
+        {
+            var h = new Handler(); h.Add(Auth); h.Add(Auth); h.Add(new JObject { ["slug"] = slug, ["kind"] = "game_server" }.ToString());
+            using (var c = Client(h)) { await c.ConnectAsync(default); Assert.Throws<InvalidOperationException>(() => Run(() => Create(c, name, slug))); }
+            Assert.That(h.Calls, Is.EqualTo(1));
+        });
+        [Test] public void CancelledCreateDoesNotPost() => Run(async () =>
+        {
+            var h = new Handler(); h.Add(Auth);
+            using (var c = Client(h))
+            using (var ct = new CancellationTokenSource())
+            {
+                await c.ConnectAsync(default); ct.Cancel();
+                Assert.Catch<OperationCanceledException>(() => Run(() => Create(c, ct: ct.Token)));
+            }
+            Assert.That(h.Calls, Is.EqualTo(1));
+        });
         private static void Scope(HttpRequestMessage r)
         {
             Assert.That(r.Headers.Authorization.Parameter, Is.EqualTo("operator-secret"));

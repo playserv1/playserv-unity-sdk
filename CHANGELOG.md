@@ -6,6 +6,26 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-09-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Added
+
+- Register a C# multi-room game server directly from Deployment → Server Images,
+  then refresh and select it for image building. Registration preserves the
+  connected project/environment and never starts a machine or changes a pool.
+- Handle conflicting slugs, cancellation and uncertain creation responses without
+  automatically repeating the write. Keep the registration form stable across
+  IMGUI Layout/Repaint passes.
+
+### Changed
+
+- Show Server Token as visible text below Client Token in Settings and Inspector.
+  Edits save locally immediately; emptying the field clears the token. Remove the
+  Save locally and Clear buttons. Process-provided tokens remain read-only, and
+  server tokens remain excluded from assets and player builds.
+
 ## [0.6.7] - 2026-09-24
 
 Release prepared locally; distribution tags and registry publication are separate.

@@ -15,6 +15,20 @@ namespace Playserv.Editor.Tests
 {
     public class DeploymentLayoutTests
     {
+        [UnityTest] public IEnumerator RegistrationFormAndRefreshedListStayStableBetweenLayoutAndRepaint()
+        {
+            using (var panel = new ServerImagePanel())
+            {
+                yield return DrawTransition(panel.Draw, () =>
+                {
+                    Set(panel, "_showCreateServer", true);
+                    Set(panel, "_session", new PlatformFunctionSession { Project = "tanks", Environment = "dev" });
+                });
+                yield return DrawTransition(panel.Draw, () =>
+                    Get<ServerImageDraft>(panel, "_draft").CompleteConnection(new[] { "tank-room" }));
+                yield return DrawTransition(panel.Draw, () => Set(panel, "_showCreateServer", false));
+            }
+        }
         [UnityTest] public IEnumerator FirstDockerLogBetweenLayoutAndRepaintDoesNotBreakDrawing()
         {
             using (var panel = new ServerImagePanel())

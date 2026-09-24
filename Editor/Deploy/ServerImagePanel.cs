@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -31,6 +32,8 @@ namespace Playserv.Editor
         private Vector2 _scroll;
         private Action _repaint;
         private LayoutState _layout;
+        private bool _showCreateServer;
+        private string _serverName = "", _serverSlug = "";
         internal bool Running => _operation.Running;
 
         internal ServerImagePanel()
@@ -52,11 +55,31 @@ namespace Playserv.Editor
                     if (GUILayout.Button("Connect / refresh servers") && CanAct(view) && _target.CanConnect) Start("Connecting…", ConnectAsync);
                 if (!view.Target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
                 if (view.SessionText != null) EditorGUILayout.HelpBox(view.SessionText, MessageType.Info);
-                using (new EditorGUI.DisabledScope(!view.ServersReady))
+                using (new EditorGUI.DisabledScope(!view.ServersReady || view.Publisher == null))
+                using (new EditorGUILayout.HorizontalScope())
                 {
                     var index = EditorGUILayout.Popup("Game server", view.ServerIndex, view.ServerChoices);
                     if (index != view.ServerIndex && CanAct(view, true))
                     { _draft.SelectServer(index); ServerImageEditorStore.Server = _draft.Server; InvalidateBuild(); }
+                    if (GUILayout.Button("Create game server", GUILayout.Width(140)) && CanAct(view, true))
+                        _showCreateServer = true;
+                }
+                if (view.ShowCreateServer)
+                {
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    using (new EditorGUI.DisabledScope(view.Publisher == null))
+                    {
+                        EditorGUILayout.LabelField("Register in " + view.RegistrationScope, EditorStyles.wordWrappedMiniLabel);
+                        _serverName = EditorGUILayout.TextField("Name", _serverName);
+                        _serverSlug = EditorGUILayout.TextField(new GUIContent("Slug", "3–50 lowercase letters, digits or single hyphens; start with a letter and end with a letter or digit."), _serverSlug);
+                        EditorGUILayout.LabelField("Registers a C# multi-room server. No image is published and no machine is started.", EditorStyles.wordWrappedMiniLabel);
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(_serverName) || string.IsNullOrWhiteSpace(_serverSlug)))
+                                if (GUILayout.Button("Create") && CanAct(view, true) && _showCreateServer) Start("Creating game server…", CreateServerAsync);
+                            if (GUILayout.Button("Cancel") && CanAct(view, true)) _showCreateServer = false;
+                        }
+                    }
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -97,7 +120,7 @@ namespace Playserv.Editor
                         });
                 }
             }
-            if (view.Running && GUILayout.Button("Cancel") && Running && !_operation.Cancelled && view.Target.Equals(_target)) { _operation.Cancel(); _status = "Cancelled locally. A started push may have reached the registry; use Check publication."; }
+            if (view.Running && GUILayout.Button("Cancel") && Running && !_operation.Cancelled && view.Target.Equals(_target)) { _operation.Cancel(); _status = "Cancelled locally. A started creation or push may have completed; refresh servers or use Check publication."; }
             EditorGUILayout.HelpBox(view.Status, MessageType.Info);
             EditorGUILayout.LabelField("Publishing an image does not change a pool or start a game server.", EditorStyles.wordWrappedMiniLabel);
             if (view.Lines.Length > 0)
@@ -123,8 +146,8 @@ namespace Playserv.Editor
             internal readonly ServerImagePublisher Publisher;
             internal readonly BuiltServerImage Built;
             internal readonly ServerImagePublication Last;
-            internal readonly bool Running, ServersReady;
-            internal readonly string SessionText, BuildText, LastText, Status;
+            internal readonly bool Running, ServersReady, ShowCreateServer;
+            internal readonly string SessionText, BuildText, LastText, Status, RegistrationScope;
             internal readonly string[] Lines, ServerChoices;
             internal readonly int ServerIndex;
 
@@ -132,6 +155,8 @@ namespace Playserv.Editor
             {
                 Target = panel._target; Publisher = panel._publisher; Built = panel._built; Last = panel._last;
                 Running = panel.Running; Status = panel._status;
+                ShowCreateServer = panel._showCreateServer;
+                RegistrationScope = panel._session == null ? "" : panel._session.Project + " / " + panel._session.Environment;
                 var servers = panel._draft.Servers ?? Array.Empty<string>();
                 ServersReady = panel._draft.Servers != null;
                 ServerChoices = new[] { "Select game server…" }.Concat(servers).ToArray();
@@ -177,7 +202,41 @@ namespace Playserv.Editor
             {
                 _session = session; _draft.CompleteConnection(servers); ServerImageEditorStore.Server = _draft.Server;
                 _publisher = new ServerImagePublisher(client, new ServerImageProcess(client.Redact, AddLog));
-                _status = servers.Length == 0 ? "No game_server is registered in this project/environment. Register it in PlayServ first." : "Connected. Select the server, build context and version tag.";
+                _status = servers.Length == 0 ? "No game_server is registered in this project/environment. Use Create game server to register one." : "Connected. Select the server, build context and version tag.";
+            };
+        }
+        private async Task<Action> CreateServerAsync(CancellationToken ct)
+        {
+            var client = _connection.Client;
+            var name = _serverName; var slug = _serverSlug.Trim();
+            var conflict = false;
+            try { slug = await client.CreateGameServerAsync(name, slug, ct); }
+            catch (ServerImageRequestException error) when (error.Status == 409) { conflict = true; }
+            catch (HttpRequestException error)
+            { throw new InvalidOperationException("Creation could not be confirmed. Use Connect / refresh servers before trying again.", error); }
+            catch (OperationCanceledException error) when (!ct.IsCancellationRequested)
+            { throw new TimeoutException("Creation timed out and may have completed. Use Connect / refresh servers before trying again.", error); }
+
+            string[] servers;
+            try { servers = await client.ListGameServersAsync(ct); }
+            catch (Exception error) when (!ct.IsCancellationRequested)
+            {
+                var detail = client.Redact(error.Message);
+                return () =>
+                {
+                    _showCreateServer = conflict; InvalidateBuild();
+                    _status = (conflict ? "This slug already exists." : "Game server " + slug + " was created.") +
+                        " Could not refresh the list. Use Connect / refresh servers. " + detail;
+                };
+            }
+            return () =>
+            {
+                InvalidateBuild();
+                if (!conflict) _draft.Server = slug;
+                _draft.CompleteConnection(servers); ServerImageEditorStore.Server = _draft.Server;
+                _showCreateServer = conflict;
+                _status = conflict ? "This slug already exists. The list was refreshed; select it or choose another slug. No existing server was changed." :
+                    (_draft.Server == slug ? "Game server created and selected. Choose the build context and image tag." : "Game server created but not yet listed. Use Connect / refresh servers; do not create it again.");
             };
         }
         private async Task<Action> BuildAsync(CancellationToken ct)
@@ -212,6 +271,7 @@ namespace Playserv.Editor
             {
                 _target = target; _draft.Api = target.Api; _draft.Key = target.Key;
                 _operation.Cancel(); _connection.Dispose(); _session = null; _publisher = null; _built = null; _draft.BeginConnection();
+                _showCreateServer = false; _serverName = ""; _serverSlug = "";
                 _status = "Deployment settings changed. Connect and review the target.";
             }
             if (Running) _repaint?.Invoke();

@@ -21,13 +21,21 @@ Open **Tools → PlayServ → Settings → Deployment → Server Images**. This 
 workflow builds an existing server Dockerfile and publishes an image using the
 current server-image REST contract. Studios need no checkout of the platform repository.
 
-1. In **PlayServ Config**, select Dev or Prod, set **Dashboard Address** and save
+1. In **PlayServ Config**, select Dev or Prod, set **Dashboard Address** and enter
    **Server Token (Dev/Prod)** beneath Client Token. Then **Connect / refresh
    servers**. Both Server Images and Platform Functions use these same settings.
    The operator session comes from `POST /api/v1/auth/cli`; review its project and
    environment. A token for a different selected environment is rejected.
-2. Select an existing **game_server**. All pages of the server listing are loaded.
-   Registration happens in PlayServ; this tool does not create a server or pool.
+2. Select an existing **game_server**, or click **Create game server** and enter
+   its display **Name** and **Slug**. Slugs have 3–50 lowercase letters, digits
+   or single hyphens, starting with a letter and ending with a letter or digit
+   so the slug also works as an image repository name. Review the project/environment,
+   then **Create**. The Editor refreshes the operator session and requires the
+   same scope before `POST /api/v1/functions` with `kind=game_server`,
+   `runtime=dotnet10`, `hosting_mode=multi-room` (the C# CLI declaration defaults).
+   This only registers the server; it does not deploy code or start a machine.
+   All pages of the listing are loaded; the created server is selected and any
+   previously prepared image is invalidated. An existing slug is never modified.
 3. Choose the **build context** folder and a **Dockerfile inside it**. Keep the
    server in your game's repository, outside Unity `Assets`, with its own SDK
    dependencies and `.dockerignore`. The Dockerfile is responsible for compiling
@@ -61,6 +69,10 @@ retain ordinary build cache and local image tags.
 
 Budgets are 30 seconds per HTTP request, 30 minutes each for build and push, and
 60 seconds for publication verification. Polling respects `Retry-After`.
+Creation is never automatically retried. On a conflict the server list is refreshed;
+on a timeout or lost response, use **Connect / refresh servers** before trying again.
+If creation succeeded but listing failed, refresh the list instead of creating again.
+Cancelling creation locally cannot delete a registration already accepted by PlayServ.
 **Cancel**, window disposal and domain reload stop local work, including Docker
 child processes. They cannot undo a push already accepted by the registry.
 A push is never automatically repeated after a lost response. **Check publication**
@@ -95,9 +107,11 @@ selected initially. The **RPC** mode retains the ZIP, analyzer and version-sync 
    `https://dashboard.dev.playserv.com`; Prod to `https://dashboard.playserv.com`.
    Known old `.io` dashboard defaults migrate automatically; custom URLs are preserved.
    The legacy RPC endpoint and its Deploy Token remain independent.
-2. Save **Server Token (Dev/Prod)** below Client Token, in Settings or the Config
-   Inspector. Local Editor preferences isolate it by Unity project, config GUID
-   and environment. `PLAYSERV_API_KEY` has read-only precedence and is never copied
+2. Enter **Server Token (Dev/Prod)** below Client Token, in Settings or the Config
+   Inspector. Like Client Token it is visible text, with automatic local saving
+   on edit; empty the field to clear it. There are no Save/Clear buttons.
+   Local Editor preferences isolate it by Unity project, config GUID
+   and environment. `PLAYSERV_API_KEY` is shown read-only, takes precedence and is never copied
    into local storage. Server tokens are never serialized into assets or player builds.
    Editor preferences are local storage, not an encrypted secret vault.
 3. Connect to resolve the **project** and **environment** from `/api/v1/auth/cli`.

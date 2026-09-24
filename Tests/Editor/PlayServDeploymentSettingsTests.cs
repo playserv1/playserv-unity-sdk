@@ -162,6 +162,78 @@ namespace Playserv.Editor.Tests
             }
             finally { window.Close(); UnityEngine.Object.DestroyImmediate(window); }
         }
+
+        [UnityTest] public IEnumerator ServerTokenEditsSaveImmediatelyAndEmptyTextClearsTheLocalKey()
+        {
+            var field = new PlayServServerTokenField();
+            var window = ScriptableObject.CreateInstance<DeploymentLayoutTestWindow>();
+            var clipboard = EditorGUIUtility.systemCopyBuffer;
+            try
+            {
+                PlayServDeploymentSettings.SetLocal(_first, "Dev", "sk_visible_fixture");
+                window.DrawPanel = _ => field.Draw(_first);
+                window.ShowUtility(); window.position = new Rect(150, 100, 600, 200); window.Focus();
+                for (var i = 0; i < 30 && window.Repaints == 0; i++) { window.Repaint(); yield return null; }
+                Assert.That(window.Repaints, Is.GreaterThan(0));
+                var point = new Vector2(300, 10);
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 0 });
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = point, button = 0 });
+                window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "SelectAll" });
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.X, character = 'x' });
+                Assert.That(PlayServDeploymentSettings.GetLocal(_first, "Dev"), Is.EqualTo("x"), "Typing must save without a Save button.");
+                window.Repaint(); yield return null;
+                window.Focus();
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 0 });
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = point, button = 0 });
+                window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "SelectAll" });
+                window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "Cut" });
+                Assert.That(PlayServDeploymentSettings.GetLocal(_first, "Dev"), Is.Empty);
+                Assert.That(EditorPrefs.HasKey(PlayServDeploymentSettings.PreferenceKey(_first, "Dev")), Is.False);
+            }
+            finally { EditorGUIUtility.systemCopyBuffer = clipboard; window.DrawPanel = null; window.Close(); UnityEngine.Object.DestroyImmediate(window); }
+        }
+
+        [UnityTest] public IEnumerator ServerTokenIsVisibleAndSelectableLikeClientToken()
+        {
+            var field = new PlayServServerTokenField();
+            var window = ScriptableObject.CreateInstance<DeploymentLayoutTestWindow>();
+            var clipboard = EditorGUIUtility.systemCopyBuffer;
+            try
+            {
+                PlayServDeploymentSettings.SetLocal(_first, "Dev", "sk_visible_fixture");
+                window.DrawPanel = _ => field.Draw(_first);
+                window.ShowUtility(); window.position = new Rect(150, 100, 600, 200); window.Focus();
+                for (var i = 0; i < 30 && window.Repaints == 0; i++) { window.Repaint(); yield return null; }
+                var point = new Vector2(300, 10);
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 0 });
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = point, button = 0 });
+                EditorGUIUtility.systemCopyBuffer = "unchanged";
+                window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "SelectAll" });
+                window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "Copy" });
+                Assert.That(EditorGUIUtility.systemCopyBuffer, Is.EqualTo("sk_visible_fixture"));
+            }
+            finally { EditorGUIUtility.systemCopyBuffer = clipboard; window.DrawPanel = null; window.Close(); UnityEngine.Object.DestroyImmediate(window); }
+        }
+
+        [UnityTest] public IEnumerator ProcessServerTokenCannotBeEditedOrCopiedIntoLocalStorage()
+        {
+            var field = new PlayServServerTokenField();
+            var window = ScriptableObject.CreateInstance<DeploymentLayoutTestWindow>();
+            try
+            {
+                PlayServDeploymentSettings.SetLocal(_first, "Dev", "sk_local_fixture");
+                System.Environment.SetEnvironmentVariable("PLAYSERV_API_KEY", "sk_process_fixture");
+                window.DrawPanel = _ => field.Draw(_first);
+                window.ShowUtility(); window.position = new Rect(150, 100, 600, 200); window.Focus();
+                for (var i = 0; i < 30 && window.Repaints == 0; i++) { window.Repaint(); yield return null; }
+                window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = new Vector2(300, 10), button = 0 });
+                window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = new Vector2(300, 10), button = 0 });
+                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.X, character = 'x' });
+                Assert.That(DeploymentTarget.Read(_first).Key, Is.EqualTo("sk_process_fixture"));
+                Assert.That(PlayServDeploymentSettings.GetLocal(_first, "Dev"), Is.EqualTo("sk_local_fixture"));
+            }
+            finally { window.DrawPanel = null; window.Close(); UnityEngine.Object.DestroyImmediate(window); }
+        }
     }
 
     internal sealed class DeploymentTokenTestWindow : EditorWindow

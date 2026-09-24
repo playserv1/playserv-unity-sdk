@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.sdk",
   "displayName": "PlayServ SDK",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "unity": "2021.3",
   "description": "PlayServ multiplayer SDK for Unity (runtime, editor tooling, and samples).",
   "author": {

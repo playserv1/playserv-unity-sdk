@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.debug-terminal",
   "displayName": "PlayServ Debug Terminal",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "unity": "2021.3",
   "description": "Optional in-game debug terminal and authenticated connection sample for the PlayServ Unity SDK.",
   "author": {
@@ -13,9 +13,9 @@
   },
   "license": "MIT",
   "dependencies": {
-    "com.playserv.sdk": "0.6.7",
-    "com.playserv.analytics": "0.6.7",
-    "com.playserv.game-server": "0.6.7"
+    "com.playserv.sdk": "0.6.8",
+    "com.playserv.analytics": "0.6.8",
+    "com.playserv.game-server": "0.6.8"
   },
   "samples": [
     {
