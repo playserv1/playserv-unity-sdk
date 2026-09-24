@@ -9,6 +9,55 @@ namespace Playserv.Editor.Tests
     public class ServerImageProcessTests
     {
         private static void Run(Func<Task> action) => Task.Run(action).GetAwaiter().GetResult();
+        [Test, Explicit("Requires Docker Desktop and access to a public base image.")]
+        public void MinimalUnityPathCanResolveBaseImageCredentials() => Run(async () =>
+        {
+            if (UnityEngine.Application.platform != UnityEngine.RuntimePlatform.OSXEditor) Assert.Ignore("Docker Desktop macOS fixture.");
+            var previous = Environment.GetEnvironmentVariable("PATH");
+            var config = Path.Combine(Path.GetTempPath(), "psv-docker-helper-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(config);
+            File.WriteAllText(Path.Combine(config, "config.json"), "{\"credsStore\":\"desktop\",\"cliPluginsExtraDirs\":[\"/Applications/Docker.app/Contents/Resources/cli-plugins\"]}");
+            try
+            {
+                Environment.SetEnvironmentVariable("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+                var runner = new ServerImageProcess(s => s);
+                var result = await runner.RunAsync(new[] { "build", "--call=outline", "--progress=plain", "-" }, null,
+                    new Dictionary<string, string> { ["DOCKER_CONFIG"] = config }, "FROM alpine:3.20\n", TimeSpan.FromMinutes(2), default);
+                Assert.That(result.ExitCode, Is.Zero, result.Output);
+                Assert.That(Environment.GetEnvironmentVariable("PATH"), Is.EqualTo("/usr/bin:/bin:/usr/sbin:/sbin"));
+            }
+            finally { Environment.SetEnvironmentVariable("PATH", previous); Directory.Delete(config, true); }
+        });
+        [Test] public void DockerResolutionPrefersPathAndFallsBackToDesktopWithoutChangingEnvironment()
+        {
+            Assert.That(DockerExecutable.Resolve("/custom/bin", true, "/Users/fixture", false,
+                p => p == "/custom/bin/docker" || p == "/Applications/Docker.app/Contents/Resources/bin/docker", _ => true),
+                Is.EqualTo("/custom/bin/docker"));
+            Assert.That(DockerExecutable.Resolve("/usr/bin:/bin", true, "/Users/fixture", false,
+                p => p == "/Users/fixture/.docker/bin/docker", _ => true), Is.EqualTo("/Users/fixture/.docker/bin/docker"));
+        }
+        [Test] public void DockerResolutionDistinguishesMissingAndNonExecutableFiles()
+        {
+            Assert.Throws<FileNotFoundException>(() => DockerExecutable.Resolve("/bin", false, "", false, _ => false, _ => true));
+            Assert.Throws<UnauthorizedAccessException>(() => DockerExecutable.Resolve("/bin", false, "", false, _ => true, _ => false));
+        }
+        [Test] public void DockerDesktopIsFoundWithTheUnityHubPathOnMacOS() => Run(async () =>
+        {
+            if (UnityEngine.Application.platform != UnityEngine.RuntimePlatform.OSXEditor ||
+                !File.Exists("/Applications/Docker.app/Contents/Resources/bin/docker"))
+                Assert.Ignore("Requires macOS with Docker Desktop installed.");
+            var previous = Environment.GetEnvironmentVariable("PATH");
+            try
+            {
+                Environment.SetEnvironmentVariable("PATH", "/usr/bin:/bin:/usr/sbin:/sbin");
+                var runner = new ServerImageProcess(s => s);
+                var result = await runner.RunAsync(new[] { "--version" }, null, null, null, TimeSpan.FromSeconds(10), default);
+                Assert.That(result.ExitCode, Is.Zero);
+                Assert.That(result.Output, Does.Contain("Docker version"));
+                Assert.That(Environment.GetEnvironmentVariable("PATH"), Is.EqualTo("/usr/bin:/bin:/usr/sbin:/sbin"));
+            }
+            finally { Environment.SetEnvironmentVariable("PATH", previous); }
+        });
         [Test] public void ActualProcessPreservesSpacesQuotesBackslashesAndShellCharacters() => Run(async () =>
         {
             if (Path.DirectorySeparatorChar == '\\') Assert.Ignore("POSIX process fixture; Windows quoting is exercised by the Windows Docker smoke.");

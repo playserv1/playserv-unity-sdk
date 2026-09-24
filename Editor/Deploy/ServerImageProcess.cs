@@ -23,7 +23,8 @@ namespace Playserv.Editor
             return Task.Run(async () =>
             {
                 ct.ThrowIfCancellationRequested();
-                var start = new ProcessStartInfo(_executable, string.Join(" ", args.Select(Quote)))
+                var executable = _executable == "docker" ? DockerExecutable.Resolve() : _executable;
+                var start = new ProcessStartInfo(executable, string.Join(" ", args.Select(Quote)))
                 {
                     UseShellExecute = false, CreateNoWindow = true,
                     RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
@@ -36,6 +37,8 @@ namespace Playserv.Editor
                     foreach (var pair in environment)
                         if (pair.Value == null) start.EnvironmentVariables.Remove(pair.Key);
                         else start.EnvironmentVariables[pair.Key] = pair.Value;
+                if (_executable == "docker")
+                    start.EnvironmentVariables["PATH"] = Path.GetDirectoryName(executable) + Path.PathSeparator + start.EnvironmentVariables["PATH"];
                 using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct))
                 using (var process = new Process { StartInfo = start })
                 {

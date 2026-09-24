@@ -6,6 +6,30 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-09-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Changed
+
+- Deployment now opens Platform Functions first, followed by Server Images and RPC.
+  Platform Functions and Server Images share Dashboard Address from the current config.
+- Move Server Token below Client Token in Settings and Inspector, with separate local
+  storage per Unity project, config and Dev/Prod environment. `PLAYSERV_API_KEY` remains
+  read-only and takes precedence; server tokens are excluded from player builds.
+- Use `.com` Dev/Prod dashboard defaults and migrate known old `.io` defaults while
+  preserving custom addresses. Migrate the old local Deployment token once only when
+  its environment is known; otherwise preserve it and request manual re-entry.
+
+### Fixed
+
+- Find Docker Desktop from Unity Hub's minimal macOS PATH and resolve credential helpers
+  in the child process without changing the Editor environment. Distinguish missing CLI,
+  launch failure, unavailable daemon and non-Linux daemon diagnostics.
+- Reject operator sessions for the wrong selected environment. Changes to config,
+  address, environment or token cancel local operations, discard stale responses,
+  clear prepared images and require reconnecting.
+
 ## [0.6.5] - 2026-09-23
 
 Release prepared locally; distribution tags and registry publication are separate.

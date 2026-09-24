@@ -9,6 +9,7 @@ namespace Playserv.Editor
         private readonly Func<PlayServWindowContext, PlayServDeploymentController> _getController;
         private readonly PlatformFunctionPanel _platformFunctions = new PlatformFunctionPanel();
         private readonly ServerImagePanel _serverImages = new ServerImagePanel();
+        internal static readonly string[] TabLabels = { "Platform Functions", "Server Images", "RPC" };
         private int _mode;
 
         public void Dispose() { _platformFunctions.Dispose(); _serverImages.Dispose(); }
@@ -20,6 +21,8 @@ namespace Playserv.Editor
 
         public void Draw(PlayServWindowContext context)
         {
+            _platformFunctions.Config = () => context.Config;
+            _serverImages.Config = () => context.Config;
             var state = context.State;
             var controller = _getController(context);
             var expanded = PlayServWindowChrome.BeginSectionCard(
@@ -31,10 +34,10 @@ namespace Playserv.Editor
             if (expanded)
             {
                 using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning || _platformFunctions.Running || _serverImages.Running))
-                    _mode = GUILayout.Toolbar(_mode, new[] { "RPC", "Platform Functions", "Server Images" });
-                if (_mode == 1 || _mode == 2)
+                    _mode = GUILayout.Toolbar(_mode, TabLabels);
+                if (_mode == 0 || _mode == 1)
                 {
-                    if (_mode == 1) _platformFunctions.Draw(context.Repaint);
+                    if (_mode == 0) _platformFunctions.Draw(context.Repaint);
                     else _serverImages.Draw(context.Repaint);
                     PlayServWindowChrome.EndSectionCard(expanded);
                     EditorPrefs.SetBool(Const.PrefFoldDeployment, state.FoldDeployment);

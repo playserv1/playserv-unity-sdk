@@ -7,6 +7,7 @@ namespace Playserv.Editor
     [CustomEditor(typeof(PlayServConfig))]
     internal sealed class PlayServConfigInspector : UnityEditor.Editor
     {
+        private readonly PlayServServerTokenField _serverToken = new PlayServServerTokenField();
         private static readonly string[] EditablePropertyOrder =
         {
             "deploymentGameId",
@@ -34,6 +35,7 @@ namespace Playserv.Editor
         public override void OnInspectorGUI()
         {
             var config = (PlayServConfig)target;
+            PlayServDeploymentSettings.MigrateDashboard(config);
             if (PlayServEnvironmentClientTokens.IsManaged(config))
                 PlayServEnvironmentClientTokens.DrawTokenField(config);
             serializedObject.Update();
@@ -41,6 +43,7 @@ namespace Playserv.Editor
             if (!PlayServEnvironmentClientTokens.IsManaged(config))
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("clientToken"));
 
+            _serverToken.Draw(config);
             DrawProperties(EditablePropertyOrder, readOnly: false);
             DrawProperties(SdkVersionPropertyOrder, readOnly: !CanEditSdkVersionInClientEditor());
 

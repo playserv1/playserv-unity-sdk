@@ -22,15 +22,16 @@ namespace Playserv.Editor
     }
     internal sealed partial class PlatformFunctionClient : IDisposable
     {
-        private readonly string _api, _key;
+        private readonly string _api, _key, _expectedEnvironment;
         private readonly HttpClient _http;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
         private readonly TimeSpan _pollTimeout;
         private readonly System.Collections.Generic.HashSet<string> _secrets = new System.Collections.Generic.HashSet<string>();
         private PlatformFunctionSession _session;
-        public PlatformFunctionClient(string api, string key, HttpClient http = null, Func<TimeSpan, CancellationToken, Task> delay = null, TimeSpan? pollTimeout = null)
+        public PlatformFunctionClient(string api, string key, HttpClient http = null, Func<TimeSpan, CancellationToken, Task> delay = null, TimeSpan? pollTimeout = null, string expectedEnvironment = null)
         {
             _api = NormalizeApi(api);
+            _expectedEnvironment = expectedEnvironment;
             _key = (key ?? "").Trim();
             if (_key.Length == 0 || _key.IndexOfAny(new[] { '\r', '\n' }) >= 0) throw new InvalidOperationException("A server API key is required.");
             _secrets.Add(_key);
@@ -65,6 +66,9 @@ namespace Playserv.Editor
                     var refresh = (string)json["refresh_token"];
                     if (!string.IsNullOrEmpty(refresh)) _secrets.Add(refresh);
                     var session = new PlatformFunctionSession { Token = token, Project = Required(json, "project_slug"), Environment = Required(json, "env") };
+                    ct.ThrowIfCancellationRequested();
+                    if (_expectedEnvironment != null && !string.Equals(session.Environment, _expectedEnvironment, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("The Server Token belongs to a different environment. Select the matching Dev/Prod configuration and connect again.");
                     _session = session;
                     return session;
                 }

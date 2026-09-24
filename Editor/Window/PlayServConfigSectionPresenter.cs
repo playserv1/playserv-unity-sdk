@@ -7,6 +7,8 @@ namespace Playserv.Editor
 {
     internal sealed class PlayServConfigSectionPresenter
     {
+        private readonly PlayServServerTokenField _serverToken = new PlayServServerTokenField();
+
         public void Draw(PlayServWindowContext context)
         {
             var state = context.State;
@@ -47,12 +49,14 @@ namespace Playserv.Editor
 
                     GUILayout.Space(6f);
 
+                    PlayServDeploymentSettings.MigrateDashboard(context.Config);
                     context.SerializedObject.Update();
 
                     if (PlayServEnvironmentClientTokens.IsManaged(context.Config))
                         PlayServEnvironmentClientTokens.DrawTokenField(context.Config);
                     else
                         EditorGUILayout.PropertyField(context.ClientTokenProperty);
+                    _serverToken.Draw(context.Config);
                     EditorGUILayout.PropertyField(context.DeploymentGameIdProperty);
                     EditorGUILayout.PropertyField(context.GameVersionProperty);
                     EditorGUILayout.PropertyField(context.AllowMultipleConnectionsProperty);

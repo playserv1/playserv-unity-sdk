@@ -173,9 +173,12 @@ namespace Playserv.Editor
         {
             ServerImageProcessResult result;
             try { result = await _process.RunAsync(args, directory, environment, input, timeout, ct); }
-            catch (System.ComponentModel.Win32Exception) { throw new InvalidOperationException("Docker CLI is unavailable. Install Docker and make it available on the Editor's PATH."); }
+            catch (System.ComponentModel.Win32Exception) { throw new InvalidOperationException("Docker CLI could not be started. Check the executable's permissions and installation."); }
             ct.ThrowIfCancellationRequested();
-            if (result.ExitCode != 0) throw new InvalidOperationException("Docker " + args[0] + " failed. " + _api.Redact(result.Output));
+            if (result.ExitCode != 0)
+                throw new InvalidOperationException((args[0] == "info"
+                    ? "Docker CLI was found, but the daemon is unavailable. Start Docker Desktop and check the selected context. "
+                    : "Docker " + args[0] + " failed. ") + _api.Redact(result.Output));
             return result;
         }
         private static JToken FindTag(JObject listing, string server, string tag)

@@ -20,7 +20,7 @@ MonoBehaviour:
   webRtcIceServers: []
   deployApiServerAddress: https://deployment.playserv.io
   schemaApiServerAddress: https://backoffice.playserv.io/
-  dashboardAddress: https://dashboard.playserv.io/
+  dashboardAddress: https://dashboard.playserv.com
   allowMultipleConnections: 1
   keepAlivePingIntervalMs: 20000
   keepAlivePongTimeoutMs: 10000

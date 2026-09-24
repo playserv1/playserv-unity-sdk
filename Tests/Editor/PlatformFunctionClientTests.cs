@@ -60,6 +60,21 @@ namespace Playserv.Editor.Tests
             Assert.That(h.Calls, Is.EqualTo(5));
         });
 
+        [Test] public void CancelledAuthenticationResponseCannotCreateSession() => RunTask(async () =>
+        {
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var h = new Handler();
+                h.Responses.Enqueue(_ => { cancellation.Cancel(); return Json(Auth); });
+                using (var client = Client(h))
+                {
+                    Assert.That(() => RunTask(() => client.ConnectAsync(cancellation.Token)), Throws.InstanceOf<OperationCanceledException>());
+                    AssertTaskThrows<InvalidOperationException>(() => client.UploadAsync("room", "game_server", new byte[] { 1 }, default));
+                }
+                Assert.That(h.Calls, Is.EqualTo(1));
+            }
+        });
+
         [Test] public void RefreshCannotSwitchTarget() => RunTask(async () =>
         {
             var h = new Handler(); h.Add(Auth); h.Add("{}", HttpStatusCode.Unauthorized); h.Add(Auth.Replace("dev", "prod"));

@@ -5,26 +5,27 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using Playserv.Wrapper;
 
 namespace Playserv.Editor
 {
     internal sealed class PlatformFunctionPanel : IDisposable
     {
         private readonly PlatformFunctionConnection _connection = new PlatformFunctionConnection();
-        private string _api = PlatformFunctionEditorStore.Api;
-        private string _key = PlatformFunctionEditorStore.LocalKey;
+        internal Func<PlayServConfig> Config;
+        private DeploymentTarget _target;
+        private readonly ServerImageOperation _operation = new ServerImageOperation();
         private string _folder = PlatformFunctionEditorStore.Folder;
         private string _slug;
         private int _kind;
         private PlatformFunctionPackage _preview;
         private PlatformFunctionSession _session;
         private PlatformDeploymentReference _last = PlatformFunctionEditorStore.LastDeployment;
-        private CancellationTokenSource _cancel;
         private string _status = "Connect and preview the source package before deploying.";
         private bool _disposed;
         private Vector2 _scroll;
         private Action _repaint;
-        public bool Running => _cancel != null;
+        public bool Running => _operation.Running;
 
         public PlatformFunctionPanel()
         {
@@ -38,22 +39,13 @@ namespace Playserv.Editor
             _repaint = repaint;
             using (new EditorGUI.DisabledScope(Running))
             {
-                _api = EditorGUILayout.TextField("Platform API", _api);
-                if (!string.IsNullOrWhiteSpace(PlatformFunctionEditorStore.EnvironmentKey))
-                    EditorGUILayout.LabelField("Server key", "Using PLAYSERV_API_KEY");
-                else
-                {
-                    _key = EditorGUILayout.PasswordField("Server key", _key);
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        if (GUILayout.Button("Save key locally")) PlatformFunctionEditorStore.LocalKey = _key;
-                        if (GUILayout.Button("Clear key")) { PlatformFunctionEditorStore.LocalKey = ""; _key = ""; }
-                    }
-                }
                 CheckCredentials();
-                if (GUILayout.Button("Connect")) _ = RunAsync(ConnectAsync);
+                EditorGUILayout.LabelField("Dashboard", _target.Api, EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(!_target.CanConnect))
+                    if (GUILayout.Button("Connect")) _ = RunAsync(ConnectAsync);
+                if (!_target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
                 if (_session != null)
-                    EditorGUILayout.HelpBox("Target: " + _session.Project + " / " + _session.Environment + "\n" + _api, MessageType.Info);
+                    EditorGUILayout.HelpBox("Target: " + _session.Project + " / " + _session.Environment + "\n" + _target.Api, MessageType.Info);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -99,7 +91,7 @@ namespace Playserv.Editor
                         if (GUILayout.Button("Resume status")) _ = RunAsync(ct => PollAsync(_last, ct));
                 }
             }
-            if (Running && GUILayout.Button("Stop waiting")) _cancel.Cancel();
+            if (Running && GUILayout.Button("Stop waiting")) { _operation.Cancel(); _status = "Stopped locally. An accepted deployment may still be running."; }
             EditorGUILayout.HelpBox(_status, MessageType.Info);
             EditorGUILayout.LabelField("Stopping local work does not cancel an accepted server deployment.", EditorStyles.wordWrappedMiniLabel);
         }
@@ -111,64 +103,71 @@ namespace Playserv.Editor
         }
         private void CheckCredentials()
         {
-            if (_connection.InvalidateIfChanged(_api, PlatformFunctionEditorStore.ResolveKey(_key)))
-            {
-                _cancel?.Cancel(); _session = null;
-                _status = "API or key changed. Reconnect to verify the target."; _repaint?.Invoke();
-            }
+            if (_disposed) return;
+            var target = DeploymentTarget.Read(Config?.Invoke());
+            if (target.Equals(_target)) return;
+            _target = target;
+            _operation.Cancel(); _connection.Dispose(); _session = null; _preview = null;
+            _status = "Deployment settings changed. Connect to verify the target."; _repaint?.Invoke();
         }
-        private async Task ConnectAsync(CancellationToken ct)
+        private async Task<Action> ConnectAsync(CancellationToken ct)
         {
             _session = null;
-            _connection.Create(_api, PlatformFunctionEditorStore.ResolveKey(_key));
-            PlatformFunctionEditorStore.Api = _api;
-            _session = await _connection.Client.ConnectAsync(ct);
-            _status = "Connected. Review the target and source package before deploying.";
+            _connection.Create(_target);
+            PlatformFunctionSession session;
+            using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            { deadline.CancelAfter(TimeSpan.FromSeconds(30)); session = await _connection.Client.ConnectAsync(deadline.Token); }
+            return () => { _session = session; _status = "Connected. Review the target and source package before deploying."; };
         }
-        private async Task PreviewAsync(CancellationToken ct)
+        private async Task<Action> PreviewAsync(CancellationToken ct)
         {
             _preview = null;
             var preview = await Task.Run(() => PlatformFunctionPackage.Preview(_folder), ct);
-            ct.ThrowIfCancellationRequested(); _preview = preview;
+            return () => { _preview = preview;
             _kind = preview.SuggestedKind == "cloud_function" ? 1 : preview.SuggestedKind == "game_server" ? 2 : 0;
-            _status = "Package preview ready. Upload will reject any source changes since this preview.";
+            _status = "Package preview ready. Upload will reject any source changes since this preview."; };
         }
-        private async Task DeployAsync(CancellationToken ct)
+        private async Task<Action> DeployAsync(CancellationToken ct)
         {
             var client = _connection.Client;
             var archive = await Task.Run(() => _preview.BuildArchive(), ct);
-            ct.ThrowIfCancellationRequested();
-            if (!_connection.Matches(_api, PlatformFunctionEditorStore.ResolveKey(_key))) throw new InvalidOperationException("Target changed. Reconnect before deploying.");
+            CheckCredentials(); ct.ThrowIfCancellationRequested();
+            if (!_connection.Matches(_target.Api, _target.Key)) throw new InvalidOperationException("Target changed. Reconnect before deploying.");
             _status = "Uploading once. If the response is lost, check server deployments before attempting another upload."; _repaint?.Invoke();
-            _last = await client.UploadAsync(_slug, _kind == 1 ? "cloud_function" : "game_server", archive, ct);
-            PlatformFunctionEditorStore.LastDeployment = _last;
-            await PollAsync(_last, ct);
+            var last = await client.UploadAsync(_slug, _kind == 1 ? "cloud_function" : "game_server", archive, ct);
+            CheckCredentials(); ct.ThrowIfCancellationRequested();
+            _last = last; PlatformFunctionEditorStore.LastDeployment = last;
+            return await PollAsync(last, ct);
         }
-        private async Task PollAsync(PlatformDeploymentReference deployment, CancellationToken ct)
+        private async Task<Action> PollAsync(PlatformDeploymentReference deployment, CancellationToken ct)
         {
-            await _connection.Client.PollAsync(deployment, phase => { _status = "Deployment " + deployment.Id + ": " + phase; _repaint?.Invoke(); }, ct);
-            _status = "Deployment " + deployment.Id + " deployed successfully.";
+            await _connection.Client.PollAsync(deployment, phase => { if (ct.IsCancellationRequested || _disposed) return; _status = "Deployment " + deployment.Id + ": " + phase; _repaint?.Invoke(); }, ct);
+            return () => _status = "Deployment " + deployment.Id + " deployed successfully.";
         }
-        private async Task RunAsync(Func<CancellationToken, Task> action)
+        private async Task RunAsync(Func<CancellationToken, Task<Action>> action)
         {
             if (Running || _disposed) return;
-            var cancel = _cancel = new CancellationTokenSource();
             var client = _connection.Client;
-            try { await action(cancel.Token); }
-            catch (OperationCanceledException) { _status = "Local operation stopped. An accepted deployment may still be running; use Resume status."; }
-            catch (Exception e)
+            await _operation.TryRunAsync(async ct =>
             {
-                var message = (_connection.Client ?? client)?.Redact(e.Message) ?? "The operation could not be completed. Check the API, source folder and key.";
+                var apply = await action(ct);
+                CheckCredentials();
+                return apply;
+            }, error =>
+            {
+                CheckCredentials();
+                if (_operation.Cancelled) return;
+                var message = (_connection.Client ?? client)?.Redact(error.Message) ?? "The operation could not be completed. Check the Dashboard Address, source folder and Server Token.";
                 _status = "Failed: " + message;
-            }
-            finally { cancel.Dispose(); _cancel = null; if (!_disposed) _repaint?.Invoke(); }
+            });
+            if (!_disposed) _repaint?.Invoke();
         }
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true; EditorApplication.update -= CheckCredentials;
             AssemblyReloadEvents.beforeAssemblyReload -= Dispose;
-            _cancel?.Cancel(); _connection.Dispose(); _repaint = null;
+            _operation.Dispose(); _connection.Dispose(); _repaint = null;
         }
     }
 }

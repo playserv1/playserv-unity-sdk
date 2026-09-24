@@ -19,6 +19,7 @@ namespace Playserv.Editor
             var config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (config != null)
             {
+                PlayServDeploymentSettings.MigrateDashboard(config);
                 var changed = PlayServDeployCredentialStore.MigrateLegacySecrets(config);
                 changed |= ApplyEnvironmentProfile(config);
                 changed |= EnsureBackendServerAddress(config);
@@ -58,6 +59,7 @@ namespace Playserv.Editor
             var atPath = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetPath);
             if (atPath != null)
             {
+                PlayServDeploymentSettings.MigrateDashboard(atPath);
                 if (PlayServDeployCredentialStore.MigrateLegacySecrets(atPath))
                     AssetDatabase.SaveAssets();
                 return atPath;
@@ -71,6 +73,7 @@ namespace Playserv.Editor
                 var asset = AssetDatabase.LoadAssetAtPath<PlayServConfig>(path);
                 if (asset != null)
                 {
+                    PlayServDeploymentSettings.MigrateDashboard(asset);
                     if (PlayServDeployCredentialStore.MigrateLegacySecrets(asset))
                         AssetDatabase.SaveAssets();
                     return asset;

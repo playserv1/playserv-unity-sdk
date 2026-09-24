@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using Playserv.Wrapper;
 
 namespace Playserv.Editor
 {
@@ -14,7 +15,9 @@ namespace Playserv.Editor
         private readonly PlatformFunctionConnection _connection = new PlatformFunctionConnection();
         private readonly ServerImageOperation _operation = new ServerImageOperation();
         private readonly Queue<string> _log = new Queue<string>();
-        private readonly ServerImageDraft _draft = new ServerImageDraft(PlatformFunctionEditorStore.Api, PlatformFunctionEditorStore.LocalKey, ServerImageEditorStore.Server);
+        private readonly ServerImageDraft _draft = new ServerImageDraft("", "", ServerImageEditorStore.Server);
+        internal Func<PlayServConfig> Config;
+        private DeploymentTarget _target;
         private string _folder = ServerImageEditorStore.Folder;
         private string _dockerfile = ServerImageEditorStore.Dockerfile;
         private string _tag = ServerImageEditorStore.Tag;
@@ -40,19 +43,11 @@ namespace Playserv.Editor
             _repaint = repaint;
             using (new EditorGUI.DisabledScope(Running))
             {
-                _draft.Api = EditorGUILayout.TextField(new GUIContent("Platform API", "HTTPS origin; no /api path. Uses the same local credentials as Platform Functions."), _draft.Api);
-                if (!string.IsNullOrWhiteSpace(PlatformFunctionEditorStore.EnvironmentKey)) EditorGUILayout.LabelField("Server key", "Using PLAYSERV_API_KEY");
-                else
-                {
-                    _draft.Key = EditorGUILayout.PasswordField("Server key", _draft.Key);
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        if (GUILayout.Button("Save key locally")) PlatformFunctionEditorStore.LocalKey = _draft.Key;
-                        if (GUILayout.Button("Clear key")) { PlatformFunctionEditorStore.LocalKey = ""; _draft.Key = ""; }
-                    }
-                }
                 Update();
-                if (GUILayout.Button("Connect / refresh servers")) Start("Connecting…", ConnectAsync);
+                EditorGUILayout.LabelField("Dashboard", _target.Api, EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(!_target.CanConnect))
+                    if (GUILayout.Button("Connect / refresh servers")) Start("Connecting…", ConnectAsync);
+                if (!_target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
                 if (_session != null) EditorGUILayout.HelpBox("Project: " + _session.Project + "   Environment: " + _session.Environment + "\nImages are shared by all environments of this project.", MessageType.Info);
                 var servers = _draft.Servers ?? Array.Empty<string>();
                 var choices = new[] { "Select game server…" }.Concat(servers).ToArray();
@@ -121,14 +116,20 @@ namespace Playserv.Editor
         }
         private async Task RunAsync(Func<CancellationToken, Task<Action>> work)
         {
-            await _operation.TryRunAsync(work, error => _status = _connection.Client?.Redact(error.Message) ?? "Cannot connect. Check the API origin and server key.");
+            await _operation.TryRunAsync(async ct =>
+            {
+                var apply = await work(ct); Update(); return apply;
+            }, error =>
+            {
+                Update();
+                if (!_operation.Cancelled) _status = _connection.Client?.Redact(error.Message) ?? "Cannot connect. Check Dashboard Address and Server Token.";
+            });
             if (!_disposed) { RememberPublication(); _repaint?.Invoke(); }
         }
         private async Task<Action> ConnectAsync(CancellationToken ct)
         {
             _session = null; _publisher = null; _built = null; _draft.BeginConnection();
-            _connection.Create(_draft.Api, PlatformFunctionEditorStore.ResolveKey(_draft.Key));
-            PlatformFunctionEditorStore.Api = _draft.Api;
+            _connection.Create(_target);
             var client = _connection.Client;
             PlatformFunctionSession session;
             using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct))
@@ -168,11 +169,12 @@ namespace Playserv.Editor
         {
             if (_disposed) return;
             RememberPublication();
-            _draft.RefreshCredentials(PlatformFunctionEditorStore.Api, PlatformFunctionEditorStore.LocalKey);
-            if (_connection.InvalidateIfChanged(_draft.Api, PlatformFunctionEditorStore.ResolveKey(_draft.Key)))
+            var target = DeploymentTarget.Read(Config?.Invoke());
+            if (!target.Equals(_target))
             {
-                _operation.Cancel(); _session = null; _publisher = null; _built = null; _draft.BeginConnection();
-                _status = "API or key changed. Reconnect and review the target.";
+                _target = target; _draft.Api = target.Api; _draft.Key = target.Key;
+                _operation.Cancel(); _connection.Dispose(); _session = null; _publisher = null; _built = null; _draft.BeginConnection();
+                _status = "Deployment settings changed. Connect and review the target.";
             }
             if (Running) _repaint?.Invoke();
         }

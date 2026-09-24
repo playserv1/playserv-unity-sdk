@@ -10,16 +10,17 @@ This document describes the Unity Editor tooling under `Editor/Deploy`.
 - Platform Functions deployment (`cloud_function` and `game_server`) through the v1 API
 - Server Images: build and publish a Docker image to the project registry
 
-## Server Images (0.6.5)
+## Server Images
 
 Open **Tools → PlayServ → Settings → Deployment → Server Images**. This Editor-only
 workflow builds an existing server Dockerfile and publishes an image using the
 current server-image REST contract. Studios need no checkout of the platform repository.
 
-1. Set the **Platform API** origin and server `sk_` key, then **Connect / refresh
-   servers**. Credentials use the same project-local Editor preferences and
-   `PLAYSERV_API_KEY` precedence as Platform Functions. The operator session comes
-   from `POST /api/v1/auth/cli`; review the displayed project and environment.
+1. In **PlayServ Config**, select Dev or Prod, set **Dashboard Address** and save
+   **Server Token (Dev/Prod)** beneath Client Token. Then **Connect / refresh
+   servers**. Both Server Images and Platform Functions use these same settings.
+   The operator session comes from `POST /api/v1/auth/cli`; review its project and
+   environment. A token for a different selected environment is rejected.
 2. Select an existing **game_server**. All pages of the server listing are loaded.
    Registration happens in PlayServ; this tool does not create a server or pool.
 3. Choose the **build context** folder and a **Dockerfile inside it**. Keep the
@@ -29,7 +30,7 @@ current server-image REST contract. Studios need no checkout of the platform rep
 4. Enter a unique **image tag**, preferably the reviewed commit SHA. Click
    **Check Docker**, then **Build image**. Install Docker separately and use a
    local Linux daemon (Docker Desktop on macOS/Windows or Docker Engine on Linux).
-   The CLI must be on the Editor's PATH; restart the Editor after changing PATH.
+   The CLI is found on the Editor's PATH or in standard macOS Docker locations.
    BuildKit with `--load` / `--provenance=false` is required. On Apple Silicon,
    Docker must provide amd64 emulation when the Dockerfile executes amd64 code.
 5. Review the project, environment, server slug, tag, `linux/amd64` architecture
@@ -62,6 +63,13 @@ uses the saved local publication reference after cancellation or reopening the
 Editor. If the manifest digest was lost, finding the tag is reported as unverified;
 inspect the registry/build evidence before deciding to publish another tag.
 
+Docker is resolved from the Editor's PATH and, on macOS, standard Docker Desktop,
+Homebrew, `/usr/local/bin` and `~/.docker/bin` locations. The resolved absolute
+executable is used without changing the Editor's PATH or launching a shell. Its
+directory is added only to the child process's PATH so credential helpers also work.
+Diagnostics distinguish
+a missing CLI, an executable that cannot start, an unavailable daemon and a non-Linux daemon.
+
 Common failures: unavailable Docker or Linux daemon, an unsupported build platform,
 existing tag, changed scope, registry not configured (`503 image_registry_not_configured`),
 expired credentials, incompatible architecture, or a digest mismatch. Correct the
@@ -75,17 +83,25 @@ remain explicit release steps. C# server SDK and game runtime APIs are unchanged
 ## Platform Functions
 
 Open `Tools/PlayServ/Settings`, expand **Deployment**, and select **Platform Functions**.
-The **RPC** mode retains the ZIP, analyzer and version-sync workflow described below.
+Tabs are ordered **Platform Functions → Server Images → RPC**, with Platform Functions
+selected initially. The **RPC** mode retains the ZIP, analyzer and version-sync workflow described below.
 
-1. Set **Platform API** to the platform API origin used by your CI workflow. This is
-   separate from the legacy RPC deployment endpoint.
-2. Supply a server API key locally in the Editor or through `PLAYSERV_API_KEY`.
-   The environment variable takes precedence. Local storage is project-scoped
-   Editor preferences, not an encrypted secret vault; keys never belong in
-   `PlayServConfig`, Assets, source control or a player build.
+1. Use **Dashboard Address** in the current PlayServ Config. Dev defaults to
+   `https://dashboard.dev.playserv.com`; Prod to `https://dashboard.playserv.com`.
+   Known old `.io` dashboard defaults migrate automatically; custom URLs are preserved.
+   The legacy RPC endpoint and its Deploy Token remain independent.
+2. Save **Server Token (Dev/Prod)** below Client Token, in Settings or the Config
+   Inspector. Local Editor preferences isolate it by Unity project, config GUID
+   and environment. `PLAYSERV_API_KEY` has read-only precedence and is never copied
+   into local storage. Server tokens are never serialized into assets or player builds.
+   Editor preferences are local storage, not an encrypted secret vault.
 3. Connect to resolve the **project** and **environment** from `/api/v1/auth/cli`.
-   Changing the API or key invalidates the previous connection. A public client
-   key cannot create this operator session.
+   The returned environment must match the selected Dev/Prod environment.
+   Changing the config, address, environment or saved key cancels local work,
+   invalidates the connection and prepared image, and requires another Connect.
+   Late responses cannot restore the old session. An old Deployment key migrates
+   once according to its saved standard API address; unknown addresses preserve
+   the old record and show a request to re-enter the appropriate token.
 4. Select the function's source folder, including folders outside `Assets`.
    The starting location is `<UnityProject>/functions`. The folder name supplies
    the initial editable slug. C# declarations implementing `IPlatformFunction`

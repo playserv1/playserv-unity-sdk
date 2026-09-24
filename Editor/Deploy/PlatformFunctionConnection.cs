@@ -8,6 +8,12 @@ namespace Playserv.Editor
         private string _api, _key;
         public PlatformFunctionClient Client { get; private set; }
         public bool Matches(string api, string key) => Client != null && _api == api && _key == key;
+        internal void Create(DeploymentTarget target)
+        {
+            Dispose();
+            Client = target.CreateClient();
+            _api = target.Api; _key = target.Key;
+        }
         public void Create(string api, string key, HttpClient http = null)
         {
             Dispose();

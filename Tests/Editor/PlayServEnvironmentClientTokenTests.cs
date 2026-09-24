@@ -469,6 +469,8 @@ namespace Playserv.Tests.Editor
             _config.SetClientToken("pk_not_in_player_build_fixture");
             SwitchEnvironment("Dev");
             _config.SetClientToken("pk_in_player_build_fixture");
+            PlayServDeploymentSettings.SetLocal(_config, "Dev", "sk_never_in_player_dev_fixture");
+            PlayServDeploymentSettings.SetLocal(_config, "Prod", "sk_never_in_player_prod_fixture");
             var setup = EditorSceneManager.GetSceneManagerSetup();
             var output = Path.GetFullPath("Temp/PlayServTokenSmoke/Player.app");
             try
@@ -491,13 +493,17 @@ namespace Playserv.Tests.Editor
                     var content = Encoding.UTF8.GetString(File.ReadAllBytes(asset));
                     containsActive |= content.Contains("pk_in_player_build_fixture");
                     StringAssert.DoesNotContain("pk_not_in_player_build_fixture", content);
+                    StringAssert.DoesNotContain("sk_never_in_player", content);
                 }
                 Assert.That(containsActive, Is.True, "The player must contain the selected runtime credential.");
                 Assert.That(new SerializedObject(_config).FindProperty("clientToken").stringValue, Is.Empty);
                 Assert.That(File.Exists(PlayServClientTokenBuildProcessor.JournalPath), Is.False);
+                StringAssert.DoesNotContain("sk_never_in_player", File.ReadAllText(AssetDatabase.GetAssetPath(_config)));
             }
             finally
             {
+                PlayServDeploymentSettings.SetLocal(_config, "Dev", "");
+                PlayServDeploymentSettings.SetLocal(_config, "Prod", "");
                 PlayServClientTokenBuildProcessor.Restore();
                 if (setup.Any(item => item.isLoaded && item.isActive))
                     EditorSceneManager.RestoreSceneManagerSetup(setup);

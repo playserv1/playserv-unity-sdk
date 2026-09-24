@@ -14,6 +14,13 @@ namespace Playserv.Editor.Tests
 {
     public class PlatformFunctionEditorTests
     {
+        [Test] public void DeploymentTabsDefaultToFunctionsAndKeepRpcLast()
+        {
+            Assert.That(PlayServDeploymentSectionPresenter.TabLabels, Is.EqualTo(new[] { "Platform Functions", "Server Images", "RPC" }));
+            using (var presenter = new PlayServDeploymentSectionPresenter(_ => null))
+                Assert.That(typeof(PlayServDeploymentSectionPresenter).GetField("_mode", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(presenter), Is.EqualTo(0));
+        }
+
         [Test] public void LastDeploymentPersistsOnlyApiTargetAndId()
         {
             var previous = PlatformFunctionEditorStore.LastDeployment;
@@ -53,7 +60,7 @@ namespace Playserv.Editor.Tests
             var window = ScriptableObject.CreateInstance<PlatformDeploymentTestWindow>();
             try
             {
-                window.Mode = 2; window.ShowUtility(); window.position = new Rect(20, 20, 720, 850);
+                window.Mode = 1; window.ShowUtility(); window.position = new Rect(20, 20, 720, 850);
                 for (var i = 0; i < 30 && !window.Rendered; i++) { window.Repaint(); yield return null; }
                 Assert.That(window.Rendered, Is.True);
                 Assert.That(ServerImageEditorStore.Server, Is.EqualTo("tank-room"));
@@ -75,7 +82,7 @@ namespace Playserv.Editor.Tests
                     for (var i = 0; i < 30 && !window.Rendered; i++) { window.Repaint(); yield return null; }
                     Assert.That(window.Rendered, Is.True, "Deployment mode " + mode + " should render in IMGUI.");
                     var capture = Environment.GetEnvironmentVariable("PLAYSERV_IMAGE_UI_CAPTURE");
-                    if (mode == 2 && !string.IsNullOrEmpty(capture))
+                    if (mode == 1 && !string.IsNullOrEmpty(capture))
                     {
                         Directory.CreateDirectory(capture);
                         var scale = EditorGUIUtility.pixelsPerPoint;

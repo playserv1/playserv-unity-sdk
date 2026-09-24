@@ -8,6 +8,13 @@ namespace Playserv.Tests.Editor
 {
     public sealed class PlayServConfigEndpointOverrideTests
     {
+        [TestCase("Dev", "https://dashboard.dev.playserv.com")]
+        [TestCase("Prod", "https://dashboard.playserv.com")]
+        public void DefaultDashboardUsesCurrentPlatformOrigin(string environment, string expected)
+        {
+            Assert.That(PlayServPackageDefaultsProvider.LoadSettingsOrDefault(environment).DashboardAddress.TrimEnd('/'), Is.EqualTo(expected));
+        }
+
         private static string ActiveEnvironmentPrefKey =>
             PlayServEnvironmentClientTokens.ActiveEnvironmentPreference;
 
