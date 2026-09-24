@@ -8,6 +8,69 @@ This document describes the Unity Editor tooling under `Editor/Deploy`.
 - RPC code analyzer used before deployment
 - Version synchronization (`Sync Version`)
 - Platform Functions deployment (`cloud_function` and `game_server`) through the v1 API
+- Server Images: build and publish a Docker image to the project registry
+
+## Server Images (0.6.5)
+
+Open **Tools → PlayServ → Settings → Deployment → Server Images**. This Editor-only
+workflow builds an existing server Dockerfile and publishes an image using the
+current server-image REST contract. Studios need no checkout of the platform repository.
+
+1. Set the **Platform API** origin and server `sk_` key, then **Connect / refresh
+   servers**. Credentials use the same project-local Editor preferences and
+   `PLAYSERV_API_KEY` precedence as Platform Functions. The operator session comes
+   from `POST /api/v1/auth/cli`; review the displayed project and environment.
+2. Select an existing **game_server**. All pages of the server listing are loaded.
+   Registration happens in PlayServ; this tool does not create a server or pool.
+3. Choose the **build context** folder and a **Dockerfile inside it**. Keep the
+   server in your game's repository, outside Unity `Assets`, with its own SDK
+   dependencies and `.dockerignore`. The Dockerfile is responsible for compiling
+   the server. Use an exec-form `ENTRYPOINT` so platform launch arguments reach it.
+4. Enter a unique **image tag**, preferably the reviewed commit SHA. Click
+   **Check Docker**, then **Build image**. Install Docker separately and use a
+   local Linux daemon (Docker Desktop on macOS/Windows or Docker Engine on Linux).
+   The CLI must be on the Editor's PATH; restart the Editor after changing PATH.
+   BuildKit with `--load` / `--provenance=false` is required. On Apple Silicon,
+   Docker must provide amd64 emulation when the Dockerfile executes amd64 code.
+5. Review the project, environment, server slug, tag, `linux/amd64` architecture
+   and immutable local image ID. Click **Publish image** to publish that exact
+   image. Editing any build/target field invalidates the prepared build.
+6. Success means `GET /api/v1/server-images` reports that tag with the push's
+   **manifest digest** and architecture `amd64` or `multi`. Local image IDs are
+   config digests; they are not compared with registry manifest digests.
+
+The Editor refreshes the operator session before publishing and refuses a change
+of project/environment. It checks for an existing tag and refuses to overwrite
+one; this is a preflight, not an atomic lock against another publisher. Images
+are project-wide even though requests also require an environment selector.
+
+After building, `POST /api/v1/server-images:credentials` supplies the registry,
+repository and a one-hour credential. Docker pushes directly to that repository:
+there is no Docker-archive upload endpoint. The password goes through stdin,
+with an isolated temporary Docker config deleted on success, failure or Cancel.
+The user's Docker authentication is preserved. PlayServ environment credentials
+are removed from child processes and known secrets are redacted from the bounded
+Editor log. No credential is added to Unity assets or player builds. Docker may
+retain ordinary build cache and local image tags.
+
+Budgets are 30 seconds per HTTP request, 30 minutes each for build and push, and
+60 seconds for publication verification. Polling respects `Retry-After`.
+**Cancel**, window disposal and domain reload stop local work, including Docker
+child processes. They cannot undo a push already accepted by the registry.
+A push is never automatically repeated after a lost response. **Check publication**
+uses the saved local publication reference after cancellation or reopening the
+Editor. If the manifest digest was lost, finding the tag is reported as unverified;
+inspect the registry/build evidence before deciding to publish another tag.
+
+Common failures: unavailable Docker or Linux daemon, an unsupported build platform,
+existing tag, changed scope, registry not configured (`503 image_registry_not_configured`),
+expired credentials, incompatible architecture, or a digest mismatch. Correct the
+reported condition and use **Check publication** for an uncertain push.
+
+This feature does not move legacy sample code into a game repository, create a
+Dockerfile, configure a pool, change `image_version`, restart machines, or replace
+Cloud Run deployments. Selecting a pool version and two-browser/WSS acceptance
+remain explicit release steps. C# server SDK and game runtime APIs are unchanged.
 
 ## Platform Functions
 

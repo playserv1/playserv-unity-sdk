@@ -8,9 +8,10 @@ namespace Playserv.Editor
     {
         private readonly Func<PlayServWindowContext, PlayServDeploymentController> _getController;
         private readonly PlatformFunctionPanel _platformFunctions = new PlatformFunctionPanel();
+        private readonly ServerImagePanel _serverImages = new ServerImagePanel();
         private int _mode;
 
-        public void Dispose() => _platformFunctions.Dispose();
+        public void Dispose() { _platformFunctions.Dispose(); _serverImages.Dispose(); }
 
         public PlayServDeploymentSectionPresenter(Func<PlayServWindowContext, PlayServDeploymentController> getController)
         {
@@ -25,15 +26,16 @@ namespace Playserv.Editor
                 ref state.FoldDeployment,
                 "Server Code",
                 "Deployment",
-                "Deploy legacy RPC code or Platform Functions to their respective deployment APIs.");
+                "Deploy server code or publish a game-server image to your project.");
 
             if (expanded)
             {
-                using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning || _platformFunctions.Running))
-                    _mode = GUILayout.Toolbar(_mode, new[] { "RPC", "Platform Functions" });
-                if (_mode == 1)
+                using (new EditorGUI.DisabledScope(state.DeployRunning || state.VersionSyncRunning || _platformFunctions.Running || _serverImages.Running))
+                    _mode = GUILayout.Toolbar(_mode, new[] { "RPC", "Platform Functions", "Server Images" });
+                if (_mode == 1 || _mode == 2)
                 {
-                    _platformFunctions.Draw(context.Repaint);
+                    if (_mode == 1) _platformFunctions.Draw(context.Repaint);
+                    else _serverImages.Draw(context.Repaint);
                     PlayServWindowChrome.EndSectionCard(expanded);
                     EditorPrefs.SetBool(Const.PrefFoldDeployment, state.FoldDeployment);
                     return;

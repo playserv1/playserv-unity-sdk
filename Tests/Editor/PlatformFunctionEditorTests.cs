@@ -46,17 +46,46 @@ namespace Playserv.Editor.Tests
             finally { if (zip != null) File.Delete(zip); Directory.Delete(root, true); }
         }
 
-        [UnityTest] public IEnumerator BothDeploymentModesRenderInRealEditorWindow()
+        [UnityTest] public IEnumerator ServerImagesDrawingPreservesSavedServerBeforeConnecting()
+        {
+            var previous = ServerImageEditorStore.Server;
+            ServerImageEditorStore.Server = "tank-room";
+            var window = ScriptableObject.CreateInstance<PlatformDeploymentTestWindow>();
+            try
+            {
+                window.Mode = 2; window.ShowUtility(); window.position = new Rect(20, 20, 720, 850);
+                for (var i = 0; i < 30 && !window.Rendered; i++) { window.Repaint(); yield return null; }
+                Assert.That(window.Rendered, Is.True);
+                Assert.That(ServerImageEditorStore.Server, Is.EqualTo("tank-room"));
+            }
+            finally { window.Close(); UnityEngine.Object.DestroyImmediate(window); ServerImageEditorStore.Server = previous; }
+        }
+
+        [UnityTest] public IEnumerator AllDeploymentModesRenderAtNarrowAndWideWidths()
         {
             var window = ScriptableObject.CreateInstance<PlatformDeploymentTestWindow>();
             try
             {
-                window.ShowUtility(); window.position = new Rect(20, 20, 720, 850);
-                foreach (var mode in new[] { 0, 1 })
+                window.ShowUtility();
+                foreach (var width in new[] { 420, 1000 })
+                foreach (var mode in new[] { 0, 1, 2 })
                 {
+                    window.position = new Rect(20, 20, width, 850);
                     window.Mode = mode; window.Rendered = false;
                     for (var i = 0; i < 30 && !window.Rendered; i++) { window.Repaint(); yield return null; }
                     Assert.That(window.Rendered, Is.True, "Deployment mode " + mode + " should render in IMGUI.");
+                    var capture = Environment.GetEnvironmentVariable("PLAYSERV_IMAGE_UI_CAPTURE");
+                    if (mode == 2 && !string.IsNullOrEmpty(capture))
+                    {
+                        Directory.CreateDirectory(capture);
+                        var scale = EditorGUIUtility.pixelsPerPoint;
+                        var pixelWidth = (int)(window.position.width * scale);
+                        var pixelHeight = (int)(window.position.height * scale);
+                        var pixels = UnityEditorInternal.InternalEditorUtility.ReadScreenPixel(window.position.position * scale, pixelWidth, pixelHeight);
+                        var texture = new Texture2D(pixelWidth, pixelHeight);
+                        try { texture.SetPixels(pixels); texture.Apply(); File.WriteAllBytes(Path.Combine(capture, "server-images-" + width + ".png"), texture.EncodeToPNG()); }
+                        finally { UnityEngine.Object.DestroyImmediate(texture); }
+                    }
                 }
             }
             finally { window.Close(); UnityEngine.Object.DestroyImmediate(window); }

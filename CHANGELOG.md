@@ -6,6 +6,17 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-09-23
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Added
+
+- Add Editor Deployment → Server Images: build and inspect linux/amd64 images,
+  select an existing game server, publish with one-hour project credentials,
+  verify the manifest digest, and check uncertain publications without retrying
+  a push. Operations support cancellation, bounded logs and isolated Docker auth.
+
 ### Fixed
 
 - Run Platform Functions async HTTP test scenarios through synchronous NUnit entry

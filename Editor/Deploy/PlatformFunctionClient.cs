@@ -20,7 +20,7 @@ namespace Playserv.Editor
     {
         public string Api, Project, Environment, Id;
     }
-    internal sealed class PlatformFunctionClient : IDisposable
+    internal sealed partial class PlatformFunctionClient : IDisposable
     {
         private readonly string _api, _key;
         private readonly HttpClient _http;
