@@ -6,6 +6,18 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-09-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Fixed
+
+- Keep Deployment layout stable while Docker logs and asynchronous connection,
+  build, publication and function-preview results arrive. Server Images and
+  Platform Functions render one captured view per Layout/Repaint cycle.
+- Revalidate the current Deployment target before acting on a displayed result;
+  cancellation and late callbacks cannot reactivate an obsolete operation.
+
 ## [0.6.6] - 2026-09-24
 
 Release prepared locally; distribution tags and registry publication are separate.

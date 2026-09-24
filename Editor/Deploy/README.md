@@ -12,6 +12,11 @@ This document describes the Unity Editor tooling under `Editor/Deploy`.
 
 ## Server Images
 
+Deployment captures log lines and result panels at the start of each IMGUI layout
+cycle, so background output cannot change the controls during repaint. Changing
+the target still invalidates operations immediately; a displayed older result
+cannot authorize a new publish or deploy.
+
 Open **Tools → PlayServ → Settings → Deployment → Server Images**. This Editor-only
 workflow builds an existing server Dockerfile and publishes an image using the
 current server-image REST contract. Studios need no checkout of the platform repository.

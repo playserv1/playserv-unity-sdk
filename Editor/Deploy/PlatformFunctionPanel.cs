@@ -25,6 +25,7 @@ namespace Playserv.Editor
         private bool _disposed;
         private Vector2 _scroll;
         private Action _repaint;
+        private LayoutState _layout;
         public bool Running => _operation.Running;
 
         public PlatformFunctionPanel()
@@ -37,15 +38,16 @@ namespace Playserv.Editor
         public void Draw(Action repaint)
         {
             _repaint = repaint;
-            using (new EditorGUI.DisabledScope(Running))
+            CheckCredentials();
+            if (Event.current.type == EventType.Layout || _layout == null) _layout = new LayoutState(this);
+            var view = _layout;
+            using (new EditorGUI.DisabledScope(view.Running || Running))
             {
-                CheckCredentials();
-                EditorGUILayout.LabelField("Dashboard", _target.Api, EditorStyles.wordWrappedMiniLabel);
-                using (new EditorGUI.DisabledScope(!_target.CanConnect))
-                    if (GUILayout.Button("Connect")) _ = RunAsync(ConnectAsync);
-                if (!_target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
-                if (_session != null)
-                    EditorGUILayout.HelpBox("Target: " + _session.Project + " / " + _session.Environment + "\n" + _target.Api, MessageType.Info);
+                EditorGUILayout.LabelField("Dashboard", view.Target.Api, EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(!view.Target.CanConnect))
+                    if (GUILayout.Button("Connect") && CanAct(view) && _target.CanConnect) _ = RunAsync(ConnectAsync);
+                if (!view.Target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
+                if (view.SessionText != null) EditorGUILayout.HelpBox(view.SessionText, MessageType.Info);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -57,43 +59,73 @@ namespace Playserv.Editor
                     }
                     if (folder != _folder) SelectFolder(folder);
                 }
-                if (_preview == null && Directory.Exists(_folder))
+                if (view.Children.Length > 0)
                 {
-                    string[] children;
-                    try { children = Directory.GetDirectories(_folder).Where(p => (File.GetAttributes(p) & FileAttributes.ReparsePoint) == 0).OrderBy(p => p, StringComparer.Ordinal).ToArray(); }
-                    catch (IOException) { children = Array.Empty<string>(); }
-                    catch (UnauthorizedAccessException) { children = Array.Empty<string>(); }
-                    if (children.Length > 0)
-                    {
-                        var options = new[] { "Select a child function folder…" }.Concat(children.Select(Path.GetFileName)).ToArray();
-                        var child = EditorGUILayout.Popup("Functions", 0, options);
-                        if (child > 0) SelectFolder(children[child - 1]);
-                    }
+                    var child = EditorGUILayout.Popup("Functions", 0, view.ChildOptions);
+                    if (child > 0 && CanAct(view)) SelectFolder(view.Children[child - 1]);
                 }
                 _slug = EditorGUILayout.TextField("Function slug", _slug);
                 _kind = EditorGUILayout.Popup("Function type", _kind, new[] { "Choose type…", "cloud_function", "game_server" });
-                if (GUILayout.Button("Preview package")) _ = RunAsync(PreviewAsync);
-                if (_preview != null)
+                if (GUILayout.Button("Preview package") && CanAct(view)) _ = RunAsync(PreviewAsync);
+                if (view.Preview != null)
                 {
-                    EditorGUILayout.LabelField("Package files (" + _preview.Files.Length + ")");
-                    _scroll = EditorGUILayout.BeginScrollView(_scroll, GUILayout.Height(140));
-                    foreach (var file in _preview.Files) EditorGUILayout.LabelField(file);
-                    EditorGUILayout.EndScrollView();
-                    if (_kind == 0) EditorGUILayout.HelpBox("Handler type is ambiguous. Choose cloud_function or game_server explicitly.", MessageType.Warning);
+                    EditorGUILayout.LabelField("Package files (" + view.Files.Length + ")");
+                    using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.Height(140)))
+                    {
+                        _scroll = scroll.scrollPosition;
+                        foreach (var file in view.Files) EditorGUILayout.LabelField(file);
+                    }
+                    if (view.AmbiguousKind) EditorGUILayout.HelpBox("Handler type is ambiguous. Choose cloud_function or game_server explicitly.", MessageType.Warning);
                 }
-                using (new EditorGUI.DisabledScope(_session == null || _preview == null || _kind == 0 || string.IsNullOrWhiteSpace(_slug)))
-                    if (GUILayout.Button("Deploy function")) _ = RunAsync(DeployAsync);
-                if (_last != null)
+                using (new EditorGUI.DisabledScope(view.SessionText == null || view.Preview == null || _kind == 0 || string.IsNullOrWhiteSpace(_slug)))
+                    if (GUILayout.Button("Deploy function") && CanAct(view, true) && _preview != null && ReferenceEquals(view.Preview, _preview)) _ = RunAsync(DeployAsync);
+                if (view.Last != null)
                 {
-                    EditorGUILayout.LabelField("Last deployment", _last.Id);
-                    EditorGUILayout.LabelField("Deployment target", _last.Project + " / " + _last.Environment);
-                    using (new EditorGUI.DisabledScope(_session == null))
-                        if (GUILayout.Button("Resume status")) _ = RunAsync(ct => PollAsync(_last, ct));
+                    EditorGUILayout.LabelField("Last deployment", view.LastId);
+                    EditorGUILayout.LabelField("Deployment target", view.LastTarget);
+                    using (new EditorGUI.DisabledScope(view.SessionText == null))
+                        if (GUILayout.Button("Resume status") && CanAct(view, true) && ReferenceEquals(view.Last, _last)) _ = RunAsync(ct => PollAsync(_last, ct));
                 }
             }
-            if (Running && GUILayout.Button("Stop waiting")) { _operation.Cancel(); _status = "Stopped locally. An accepted deployment may still be running."; }
-            EditorGUILayout.HelpBox(_status, MessageType.Info);
+            if (view.Running && GUILayout.Button("Stop waiting") && Running && !_operation.Cancelled && view.Target.Equals(_target)) { _operation.Cancel(); _status = "Stopped locally. An accepted deployment may still be running."; }
+            EditorGUILayout.HelpBox(view.Status, MessageType.Info);
             EditorGUILayout.LabelField("Stopping local work does not cancel an accepted server deployment.", EditorStyles.wordWrappedMiniLabel);
+        }
+
+        private bool CanAct(LayoutState view, bool connected = false)
+        {
+            CheckCredentials();
+            return !_disposed && !Running && view.Target.Equals(_target) &&
+                (!connected || (_session != null && ReferenceEquals(view.Client, _connection.Client)));
+        }
+
+        private sealed class LayoutState
+        {
+            internal readonly DeploymentTarget Target;
+            internal readonly PlatformFunctionClient Client;
+            internal readonly PlatformFunctionPackage Preview;
+            internal readonly PlatformDeploymentReference Last;
+            internal readonly bool Running, AmbiguousKind;
+            internal readonly string SessionText, Status, LastId, LastTarget;
+            internal readonly string[] Files, Children, ChildOptions;
+
+            internal LayoutState(PlatformFunctionPanel panel)
+            {
+                Target = panel._target; Client = panel._connection.Client; Preview = panel._preview; Last = panel._last;
+                Running = panel.Running; AmbiguousKind = panel._kind == 0; Status = panel._status;
+                if (panel._session != null)
+                    SessionText = "Target: " + panel._session.Project + " / " + panel._session.Environment + "\n" + Target.Api;
+                Files = Preview?.Files ?? Array.Empty<string>();
+                Children = Array.Empty<string>();
+                if (Preview == null && Directory.Exists(panel._folder))
+                {
+                    try { Children = Directory.GetDirectories(panel._folder).Where(p => (File.GetAttributes(p) & FileAttributes.ReparsePoint) == 0).OrderBy(p => p, StringComparer.Ordinal).ToArray(); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+                ChildOptions = new[] { "Select a child function folder…" }.Concat(Children.Select(Path.GetFileName)).ToArray();
+                if (Last != null) { LastId = Last.Id; LastTarget = Last.Project + " / " + Last.Environment; }
+            }
         }
 
         private void SelectFolder(string folder)

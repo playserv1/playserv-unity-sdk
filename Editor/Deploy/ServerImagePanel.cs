@@ -30,6 +30,7 @@ namespace Playserv.Editor
         private bool _disposed;
         private Vector2 _scroll;
         private Action _repaint;
+        private LayoutState _layout;
         internal bool Running => _operation.Running;
 
         internal ServerImagePanel()
@@ -41,21 +42,22 @@ namespace Playserv.Editor
         internal void Draw(Action repaint)
         {
             _repaint = repaint;
-            using (new EditorGUI.DisabledScope(Running))
+            Update();
+            if (Event.current.type == EventType.Layout || _layout == null) _layout = new LayoutState(this);
+            var view = _layout;
+            using (new EditorGUI.DisabledScope(view.Running || Running))
             {
-                Update();
-                EditorGUILayout.LabelField("Dashboard", _target.Api, EditorStyles.wordWrappedMiniLabel);
-                using (new EditorGUI.DisabledScope(!_target.CanConnect))
-                    if (GUILayout.Button("Connect / refresh servers")) Start("Connecting…", ConnectAsync);
-                if (!_target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
-                if (_session != null) EditorGUILayout.HelpBox("Project: " + _session.Project + "   Environment: " + _session.Environment + "\nImages are shared by all environments of this project.", MessageType.Info);
-                var servers = _draft.Servers ?? Array.Empty<string>();
-                var choices = new[] { "Select game server…" }.Concat(servers).ToArray();
-                var index = Array.IndexOf(servers, _draft.Server) + 1;
-                var previousServer = _draft.Server;
-                using (new EditorGUI.DisabledScope(_draft.Servers == null))
-                    _draft.SelectServer(EditorGUILayout.Popup("Game server", Math.Max(0, index), choices));
-                if (previousServer != _draft.Server) { ServerImageEditorStore.Server = _draft.Server; InvalidateBuild(); }
+                EditorGUILayout.LabelField("Dashboard", view.Target.Api, EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(!view.Target.CanConnect))
+                    if (GUILayout.Button("Connect / refresh servers") && CanAct(view) && _target.CanConnect) Start("Connecting…", ConnectAsync);
+                if (!view.Target.CanConnect) EditorGUILayout.HelpBox("Set Dashboard Address and Server Token in PlayServ Config before connecting.", MessageType.Info);
+                if (view.SessionText != null) EditorGUILayout.HelpBox(view.SessionText, MessageType.Info);
+                using (new EditorGUI.DisabledScope(!view.ServersReady))
+                {
+                    var index = EditorGUILayout.Popup("Game server", view.ServerIndex, view.ServerChoices);
+                    if (index != view.ServerIndex && CanAct(view, true))
+                    { _draft.SelectServer(index); ServerImageEditorStore.Server = _draft.Server; InvalidateBuild(); }
+                }
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     var folder = EditorGUILayout.TextField("Build context", _folder);
@@ -72,38 +74,74 @@ namespace Playserv.Editor
                 }
                 var tag = EditorGUILayout.TextField(new GUIContent("Image tag", "Required, unique version, such as the reviewed commit SHA. Existing tags are not overwritten."), _tag);
                 if (tag != _tag) { _tag = tag; ServerImageEditorStore.Tag = tag; InvalidateBuild(); }
-                using (new EditorGUI.DisabledScope(_publisher == null))
+                using (new EditorGUI.DisabledScope(view.Publisher == null))
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("Check Docker")) Start("Checking Docker…", async ct => { await _publisher.CheckDockerAsync(ct); return () => _status = "Docker Linux daemon is ready. Build checks linux/amd64 support."; });
+                    if (GUILayout.Button("Check Docker") && CanAct(view, true)) Start("Checking Docker…", async ct => { await _publisher.CheckDockerAsync(ct); return () => _status = "Docker Linux daemon is ready. Build checks linux/amd64 support."; });
                     using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(_draft.Server) || string.IsNullOrWhiteSpace(_tag)))
-                        if (GUILayout.Button("Build image")) { _built = null; Start("Building linux/amd64…", BuildAsync); }
+                        if (GUILayout.Button("Build image") && CanAct(view, true)) { _built = null; Start("Building linux/amd64…", BuildAsync); }
                 }
-                if (_built != null)
+                if (view.Built != null)
                 {
-                    EditorGUILayout.HelpBox("Ready to publish\n" + _session.Project + " / " + _session.Environment + "\n" + _draft.Server + ":" + _tag + "\nlinux/amd64\n" + _built.Id, MessageType.Info);
-                    if (GUILayout.Button("Publish image")) Start("Publishing image…", PublishAsync);
+                    EditorGUILayout.HelpBox(view.BuildText, MessageType.Info);
+                    if (GUILayout.Button("Publish image") && CanAct(view, true) && ReferenceEquals(view.Built, _built)) Start("Publishing image…", PublishAsync);
                 }
-                if (_last != null)
+                if (view.Last != null)
                 {
-                    EditorGUILayout.LabelField("Last publication", _last.Server + ":" + _last.Tag);
-                    using (new EditorGUI.DisabledScope(_publisher == null))
-                        if (GUILayout.Button("Check publication")) Start("Checking publication…", async ct =>
+                    EditorGUILayout.LabelField("Last publication", view.LastText);
+                    using (new EditorGUI.DisabledScope(view.Publisher == null))
+                        if (GUILayout.Button("Check publication") && CanAct(view, true) && ReferenceEquals(view.Last, _last)) Start("Checking publication…", async ct =>
                         {
                             var verified = await _publisher.CheckPublicationAsync(_last, ct);
                             return () => _status = verified ? "Published: tag, manifest digest and architecture verified." : "Tag exists with compatible architecture. Its digest cannot be verified because the push response was lost.";
                         });
                 }
             }
-            if (Running && GUILayout.Button("Cancel")) { _operation.Cancel(); _status = "Cancelled locally. A started push may have reached the registry; use Check publication."; }
-            EditorGUILayout.HelpBox(_status, MessageType.Info);
+            if (view.Running && GUILayout.Button("Cancel") && Running && !_operation.Cancelled && view.Target.Equals(_target)) { _operation.Cancel(); _status = "Cancelled locally. A started push may have reached the registry; use Check publication."; }
+            EditorGUILayout.HelpBox(view.Status, MessageType.Info);
             EditorGUILayout.LabelField("Publishing an image does not change a pool or start a game server.", EditorStyles.wordWrappedMiniLabel);
-            string[] lines; lock (_log) lines = _log.ToArray();
-            if (lines.Length > 0)
+            if (view.Lines.Length > 0)
             {
-                _scroll = EditorGUILayout.BeginScrollView(_scroll, GUILayout.Height(120));
-                foreach (var line in lines) EditorGUILayout.LabelField(line, EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.EndScrollView();
+                using (var scroll = new EditorGUILayout.ScrollViewScope(_scroll, GUILayout.Height(120)))
+                {
+                    _scroll = scroll.scrollPosition;
+                    foreach (var line in view.Lines) EditorGUILayout.LabelField(line, EditorStyles.wordWrappedMiniLabel);
+                }
+            }
+        }
+
+        private bool CanAct(LayoutState view, bool connected = false)
+        {
+            Update();
+            return !_disposed && !Running && view.Target.Equals(_target) &&
+                (!connected || (_publisher != null && ReferenceEquals(view.Publisher, _publisher)));
+        }
+
+        private sealed class LayoutState
+        {
+            internal readonly DeploymentTarget Target;
+            internal readonly ServerImagePublisher Publisher;
+            internal readonly BuiltServerImage Built;
+            internal readonly ServerImagePublication Last;
+            internal readonly bool Running, ServersReady;
+            internal readonly string SessionText, BuildText, LastText, Status;
+            internal readonly string[] Lines, ServerChoices;
+            internal readonly int ServerIndex;
+
+            internal LayoutState(ServerImagePanel panel)
+            {
+                Target = panel._target; Publisher = panel._publisher; Built = panel._built; Last = panel._last;
+                Running = panel.Running; Status = panel._status;
+                var servers = panel._draft.Servers ?? Array.Empty<string>();
+                ServersReady = panel._draft.Servers != null;
+                ServerChoices = new[] { "Select game server…" }.Concat(servers).ToArray();
+                ServerIndex = Math.Max(0, Array.IndexOf(servers, panel._draft.Server) + 1);
+                if (panel._session != null)
+                    SessionText = "Project: " + panel._session.Project + "   Environment: " + panel._session.Environment + "\nImages are shared by all environments of this project.";
+                if (Built != null)
+                    BuildText = "Ready to publish\n" + panel._session.Project + " / " + panel._session.Environment + "\n" + panel._draft.Server + ":" + panel._tag + "\nlinux/amd64\n" + Built.Id;
+                if (Last != null) LastText = Last.Server + ":" + Last.Tag;
+                lock (panel._log) Lines = panel._log.ToArray();
             }
         }
 
