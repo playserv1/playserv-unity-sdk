@@ -1,5 +1,5 @@
-#if UNITY_5_3_OR_NEWER
 using System;
+#if UNITY_5_3_OR_NEWER
 using UnityEngine;
 #endif
 
@@ -93,7 +93,7 @@ namespace Playserv.Wrapper
         public static string ResolveBackendServerAddress(string value)
         {
             if (!string.IsNullOrWhiteSpace(value))
-                return value.Trim();
+                return MigrateBackendAddress(value.Trim());
 
 #if UNITY_5_3_OR_NEWER
             if (TryLoadAsset(out var packageDefaults) &&
@@ -109,7 +109,7 @@ namespace Playserv.Wrapper
         public static string ResolveBackendServerAddress(string value, string environmentName)
         {
             if (!string.IsNullOrWhiteSpace(value))
-                return value.Trim();
+                return MigrateBackendAddress(value.Trim());
 
 #if UNITY_5_3_OR_NEWER
             if (TryLoadEnvironmentAsset(environmentName, out var packageDefaults) &&
@@ -122,69 +122,21 @@ namespace Playserv.Wrapper
             return ResolveBackendServerAddress(value);
         }
 
-        public static string ResolveDeployApiServerAddress(string value)
+        internal static string MigrateBackendAddress(string value)
         {
-            if (!string.IsNullOrWhiteSpace(value))
-                return value.Trim();
-
-#if UNITY_5_3_OR_NEWER
-            if (TryLoadAsset(out var packageDefaults) &&
-                !string.IsNullOrWhiteSpace(packageDefaults.DeployApiServerAddress))
-            {
-                return packageDefaults.DeployApiServerAddress.Trim();
-            }
-#endif
-
-            return PlayServSettings.DefaultDeployApiServerAddress;
+            if (string.Equals(value?.Trim().TrimEnd('/'), "wss://proxy.playserv.io/ws", StringComparison.OrdinalIgnoreCase))
+                return "wss://platform.playserv.com/ws";
+            return value;
         }
 
-        public static string ResolveDeployApiServerAddress(string value, string environmentName)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-                return value.Trim();
-
-#if UNITY_5_3_OR_NEWER
-            if (TryLoadEnvironmentAsset(environmentName, out var packageDefaults) &&
-                !string.IsNullOrWhiteSpace(packageDefaults.DeployApiServerAddress))
-            {
-                return packageDefaults.DeployApiServerAddress.Trim();
-            }
-#endif
-
-            return ResolveDeployApiServerAddress(value);
-        }
-
-        public static string ResolveSchemaApiServerAddress(string value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-                return value.Trim();
-
-#if UNITY_5_3_OR_NEWER
-            if (TryLoadAsset(out var packageDefaults) &&
-                !string.IsNullOrWhiteSpace(packageDefaults.SchemaApiServerAddress))
-            {
-                return packageDefaults.SchemaApiServerAddress.Trim();
-            }
-#endif
-
-            return PlayServSettings.DefaultSchemaApiServerAddress;
-        }
-
-        public static string ResolveSchemaApiServerAddress(string value, string environmentName)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-                return value.Trim();
-
-#if UNITY_5_3_OR_NEWER
-            if (TryLoadEnvironmentAsset(environmentName, out var packageDefaults) &&
-                !string.IsNullOrWhiteSpace(packageDefaults.SchemaApiServerAddress))
-            {
-                return packageDefaults.SchemaApiServerAddress.Trim();
-            }
-#endif
-
-            return ResolveSchemaApiServerAddress(value);
-        }
+        [System.Obsolete("V1 deployment has been retired.")]
+        public static string ResolveDeployApiServerAddress(string value) => string.Empty;
+        [System.Obsolete("V1 deployment has been retired.")]
+        public static string ResolveDeployApiServerAddress(string value, string environmentName) => string.Empty;
+        [System.Obsolete("V1 schema download has been retired.")]
+        public static string ResolveSchemaApiServerAddress(string value) => string.Empty;
+        [System.Obsolete("V1 schema download has been retired.")]
+        public static string ResolveSchemaApiServerAddress(string value, string environmentName) => string.Empty;
 
         public static string ResolveDashboardAddress(string value)
         {

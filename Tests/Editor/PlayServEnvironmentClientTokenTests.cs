@@ -46,7 +46,10 @@ namespace Playserv.Tests.Editor
         {
             FinishBuild();
             foreach (var environment in new[] { "Dev", "Prod" })
-                EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.PreferenceKey(_config, environment));
+            {
+                DeleteToken(PlayServEnvironmentClientTokens.PreferenceKey(_config, environment));
+                DeleteToken(PlayServDeploymentSettings.PreferenceKey(_config, environment));
+            }
             EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.MigrationKey(_config));
             AssetDatabase.DeleteAsset(_folder);
             if (_hadEnvironment)
@@ -55,6 +58,12 @@ namespace Playserv.Tests.Editor
                 EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.ActiveEnvironmentPreference);
             Environment.SetEnvironmentVariable("PLAYSERV_ENVIRONMENT", _processEnvironment);
             Environment.SetEnvironmentVariable("PLAYSERV_CLIENT_TOKEN", _processToken);
+        }
+
+        private static void DeleteToken(string key)
+        {
+            EditorPrefs.DeleteKey(key);
+            File.Delete(PlayServLocalTokenStore.Instance.BackupPath(key));
         }
 
         [Test]
@@ -158,7 +167,7 @@ namespace Playserv.Tests.Editor
             finally
             {
                 foreach (var environment in new[] { "Dev", "Prod" })
-                    EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.PreferenceKey(other, environment));
+                    DeleteToken(PlayServEnvironmentClientTokens.PreferenceKey(other, environment));
                 EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.MigrationKey(other));
             }
         }
@@ -196,7 +205,7 @@ namespace Playserv.Tests.Editor
             try { Assert.DoesNotThrow(PrepareBuild); }
             finally
             {
-                EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.PreferenceKey(other, "Dev"));
+                DeleteToken(PlayServEnvironmentClientTokens.PreferenceKey(other, "Dev"));
                 EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.MigrationKey(other));
             }
         }
@@ -221,7 +230,7 @@ namespace Playserv.Tests.Editor
             }
             finally
             {
-                EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.PreferenceKey(other, "Dev"));
+                DeleteToken(PlayServEnvironmentClientTokens.PreferenceKey(other, "Dev"));
                 EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.MigrationKey(other));
             }
         }

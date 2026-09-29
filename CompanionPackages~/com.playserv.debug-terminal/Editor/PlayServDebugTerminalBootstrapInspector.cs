@@ -10,8 +10,6 @@ namespace Playserv.DebugTerminal.Editor
         private static readonly string[] ReadOnlyEndpointPropertyOrder =
         {
             "backendServerAddress",
-            "deployApiServerAddress",
-            "schemaApiServerAddress"
         };
 
         public override void OnInspectorGUI()

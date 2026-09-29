@@ -8,9 +8,11 @@ namespace Playserv.Runtime.Abstractions
     public sealed class PlayServRuntimeSettings
     {
         public const string DefaultBackendServerAddress = "";
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public const string DefaultDeployApiServerAddress = "";
         public const string DefaultWebRtcSignalingServerAddress = "";
         public const string DefaultWebRtcDataChannelLabel = "playserv";
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public const string DefaultSchemaApiServerAddress = "";
         public const string DefaultDashboardAddress = "";
 
@@ -27,7 +29,7 @@ namespace Playserv.Runtime.Abstractions
         public string DeploymentGameId { get; set; } = string.Empty;
         public string PlayerId { get; set; } = string.Empty;
         public string GameVersion { get; set; } = "1.0.0";
-        public string SdkVersion { get; set; } = "0.6.9";
+        public string SdkVersion { get; set; } = "0.6.10";
         public bool AllowMultipleConnections { get; set; } = true;
         public int KeepAlivePingIntervalMs { get; set; } = 30000;
         public int KeepAlivePongTimeoutMs { get; set; } = 10000;
@@ -36,7 +38,9 @@ namespace Playserv.Runtime.Abstractions
         public string WebRtcSignalingServerAddress { get; set; } = DefaultWebRtcSignalingServerAddress;
         public string WebRtcDataChannelLabel { get; set; } = DefaultWebRtcDataChannelLabel;
         public string[] WebRtcIceServers { get; set; } = Array.Empty<string>();
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public string DeployApiServerAddress { get; set; } = DefaultDeployApiServerAddress;
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public string SchemaApiServerAddress { get; set; } = DefaultSchemaApiServerAddress;
         public string DashboardAddress { get; set; } = DefaultDashboardAddress;
         public int TimeoutSeconds { get; set; } = 120;

@@ -6,6 +6,25 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-09-29
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Changed
+
+- Retire V1 RPC ZIP deployment, version sync, remote code hash/archive and
+  by-sdk-key schema download. Deployment retains Platform Functions and Server
+  Images; model generation accepts local JSON and Schema Tool remains available.
+- Remove Deploy API and Schema API from serialized defaults and config assets.
+  Migrate the known legacy Prod runtime to `wss://platform.playserv.com/ws`,
+  preserve custom addresses and point documentation to `docs.playserv.com`.
+- Connect uses the configured `GameVersion`; obsolete V1 version lookup APIs fail
+  locally with a clear error. Remove `sdk latest` from the debug terminal.
+- Align core, all twelve companions and the bundled Schema Tool at `0.6.10`.
+- Immediately back up local Client and Server Token edits to `Library/PlayServ/Tokens`
+  and restore missing preferences from their project/config/environment backup.
+  Explicit clearing updates both stores; process environment overrides are not saved.
+
 ## [0.6.9] - 2026-09-24
 
 Release prepared locally; distribution tags and registry publication are separate.

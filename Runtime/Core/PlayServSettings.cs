@@ -18,6 +18,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Default deployment API server address.
         /// </summary>
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public const string DefaultDeployApiServerAddress = "";
 
         /// <summary>
@@ -33,6 +34,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Default schema API server address.
         /// </summary>
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public const string DefaultSchemaApiServerAddress = "";
 
         /// <summary>
@@ -119,6 +121,7 @@ namespace Playserv.Wrapper
         /// version before opening the runtime connection. Disable this for session-only
         /// debug overrides that must use <see cref="GameVersion"/> exactly as provided.
         /// </summary>
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public bool ResolveLatestGameVersionOnConnect { get; set; } = true;
 
         /// <summary>
@@ -171,11 +174,13 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Deployment API server address used by editor deployment tools.
         /// </summary>
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public string DeployApiServerAddress { get; set; } = DefaultDeployApiServerAddress;
 
         /// <summary>
         /// Schema API server address used by editor schema tools.
         /// </summary>
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public string SchemaApiServerAddress { get; set; } = DefaultSchemaApiServerAddress;
 
         /// <summary>
@@ -186,6 +191,7 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Backward-compatible alias for <see cref="DeployApiServerAddress"/>.
         /// </summary>
+        [Obsolete("V1 deployment and version lookup have been retired; this value is ignored.")]
         public string DeployApiEndpoint
         {
             get => DeployApiServerAddress;

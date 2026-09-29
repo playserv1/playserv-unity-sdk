@@ -9,8 +9,6 @@ namespace Playserv.Editor
         // You can change this path if you want a different location.
         private const string AssetPath = "Assets/Resources/PlayServConfig.asset";
         private const string BackendServerAddressPropertyName = "backendServerAddress";
-        private const string DeployApiServerAddressPropertyName = "deployApiServerAddress";
-        private const string SchemaApiServerAddressPropertyName = "schemaApiServerAddress";
         private const string DashboardAddressPropertyName = "dashboardAddress";
         private const string LegacyDefaultSdkVersion = "1.0.0";
 
@@ -23,8 +21,6 @@ namespace Playserv.Editor
                 var changed = PlayServDeployCredentialStore.MigrateLegacySecrets(config);
                 changed |= ApplyEnvironmentProfile(config);
                 changed |= EnsureBackendServerAddress(config);
-                changed |= EnsureDeployApiServerAddress(config);
-                changed |= EnsureSchemaApiServerAddress(config);
                 changed |= EnsureDashboardAddress(config);
                 changed |= EnsureDefaultSdkVersion(config);
                 if (changed)
@@ -44,8 +40,6 @@ namespace Playserv.Editor
             PlayServPackageEnvironmentProvider.TryApplyActiveEnvironmentDefaults(config);
             ApplyEnvironmentProfile(config);
             EnsureBackendServerAddress(config);
-            EnsureDeployApiServerAddress(config);
-            EnsureSchemaApiServerAddress(config);
             EnsureDashboardAddress(config);
             EnsureDefaultSdkVersion(config);
             AssetDatabase.SaveAssets();
@@ -94,11 +88,11 @@ namespace Playserv.Editor
                 return false;
 
             var currentValue = backendProperty.stringValue?.Trim();
-            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
-            if (!shouldReplace)
+            var resolved = PlayServPackageDefaultsProvider.ResolveBackendServerAddress(currentValue);
+            if (string.Equals(currentValue, resolved, System.StringComparison.Ordinal))
                 return false;
 
-            backendProperty.stringValue = PlayServPackageDefaultsProvider.ResolveBackendServerAddress(null);
+            backendProperty.stringValue = resolved;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return true;
@@ -118,48 +112,6 @@ namespace Playserv.Editor
                     AssetDatabase.CreateFolder(current, parts[i]);
                 current = next;
             }
-        }
-
-        private static bool EnsureDeployApiServerAddress(PlayServConfig config)
-        {
-            if (config == null)
-                return false;
-
-            var serializedObject = new SerializedObject(config);
-            var deployEndpointProperty = serializedObject.FindProperty(DeployApiServerAddressPropertyName);
-            if (deployEndpointProperty == null)
-                return false;
-
-            var currentValue = deployEndpointProperty.stringValue?.Trim();
-            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
-            if (!shouldReplace)
-                return false;
-
-            deployEndpointProperty.stringValue = PlayServPackageDefaultsProvider.ResolveDeployApiServerAddress(null);
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(config);
-            return true;
-        }
-
-        private static bool EnsureSchemaApiServerAddress(PlayServConfig config)
-        {
-            if (config == null)
-                return false;
-
-            var serializedObject = new SerializedObject(config);
-            var schemaEndpointProperty = serializedObject.FindProperty(SchemaApiServerAddressPropertyName);
-            if (schemaEndpointProperty == null)
-                return false;
-
-            var currentValue = schemaEndpointProperty.stringValue?.Trim();
-            var shouldReplace = string.IsNullOrWhiteSpace(currentValue);
-            if (!shouldReplace)
-                return false;
-
-            schemaEndpointProperty.stringValue = PlayServPackageDefaultsProvider.ResolveSchemaApiServerAddress(null);
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(config);
-            return true;
         }
 
         private static bool EnsureDashboardAddress(PlayServConfig config)
@@ -227,10 +179,8 @@ namespace Playserv.Editor
                     merged.DeploymentGameId = bakedSettings.DeploymentGameId;
                 if (string.IsNullOrWhiteSpace(merged.BackendServerAddress))
                     merged.BackendServerAddress = bakedSettings.BackendServerAddress;
-                if (string.IsNullOrWhiteSpace(merged.DeployApiServerAddress))
-                    merged.DeployApiServerAddress = bakedSettings.DeployApiServerAddress;
-                if (string.IsNullOrWhiteSpace(merged.SchemaApiServerAddress))
-                    merged.SchemaApiServerAddress = bakedSettings.SchemaApiServerAddress;
+
+
                 if (string.IsNullOrWhiteSpace(merged.DashboardAddress))
                     merged.DashboardAddress = bakedSettings.DashboardAddress;
                 return config.ApplySettings(merged);

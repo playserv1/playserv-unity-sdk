@@ -5,6 +5,7 @@ namespace Playserv.Http.Interfaces
 {
     public interface IPlayServRuntimeHttpClient
     {
+        [System.Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed.")]
         Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default);
 
         /// <summary>

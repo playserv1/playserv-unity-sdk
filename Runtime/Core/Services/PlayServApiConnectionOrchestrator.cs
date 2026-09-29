@@ -10,7 +10,6 @@ namespace Playserv.Wrapper
         private readonly object _connectGate = new object();
         private readonly Func<PlayServState> _getState;
         private readonly Func<PlayServSettings> _getOrCreateSettings;
-        private readonly Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> _refreshConfiguredGameVersionAsync;
         private readonly Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> _preparePlayerAuthenticationAsync;
         private readonly Action<PlayServSettings> _applySettings;
         private readonly Action<PlayServSettings> _handleConnected;
@@ -25,7 +24,6 @@ namespace Playserv.Wrapper
         public PlayServApiConnectionOrchestrator(
             Func<PlayServState> getState,
             Func<PlayServSettings> getOrCreateSettings,
-            Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> refreshConfiguredGameVersionAsync,
             Func<PlayServSettings, CancellationToken, Task<PlayServSettings>> preparePlayerAuthenticationAsync,
             Action<PlayServSettings> applySettings,
             Action<PlayServSettings> handleConnected,
@@ -38,7 +36,6 @@ namespace Playserv.Wrapper
         {
             _getState = getState ?? throw new ArgumentNullException(nameof(getState));
             _getOrCreateSettings = getOrCreateSettings ?? throw new ArgumentNullException(nameof(getOrCreateSettings));
-            _refreshConfiguredGameVersionAsync = refreshConfiguredGameVersionAsync ?? throw new ArgumentNullException(nameof(refreshConfiguredGameVersionAsync));
             _preparePlayerAuthenticationAsync = preparePlayerAuthenticationAsync ?? throw new ArgumentNullException(nameof(preparePlayerAuthenticationAsync));
             _applySettings = applySettings ?? throw new ArgumentNullException(nameof(applySettings));
             _handleConnected = handleConnected ?? throw new ArgumentNullException(nameof(handleConnected));
@@ -90,8 +87,6 @@ namespace Playserv.Wrapper
                 _resetShutdownState();
                 var settings = _getOrCreateSettings();
                 _logTrace($"[PlayServ] Connect started. state={state}, endpoint={settings.Endpoint}");
-                settings = await _refreshConfiguredGameVersionAsync(settings, CancellationToken.None);
-                _logTrace($"[PlayServ] Connect continue after version refresh. resolvedGameVersion={settings.GameVersion}");
                 settings = await _preparePlayerAuthenticationAsync(settings, CancellationToken.None);
                 _logTrace(
                     $"[PlayServ] Player authentication prepared. playerIdKnown={!string.IsNullOrWhiteSpace(settings.PlayerId)}");

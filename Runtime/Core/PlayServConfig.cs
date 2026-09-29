@@ -33,8 +33,6 @@ namespace Playserv.Wrapper
         }
 #endif
         private const string DEFAULT_BACKEND_SERVER_ADDRESS = PlayServSettings.DefaultBackendServerAddress;
-        private const string DEFAULT_DEPLOY_API_SERVER_ADDRESS = PlayServSettings.DefaultDeployApiServerAddress;
-        private const string DEFAULT_SCHEMA_API_SERVER_ADDRESS = PlayServSettings.DefaultSchemaApiServerAddress;
         private const string DEFAULT_DASHBOARD_ADDRESS = PlayServSettings.DefaultDashboardAddress;
 
         [FormerlySerializedAs("gameAccessToken")]
@@ -58,10 +56,7 @@ namespace Playserv.Wrapper
         [SerializeField] private string webRtcDataChannelLabel = PlayServSettings.DefaultWebRtcDataChannelLabel;
         [SerializeField] private string[] webRtcIceServers = Array.Empty<string>();
         
-        [FormerlySerializedAs("deployApiEndpoint")]
         [Header("Deploy")]
-        [SerializeField] private string deployApiServerAddress = DEFAULT_DEPLOY_API_SERVER_ADDRESS;
-        [SerializeField] private string schemaApiServerAddress = DEFAULT_SCHEMA_API_SERVER_ADDRESS;
         [SerializeField] private string dashboardAddress = DEFAULT_DASHBOARD_ADDRESS;
 #if UNITY_EDITOR
         [FormerlySerializedAs("deployAuthToken")]
@@ -131,7 +126,7 @@ namespace Playserv.Wrapper
         /// desktop reliable UDP endpoints via <c>rudp://host:port</c>, and WebRTC routing via <c>webrtc://...</c>
         /// when signaling client factory is configured.
         /// </summary>
-        public string BackendServerAddress => backendServerAddress;
+        public string BackendServerAddress => PlayServPackageDefaultsProvider.MigrateBackendAddress(backendServerAddress);
 
         /// <summary>
         /// Optional signaling server address used by WebRTC DataChannel transport.
@@ -151,17 +146,19 @@ namespace Playserv.Wrapper
         /// <summary>
         /// Backward-compatible alias for <see cref="BackendServerAddress"/>.
         /// </summary>
-        public string Endpoint => backendServerAddress;
+        public string Endpoint => BackendServerAddress;
         
         /// <summary>
         /// Deployment API endpoint used by editor deployment tools.
         /// </summary>
-        public string DeployApiServerAddress => deployApiServerAddress;
+        [Obsolete("V1 deployment and schema download have been retired.")]
+        public string DeployApiServerAddress => string.Empty;
 
         /// <summary>
         /// Schema API endpoint used by editor schema tools.
         /// </summary>
-        public string SchemaApiServerAddress => schemaApiServerAddress;
+        [Obsolete("V1 deployment and schema download have been retired.")]
+        public string SchemaApiServerAddress => string.Empty;
 
         /// <summary>
         /// Dashboard URL used by editor shortcuts.
@@ -186,12 +183,10 @@ namespace Playserv.Wrapper
                 KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
                 KeepAlivePongTimeoutMs = keepAlivePongTimeoutMs,
                 NetworkTransformSyncIntervalMs = networkTransformSyncIntervalMs,
-                BackendServerAddress = backendServerAddress,
+                BackendServerAddress = BackendServerAddress,
                 WebRtcSignalingServerAddress = webRtcSignalingServerAddress,
                 WebRtcDataChannelLabel = webRtcDataChannelLabel,
                 WebRtcIceServers = webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone(),
-                DeployApiServerAddress = deployApiServerAddress,
-                SchemaApiServerAddress = schemaApiServerAddress,
                 DashboardAddress = dashboardAddress,
                 TimeoutSeconds = timeoutSeconds
             };
@@ -219,8 +214,6 @@ namespace Playserv.Wrapper
             changed |= AssignIfDifferent(ref webRtcSignalingServerAddress, settings.WebRtcSignalingServerAddress);
             changed |= AssignIfDifferent(ref webRtcDataChannelLabel, settings.WebRtcDataChannelLabel);
             changed |= AssignArrayIfDifferent(ref webRtcIceServers, settings.WebRtcIceServers);
-            changed |= AssignIfDifferent(ref deployApiServerAddress, settings.DeployApiServerAddress);
-            changed |= AssignIfDifferent(ref schemaApiServerAddress, settings.SchemaApiServerAddress);
             changed |= AssignIfDifferent(ref dashboardAddress, settings.DashboardAddress);
             changed |= AssignIfDifferent(ref timeoutSeconds, settings.TimeoutSeconds);
 

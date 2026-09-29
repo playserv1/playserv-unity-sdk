@@ -37,21 +37,5 @@ namespace Playserv.Editor
         public string WebSocketEndpoint = string.Empty;
         public string TestMessage = "{\"type\":\"ping\"}";
 
-        public DefaultAsset DeployFolder;
-        public bool DeployIncludeSubfolders = true;
-        public string DeployPattern = "*";
-        public bool DeployKeepRelativePaths = true;
-        public bool DeployTokenInitialized;
-        public string DeployTokenDraft = string.Empty;
-        public bool DeployShowFileList;
-        public Vector2 DeployFilesScroll;
-        public List<string> DeployFilesPreview = new List<string>();
-
-        public bool DeployRunning;
-        public float DeployProgress;
-        public string DeployStatus = string.Empty;
-        public CancellationTokenSource DeployCts;
-        public bool VersionSyncRunning;
-        public string VersionSyncStatus = string.Empty;
     }
 }

@@ -11,7 +11,7 @@ namespace Playserv.Editor
         private const string WindowTitlePrefix = "PlayServ";
         private const string MenuPath = "Tools/PlayServ/Settings";
         private const int MenuPriority = 2000;
-        private const string DocsUrl = "https://docs.playserv.io/";
+        private const string DocsUrl = "https://docs.playserv.com/";
         private const float FixedWindowWidth = 720f;
         private const float MinWindowHeight = 760f;
         private const float MaxWindowHeight = 10000f;
@@ -89,7 +89,6 @@ namespace Playserv.Editor
             _state.WebSocketEndpoint = EditorPrefs.GetString(
                 Const.PrefKeyWebSocketEndpoint,
                 PlayServPackageDefaultsProvider.ResolveBackendServerAddress(null));
-            _state.DeployFolder = LoadSavedDeployFolder();
 
             EnsureConfig();
             UpdateWindowTitle();
@@ -146,8 +145,6 @@ namespace Playserv.Editor
                 EditorGUIUtility.labelWidth = previousLabelWidth;
             }
 
-            if (_state.DeployRunning)
-                Repaint();
         }
 
         private void DrawMainLayer(PlayServWindowContext context)
@@ -158,7 +155,7 @@ namespace Playserv.Editor
             _configSectionPresenter.Draw(context);
 
             if (PlayServEditorModuleAvailability.EditorDeployment &&
-                (_state.ModuleSettings.Deployment || _state.DeployRunning || _state.VersionSyncRunning) &&
+                _state.ModuleSettings.Deployment &&
                 _deploymentSection.IsAvailable)
             {
                 GUILayout.Space(12f);
@@ -231,15 +228,6 @@ namespace Playserv.Editor
         private void UpdateWindowTitle()
         {
             titleContent = new GUIContent(WindowTitlePrefix);
-        }
-
-        private static DefaultAsset LoadSavedDeployFolder()
-        {
-            var assetPath = EditorPrefs.GetString(Const.PrefKeyDeploymentFolderAssetPath, string.Empty);
-            if (string.IsNullOrWhiteSpace(assetPath) || !AssetDatabase.IsValidFolder(assetPath))
-                return null;
-
-            return AssetDatabase.LoadAssetAtPath<DefaultAsset>(assetPath);
         }
 
         private void DrawWindowBackdrop()

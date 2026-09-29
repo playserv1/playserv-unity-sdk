@@ -1,5 +1,9 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+using Playserv.Editor;
 using NUnit.Framework;
 using Playserv.ModelGenerator.Editor;
 
@@ -146,12 +150,54 @@ namespace Playserv.Tests.Editor
         }
 
         [Test]
-        public void DownloadSchema_RequiresClientToken()
+        public void RegenerateAfterLocalImport_DoesNotRestoreLegacyDownloadedSchema()
         {
-            Assert.Throws<InvalidOperationException>(
-                () => SchemaLoader.LoadSchema(" "));
-            Assert.Throws<InvalidOperationException>(
-                () => SchemaLoader.LoadSchema("sk_private"));
+            var currentPath = PlayServServerSchemaWorkflow.ToAbsolutePath(PlayServServerSchemaWorkflow.CurrentSchemaAssetPath);
+            var latestPath = PlayServServerSchemaWorkflow.ToAbsolutePath(PlayServServerSchemaWorkflow.LatestSchemaAssetPath);
+            var generated = PlayServServerSchemaWorkflow.ToAbsolutePath(PlayServServerSchemaWorkflow.GeneratedModelsAssetPath);
+            var paths = new List<string> { currentPath, currentPath + ".meta", latestPath, latestPath + ".meta" };
+            if (Directory.Exists(generated)) paths.AddRange(Directory.GetFiles(generated));
+            var saved = paths.ToDictionary(path => path, path => File.Exists(path) ? File.ReadAllBytes(path) : null);
+            var prefKeys = new[] { Const.PrefKeyJsonSchemaVersion, Const.PrefKeyJsonSchemaTimestamp };
+            var savedPrefs = prefKeys.ToDictionary(key => key, key => EditorPrefs.HasKey(key) ? EditorPrefs.GetString(key) : null);
+            var importPath = Path.GetTempFileName();
+            const string imported = "{\"version\":1,\"jsonSchema\":{\"$defs\":{},\"x-version\":\"new-local\"}}";
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(latestPath));
+                File.WriteAllText(latestPath, "{\"version\":1,\"jsonSchema\":{\"$defs\":{},\"x-version\":\"old-download\"}}");
+                File.WriteAllText(importPath, imported);
+                var result = SchemaCodeGenerator.GenerateFromSchemaFile(importPath, acceptAsCurrent: true);
+                Assert.That(result.Success, Is.True, result.Error);
+
+                SchemaCodeGenerator.GenerateModels();
+
+                Assert.That(File.ReadAllText(currentPath), Is.EqualTo(imported));
+            }
+            finally
+            {
+                File.Delete(importPath);
+                foreach (var entry in savedPrefs)
+                {
+                    if (entry.Value == null) EditorPrefs.DeleteKey(entry.Key);
+                    else EditorPrefs.SetString(entry.Key, entry.Value);
+                }
+                foreach (var entry in saved)
+                {
+                    if (entry.Value == null) File.Delete(entry.Key);
+                    else File.WriteAllBytes(entry.Key, entry.Value);
+                }
+                AssetDatabase.StopAssetEditing();
+                AssetDatabase.Refresh();
+            }
+        }
+
+        [Test]
+        public void DownloadSchemaIsRetiredWithoutResolvingCredentials()
+        {
+            Assert.Throws<NotSupportedException>(() => SchemaLoader.LoadSchema("pk_fixture").GetAwaiter().GetResult());
+            Assert.Throws<NotSupportedException>(() => SchemaLoader.LoadSchema(" ").GetAwaiter().GetResult());
         }
 
         private static PlayServSchemaDocumentInfo Document(

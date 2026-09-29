@@ -25,15 +25,18 @@ namespace Playserv.Editor
             return path.StartsWith("Assets/", StringComparison.Ordinal) ? AssetDatabase.AssetPathToGUID(path) : "";
         }
 
-        internal static string GetLocal(PlayServConfig config, string environment) =>
-            ConfigId(config).Length == 0 ? "" : EditorPrefs.GetString(PreferenceKey(config, environment), "");
+        internal static string GetLocal(PlayServConfig config, string environment)
+        {
+            if (ConfigId(config).Length == 0) return string.Empty;
+            PlayServLocalTokenStore.Instance.TryGet(PreferenceKey(config, environment), out var value);
+            return value;
+        }
 
         internal static void SetLocal(PlayServConfig config, string environment, string value)
         {
             if (ConfigId(config).Length == 0) throw new InvalidOperationException("Save the PlayServ Config in Assets before storing a Server Token.");
             var key = PreferenceKey(config, environment);
-            if (string.IsNullOrWhiteSpace(value)) EditorPrefs.DeleteKey(key);
-            else EditorPrefs.SetString(key, value.Trim());
+            PlayServLocalTokenStore.Instance.TrySet(key, string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim());
         }
 
         internal static string MigrateLegacyKey(PlayServConfig config)
@@ -42,7 +45,12 @@ namespace Playserv.Editor
             var environment = EnvironmentForDashboard(LegacyApi);
             if (environment == null) return "The old Deployment key has an unknown environment. It was preserved locally. Enter a Server Token separately for Dev and Prod.";
             var key = PreferenceKey(config, environment);
-            if (!EditorPrefs.HasKey(key)) SetLocal(config, environment, LegacyKey);
+            var store = PlayServLocalTokenStore.Instance;
+            if (!store.TryGet(key, out _))
+            {
+                if (store.Error(key) != null || !store.TrySet(key, LegacyKey.Trim()))
+                    return "The legacy Server Token could not be backed up in Library/PlayServ. It was preserved locally.";
+            }
             EditorPrefs.SetBool(MigrationKey, true);
             LegacyKey = "";
             return null;

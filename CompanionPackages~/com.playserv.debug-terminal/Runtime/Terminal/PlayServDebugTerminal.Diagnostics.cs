@@ -28,11 +28,8 @@ namespace Playserv.DebugTerminal
                 case "modules":
                     PrintSdkModules();
                     return;
-                case "latest":
-                    await PrintLatestVersionAsync(parts.Count > 2 ? parts[2] : null);
-                    return;
                 default:
-                    AddLog("Usage: sdk <info|modules|latest> [gameId]");
+                    AddLog("Usage: sdk <info|modules>");
                     return;
             }
         }
@@ -69,7 +66,6 @@ namespace Playserv.DebugTerminal
                 $"version={settings.GameVersion}; endpoint={settings.BackendServerAddress}");
             AddLog(
                 $"multipleConnections={settings.AllowMultipleConnections}; " +
-                $"latestLookup={settings.ResolveLatestGameVersionOnConnect}; " +
                 $"keepalive={settings.KeepAlivePingIntervalMs}/{settings.KeepAlivePongTimeoutMs}ms");
             AddLog($"Auth = {GetAuthSummary(includeProviders: true)}");
         }
@@ -89,22 +85,6 @@ namespace Playserv.DebugTerminal
                 AddLog($"- {moduleId}: " +
                        (PlayServModuleRegistry.IsSelected(moduleId) ? "selected" : "not selected"));
             }
-        }
-
-        private async Task PrintLatestVersionAsync(string deploymentId)
-        {
-            deploymentId = string.IsNullOrWhiteSpace(deploymentId)
-                ? PlayServ.Settings?.DeploymentGameId
-                : deploymentId.Trim();
-            if (string.IsNullOrWhiteSpace(deploymentId))
-            {
-                AddLog("Deployment ID is required. Usage: sdk latest [deploymentId]");
-                return;
-            }
-
-            var version = await PlayServ.GetLatestVersionAsync(deploymentId);
-            _status = $"Latest version for deployment '{deploymentId}' is '{version}'";
-            AddLog(_status);
         }
 
         private void ExecuteKeepAliveCommand(IReadOnlyList<string> parts)

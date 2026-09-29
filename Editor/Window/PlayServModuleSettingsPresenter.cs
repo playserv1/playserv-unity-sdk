@@ -83,17 +83,11 @@ namespace Playserv.Editor
 
                     if (PlayServEditorModuleAvailability.EditorDeployment)
                     {
-                        using (new EditorGUI.DisabledScope(context.State.DeployRunning || context.State.VersionSyncRunning))
-                        {
-                            changed |= DrawToggleModule(
-                                "Deployment",
-                                "Release ZIP preview, version sync, and deploy controls.",
-                                settings.Deployment,
-                                settings.SetDeployment);
-                        }
-
-                        if (context.State.DeployRunning || context.State.VersionSyncRunning)
-                            PlayServWindowChrome.DrawNotice("Deployment module cannot be hidden while deployment/version sync is running.", MessageType.Info);
+                        changed |= DrawToggleModule(
+                            "Deployment",
+                            "Platform Functions and Server Images publishing.",
+                            settings.Deployment,
+                            settings.SetDeployment);
                     }
 
                     if (PlayServEditorModuleAvailability.EditorModelSync)

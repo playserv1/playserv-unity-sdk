@@ -16,9 +16,6 @@ namespace Playserv.Wrapper
     internal sealed class PlayServApiConfigFacade
     {
         private const string WebRtcScheme = "webrtc";
-#if UNITY_5_3_OR_NEWER
-        private const string ConfigResourceName = "PlayServConfig";
-#endif
 
         private readonly PlayServRuntimeSettingsService _settingsService;
         private Func<PlayServRuntimeSettings, IWebRtcSignalingClient> _webRtcSignalingClientFactory;
@@ -28,26 +25,17 @@ namespace Playserv.Wrapper
         private string _instanceTransportKey;
 
         public PlayServApiConfigFacade(
-            Action<IPlayServRuntimeSession> subscribeToInstanceEvents,
-            Action<string> logTrace,
-            int versionRefreshTimeoutSeconds)
+            Action<IPlayServRuntimeSession> subscribeToInstanceEvents)
         {
             if (subscribeToInstanceEvents == null)
                 throw new ArgumentNullException(nameof(subscribeToInstanceEvents));
-
-            if (logTrace == null)
-                throw new ArgumentNullException(nameof(logTrace));
 
             _settingsService = new PlayServRuntimeSettingsService(
                 loadSettings: LoadSettingsFromUnityResources,
                 sessionFactory: new PlayServRuntimeSessionFactory(),
                 createTransportImplementationFactory: CreateTransportImplementationFactory,
                 buildTransportKey: BuildTransportKey,
-                subscribeToInstanceEvents: subscribeToInstanceEvents,
-                resolveLatestVersion: GetLatestVersionOrFallbackAsync,
-                syncLoadedConfigGameVersion: SyncLoadedConfigGameVersion,
-                logTrace: logTrace,
-                versionRefreshTimeoutSeconds: versionRefreshTimeoutSeconds);
+                subscribeToInstanceEvents: subscribeToInstanceEvents);
         }
 
         public PlayServSettings Settings => _settings;
@@ -100,16 +88,9 @@ namespace Playserv.Wrapper
                 Disconnect();
         }
 
-        public Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default)
-        {
-#if UNITY_5_3_OR_NEWER
-            var settings = GetOrCreateSettings();
-            return GetLatestVersionOrFallbackAsync(settings, deploymentId, ct);
-#else
-            return Task.FromException<string>(
-                new PlatformNotSupportedException("Latest version lookup requires Unity runtime."));
-#endif
-        }
+        [Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed.")]
+        public Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default) =>
+            Task.FromException<string>(new NotSupportedException("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed."));
 
         public PlayServSettings GetOrCreateSettings()
         {
@@ -124,11 +105,6 @@ namespace Playserv.Wrapper
                 ref _instance,
                 ref _instanceEndpoint,
                 ref _instanceTransportKey);
-        }
-
-        public Task<PlayServSettings> RefreshConfiguredGameVersionAsync(PlayServSettings settings, CancellationToken ct = default)
-        {
-            return _settingsService.RefreshConfiguredGameVersionAsync(settings, ct);
         }
 
         public void Disconnect()
@@ -196,61 +172,5 @@ namespace Playserv.Wrapper
             return string.Equals(uri.Scheme, WebRtcScheme, StringComparison.OrdinalIgnoreCase);
         }
 
-#if UNITY_5_3_OR_NEWER
-        private static async Task<string> GetLatestVersionOrFallbackAsync(
-            PlayServSettings settings,
-            string deploymentId,
-            CancellationToken ct = default)
-        {
-            if (settings == null)
-                throw new ArgumentNullException(nameof(settings));
-
-            var fallbackVersion = settings.GameVersion?.Trim();
-
-            try
-            {
-                var httpClient = PlayServRuntimeHttpClientResolver.Create(
-                    new PlayServHttpModuleContext(
-                        settings.ToRuntimeSettings(),
-                        PlayServJsonCompositionRoot.CreateDefaultJsonCodec()));
-                var latestVersion = await httpClient.GetLatestVersionAsync(deploymentId, ct);
-                PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version resolved from deployment API: {latestVersion}");
-                return latestVersion;
-            }
-            catch (Exception ex) when (!string.IsNullOrWhiteSpace(fallbackVersion))
-            {
-                PlayServLog.TraceWarning(
-                    PlayServLogCategory.Http,
-                    $"Failed to fetch latest game version for deploymentId={deploymentId}. " +
-                    $"Falling back to configured GameVersion={fallbackVersion}. Error: {ex.Message}");
-                return fallbackVersion;
-            }
-        }
-
-        private static void SyncLoadedConfigGameVersion(string gameVersion)
-        {
-            if (string.IsNullOrWhiteSpace(gameVersion))
-                return;
-
-            var config = Resources.Load<PlayServConfig>(ConfigResourceName);
-            if (config == null)
-                return;
-
-            config.SetGameVersion(gameVersion);
-        }
-#else
-        private static Task<string> GetLatestVersionOrFallbackAsync(
-            PlayServSettings settings,
-            string deploymentId,
-            CancellationToken ct = default)
-        {
-            return Task.FromException<string>(
-                new PlatformNotSupportedException("Latest version lookup requires Unity runtime."));
-        }
-
-        private static void SyncLoadedConfigGameVersion(string gameVersion)
-        {
-        }
-#endif
     }
 }

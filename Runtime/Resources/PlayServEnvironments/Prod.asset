@@ -14,12 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   clientToken: 
   deploymentGameId:
-  backendServerAddress: wss://proxy.playserv.io/ws
+  backendServerAddress: wss://platform.playserv.com/ws
   webRtcSignalingServerAddress: 
   webRtcDataChannelLabel: playserv
   webRtcIceServers: []
-  deployApiServerAddress: https://deployment.playserv.io
-  schemaApiServerAddress: https://backoffice.playserv.io/
   dashboardAddress: https://dashboard.playserv.com
   allowMultipleConnections: 1
   keepAlivePingIntervalMs: 20000

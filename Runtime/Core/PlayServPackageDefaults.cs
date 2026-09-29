@@ -19,8 +19,6 @@ namespace Playserv.Wrapper
         [SerializeField] private string webRtcSignalingServerAddress = PlayServSettings.DefaultWebRtcSignalingServerAddress;
         [SerializeField] private string webRtcDataChannelLabel = PlayServSettings.DefaultWebRtcDataChannelLabel;
         [SerializeField] private string[] webRtcIceServers = Array.Empty<string>();
-        [SerializeField] private string deployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress;
-        [SerializeField] private string schemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress;
         [SerializeField] private string dashboardAddress = PlayServSettings.DefaultDashboardAddress;
         [SerializeField] private bool allowMultipleConnections = true;
         [SerializeField] private int keepAlivePingIntervalMs = 30000;
@@ -31,12 +29,14 @@ namespace Playserv.Wrapper
         public string ClientToken => clientToken;
         public string GameAccessToken => clientToken;
         public string DeploymentGameId => deploymentGameId;
-        public string BackendServerAddress => backendServerAddress;
+        public string BackendServerAddress => PlayServPackageDefaultsProvider.MigrateBackendAddress(backendServerAddress);
         public string WebRtcSignalingServerAddress => webRtcSignalingServerAddress;
         public string WebRtcDataChannelLabel => webRtcDataChannelLabel;
         public string[] WebRtcIceServers => webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone();
-        public string DeployApiServerAddress => deployApiServerAddress;
-        public string SchemaApiServerAddress => schemaApiServerAddress;
+        [Obsolete("V1 deployment and schema download have been retired.")]
+        public string DeployApiServerAddress => string.Empty;
+        [Obsolete("V1 deployment and schema download have been retired.")]
+        public string SchemaApiServerAddress => string.Empty;
         public string DashboardAddress => dashboardAddress;
         public bool AllowMultipleConnections => allowMultipleConnections;
         public int KeepAlivePingIntervalMs => keepAlivePingIntervalMs;
@@ -50,12 +50,10 @@ namespace Playserv.Wrapper
             {
                 ClientToken = ResolveOptionalText(clientToken),
                 DeploymentGameId = ResolveOptionalText(deploymentGameId),
-                BackendServerAddress = ResolveText(backendServerAddress, PlayServSettings.DefaultBackendServerAddress),
+                BackendServerAddress = ResolveText(BackendServerAddress, PlayServSettings.DefaultBackendServerAddress),
                 WebRtcSignalingServerAddress = ResolveText(webRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress),
                 WebRtcDataChannelLabel = ResolveText(webRtcDataChannelLabel, PlayServSettings.DefaultWebRtcDataChannelLabel),
                 WebRtcIceServers = webRtcIceServers == null ? Array.Empty<string>() : (string[])webRtcIceServers.Clone(),
-                DeployApiServerAddress = ResolveText(deployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress),
-                SchemaApiServerAddress = ResolveText(schemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress),
                 DashboardAddress = ResolveText(dashboardAddress, PlayServSettings.DefaultDashboardAddress),
                 AllowMultipleConnections = allowMultipleConnections,
                 KeepAlivePingIntervalMs = keepAlivePingIntervalMs,
@@ -76,8 +74,6 @@ namespace Playserv.Wrapper
             webRtcSignalingServerAddress = ResolveText(settings.WebRtcSignalingServerAddress, PlayServSettings.DefaultWebRtcSignalingServerAddress);
             webRtcDataChannelLabel = ResolveText(settings.WebRtcDataChannelLabel, PlayServSettings.DefaultWebRtcDataChannelLabel);
             webRtcIceServers = settings.WebRtcIceServers == null ? Array.Empty<string>() : (string[])settings.WebRtcIceServers.Clone();
-            deployApiServerAddress = ResolveText(settings.DeployApiServerAddress, PlayServSettings.DefaultDeployApiServerAddress);
-            schemaApiServerAddress = ResolveText(settings.SchemaApiServerAddress, PlayServSettings.DefaultSchemaApiServerAddress);
             dashboardAddress = ResolveText(settings.DashboardAddress, PlayServSettings.DefaultDashboardAddress);
             allowMultipleConnections = settings.AllowMultipleConnections;
             keepAlivePingIntervalMs = settings.KeepAlivePingIntervalMs;

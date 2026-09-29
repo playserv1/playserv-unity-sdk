@@ -27,8 +27,6 @@ namespace Playserv.DebugTerminal
         [Header("Resolved Endpoints (Read Only)")]
         [FormerlySerializedAs("remoteEndpoint")]
         [SerializeField] private string backendServerAddress = PlayServSettings.DefaultBackendServerAddress;
-        [SerializeField] private string deployApiServerAddress = PlayServSettings.DefaultDeployApiServerAddress;
-        [SerializeField] private string schemaApiServerAddress = PlayServSettings.DefaultSchemaApiServerAddress;
 
         [Header("Behavior")]
         [SerializeField] private bool autoConnect;
@@ -403,7 +401,6 @@ namespace Playserv.DebugTerminal
             settings.ClientToken = clientToken;
             settings.DeploymentGameId = deploymentGameId;
             settings.GameVersion = gameVersion;
-            settings.ResolveLatestGameVersionOnConnect = false;
             settings.BackendServerAddress = backendServerAddress;
             settings.AllowMultipleConnections = _draftAllowMultipleConnections;
             settings.EnableAutomaticPlayerAuthentication = true;
@@ -508,8 +505,6 @@ namespace Playserv.DebugTerminal
                 return;
 
             backendServerAddress = settings.BackendServerAddress;
-            deployApiServerAddress = settings.DeployApiServerAddress;
-            schemaApiServerAddress = settings.SchemaApiServerAddress;
         }
 
         private static PlayServSettings BuildSettingsFromConfig()

@@ -43,6 +43,8 @@ namespace Playserv.Editor.Tests
                 {
                     foreach (var env in new[] { "Dev", "Prod" })
                     {
+                        File.Delete(PlayServLocalTokenStore.Instance.BackupPath(PlayServDeploymentSettings.PreferenceKey(config, env)));
+                        File.Delete(PlayServLocalTokenStore.Instance.BackupPath(PlayServEnvironmentClientTokens.PreferenceKey(config, env)));
                         EditorPrefs.DeleteKey(PlayServDeploymentSettings.PreferenceKey(config, env));
                         EditorPrefs.DeleteKey(PlayServEnvironmentClientTokens.PreferenceKey(config, env));
                     }
@@ -188,7 +190,7 @@ namespace Playserv.Editor.Tests
                 window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "SelectAll" });
                 window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "Cut" });
                 Assert.That(PlayServDeploymentSettings.GetLocal(_first, "Dev"), Is.Empty);
-                Assert.That(EditorPrefs.HasKey(PlayServDeploymentSettings.PreferenceKey(_first, "Dev")), Is.False);
+                Assert.That(EditorPrefs.GetString(PlayServDeploymentSettings.PreferenceKey(_first, "Dev")), Is.Empty);
             }
             finally { EditorGUIUtility.systemCopyBuffer = clipboard; window.DrawPanel = null; window.Close(); UnityEngine.Object.DestroyImmediate(window); }
         }

@@ -157,7 +157,6 @@ The original flat commands remain available for compatibility. `bind`,
 | --- | --- |
 | `sdk info` | Print SDK version, connection state, optional deployment ID, game version, endpoint, session, latest-version lookup, and keepalive configuration. |
 | `sdk modules` | Print registered runtime module IDs and whether each module is selected. |
-| `sdk latest [deploymentId]` | Resolve the latest backend version for the supplied deployment or the configured deployment. |
 | `state` | Print the current connection state and short authentication summary. |
 | `keepalive status` | Print ping/pong counts and the local time of the last ping and pong. |
 | `keepalive reset` | Reset terminal-owned keepalive counters without changing SDK configuration. |

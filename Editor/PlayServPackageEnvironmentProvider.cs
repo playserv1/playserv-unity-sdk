@@ -161,8 +161,6 @@ namespace Playserv.Editor
             AssignIfSet(value => target.BackendServerAddress = value, defaults.BackendServerAddress);
             AssignIfSet(value => target.WebRtcSignalingServerAddress = value, defaults.WebRtcSignalingServerAddress);
             AssignIfSet(value => target.WebRtcDataChannelLabel = value, defaults.WebRtcDataChannelLabel);
-            AssignIfSet(value => target.DeployApiServerAddress = value, defaults.DeployApiServerAddress);
-            AssignIfSet(value => target.SchemaApiServerAddress = value, defaults.SchemaApiServerAddress);
             AssignIfSet(value => target.DashboardAddress = value, defaults.DashboardAddress);
 
             var iceServers = defaults.WebRtcIceServers;
@@ -200,14 +198,6 @@ namespace Playserv.Editor
                 value => target.WebRtcDataChannelLabel = value,
                 target.WebRtcDataChannelLabel,
                 defaults.WebRtcDataChannelLabel);
-            AssignIfMissing(
-                value => target.DeployApiServerAddress = value,
-                target.DeployApiServerAddress,
-                defaults.DeployApiServerAddress);
-            AssignIfMissing(
-                value => target.SchemaApiServerAddress = value,
-                target.SchemaApiServerAddress,
-                defaults.SchemaApiServerAddress);
             AssignIfMissing(
                 value => target.DashboardAddress = value,
                 target.DashboardAddress,

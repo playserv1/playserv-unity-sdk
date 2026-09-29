@@ -69,7 +69,7 @@ namespace Playserv.ModelGenerator.Editor
             Report(GenerateFromSchemaFile(path, acceptAsCurrent: true));
         }
 
-        public static void GenerateModels(bool isLatestSchemaUse = true)
+        public static void GenerateModels(bool isLatestSchemaUse = false)
         {
             Report(GenerateModelsWithResult(isLatestSchemaUse));
         }

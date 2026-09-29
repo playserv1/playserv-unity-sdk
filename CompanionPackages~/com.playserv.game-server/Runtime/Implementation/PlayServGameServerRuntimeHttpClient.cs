@@ -37,8 +37,9 @@ namespace Playserv.GameServer
                 ct);
         }
 
+        [Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly.")]
         public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
-            throw Unsupported();
+            Task.FromException<string>(new NotSupportedException("V1 version lookup has been retired. Configure GameVersion explicitly."));
 
         public Task<PlayerTokenBundleDto> SignInAnonAsync(
             string clientToken,

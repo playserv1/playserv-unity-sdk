@@ -42,6 +42,7 @@ namespace Playserv.Wrapper
 
         void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory);
 
+        [System.Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed.")]
         Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default);
 
         Proxy.Interfaces.ITransportImplementation GetTransportImplementation();

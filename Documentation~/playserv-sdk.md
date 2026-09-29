@@ -38,14 +38,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.6.9
+git@github.com:playserv1/playserv-unity-sdk.git#0.6.10
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.9
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.6.10
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -61,7 +61,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.6.9 is prepared in this checkout**, not asserted to be available in
+Version **0.6.10 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -87,7 +87,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.6.9"
+    "com.playserv.sdk": "0.6.10"
   }
 }
 ```
@@ -96,12 +96,12 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.6.9`).
+- A source release tag uses `unity-<version>` (for example `unity-0.6.10`).
 - Both tagged and manually dispatched releases require the source commit to be
   contained in `origin/dev` or an existing `origin/release/*` branch. The publisher
   refreshes these refs before checking; local-only or deleted branches do not qualify.
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.6.9`) atomically.
+  the matching plain-SemVer tag (for example `0.6.10`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
@@ -397,27 +397,23 @@ C# [PlayServSchema] contracts
 
 The external `com.playserv.schema-tool` companion owns this workflow.
 
-### Server schema: schema to Unity C#
+### Local JSON schema to Unity C#
 
-`Server schema` restores the Schema API workflow:
+Use **Schema Workflows → Local JSON schema → Import JSON & Generate** to choose a
+local schema. The complete schema is validated before models under
+`Assets/Shared/Generated/Models` are replaced. Only successful generation updates
+`Assets/Resources/current-schema.json`. Regeneration always uses this accepted current schema. To reuse an existing
+`latest-schema.json`, explicitly select that file with Import JSON & Generate.
 
-1. `Download Latest` sends the public `pk_*` Client Token to
-   `POST /api/schemas/by-sdk-key`.
-2. The response is saved as `Assets/Resources/latest-schema.json`.
-3. The SDK compares it with `Assets/Resources/current-schema.json` by content
-   hash and displays version, timestamp, and definition count.
-4. `Apply & Generate C#` asks for confirmation, validates the complete schema,
-   and generates models under `Assets/Shared/Generated/Models`.
-5. Only after successful generation does the downloaded schema become
-   `current-schema.json`.
+The V1 `/api/schemas/by-sdk-key` download is retired. Schema API and Deploy API
+fields are no longer serialized or used. Deployment offers Platform Functions
+and Server Images; the old RPC ZIP/version-sync workflow is removed. Gameplay RPC
+is unchanged. Set `GameVersion` explicitly: Connect never looks it up from V1.
+`GetLatestVersionAsync` is obsolete and returns `NotSupportedException` without a
+network request. Replace old calls with your configured version.
 
-Downloading never changes generated C# automatically. A malformed schema or
-unsafe generated file name fails before the existing models are touched.
-`Regenerate C# Models` can rebuild models when the downloaded and current
-schemas already match.
-
-The selected environment must provide a Schema API Server address, and
-PlayServ Config must contain a public Client Token.
+Prod runtime defaults to `wss://platform.playserv.com/ws`. Known old Prod runtime
+and dashboard defaults migrate; custom addresses remain unchanged.
 
 ## External Schema Tool
 
@@ -530,7 +526,7 @@ Initialization creates `playserv.schema.json` in the project root:
     }
   ],
   "service": {
-    "endpoint": "https://api.playserv.io",
+    "endpoint": "https://platform.playserv.com",
     "environment": "dev",
     "projectId": "prj_...",
     "serverKeyEnvironmentVariable": "PLAYSERV_SERVER_KEY"
@@ -830,12 +826,24 @@ The request-shape and lifecycle tests use local fixtures, not live backend integ
 ### Environment client tokens
 
 In the standard package Editor configuration, Dev and Prod have independent Client
-Token values. Tokens live in local `EditorPrefs`, scoped by project path, config
-asset GUID and environment; the selected environment is project-local too. The
+Token values. Client and Server Tokens live in local `EditorPrefs`, scoped by project
+path, config asset GUID and environment. Every edit immediately writes a backup to
+`Library/PlayServ/Tokens`; no Save button or shutdown is required. The selected
+environment is project-local too. The
 PlayServ window and config Inspector use this store. `config.ClientToken` and
 `config.ToSettings()` resolve the active token in the Editor without serializing
 it into the project asset. Explicit `PlayServSettings` and custom project settings
 providers retain their existing behavior. Endpoint switching is unchanged.
+
+When a local preference is missing, the Editor restores its matching Library backup.
+Existing preferences take precedence and seed or refresh the backup. Emptying a field
+clears the token in both stores; an empty backup prevents an old key from returning.
+If Library cannot be written, the edit is not saved and the previous value is kept;
+the field reports a storage error without displaying credentials in the message.
+Process environment overrides remain read-only and are never copied to Library.
+These files are local credentials, not encrypted storage; they stay outside assets
+and player builds. If both local preferences and Library are deleted, re-enter the
+tokens. A new project path or config GUID has a separate scope.
 
 On first use, the existing serialized token is moved to the currently selected
 environment and cleared from the asset. An existing local value is never
@@ -2285,7 +2293,7 @@ PlayServ.Config(new PlayServSettings
     ClientToken = "pk_...",
     GameVersion = "1.0.0",
     SdkVersion = PlayServ.SdkVersion,
-    BackendServerAddress = "wss://playserv-proxy.test.playserv.io/ws",
+    BackendServerAddress = "wss://platform.playserv.com/ws",
     AllowMultipleConnections = true,
     KeepAlivePingIntervalMs = 30000,
     KeepAlivePongTimeoutMs = 10000

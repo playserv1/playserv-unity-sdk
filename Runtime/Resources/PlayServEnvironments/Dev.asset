@@ -18,8 +18,6 @@ MonoBehaviour:
   webRtcSignalingServerAddress: 
   webRtcDataChannelLabel: playserv
   webRtcIceServers: []
-  deployApiServerAddress: https://deployment.dev.playserv.io
-  schemaApiServerAddress: https://backoffice.dev.playserv.io
   dashboardAddress: https://dashboard.dev.playserv.com
   allowMultipleConnections: 1
   keepAlivePingIntervalMs: 20000

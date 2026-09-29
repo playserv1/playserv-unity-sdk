@@ -1,12 +1,9 @@
-# PlayServ Editor Deployment, Analyzer, and Versioning
+# PlayServ Editor Deployment
 
 This document describes the Unity Editor tooling under `Editor/Deploy`.
 
 ## Scope
 
-- Deployment upload (`Deploy Now`)
-- RPC code analyzer used before deployment
-- Version synchronization (`Sync Version`)
 - Platform Functions deployment (`cloud_function` and `game_server`) through the v1 API
 - Server Images: build and publish a Docker image to the project registry
 
@@ -107,13 +104,11 @@ remain explicit release steps. C# server SDK and game runtime APIs are unchanged
 ## Platform Functions
 
 Open `Tools/PlayServ/Settings`, expand **Deployment**, and select **Platform Functions**.
-Tabs are ordered **Platform Functions → Server Images → RPC**, with Platform Functions
-selected initially. The **RPC** mode retains the ZIP, analyzer and version-sync workflow described below.
+Tabs are ordered **Platform Functions → Server Images**, with Platform Functions selected initially.
 
 1. Use **Dashboard Address** in the current PlayServ Config. Dev defaults to
    `https://dashboard.dev.playserv.com`; Prod to `https://dashboard.playserv.com`.
    Known old `.io` dashboard defaults migrate automatically; custom URLs are preserved.
-   The legacy RPC endpoint and its Deploy Token remain independent.
 2. Enter **Server Token (Dev/Prod)** below Client Token, in Settings or the Config
    Inspector. Like Client Token it is visible text, with automatic local saving
    on edit; empty the field to clear it. There are no Save/Clear buttons.
@@ -166,107 +161,15 @@ This mode publishes source and monitors deployment status. Existing game CI
 remains usable; game-specific post-deployment steps (for example Eggie's
 room-config cleanup) are not executed by the generic SDK tool.
 
-Main files:
+## Retired V1 workflows
 
-- `Editor/PlayServWindow.cs`
-- `Editor/PlayServWindowTheme.cs`
-- `Editor/PlayServClientProjectConfigBridge.cs`
-- `Editor/Deploy/DeploymentApiClient.cs`
-- `Editor/Deploy/DeploymentService.cs`
-- `Editor/Deploy/DeploymentClosureFilter.cs`
-- `Editor/Deploy/DeploymentZipBuilder.cs`
-- `Editor/Deploy/DeploymentUploadAction.cs`
-- `Editor/Deploy/VersionSyncAction.cs`
-- `Editor/Deploy/Analysis/RpcCodeAnalyzer.cs`
+The RPC deployment tab, ZIP upload, Sync Version, remote code hash/archive and
+by-sdk-key schema download are retired in 0.6.10 (PSV-2887). Use Platform Functions
+for platform source and Server Images for an existing Dockerfile. Gameplay RPC is
+unchanged. Deploy API and Schema API values from older config assets are ignored.
 
-## RPC Deployment Flow
-
-1. Open `Tools/PlayServ/Settings`.
-2. Expand `Deployment`.
-3. Select folder + pattern.
-4. Click `Deploy Now`.
-
-Runtime flow:
-
-1. `DeploymentClosureFilter.CollectDeployFiles(...)` collects `*.cs` files.
-2. Files are analyzed by `FunctionAnalyzerService` (Roslyn-based analyzer).
-3. Analyzer returns `FilesToCompile` (RPC classes + dependency closure).
-4. `DeploymentZipBuilder` creates ZIP archive.
-5. `DeploymentUploadAction` uploads ZIP with `X-Game-Id` header.
-
-Upload endpoint behavior:
-
-- Upload always targets `/api/deployments`.
-- `DeployApiEndpoint` can be:
-  - host only, for example `http://host`
-  - API base, for example `http://host/api`
-  - full deploy path, for example `http://host/api/deployments`
-
-## Analyzer Flow
-
-Analyzer entry point:
-
-- `FunctionAnalyzerService.AnalyzeFiles(...)` in `RpcCodeAnalyzer.cs`
-
-What analyzer does:
-
-1. Parses source files with Roslyn.
-2. Finds classes marked with `[Rpc]`.
-3. Validates RPC classes (constructors, modifiers, methods).
-4. Resolves dependent user types.
-5. Validates dependency types/references.
-6. Returns:
-  - `Success`
-  - `Errors`
-  - `FilesToCompile`
-  - RPC metadata
-
-If analyzer fails, deployment/version sync is blocked and first errors are shown in the Console.
-
-## Version Sync Flow
-
-UI action:
-
-- Click `Sync Version` in Deployment section.
-
-Goal:
-
-- Check if local analyzed RPC code matches backend RPC code hash.
-- If it matches, update local `gameVersion` from backend latest version.
-
-Steps:
-
-1. Reuse analyzer-selected file list from `DeploymentClosureFilter`.
-2. Call `GET /api/schemas/{gameId}/latest`.
-3. `DeploymentZipBuilder` creates in-memory ZIP from local analyzed files.
-4. `DeploymentZipBuilder` computes SHA-256 hash of ZIP bytes.
-5. Call `GET /api/games/{gameId}/rpc-code/hash`.
-6. Compare local hash with remote hash.
-7. On match:
-  - call `GET /api/games/{gameId}/version/latest`
-  - write returned value into `PlayServConfig.gameVersion`
-8. On mismatch:
-  - call `GET /api/games/{gameId}/code-archive`
-  - save archive to temp folder (`.../playserv-sync`)
-
-Execution entry:
-
-- `VersionSyncAction.ExecuteAsync(...)`
-
-Important:
-
-- Version sync does not upload deployment ZIP.
-- It validates code parity and aligns version metadata only.
-
-## Quick Analyzer Test
-
-Use sample folders:
-
-- `<imported PlayServ sample>/RPC/TestCode` (valid)
-- `<imported PlayServ sample>/RPC/TestCodeWrong` (invalid)
-
-To test:
-
-1. In Deployment UI, choose one of these folders.
-2. Click `Preview Files` or `Deploy Now`.
-3. For `TestCodeWrong`, analyzer should report validation errors.
+Runtime Connect uses the configured `GameVersion`. Public `GetLatestVersionAsync`
+entry points remain `[Obsolete]` for source compatibility and fail with
+`NotSupportedException` before any HTTP request. The debug terminal has no
+`sdk latest` command. Import local schema JSON through Schema Workflows, or use
+Schema Tool to generate local output and push the current code-first API.

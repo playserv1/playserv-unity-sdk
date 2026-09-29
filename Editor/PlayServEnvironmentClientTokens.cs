@@ -57,8 +57,8 @@ namespace Playserv.Editor
             foreach (var guid in AssetDatabase.FindAssets("t:PlayServConfig", new[] { "Assets" }))
             {
                 var candidate = AssetDatabase.LoadAssetAtPath<PlayServConfig>(AssetDatabase.GUIDToAssetPath(guid));
-                if (IsManaged(candidate))
-                    EnsureMigrated(candidate);
+                if (IsManaged(candidate) && !EnsureMigrated(candidate) && !string.IsNullOrEmpty(candidate.SerializedClientToken))
+                    throw new IOException("Client Token migration must finish before changing environment. Check Library/PlayServ permissions.");
             }
             EditorPrefs.SetString(ActiveEnvironmentPreference, NormalizeEnvironment(environment));
         }
@@ -74,21 +74,27 @@ namespace Playserv.Editor
 
         internal static string MigrationKey(PlayServConfig config) => PreferenceKey(config, "migration") + ".v1";
 
-        internal static void EnsureMigrated(PlayServConfig config)
+        internal static bool EnsureMigrated(PlayServConfig config)
         {
             var marker = MigrationKey(config);
             if (EditorPrefs.GetBool(marker, false))
-                return;
+                return true;
 
             var key = PreferenceKey(config, LocalEnvironment);
-            if (!EditorPrefs.HasKey(key))
-                EditorPrefs.SetString(key, config.SerializedClientToken ?? string.Empty);
+            var store = PlayServLocalTokenStore.Instance;
+            if (!store.TryGet(key, out _))
+            {
+                var legacy = config.SerializedClientToken ?? string.Empty;
+                if (legacy.Length == 0 && store.Error(key) != null) return false;
+                if (!store.TrySet(key, legacy)) return false;
+            }
             // Do not mark migration complete until the on-disk value is cleared.
             config.SetSerializedClientToken(string.Empty);
             AssetDatabase.SaveAssetIfDirty(config);
             if (EditorUtility.IsDirty(config))
                 throw new IOException("PlayServ config could not be saved; client token migration will be retried.");
             EditorPrefs.SetBool(marker, true);
+            return true;
         }
 
         public bool TryGet(PlayServConfig config, out string value)
@@ -96,9 +102,11 @@ namespace Playserv.Editor
             value = null;
             if (!IsManaged(config))
                 return false;
-            EnsureMigrated(config);
-            value = TryGetProcessOverride(out _, out var processToken)
-                ? processToken : EditorPrefs.GetString(PreferenceKey(config, LocalEnvironment), string.Empty);
+            var migrated = EnsureMigrated(config);
+            if (TryGetProcessOverride(out _, out var processToken))
+                value = processToken;
+            else if (!PlayServLocalTokenStore.Instance.TryGet(PreferenceKey(config, LocalEnvironment), out value))
+                value = migrated ? string.Empty : config.SerializedClientToken ?? string.Empty;
             return true;
         }
 
@@ -113,9 +121,14 @@ namespace Playserv.Editor
                 return true;
             var key = PreferenceKey(config, LocalEnvironment);
             value = value ?? string.Empty;
-            changed = !EditorPrefs.HasKey(key) || EditorPrefs.GetString(key) != value;
-            if (changed)
-                EditorPrefs.SetString(key, value);
+            var store = PlayServLocalTokenStore.Instance;
+            var previous = EditorPrefs.GetString(key, string.Empty);
+            var hadValue = EditorPrefs.HasKey(key);
+            if (store.TrySet(key, value))
+            {
+                EnsureMigrated(config);
+                changed = !hadValue || previous != value;
+            }
             return true;
         }
 
@@ -158,10 +171,12 @@ namespace Playserv.Editor
                 if (EditorGUI.EndChangeCheck())
                     config.SetClientToken(value);
             }
+            var error = PlayServLocalTokenStore.Instance.Error(PreferenceKey(config, LocalEnvironment));
             EditorGUILayout.HelpBox(processOverride
                 ? "Client Token is supplied by process environment variables (read-only)."
-                : "Client Token is stored locally for this project, config and environment, not in the config asset. " +
-                  "Reconfigure the SDK to apply changes to an active session.", MessageType.Info);
+                : error ?? "Client Token saves immediately to local preferences and Library/PlayServ for this project, config and environment. " +
+                  "Reconfigure the SDK to apply changes to an active session.",
+                !processOverride && error != null ? MessageType.Warning : MessageType.Info);
         }
     }
 }

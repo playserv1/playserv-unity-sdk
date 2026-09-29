@@ -27,8 +27,6 @@ namespace Playserv.Editor
         private static readonly string[] EndpointPropertyOrder =
         {
             "backendServerAddress",
-            "deployApiServerAddress",
-            "schemaApiServerAddress",
             "dashboardAddress"
         };
 

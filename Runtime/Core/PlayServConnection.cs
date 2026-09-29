@@ -66,6 +66,7 @@ namespace Playserv.Wrapper
         public static void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
             Api.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
+        [System.Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed.")]
         public static Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default) =>
             Api.GetLatestVersionAsync(deploymentId, ct);
 

@@ -94,10 +94,8 @@ namespace Playserv.Wrapper
             {
                 merged.WebRtcIceServers = (string[])packageDefaults.WebRtcIceServers.Clone();
             }
-            if (string.IsNullOrWhiteSpace(merged.DeployApiServerAddress))
-                merged.DeployApiServerAddress = packageDefaults.DeployApiServerAddress;
-            if (string.IsNullOrWhiteSpace(merged.SchemaApiServerAddress))
-                merged.SchemaApiServerAddress = packageDefaults.SchemaApiServerAddress;
+
+
             if (string.IsNullOrWhiteSpace(merged.DashboardAddress))
                 merged.DashboardAddress = packageDefaults.DashboardAddress;
 

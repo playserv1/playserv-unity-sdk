@@ -33,7 +33,7 @@ namespace Playserv.Editor
                 ref state.FoldModel,
                 "Schema",
                 "Schema Workflows",
-                "Generate schemas from local C# contracts or download the server schema and generate Unity models.");
+                "Generate schemas from local C# contracts or import a local JSON schema to generate Unity models.");
 
             if (expanded)
             {
@@ -268,60 +268,27 @@ namespace Playserv.Editor
 
         private void DrawServerSchema(PlayServWindowContext context)
         {
-            GUILayout.Label("Server schema", PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Label("Local JSON schema", PlayServWindowTheme.MiniHeadingStyle);
             GUILayout.Label(
-                "PlayServ Schema API  →  downloaded JSON Schema  →  generated Unity C# models",
+                "Local JSON Schema  →  generated Unity C# models",
                 PlayServWindowTheme.SectionSubtitleStyle);
             GUILayout.Space(8f);
 
             var current =
                 PlayServServerSchemaWorkflow.ReadCurrent(out var currentError);
-            var latest =
-                PlayServServerSchemaWorkflow.ReadLatest(out var latestError);
-            var comparison =
-                PlayServServerSchemaWorkflow.Compare(current, latest);
-
-            using (new EditorGUILayout.VerticalScope(
-                       PlayServWindowTheme.LogContainerStyle))
-            {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.LogContainerStyle))
                 DrawSchemaInfo("Current", current);
-                GUILayout.Space(4f);
-                DrawSchemaInfo("Downloaded", latest);
-            }
 
             if (!string.IsNullOrWhiteSpace(currentError))
                 PlayServWindowChrome.DrawNotice(currentError, MessageType.Warning);
-            if (!string.IsNullOrWhiteSpace(latestError))
-                PlayServWindowChrome.DrawNotice(latestError, MessageType.Warning);
 
-            DrawComparisonNotice(comparison);
             if (!string.IsNullOrWhiteSpace(_serverStatus))
             {
                 GUILayout.Space(6f);
                 PlayServWindowChrome.DrawNotice(_serverStatus, _serverStatusType);
             }
 
-            var canAccessServer = TryResolveServerAccess(
-                context,
-                out var clientToken,
-                out var accessError);
-            if (!canAccessServer)
-            {
-                GUILayout.Space(6f);
-                PlayServWindowChrome.DrawNotice(accessError, MessageType.Warning);
-            }
-
-            var latestIsValid =
-                latest.Exists && string.IsNullOrWhiteSpace(latestError);
-            var currentIsValid =
-                current.Exists && string.IsNullOrWhiteSpace(currentError);
-            var generationUsesLatest = latestIsValid;
-            var canGenerate = latestIsValid || currentIsValid;
-            var generateLabel = generationUsesLatest
-                ? comparison == PlayServServerSchemaComparison.UpToDate
-                    ? "Regenerate C# Models"
-                    : "Apply & Generate C#"
-                : "Regenerate Current C#";
+            var canGenerate = current.Exists && string.IsNullOrWhiteSpace(currentError);
 
             GUILayout.Space(8f);
             using (new EditorGUI.DisabledScope(
@@ -331,35 +298,26 @@ namespace Playserv.Editor
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUI.DisabledScope(!canAccessServer))
+                    if (PlayServWindowChrome.DrawActionButton("Import JSON & Generate", PlayServWindowButtonTone.Secondary,
+                            GUILayout.Width(184f), GUILayout.Height(32f)))
                     {
-                        if (PlayServWindowChrome.DrawActionButton(
-                                _serverCommandRunning
-                                    ? "Downloading..."
-                                    : "Download Latest",
-                                PlayServWindowButtonTone.Secondary,
-                                GUILayout.Width(154f),
-                                GUILayout.Height(32f)))
+                        var path = EditorUtility.OpenFilePanel("Select schema JSON", "", "json");
+                        if (!string.IsNullOrEmpty(path))
                         {
-                            _ = DownloadServerSchemaAsync(
-                                clientToken,
-                                context);
+                            var result = SchemaCodeGenerator.GenerateFromSchemaFile(path, acceptAsCurrent: true);
+                            SetServerStatus(result.Success ? $"Generated {result.GeneratedFileCount} C# model files."
+                                : result.Error, result.Success ? MessageType.Info : MessageType.Warning, context);
                         }
                     }
-
-                    GUILayout.Space(6f);
                     using (new EditorGUI.DisabledScope(!canGenerate))
                     {
                         if (PlayServWindowChrome.DrawActionButton(
-                                generateLabel,
+                                "Regenerate Current C#",
                                 PlayServWindowButtonTone.Primary,
                                 GUILayout.Width(184f),
                                 GUILayout.Height(32f)))
                         {
-                            ApplyServerSchema(
-                                generationUsesLatest,
-                                comparison,
-                                context);
+                            RegenerateCurrentSchema(context);
                         }
                     }
                 }
@@ -388,32 +346,6 @@ namespace Playserv.Editor
                     $"v{info.DisplayVersion}  |  {info.DefinitionCount} definitions  |  " +
                     info.DisplayTimestamp,
                     PlayServWindowTheme.MetricCaptionStyle);
-            }
-        }
-
-        private static void DrawComparisonNotice(
-            PlayServServerSchemaComparison comparison)
-        {
-            switch (comparison)
-            {
-                case PlayServServerSchemaComparison.NoCurrentSchema:
-                    GUILayout.Space(6f);
-                    PlayServWindowChrome.DrawNotice(
-                        "A server schema is downloaded and ready to generate the initial C# models.",
-                        MessageType.Warning);
-                    break;
-                case PlayServServerSchemaComparison.UpToDate:
-                    GUILayout.Space(6f);
-                    PlayServWindowChrome.DrawNotice(
-                        "Current models use the downloaded server schema.",
-                        MessageType.Info);
-                    break;
-                case PlayServServerSchemaComparison.Different:
-                    GUILayout.Space(6f);
-                    PlayServWindowChrome.DrawNotice(
-                        "The downloaded server schema differs from the current schema. Review and apply it to regenerate C#.",
-                        MessageType.Warning);
-                    break;
             }
         }
 
@@ -455,80 +387,16 @@ namespace Playserv.Editor
             }
         }
 
-        private async Task DownloadServerSchemaAsync(
-            string clientToken,
-            PlayServWindowContext context)
+        private void RegenerateCurrentSchema(PlayServWindowContext context)
         {
-            _serverCommandRunning = true;
-            SetServerStatus(
-                "Downloading the latest server schema...",
-                MessageType.Info,
-                context);
-            try
-            {
-                var downloaded = await SchemaLoader.LoadSchema(clientToken);
-                if (!downloaded)
-                {
-                    SetServerStatus(
-                        "Server schema download failed. See the Unity Console for details.",
-                        MessageType.Warning,
-                        context);
-                    return;
-                }
-
-                SchemaCodeGenerator.CheckNewVersionJsonSchema();
-                var latest =
-                    PlayServServerSchemaWorkflow.ReadLatest(out var error);
-                SetServerStatus(
-                    string.IsNullOrWhiteSpace(error)
-                        ? $"Downloaded server schema v{latest.DisplayVersion}. Review it before generating C#."
-                        : error,
-                    string.IsNullOrWhiteSpace(error)
-                        ? MessageType.Info
-                        : MessageType.Warning,
-                    context);
-            }
-            catch (Exception exception)
-            {
-                SetServerStatus(
-                    exception.GetBaseException().Message,
-                    MessageType.Warning,
-                    context);
-            }
-            finally
-            {
-                _serverCommandRunning = false;
-                context.Repaint();
-            }
-        }
-
-        private void ApplyServerSchema(
-            bool useLatestSchema,
-            PlayServServerSchemaComparison comparison,
-            PlayServWindowContext context)
-        {
-            if (useLatestSchema &&
-                comparison != PlayServServerSchemaComparison.UpToDate &&
-                !EditorUtility.DisplayDialog(
-                    "Apply server schema",
-                    "The downloaded server schema will become the current schema and Unity C# models will be regenerated. Continue?",
-                    "Apply and Generate",
-                    "Cancel"))
-            {
-                return;
-            }
-
             _serverCommandRunning = true;
             try
             {
                 var result =
-                    SchemaCodeGenerator.GenerateModelsWithResult(useLatestSchema);
+                    SchemaCodeGenerator.GenerateModelsWithResult(useLatestSchema: false);
                 SetServerStatus(
                     result.Success
-                        ? $"Generated {result.GeneratedFileCount} C# model files from " +
-                          (useLatestSchema
-                              ? "the downloaded server schema."
-                              : "the current server schema.")
+                        ? $"Generated {result.GeneratedFileCount} C# model files from the current schema."
                         : result.Error,
                     result.Success ? MessageType.Info : MessageType.Warning,
                     context);
@@ -537,65 +405,6 @@ namespace Playserv.Editor
             {
                 _serverCommandRunning = false;
                 context.Repaint();
-            }
-        }
-
-        private static bool TryResolveServerAccess(
-            PlayServWindowContext context,
-            out string clientToken,
-            out string error)
-        {
-            clientToken = string.Empty;
-            error = string.Empty;
-
-            try
-            {
-                PlayServSettings settings;
-                if (context.Config != null)
-                {
-                    settings =
-                        PlayServSettingsResolver.ResolveEditorSettings(
-                            context.Config);
-                }
-                else if (!PlayServPackageDefaultsProvider.TryLoadSettings(
-                             out settings))
-                {
-                    error =
-                        "Create PlayServ Config before downloading a server schema.";
-                    return false;
-                }
-
-                if (string.IsNullOrWhiteSpace(settings.SchemaApiServerAddress))
-                {
-                    error =
-                        "Schema API Server is not configured for the selected environment.";
-                    return false;
-                }
-
-                if (string.IsNullOrWhiteSpace(settings.ClientToken))
-                {
-                    error =
-                        "Set a public Client Token (pk_*) in PlayServ Config before downloading a server schema.";
-                    return false;
-                }
-
-                clientToken = settings.ClientToken.Trim();
-                if (!clientToken.StartsWith("pk_", StringComparison.Ordinal) ||
-                    clientToken.IndexOf('\r') >= 0 ||
-                    clientToken.IndexOf('\n') >= 0)
-                {
-                    clientToken = string.Empty;
-                    error =
-                        "Server schema download accepts only a public pk_* Client Token.";
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception exception)
-            {
-                error = exception.GetBaseException().Message;
-                return false;
             }
         }
 

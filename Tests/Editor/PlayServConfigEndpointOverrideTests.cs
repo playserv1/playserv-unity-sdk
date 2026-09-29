@@ -8,6 +8,45 @@ namespace Playserv.Tests.Editor
 {
     public sealed class PlayServConfigEndpointOverrideTests
     {
+        [Test]
+        public void ProductionDefaultsUseServingRuntime()
+        {
+            Assert.That(PlayServPackageDefaultsProvider.LoadSettingsOrDefault("Prod").BackendServerAddress,
+                Is.EqualTo("wss://platform.playserv.com/ws"));
+        }
+
+        [TestCase("wss://proxy.playserv.io/ws", "wss://platform.playserv.com/ws")]
+        [TestCase("wss://custom.example.test/ws", "wss://custom.example.test/ws")]
+        public void LegacyRuntimeDefaultsMigrateWithoutChangingCustomEndpoints(string oldAddress, string expected)
+        {
+            var config = ScriptableObject.CreateInstance<PlayServConfig>();
+            try
+            {
+                JsonUtility.FromJsonOverwrite("{\"backendServerAddress\":\"" + oldAddress + "\",\"deployApiServerAddress\":\"https://retired.test\",\"schemaApiServerAddress\":\"https://retired.test\"}", config);
+                Assert.That(config.ToSettings().BackendServerAddress, Is.EqualTo(expected));
+                Assert.That(config.ToSettings().DeployApiServerAddress, Is.Empty);
+                Assert.That(config.ToSettings().SchemaApiServerAddress, Is.Empty);
+            }
+            finally { Object.DestroyImmediate(config); }
+        }
+
+        [Test]
+        public void V1EndpointFieldsAreNotSerialized()
+        {
+            var config = ScriptableObject.CreateInstance<PlayServConfig>();
+            var defaults = ScriptableObject.CreateInstance<PlayServPackageDefaults>();
+            try
+            {
+                foreach (var asset in new Object[] { config, defaults })
+                {
+                    var serialized = new SerializedObject(asset);
+                    Assert.That(serialized.FindProperty("deployApiServerAddress"), Is.Null);
+                    Assert.That(serialized.FindProperty("schemaApiServerAddress"), Is.Null);
+                }
+            }
+            finally { Object.DestroyImmediate(config); Object.DestroyImmediate(defaults); }
+        }
+
         [TestCase("Dev", "https://dashboard.dev.playserv.com")]
         [TestCase("Prod", "https://dashboard.playserv.com")]
         public void DefaultDashboardUsesCurrentPlatformOrigin(string environment, string expected)
@@ -38,10 +77,10 @@ namespace Playserv.Tests.Editor
                     Is.EqualTo(configured.BackendServerAddress));
                 Assert.That(
                     resolved.DeployApiServerAddress,
-                    Is.EqualTo(configured.DeployApiServerAddress));
+                    Is.Empty);
                 Assert.That(
                     resolved.SchemaApiServerAddress,
-                    Is.EqualTo(configured.SchemaApiServerAddress));
+                    Is.Empty);
                 Assert.That(
                     resolved.DashboardAddress,
                     Is.EqualTo(configured.DashboardAddress));

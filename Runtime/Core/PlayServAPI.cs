@@ -17,7 +17,6 @@ namespace Playserv.Wrapper
 {
     internal sealed class PlayServApi : IPlayServConnectionApi, IPlayServAuthApi, IPlayServRuntimeAccess
     {
-        private const int ConnectVersionRefreshTimeoutSeconds = 5;
         private int _shutdownIgnoreWarningLogged;
 
         private readonly IPlayServCommandDispatch _commandDispatch;
@@ -94,9 +93,7 @@ namespace Playserv.Wrapper
                 sendToModule: (command, moduleName) => SendCommand(command, moduleName));
 
             _configFacade = new PlayServApiConfigFacade(
-                subscribeToInstanceEvents: SubscribeToInstanceEvents,
-                logTrace: message => PlayServLog.Trace(PlayServLogCategory.General, message),
-                versionRefreshTimeoutSeconds: ConnectVersionRefreshTimeoutSeconds);
+                subscribeToInstanceEvents: SubscribeToInstanceEvents);
 
             _playerAuthCoordinator = new PlayServPlayerAuthCoordinator(
                 createHttpClient: settings => PlayServRuntimeHttpClientResolver.Create(
@@ -114,7 +111,6 @@ namespace Playserv.Wrapper
             _connectionOrchestrator = new PlayServApiConnectionOrchestrator(
                 getState: () => State,
                 getOrCreateSettings: _configFacade.GetOrCreateSettings,
-                refreshConfiguredGameVersionAsync: _configFacade.RefreshConfiguredGameVersionAsync,
                 preparePlayerAuthenticationAsync: _playerAuthCoordinator.PrepareSettingsForConnectAsync,
                 applySettings: _configFacade.ApplySettings,
                 handleConnected: _playerAuthCoordinator.HandleConnected,
@@ -174,6 +170,7 @@ namespace Playserv.Wrapper
         public void SetWebRtcSignalingClientFactory(Func<PlayServRuntimeSettings, IWebRtcSignalingClient> signalingClientFactory) =>
             _configFacade.SetWebRtcSignalingClientFactory(signalingClientFactory);
 
+        [System.Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed.")]
         public Task<string> GetLatestVersionAsync(string deploymentId, CancellationToken ct = default) =>
             _configFacade.GetLatestVersionAsync(deploymentId, ct);
 

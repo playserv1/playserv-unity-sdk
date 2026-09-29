@@ -20,9 +20,6 @@ namespace Playserv.Http.Modules.Unity
         IPlayServAnonymousLoginHttpClient,
         IPlayServPlayerIdentityHttpClient
     {
-        private const string ApiPath = "/api";
-        private const string DeploymentEndpointPath = "/deployments";
-        private const string LatestVersionPathTemplate = "games/{0}/version/latest";
         private const string ClientHeaderName = "X-Playserv-Client";
         private const string FunctionVersionHeaderName = "X-Playserv-Function-Version";
         private const string AnonSignInPath = "auth/players/anon";
@@ -43,32 +40,9 @@ namespace Playserv.Http.Modules.Unity
             _jsonCodec = jsonCodec ?? new NewtonsoftJsonCodec();
         }
 
-        public async Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
-        {
-            if (string.IsNullOrWhiteSpace(_settings.DeployApiServerAddress))
-                throw new InvalidOperationException("PlayServRuntimeSettings.DeployApiServerAddress is empty.");
-
-            if (string.IsNullOrWhiteSpace(gameId))
-                throw new ArgumentException("Game ID is required.", nameof(gameId));
-
-            var url = BuildApiRelativeUrl(_settings.DeployApiServerAddress, BuildPath(LatestVersionPathTemplate, gameId));
-            PlayServLog.Trace(PlayServLogCategory.Http, $"Requesting latest game version. url={url}");
-
-            using var req = UnityWebRequest.Get(url);
-            await SendRequestAsync(req, ct);
-
-            var body = req.downloadHandler?.text;
-            if (string.IsNullOrWhiteSpace(body))
-                throw new InvalidOperationException("Latest version response body is empty.");
-
-            var version = JsonResponseReader.GetStringValueIgnoreCase(body, "version", _jsonCodec);
-
-            if (string.IsNullOrWhiteSpace(version))
-                throw new InvalidOperationException("Latest version was not found in response.");
-
-            PlayServLog.Trace(PlayServLogCategory.Http, $"Latest game version response parsed. version={version}");
-            return version;
-        }
+        [Obsolete("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed.")]
+        public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
+            Task.FromException<string>(new NotSupportedException("V1 version lookup has been retired. Configure GameVersion explicitly; no network request is performed."));
 
         public async Task<PlayerTokenBundleDto> SignInAnonAsync(
             string clientToken,
@@ -702,46 +676,6 @@ namespace Playserv.Http.Modules.Unity
             };
 
             return builder.Uri.ToString().TrimEnd('/');
-        }
-
-        private static string BuildApiBaseUrl(string serverAddress)
-        {
-            serverAddress = NormalizeEndpoint(serverAddress);
-
-            if (!Uri.TryCreate(serverAddress, UriKind.Absolute, out var endpointUri))
-                throw new InvalidOperationException($"PlayServRuntimeSettings.DeployApiServerAddress is invalid: {serverAddress}");
-
-            var builder = new UriBuilder(endpointUri);
-            var normalizedPath = (builder.Path ?? string.Empty).TrimEnd('/');
-
-            if (string.IsNullOrEmpty(normalizedPath))
-            {
-                builder.Path = ApiPath;
-            }
-            else
-            {
-                if (normalizedPath.EndsWith(DeploymentEndpointPath, StringComparison.OrdinalIgnoreCase))
-                    normalizedPath = normalizedPath.Substring(0, normalizedPath.Length - DeploymentEndpointPath.Length);
-
-                if (!normalizedPath.EndsWith(ApiPath, StringComparison.OrdinalIgnoreCase))
-                    normalizedPath += ApiPath;
-
-                builder.Path = normalizedPath;
-            }
-
-            return builder.Uri.ToString().TrimEnd('/');
-        }
-
-        private static string BuildApiRelativeUrl(string serverAddress, string relativePath)
-        {
-            var baseUrl = BuildApiBaseUrl(serverAddress);
-            var rel = (relativePath ?? string.Empty).TrimStart('/');
-            return string.Concat(baseUrl, "/", rel);
-        }
-
-        private static string BuildPath(string template, string gameId)
-        {
-            return string.Format(template, gameId);
         }
 
         private async Task SendRequestAsync(

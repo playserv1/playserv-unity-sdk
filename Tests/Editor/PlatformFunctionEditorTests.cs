@@ -5,7 +5,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
-using Playserv.Deploy.Editor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -14,10 +13,10 @@ namespace Playserv.Editor.Tests
 {
     public class PlatformFunctionEditorTests
     {
-        [Test] public void DeploymentTabsDefaultToFunctionsAndKeepRpcLast()
+        [Test] public void DeploymentTabsExposeOnlySupportedPublishers()
         {
-            Assert.That(PlayServDeploymentSectionPresenter.TabLabels, Is.EqualTo(new[] { "Platform Functions", "Server Images", "RPC" }));
-            using (var presenter = new PlayServDeploymentSectionPresenter(_ => null))
+            Assert.That(PlayServDeploymentSectionPresenter.TabLabels, Is.EqualTo(new[] { "Platform Functions", "Server Images" }));
+            using (var presenter = new PlayServDeploymentSectionPresenter())
                 Assert.That(typeof(PlayServDeploymentSectionPresenter).GetField("_mode", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(presenter), Is.EqualTo(0));
         }
 
@@ -33,24 +32,6 @@ namespace Playserv.Editor.Tests
                 Assert.That(typeof(PlatformDeploymentReference).GetFields().Select(f => f.Name), Is.EquivalentTo(new[] { "Api", "Project", "Environment", "Id" }));
             }
             finally { PlatformFunctionEditorStore.LastDeployment = previous; }
-        }
-
-        [Test] public void LegacyRpcZipStillPreservesRelativeSourcePaths()
-        {
-            var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "playserv-rpc-zip-" + Guid.NewGuid().ToString("N"))).FullName;
-            string zip = null;
-            try
-            {
-                Directory.CreateDirectory(Path.Combine(root, "nested"));
-                var file = Path.Combine(root, "nested", "Rpc.cs"); File.WriteAllText(file, "legacy RPC source");
-                zip = new DeploymentZipBuilder().CreateRelativeZipArchive(root, new[] { file });
-                using (var archive = ZipFile.OpenRead(zip))
-                {
-                    Assert.That(archive.Entries.Select(e => e.FullName), Is.EqualTo(new[] { "nested/Rpc.cs" }));
-                    using (var reader = new StreamReader(archive.Entries[0].Open())) Assert.That(reader.ReadToEnd(), Is.EqualTo("legacy RPC source"));
-                }
-            }
-            finally { if (zip != null) File.Delete(zip); Directory.Delete(root, true); }
         }
 
         [UnityTest] public IEnumerator ServerImagesDrawingPreservesSavedServerBeforeConnecting()
@@ -113,7 +94,7 @@ namespace Playserv.Editor.Tests
                 var state = new PlayServWindowState { FoldDeployment = true };
                 _connection = new PlayServConnectionController(state, Repaint);
                 _context = new PlayServWindowContext(this, state, _connection, "", 25, () => { }, () => { }, () => { }, Repaint);
-                _presenter = new PlayServDeploymentSectionPresenter(_ => null);
+                _presenter = new PlayServDeploymentSectionPresenter();
             }
             PlayServWindowTheme.Ensure();
             typeof(PlayServDeploymentSectionPresenter).GetField("_mode", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(_presenter, Mode);
