@@ -1,0 +1,16 @@
+{
+    "name": "Playserv.Runtime.Modules.GoogleSignIn",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

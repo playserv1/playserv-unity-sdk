@@ -1,0 +1,16 @@
+{
+    "name": "Playserv.Runtime.Modules.Pulse",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_PULSE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

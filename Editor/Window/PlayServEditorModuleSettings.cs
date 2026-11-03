@@ -1,0 +1,334 @@
+using System;
+using System.Collections.Generic;
+using Playserv.Modules;
+
+namespace Playserv.Editor
+{
+    internal sealed class PlayServEditorModuleSettings
+    {
+        private const bool DefaultOptionalModuleState = true;
+        private const bool DefaultInternalToolState = false;
+        private PlayServRuntimeModuleState _runtimeState = new PlayServRuntimeModuleState();
+
+        public bool Deployment { get; private set; } = DefaultOptionalModuleState;
+        public bool ModelSync { get; private set; } = DefaultOptionalModuleState;
+        public bool Codegen { get; private set; } = DefaultOptionalModuleState;
+        public bool ModuleStressTests { get; private set; } = DefaultInternalToolState;
+        public bool SdkLogs { get; private set; } = true;
+        public string ActiveRuntimeProfileId => PlayServProjectModuleSettings.CurrentProfileId;
+        public string CurrentBuildTargetGroupId => PlayServProjectModuleSettings.CurrentBuildTargetGroupId;
+        public bool HasCurrentPlatformOverride => PlayServProjectModuleSettings.HasCurrentPlatformOverride;
+
+        public void Load()
+        {
+            Deployment = PlayServEditorModuleAvailability.EditorDeployment &&
+                         PlayServProjectModuleSettings.IsEditorToolEnabled(
+                             PlayServProjectModuleSettings.DeploymentEditorToolId,
+                             DefaultOptionalModuleState);
+            ModelSync = PlayServEditorModuleAvailability.EditorModelSync &&
+                        PlayServProjectModuleSettings.IsEditorToolEnabled(
+                            PlayServProjectModuleSettings.ModelSyncEditorToolId,
+                            DefaultOptionalModuleState);
+            Codegen = PlayServEditorModuleAvailability.EditorCodegen &&
+                      PlayServProjectModuleSettings.IsEditorToolEnabled(
+                          PlayServProjectModuleSettings.CodegenEditorToolId,
+                          DefaultOptionalModuleState);
+            ModuleStressTests = PlayServEditorModuleAvailability.EditorModuleStressTests &&
+                                PlayServProjectModuleSettings.IsEditorToolEnabled(
+                                    PlayServProjectModuleSettings.ModuleStressTestsEditorToolId,
+                                    DefaultInternalToolState);
+            SdkLogs = PlayServRuntimeModuleDefines.AreSdkLogsEnabled();
+            LoadRuntimeModuleDefines();
+        }
+
+        public bool SetDeployment(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorDeployment &&
+            Set(PlayServProjectModuleSettings.DeploymentEditorToolId, Deployment, enabled, value => Deployment = value);
+
+        public bool SetModelSync(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorModelSync &&
+            Set(PlayServProjectModuleSettings.ModelSyncEditorToolId, ModelSync, enabled, value => ModelSync = value);
+
+        public bool SetCodegen(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorCodegen &&
+            Set(PlayServProjectModuleSettings.CodegenEditorToolId, Codegen, enabled, value => Codegen = value);
+
+        public bool SetModuleStressTests(bool enabled) =>
+            PlayServEditorModuleAvailability.EditorModuleStressTests &&
+            Set(PlayServProjectModuleSettings.ModuleStressTestsEditorToolId, ModuleStressTests, enabled, value => ModuleStressTests = value);
+
+        public bool SetSdkLogs(bool enabled)
+        {
+            if (SdkLogs == enabled)
+                return false;
+
+            SdkLogs = enabled;
+            return PlayServRuntimeModuleDefines.SetSdkLogsEnabled(enabled);
+        }
+
+        public bool SetRuntimeModuleEnabled(string moduleId, bool enabled)
+        {
+            if (!PlayServModuleManifest.TryGet(moduleId, out var module))
+                return false;
+
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
+                return false;
+
+            var state = _runtimeState.Clone();
+            if (state.IsEnabled(moduleId) == enabled)
+                return false;
+
+            if (enabled && TryBuildMissingDependencyList(module, state, out _))
+                return false;
+
+            if (enabled && TryBuildEnabledConflictList(module, state, out _))
+                return false;
+
+            if (!enabled && TryBuildEnabledDependentList(module.Id, state, out _))
+                return false;
+
+            state.SetEnabled(moduleId, enabled);
+            return ApplyRuntimeState(state, PlayServProjectModuleSettings.CustomProfileId);
+        }
+
+        public bool CanChangeRuntimeModule(string moduleName)
+        {
+            if (!TryGetRuntimeModuleByName(moduleName, out var module))
+                return false;
+
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
+                return false;
+
+            return _runtimeState.IsEnabled(module.Id)
+                ? !TryBuildEnabledDependentList(module.Id, _runtimeState, out _)
+                : !TryBuildMissingDependencyList(module, _runtimeState, out _) &&
+                  !TryBuildEnabledConflictList(module, _runtimeState, out _);
+        }
+
+        public string GetRuntimeModuleBlockReason(string moduleName)
+        {
+            if (!TryGetRuntimeModuleByName(moduleName, out var module))
+                return string.Empty;
+
+            if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module))
+                return string.Empty;
+
+            if (_runtimeState.IsEnabled(module.Id) &&
+                TryBuildEnabledDependentList(module.Id, _runtimeState, out var dependents))
+            {
+                return $"Disable dependent modules first: {dependents}.";
+            }
+
+            if (!_runtimeState.IsEnabled(module.Id) &&
+                TryBuildMissingDependencyList(module, _runtimeState, out var dependencies))
+            {
+                return $"Enable {dependencies} first.";
+            }
+
+            if (!_runtimeState.IsEnabled(module.Id) &&
+                TryBuildEnabledConflictList(module, _runtimeState, out var conflicts))
+            {
+                return $"Disable conflicting modules first: {conflicts}.";
+            }
+
+            return string.Empty;
+        }
+
+        public bool IsRuntimeModuleEnabled(string moduleName)
+        {
+            if (!TryGetRuntimeModuleByName(moduleName, out var module))
+                return false;
+
+            return PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module) &&
+                   _runtimeState.IsEnabled(module.Id);
+        }
+
+        public void ResetToDefaults()
+        {
+            if (PlayServEditorModuleAvailability.EditorDeployment)
+                SetDeployment(DefaultOptionalModuleState);
+
+            if (PlayServEditorModuleAvailability.EditorModelSync)
+                SetModelSync(DefaultOptionalModuleState);
+
+            if (PlayServEditorModuleAvailability.EditorCodegen)
+                SetCodegen(DefaultOptionalModuleState);
+
+            if (PlayServEditorModuleAvailability.EditorModuleStressTests)
+                SetModuleStressTests(DefaultInternalToolState);
+
+            SetSdkLogs(true);
+            ApplyRuntimeProfile(PlayServSdkProfiles.ClientSdk);
+        }
+
+        public bool ApplyRuntimeProfile(PlayServSdkProfile profile)
+        {
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+
+            var state = new PlayServRuntimeModuleState();
+            foreach (var module in PlayServModuleManifest.RuntimeModules)
+                state.SetEnabled(module.Id, IsProfileModuleEnabled(profile, module));
+
+            return ApplyRuntimeState(state, profile.Id);
+        }
+
+        public bool CreateCurrentPlatformOverride()
+        {
+            if (!PlayServProjectModuleSettings.CreateCurrentPlatformOverride())
+                return false;
+
+            LoadRuntimeModuleDefines();
+            PlayServRuntimeModuleDefines.Apply(_runtimeState);
+            return true;
+        }
+
+        public bool ClearCurrentPlatformOverride()
+        {
+            if (!PlayServProjectModuleSettings.ClearCurrentPlatformOverride())
+                return false;
+
+            LoadRuntimeModuleDefines();
+            PlayServRuntimeModuleDefines.Apply(_runtimeState);
+            return true;
+        }
+
+        private static bool Set(string editorToolId, bool current, bool enabled, Action<bool> assign)
+        {
+            if (current == enabled)
+                return false;
+
+            assign(enabled);
+            return PlayServProjectModuleSettings.SetEditorToolEnabled(editorToolId, enabled);
+        }
+
+        private void LoadRuntimeModuleDefines()
+        {
+            _runtimeState = PlayServRuntimeModuleDefines.LoadProjectState();
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(_runtimeState);
+        }
+
+        private bool ApplyRuntimeState(PlayServRuntimeModuleState state, string profileId)
+        {
+            PlayServEditorModuleAvailability.NormalizeAvailableRuntimeState(state);
+            PlayServRuntimeModuleDefines.NormalizeDependencies(state);
+
+            var changed = !_runtimeState.HasSameEnabledModules(state);
+            _runtimeState = state.Clone();
+
+            return PlayServRuntimeModuleDefines.Apply(
+                       state,
+                       syncModuleGraph: true,
+                       profileId: profileId) ||
+                   changed;
+        }
+
+        private static bool IsProfileModuleEnabled(PlayServSdkProfile profile, PlayServModuleManifestEntry module)
+        {
+            if (module.ProfileIds.Length > 0)
+            {
+                for (var i = 0; i < module.ProfileIds.Length; i++)
+                {
+                    if (string.Equals(module.ProfileIds[i], profile.Id, StringComparison.Ordinal))
+                        return true;
+                }
+
+                return false;
+            }
+
+            return profile.EnablesModule(module.Id);
+        }
+
+        private static bool TryGetRuntimeModuleByName(string moduleName, out PlayServModuleManifestEntry module)
+        {
+            return PlayServModuleManifest.TryResolve(moduleName, out module);
+        }
+
+        private static bool TryBuildMissingDependencyList(
+            PlayServModuleManifestEntry module,
+            PlayServRuntimeModuleState state,
+            out string dependencies)
+        {
+            var labels = new List<string>();
+            for (var i = 0; i < module.DependencyIds.Length; i++)
+            {
+                if (state.IsEnabled(module.DependencyIds[i]))
+                    continue;
+
+                labels.Add(PlayServModuleManifest.GetLabel(module.DependencyIds[i]));
+            }
+
+            dependencies = string.Join(", ", labels);
+            return labels.Count > 0;
+        }
+
+        private static bool TryBuildEnabledDependentList(
+            string moduleId,
+            PlayServRuntimeModuleState state,
+            out string dependents)
+        {
+            var labels = new List<string>();
+            foreach (var module in PlayServModuleManifest.VisibleRuntimeModules)
+            {
+                if (!state.IsEnabled(module.Id) || !HasDependency(module, moduleId))
+                    continue;
+
+                labels.Add(module.Label);
+            }
+
+            dependents = string.Join(", ", labels);
+            return labels.Count > 0;
+        }
+
+        private static bool TryBuildEnabledConflictList(
+            PlayServModuleManifestEntry module,
+            PlayServRuntimeModuleState state,
+            out string conflicts)
+        {
+            var labels = new List<string>();
+            foreach (var candidate in PlayServModuleManifest.VisibleRuntimeModules)
+            {
+                if (!state.IsEnabled(candidate.Id) ||
+                    !ModulesConflict(module, candidate))
+                {
+                    continue;
+                }
+
+                labels.Add(candidate.Label);
+            }
+
+            conflicts = string.Join(", ", labels);
+            return labels.Count > 0;
+        }
+
+        private static bool ModulesConflict(
+            PlayServModuleManifestEntry left,
+            PlayServModuleManifestEntry right)
+        {
+            return Contains(left.ConflictsWith, right.Id) ||
+                   Contains(right.ConflictsWith, left.Id);
+        }
+
+        private static bool Contains(string[] values, string expected)
+        {
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (string.Equals(values[i], expected, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasDependency(PlayServModuleManifestEntry module, string dependencyId)
+        {
+            for (var i = 0; i < module.DependencyIds.Length; i++)
+            {
+                if (string.Equals(module.DependencyIds[i], dependencyId, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+    }
+}

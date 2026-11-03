@@ -1,0 +1,72 @@
+using Playserv.Wrapper;
+using UnityEditor;
+using UnityEngine;
+
+namespace Playserv.Editor
+{
+    [CustomEditor(typeof(PlayServConfig))]
+    internal sealed class PlayServConfigInspector : UnityEditor.Editor
+    {
+        private readonly PlayServServerTokenField _serverToken = new PlayServServerTokenField();
+        private static readonly string[] EditablePropertyOrder =
+        {
+            "deploymentGameId",
+            "gameVersion",
+            "allowMultipleConnections",
+            "keepAlivePingIntervalMs",
+            "keepAlivePongTimeoutMs",
+            "networkTransformSyncIntervalMs",
+            "timeoutSeconds"
+        };
+
+        private static readonly string[] SdkVersionPropertyOrder =
+        {
+            "sdkVersion"
+        };
+
+        private static readonly string[] EndpointPropertyOrder =
+        {
+            "backendServerAddress",
+            "dashboardAddress"
+        };
+
+        public override void OnInspectorGUI()
+        {
+            var config = (PlayServConfig)target;
+            PlayServDeploymentSettings.MigrateDashboard(config);
+            if (PlayServEnvironmentClientTokens.IsManaged(config))
+                PlayServEnvironmentClientTokens.DrawTokenField(config);
+            serializedObject.Update();
+
+            if (!PlayServEnvironmentClientTokens.IsManaged(config))
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("clientToken"));
+
+            _serverToken.Draw(config);
+            DrawProperties(EditablePropertyOrder, readOnly: false);
+            DrawProperties(SdkVersionPropertyOrder, readOnly: !CanEditSdkVersionInClientEditor());
+
+            DrawProperties(EndpointPropertyOrder, readOnly: false);
+
+            if (serializedObject.ApplyModifiedProperties())
+                EditorUtility.SetDirty(target);
+        }
+
+        private void DrawProperties(string[] propertyNames, bool readOnly)
+        {
+            foreach (var propertyName in propertyNames)
+            {
+                var property = serializedObject.FindProperty(propertyName);
+                if (property == null)
+                    continue;
+
+                using (new EditorGUI.DisabledScope(readOnly))
+                    EditorGUILayout.PropertyField(property, includeChildren: true);
+            }
+        }
+
+        private static bool CanEditSdkVersionInClientEditor()
+        {
+            return PlayServSettingsResolver.IsClientProjectContext();
+        }
+    }
+}

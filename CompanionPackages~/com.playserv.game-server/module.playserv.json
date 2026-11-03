@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "game-server",
+  "order": 155,
+  "label": "Game Server",
+  "description": "Dedicated-server matchmaking, room heartbeats, Records, Cloud Functions, analytics, commerce, reservation admission, and safe player lookup.",
+  "minSdkVersion": "0.3.9",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "runtime.game-server",
+    "matchmaking.server",
+    "matchmaking.rooms",
+    "data.records.server",
+    "code.server",
+    "analytics.events.server",
+    "commerce.catalog.server",
+    "commerce.storefronts.server"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk",
+    "com.playserv.analytics"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_GAME_SERVER",
+  "defaultEnabled": false,
+  "isServerModule": true,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Implementation"
+  ],
+  "dependencyIds": [
+    "data-subscription",
+    "analytics"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "server-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.GameServer"
+}

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "debug-terminal",
+  "order": 140,
+  "label": "Debug Terminal",
+  "description": "Optional in-game terminal for authenticated PlayServ diagnostics and module smoke testing.",
+  "minSdkVersion": "0.4.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "debug.terminal",
+    "debug.terminal.server"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk",
+    "com.playserv.analytics",
+    "com.playserv.game-server"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_DEBUG_TERMINAL",
+  "defaultEnabled": false,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": false,
+  "assetPaths": [
+    "Runtime",
+    "Editor",
+    "Samples~/DebugTerminal"
+  ],
+  "dependencyIds": [
+    "client-execution",
+    "analytics",
+    "data-subscription",
+    "events",
+    "client-rpc",
+    "spawn"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.DebugTerminal"
+}

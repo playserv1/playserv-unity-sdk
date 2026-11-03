@@ -1,0 +1,16 @@
+{
+    "name": "Playserv.Runtime.Modules.EpicAuth",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_EPIC_AUTH"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,31 @@
+{
+    "name": "Playserv.Tests.Editor.GameServer",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.GameServer"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Abstractions.dll",
+        "Playserv.Runtime.Core.dll",
+        "Playserv.Runtime.Http.dll",
+        "Playserv.Runtime.Serialization.dll",
+        "Playserv.Runtime.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_GAME_SERVER"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

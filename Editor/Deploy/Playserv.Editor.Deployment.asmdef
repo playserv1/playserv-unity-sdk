@@ -1,0 +1,27 @@
+{
+    "name": "Playserv.Editor.Deployment",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Deploy.Analysis"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Microsoft.CodeAnalysis.CSharp.dll",
+        "Microsoft.CodeAnalysis.dll",
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Serialization.dll",
+        "Playserv.Runtime.dll",
+        "System.Collections.Immutable.dll",
+        "System.Reflection.Metadata.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "transport-webrtc",
+  "order": 130,
+  "label": "WebRTC",
+  "description": "WebRTC data channel and signaling implementation.",
+  "minSdkVersion": "0.3.1",
+  "supportedPlatforms": [
+    "Editor",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "transport.webrtc"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBRTC",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Transport.WebRtc"
+}

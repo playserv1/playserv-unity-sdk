@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "data-subscription",
+  "order": 20,
+  "label": "Data Subscription",
+  "description": "Typed V2 records CRUD/query handles plus shared polling and live subscription APIs.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "data.shared",
+    "data.records.v2"
+  ],
+  "requiresPackages": [],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_DATA",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Modules/DataSubscription/Implementation"
+  ],
+  "dependencyIds": [],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "client-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.DataSubscription"
+}

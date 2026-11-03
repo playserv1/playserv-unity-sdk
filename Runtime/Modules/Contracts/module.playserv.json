@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "client-execution",
+  "order": 0,
+  "label": "Client Execution",
+  "description": "Client-side runtime execution surface. Disable this for server-only SDK builds.",
+  "minSdkVersion": "0.3.0",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "runtime.client"
+  ],
+  "requiresPackages": [],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [],
+  "dependencyIds": [],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "client-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": ""
+}

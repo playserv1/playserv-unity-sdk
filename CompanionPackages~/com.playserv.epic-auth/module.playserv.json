@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "epic-auth",
+  "order": 92,
+  "label": "Epic Auth",
+  "description": "EOS access-token and Epic Games Launcher exchange-code helpers for PlayServ authentication.",
+  "minSdkVersion": "0.3.8",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "identity.epic"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_EPIC_AUTH",
+  "defaultEnabled": false,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Implementation"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.EpicAuth"
+}

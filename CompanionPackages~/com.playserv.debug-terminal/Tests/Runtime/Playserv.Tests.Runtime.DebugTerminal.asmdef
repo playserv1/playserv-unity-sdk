@@ -1,0 +1,29 @@
+{
+    "name": "Playserv.Tests.Runtime.DebugTerminal",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Runtime.Modules.DebugTerminal",
+        "Playserv.Runtime.Modules.Analytics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Abstractions.dll",
+        "Playserv.Runtime.Modules.DataSubscription.dll",
+        "Playserv.Runtime.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_DEBUG_TERMINAL",
+        "!PLAYSERV_MODULE_DISABLED_ANALYTICS"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

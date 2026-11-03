@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>PlayServ.Schema.Tool</AssemblyName>
+    <RootNamespace>PlayServ.Schema.Tool</RootNamespace>
+    <Version>0.7.2</Version>
+    <UseAppHost>false</UseAppHost>
+    <RollForward>LatestMajor</RollForward>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <PublishReadyToRun>false</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.1" />
+    <PackageReference Include="System.Collections.Immutable" Version="6.0.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
+  </ItemGroup>
+
+  <Target Name="PrunePlayServRuntime" AfterTargets="Publish">
+    <ItemGroup>
+      <PlayServSatelliteResource Include="$(PublishDir)**/*.resources.dll" />
+    </ItemGroup>
+    <Delete Files="@(PlayServSatelliteResource)" />
+  </Target>
+</Project>

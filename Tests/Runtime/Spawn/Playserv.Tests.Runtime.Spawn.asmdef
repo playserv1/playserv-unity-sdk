@@ -1,0 +1,25 @@
+{
+    "name": "Playserv.Tests.Runtime.Spawn",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Modules.Events.dll",
+        "Playserv.Runtime.Modules.Spawn.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_EVENTS",
+        "!PLAYSERV_MODULE_DISABLED_SPAWN"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

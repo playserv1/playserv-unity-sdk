@@ -1,0 +1,7 @@
+<linker>
+  <assembly fullname="Playserv.Runtime.Modules.FacebookLogin" preserve="all" />
+  <assembly fullname="Facebook.Unity" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="Facebook.Unity.Mobile" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="Facebook.Unity.IOS" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="Facebook.Unity.Android" preserve="all" ignoreIfMissing="1" />
+</linker>

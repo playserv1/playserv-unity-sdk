@@ -1,0 +1,27 @@
+{
+  "name": "com.playserv.sdk",
+  "displayName": "PlayServ SDK",
+  "version": "0.7.2",
+  "unity": "2021.3",
+  "description": "PlayServ multiplayer SDK for Unity (runtime, editor tooling, and samples).",
+  "author": {
+    "name": "PlayServ"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:playserv1/playserv-unity-sdk.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "PlayServ SDK Examples",
+      "description": "Ready-to-run scenes for data subscriptions, events, RPC, identity, and network spawning.",
+      "path": "Samples~/PlayServSDK"
+    }
+  ]
+}

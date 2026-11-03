@@ -1,0 +1,29 @@
+{
+    "name": "Playserv.Tests.Runtime.RPC",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Abstractions.dll",
+        "Playserv.Runtime.Core.dll",
+        "Playserv.Runtime.Modules.RPC.Client.dll",
+        "Playserv.Runtime.Modules.RPC.Core.dll",
+        "Playserv.Runtime.Modules.dll",
+        "Playserv.Runtime.Serialization.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC"
+    ],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

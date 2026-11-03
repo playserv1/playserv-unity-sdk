@@ -1,0 +1,5 @@
+<linker>
+  <assembly fullname="Playserv.Runtime.Modules.SteamAuth" preserve="all" />
+  <assembly fullname="com.rlabrecque.steamworks.net" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="Steamworks.NET" preserve="all" ignoreIfMissing="1" />
+</linker>

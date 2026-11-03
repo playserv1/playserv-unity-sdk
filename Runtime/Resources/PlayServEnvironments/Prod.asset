@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 934313702, guid: eadf17f591eb03d5561a75719173465a, type: 3}
+  m_Name: Prod
+  m_EditorClassIdentifier: 
+  clientToken: 
+  deploymentGameId:
+  backendServerAddress: wss://platform.playserv.com/ws
+  webRtcSignalingServerAddress: 
+  webRtcDataChannelLabel: playserv
+  webRtcIceServers: []
+  dashboardAddress: https://dashboard.playserv.com
+  allowMultipleConnections: 1
+  keepAlivePingIntervalMs: 20000
+  keepAlivePongTimeoutMs: 10000
+  networkTransformSyncIntervalMs: 100
+  timeoutSeconds: 120

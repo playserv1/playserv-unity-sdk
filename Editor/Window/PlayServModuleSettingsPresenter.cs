@@ -1,0 +1,585 @@
+using System.Linq;
+using Playserv.Modules;
+using UnityEditor;
+using UnityEngine;
+
+namespace Playserv.Editor
+{
+    internal sealed class PlayServModuleSettingsPresenter
+    {
+        private const float ModuleTagMaxWidth = 260f;
+        private static string[] RuntimeModuleNames =>
+            PlayServModuleManifest.VisibleRuntimeModules
+                .Where(module =>
+                    !module.IsServerModule &&
+                    !PlayServCompanionPackageCatalog.IsCompanionModule(module.Id))
+                .Select(module => module.Label)
+                .ToArray();
+
+        private static string[] ServerRuntimeModuleNames =>
+            PlayServModuleManifest.VisibleRuntimeModules
+                .Where(module => module.IsServerModule)
+                .Select(module => module.Label)
+                .ToArray();
+
+        public void Draw(PlayServWindowContext context)
+        {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.HeroCardStyle))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("SDK module settings", PlayServWindowTheme.HeroTitleStyle);
+                    GUILayout.FlexibleSpace();
+
+                    if (PlayServWindowChrome.DrawActionButton("Back", PlayServWindowButtonTone.Ghost, GUILayout.Width(92f), GUILayout.Height(30f)))
+                    {
+                        context.State.ShowModuleSettingsLayer = false;
+                        context.State.MainScrollPos = Vector2.zero;
+                        context.Repaint();
+                    }
+                }
+
+                GUILayout.Space(6f);
+                GUILayout.Label(
+                    "Core runtime, serialization, and config stay enabled. Module toggles write scripting defines, so disabled module APIs are removed at compile time.",
+                    PlayServWindowTheme.HeroBodyStyle);
+            }
+
+            GUILayout.Space(12f);
+
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardStyle))
+            {
+                var settings = context.State.ModuleSettings;
+                var changed = false;
+                changed |= DrawLoggingToggle(settings);
+                GUILayout.Space(12f);
+                changed |= DrawCompanionPackages(settings);
+                GUILayout.Space(12f);
+
+                var hasRuntimeModules = DrawRuntimeModuleGroup(
+                    "Runtime",
+                    RuntimeModuleNames,
+                    settings,
+                    ref changed);
+
+                var hasServerRuntimeModules = DrawRuntimeModuleGroup(
+                    "Server Runtime",
+                    ServerRuntimeModuleNames,
+                    settings,
+                    ref changed,
+                    hasRuntimeModules);
+
+                if (!hasRuntimeModules && !hasServerRuntimeModules)
+                    PlayServWindowChrome.DrawNotice("No optional runtime modules are installed in this SDK package.", MessageType.Info);
+
+                if (hasRuntimeModules || hasServerRuntimeModules)
+                    changed |= DrawRegisteredSections(context, settings, hasRuntimeModules, hasServerRuntimeModules);
+
+                if (PlayServEditorModuleAvailability.HasAnyEditorTool)
+                {
+                    GUILayout.Space(12f);
+                    GUILayout.Label("Editor tools", PlayServWindowTheme.MiniHeadingStyle);
+                    GUILayout.Space(8f);
+
+                    if (PlayServEditorModuleAvailability.EditorDeployment)
+                    {
+                        changed |= DrawToggleModule(
+                            "Deployment",
+                            "Platform Functions and Server Images publishing.",
+                            settings.Deployment,
+                            settings.SetDeployment);
+                    }
+
+                    if (PlayServEditorModuleAvailability.EditorModelSync)
+                    {
+                        GUILayout.Space(6f);
+                        changed |= DrawToggleModule(
+                            "Schema Tool",
+                            "External schema analysis, generation, validation, and watch controls.",
+                            settings.ModelSync,
+                            settings.SetModelSync);
+                    }
+
+                    if (PlayServEditorModuleAvailability.EditorCodegen)
+                    {
+                        GUILayout.Space(6f);
+                        changed |= DrawToggleModule(
+                            "DTO Codegen",
+                            "Shared DTO generation and cleanup controls.",
+                            settings.Codegen,
+                            settings.SetCodegen);
+                    }
+
+                    if (PlayServEditorModuleAvailability.EditorModuleStressTests)
+                    {
+                        GUILayout.Space(6f);
+                        changed |= DrawToggleModule(
+                            "Module Stress Tests",
+                            "Internal delete/restore checks for optional module packaging. Excluded from SDK exports.",
+                            settings.ModuleStressTests,
+                            settings.SetModuleStressTests);
+                    }
+                }
+
+                GUILayout.Space(12f);
+                using (new EditorGUILayout.VerticalScope())
+                {
+                    PlayServWindowChrome.DrawNotice(
+                        "Changing runtime modules updates Player Settings scripting defines and triggers a Unity script reload. If a module is disabled, its public SDK types are intentionally unavailable to gameplay code.",
+                        MessageType.Info);
+
+                    GUILayout.Space(8f);
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        GUILayout.FlexibleSpace();
+
+                        if (PlayServWindowChrome.DrawActionButton("Validate Modules", PlayServWindowButtonTone.Secondary, GUILayout.Width(146f), GUILayout.Height(30f)))
+                            PlayServModuleValidator.RunInteractive();
+
+                        GUILayout.Space(8f);
+
+                        using (new EditorGUI.DisabledScope(EditorApplication.isCompiling || EditorApplication.isUpdating))
+                        {
+                            if (PlayServWindowChrome.DrawActionButton("Repair Modules", PlayServWindowButtonTone.Primary, GUILayout.Width(138f), GUILayout.Height(30f)))
+                                PlayServModuleRepairer.RunInteractive();
+                        }
+
+                        GUILayout.Space(8f);
+
+                        if (PlayServWindowChrome.DrawActionButton("Reset Defaults", PlayServWindowButtonTone.Secondary, GUILayout.Width(130f), GUILayout.Height(30f)))
+                        {
+                            settings.ResetToDefaults();
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (changed)
+                {
+                    settings.Load();
+                    context.Repaint();
+                }
+            }
+        }
+
+        private static bool DrawRegisteredSections(
+            PlayServWindowContext context,
+            PlayServEditorModuleSettings settings,
+            bool hasRuntimeModules,
+            bool hasServerRuntimeModules)
+        {
+            var changed = false;
+
+            foreach (var section in PlayServModuleSettingsSectionRegistry.RegisteredSections)
+                changed |= section.Draw(context, settings, hasRuntimeModules, hasServerRuntimeModules);
+
+            return changed;
+        }
+
+        private static bool DrawLoggingToggle(PlayServEditorModuleSettings settings)
+        {
+            GUILayout.Label("Diagnostics", PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Space(8f);
+            return DrawToggleModule(
+                "SDK Logs",
+                $"Writes PlayServ runtime diagnostics to the console. Disabling adds {PlayServRuntimeModuleDefines.SdkLogsDisabledDefine} and compiles logger output out.",
+                settings.SdkLogs,
+                settings.SetSdkLogs);
+        }
+
+        private static bool DrawCompanionPackages(PlayServEditorModuleSettings settings)
+        {
+            var changed = false;
+            GUILayout.Label("Companion packages", PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Space(8f);
+
+            foreach (var package in PlayServCompanionPackageCatalog.All)
+            {
+                using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
+                {
+                    var installed = PlayServCompanionPackageManager.TryGetInstalledPackage(
+                        package.PackageId,
+                        out var packageInfo);
+                    var busy = PlayServCompanionPackageManager.IsBusyFor(package.PackageId);
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        GUILayout.Label(package.DisplayName, EditorStyles.boldLabel);
+                        GUILayout.FlexibleSpace();
+
+                        if (busy)
+                        {
+                            GUILayout.Label(
+                                "Working...",
+                                PlayServWindowTheme.SectionSubtitleStyle,
+                                GUILayout.Width(92f));
+                        }
+                        else if (installed)
+                        {
+                            GUILayout.Label(
+                                $"Installed {packageInfo.version}",
+                                PlayServWindowTheme.SectionSubtitleStyle);
+                        }
+                        else
+                        {
+                            GUILayout.Label(
+                                "Not installed",
+                                PlayServWindowTheme.SectionSubtitleStyle);
+                        }
+                    }
+
+                    GUILayout.Space(2f);
+                    GUILayout.Label(
+                        package.Description,
+                        PlayServWindowTheme.SectionSubtitleStyle);
+
+                    GUILayout.Space(6f);
+                    if (installed)
+                    {
+                        var canRemove =
+                            PlayServCompanionPackageManager.CanRemove(
+                                package,
+                                settings,
+                                out var removeBlockReason);
+
+                        for (var i = 0; i < package.ModuleIds.Count; i++)
+                        {
+                            var moduleId = package.ModuleIds[i];
+                            var moduleAvailable =
+                                PlayServModuleManifest.TryGet(moduleId, out var module) &&
+                                PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(module);
+                            var enabled =
+                                moduleAvailable &&
+                                settings.IsRuntimeModuleEnabled(moduleId);
+                            var canChange =
+                                moduleAvailable &&
+                                settings.CanChangeRuntimeModule(moduleId);
+                            var moduleLabel = moduleAvailable
+                                ? module.Label
+                                : moduleId;
+
+                            using (new EditorGUILayout.HorizontalScope())
+                            {
+                                bool nextEnabled;
+                                using (new EditorGUI.DisabledScope(
+                                           PlayServCompanionPackageManager.IsBusy ||
+                                           EditorApplication.isCompiling ||
+                                           EditorApplication.isUpdating ||
+                                           !canChange))
+                                {
+                                    nextEnabled = EditorGUILayout.ToggleLeft(
+                                        $"{moduleLabel}: {(enabled ? "Enabled" : "Disabled")}",
+                                        enabled);
+                                }
+
+                                if (nextEnabled != enabled)
+                                    changed |= settings.SetRuntimeModuleEnabled(
+                                        moduleId,
+                                        nextEnabled);
+                            }
+
+                            if (!moduleAvailable)
+                            {
+                                GUILayout.Space(4f);
+                                GUILayout.Label(
+                                    $"Waiting for Unity to import the {moduleLabel} module descriptor.",
+                                    PlayServWindowTheme.SectionSubtitleStyle);
+                            }
+                            else if (!canChange)
+                            {
+                                var blockReason =
+                                    settings.GetRuntimeModuleBlockReason(moduleId);
+                                if (!string.IsNullOrWhiteSpace(blockReason))
+                                {
+                                    GUILayout.Space(4f);
+                                    GUILayout.Label(
+                                        blockReason,
+                                        PlayServWindowTheme.SectionSubtitleStyle);
+                                }
+                            }
+                        }
+
+                        GUILayout.Space(4f);
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            GUILayout.FlexibleSpace();
+                            using (new EditorGUI.DisabledScope(!canRemove))
+                            {
+                                if (PlayServWindowChrome.DrawActionButton(
+                                        "Remove Package",
+                                        PlayServWindowButtonTone.Ghost,
+                                        GUILayout.Width(126f),
+                                        GUILayout.Height(24f)) &&
+                                    ConfirmCompanionRemoval(package) &&
+                                    !PlayServCompanionPackageManager.Remove(
+                                        package,
+                                        settings,
+                                        out var removeError))
+                                {
+                                    EditorUtility.DisplayDialog(
+                                        "PlayServ package removal failed",
+                                        removeError,
+                                        "OK");
+                                }
+                            }
+                        }
+
+                        if (!canRemove &&
+                            !string.IsNullOrWhiteSpace(removeBlockReason) &&
+                            packageInfo.isDirectDependency)
+                        {
+                            GUILayout.Space(4f);
+                            GUILayout.Label(
+                                removeBlockReason,
+                                PlayServWindowTheme.SectionSubtitleStyle);
+                        }
+
+                        if (!packageInfo.isDirectDependency)
+                        {
+                            GUILayout.Space(4f);
+                            GUILayout.Label(
+                                "Managed by another package dependency.",
+                                PlayServWindowTheme.SectionSubtitleStyle);
+                        }
+                    }
+                    else
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            GUILayout.FlexibleSpace();
+                            using (new EditorGUI.DisabledScope(
+                                       PlayServCompanionPackageManager.IsBusy ||
+                                       EditorApplication.isCompiling ||
+                                       EditorApplication.isUpdating))
+                            {
+                                if (PlayServWindowChrome.DrawActionButton(
+                                        "Install",
+                                        PlayServWindowButtonTone.Primary,
+                                        GUILayout.Width(92f),
+                                        GUILayout.Height(24f)) &&
+                                    !PlayServCompanionPackageManager.Install(
+                                        package,
+                                        out var installError))
+                                {
+                                    EditorUtility.DisplayDialog(
+                                        "PlayServ package installation failed",
+                                        installError,
+                                        "OK");
+                                }
+                            }
+                        }
+                    }
+
+                    var operationError =
+                        PlayServCompanionPackageManager.GetLastError(package.PackageId);
+                    if (!string.IsNullOrWhiteSpace(operationError))
+                    {
+                        GUILayout.Space(6f);
+                        PlayServWindowChrome.DrawNotice(operationError, MessageType.Error);
+                    }
+                }
+
+                GUILayout.Space(6f);
+            }
+
+            return changed;
+        }
+
+        private static bool ConfirmCompanionRemoval(
+            PlayServCompanionPackageDefinition package)
+        {
+            return EditorUtility.DisplayDialog(
+                $"Remove {package.DisplayName}?",
+                "The module will be disabled first, then its UPM package will be removed from this project.",
+                "Remove",
+                "Cancel");
+        }
+
+        private static bool DrawRuntimeModuleGroup(
+            string title,
+            string[] moduleNames,
+            PlayServEditorModuleSettings settings,
+            ref bool changed,
+            bool addTopSpacing = false)
+        {
+            var drewAny = false;
+
+            for (var i = 0; i < moduleNames.Length; i++)
+            {
+                var module = FindAvailableRuntimeModule(moduleNames[i]);
+                if (module == null)
+                    continue;
+
+                if (!drewAny)
+                {
+                    if (addTopSpacing)
+                        GUILayout.Space(14f);
+
+                    GUILayout.Label(title, PlayServWindowTheme.MiniHeadingStyle);
+                    GUILayout.Space(8f);
+                }
+                else
+                {
+                    GUILayout.Space(6f);
+                }
+
+                changed |= DrawRuntimeModule(settings, module);
+                drewAny = true;
+            }
+
+            return drewAny;
+        }
+
+        private static PlayServEditorModuleAvailability.PlayServRuntimeModuleDefinition FindAvailableRuntimeModule(string moduleName)
+        {
+            foreach (var module in PlayServEditorModuleAvailability.AvailableRuntimeModules)
+            {
+                if (string.Equals(module.Name, moduleName, System.StringComparison.Ordinal))
+                    return module;
+            }
+
+            return null;
+        }
+
+        private static bool DrawToggleModule(string title, string description, bool enabled, System.Func<bool, bool> apply)
+        {
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
+            {
+                var nextEnabled = EditorGUILayout.ToggleLeft(title, enabled);
+                GUILayout.Space(2f);
+                GUILayout.Label(description, PlayServWindowTheme.SectionSubtitleStyle);
+
+                if (nextEnabled != enabled)
+                    return apply(nextEnabled);
+            }
+
+            return false;
+        }
+
+        private static bool DrawRuntimeModule(
+            PlayServEditorModuleSettings settings,
+            PlayServEditorModuleAvailability.PlayServRuntimeModuleDefinition module)
+        {
+            var title = module.Name;
+            var enabled = module.IsEnabled(settings);
+
+            using (new EditorGUILayout.VerticalScope(PlayServWindowTheme.CardBodyStyle))
+            {
+                var canChange = settings.CanChangeRuntimeModule(title);
+                var canUninstall = PlayServRuntimeModuleLifecycle.CanUninstallModule(settings, module, out _);
+                bool nextEnabled;
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUI.DisabledScope(!canChange))
+                    {
+                        nextEnabled = EditorGUILayout.ToggleLeft(title, enabled);
+                    }
+
+                    GUILayout.FlexibleSpace();
+
+                    using (new EditorGUI.DisabledScope(!canUninstall))
+                    {
+                        if (PlayServWindowChrome.DrawActionButton("Uninstall", PlayServWindowButtonTone.Ghost, GUILayout.Width(96f), GUILayout.Height(24f)))
+                        {
+                            if (ConfirmUninstall(module) &&
+                                !PlayServRuntimeModuleLifecycle.UninstallModule(settings, module, out var error))
+                            {
+                                EditorUtility.DisplayDialog(
+                                    "PlayServ module uninstall failed",
+                                    string.IsNullOrEmpty(error) ? "Unknown uninstall error." : error,
+                                    "OK");
+                            }
+
+                            return true;
+                        }
+                    }
+                }
+
+                GUILayout.Space(2f);
+                GUILayout.Label(module.Description, PlayServWindowTheme.SectionSubtitleStyle);
+                DrawModuleTags(settings, "Requires", module.Dependencies);
+                DrawModuleTags(settings, "Required by", module.Dependents);
+
+                if (canChange && nextEnabled != enabled)
+                    return module.SetEnabled(settings, nextEnabled);
+            }
+
+            return false;
+        }
+
+        private static bool ConfirmUninstall(PlayServEditorModuleAvailability.PlayServRuntimeModuleDefinition module)
+        {
+            if (!PlayServModuleManifest.TryGet(module.Id, out var manifest))
+                return false;
+
+            if (PlayServCompanionPackageCatalog.TryGetByModuleId(
+                    manifest.Id,
+                    out var companionPackage))
+            {
+                return ConfirmCompanionRemoval(companionPackage);
+            }
+
+            var paths = string.Join("\n", manifest.AssetPaths);
+            return EditorUtility.DisplayDialog(
+                $"Uninstall {module.Name} module?",
+                $"This will first disable {module.Name}, regenerate compatibility code, sync asmdef references, and then delete these package paths:\n\n{paths}",
+                "Uninstall",
+                "Cancel");
+        }
+
+        private static void DrawModuleTags(PlayServEditorModuleSettings settings, string label, string[] moduleNames)
+        {
+            if (moduleNames == null || moduleNames.Length == 0)
+                return;
+
+            if (!HasAvailableModuleTag(moduleNames))
+                return;
+
+            GUILayout.Space(6f);
+            GUILayout.Label(label, PlayServWindowTheme.MiniHeadingStyle);
+            GUILayout.Space(2f);
+
+            for (var i = 0; i < moduleNames.Length; i++)
+            {
+                var moduleName = moduleNames[i];
+                if (!PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleName))
+                    continue;
+
+                var moduleEnabled = settings.IsRuntimeModuleEnabled(moduleName);
+                var style = ResolveModuleTagStyle(moduleEnabled, label);
+                var content = new GUIContent($"{moduleName}: {(moduleEnabled ? "On" : "Off")}");
+                var width = Mathf.Min(ModuleTagMaxWidth, Mathf.Ceil(style.CalcSize(content).x));
+
+                GUILayout.Label(
+                    content,
+                    style,
+                    GUILayout.Width(width),
+                    GUILayout.Height(22f));
+                GUILayout.Space(3f);
+            }
+        }
+
+        private static bool HasAvailableModuleTag(string[] moduleNames)
+        {
+            for (var i = 0; i < moduleNames.Length; i++)
+            {
+                if (PlayServEditorModuleAvailability.IsRuntimeModuleAvailable(moduleNames[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static GUIStyle ResolveModuleTagStyle(bool moduleEnabled, string tagGroupLabel)
+        {
+            if (moduleEnabled && string.Equals(tagGroupLabel, "Required by", System.StringComparison.Ordinal))
+                return PlayServWindowTheme.ModuleTagBlockedStyle;
+
+            return moduleEnabled
+                ? PlayServWindowTheme.ModuleTagEnabledStyle
+                : PlayServWindowTheme.ModuleTagDisabledStyle;
+        }
+    }
+}

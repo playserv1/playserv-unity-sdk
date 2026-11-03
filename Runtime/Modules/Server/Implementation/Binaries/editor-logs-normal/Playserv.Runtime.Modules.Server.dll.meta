@@ -1,0 +1,44 @@
+fileFormatVersion: 2
+guid: 5f58b27a77aa8ce123bf748ed15b4f53
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints:
+  - 'UNITY_EDITOR || !ENABLE_IL2CPP'
+  - 'UNITY_EDITOR || !UNITY_WEBGL'
+  - '!PLAYSERV_MODULE_DISABLED_RPC_CORE'
+  - '!PLAYSERV_MODULE_DISABLED_SERVER'
+  isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
+  platformData:
+  - first:
+      '': Any
+    second:
+      enabled: 0
+      settings:
+        Exclude Editor: 0
+        Exclude WebGL: 1
+  - first:
+      Any: 
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      Editor: Editor
+    second:
+      enabled: 1
+      settings:
+        CPU: AnyCPU
+        OS: AnyOS
+  - first:
+      WebGL: WebGL
+    second:
+      enabled: 0
+      settings: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

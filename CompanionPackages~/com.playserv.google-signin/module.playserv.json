@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "google-sign-in",
+  "order": 90,
+  "label": "Google Sign In",
+  "description": "Google Sign-In facade for OAuth ID tokens, server auth codes, profile identity, silent sign-in, sign-out, and disconnect.",
+  "minSdkVersion": "0.3.1",
+  "supportedPlatforms": [
+    "Editor",
+    "Android",
+    "iOS"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "identity.google"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_GOOGLE_SIGN_IN",
+  "defaultEnabled": false,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Implementation",
+    "Editor"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.GoogleSignIn"
+}

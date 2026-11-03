@@ -1,0 +1,32 @@
+{
+    "name": "Playserv.Tests.Editor",
+    "rootNamespace": "",
+    "references": [
+        "Playserv.Editor.Core",
+        "Playserv.Editor.Deployment",
+        "Playserv.Editor.Migration",
+        "Playserv.Editor.ModelSync"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Abstractions.dll",
+        "Playserv.Runtime.Core.dll",
+        "Playserv.Runtime.Modules.dll",
+        "Playserv.Runtime.Transport.WebSocket.dll",
+        "Playserv.Runtime.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

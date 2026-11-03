@@ -1,0 +1,8 @@
+{
+    "name": "Playserv.Editor.BinaryDistribution",
+    "references": [],
+    "includePlatforms": ["Editor"],
+    "overrideReferences": true,
+    "precompiledReferences": ["Newtonsoft.Json.dll"],
+    "autoReferenced": true
+}

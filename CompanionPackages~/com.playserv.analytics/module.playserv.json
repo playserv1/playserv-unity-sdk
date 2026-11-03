@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "analytics",
+  "order": 75,
+  "label": "Analytics",
+  "description": "Provider-based gameplay analytics with typed parameters, user/session context, bounded batching, and HTTP ingestion.",
+  "minSdkVersion": "0.3.4",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "analytics.events"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_ANALYTICS",
+  "defaultEnabled": true,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime/Implementation"
+  ],
+  "dependencyIds": [],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "client-sdk",
+    "server-sdk",
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.Analytics"
+}

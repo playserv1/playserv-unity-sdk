@@ -1,0 +1,7 @@
+<linker>
+  <assembly fullname="Playserv.Runtime.Modules.EpicAuth" preserve="all" />
+  <assembly fullname="com.playeveryware.eos.core" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="com.Epic.OnlineServices" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="PlayEveryWare.EpicOnlineServices" preserve="all" ignoreIfMissing="1" />
+  <assembly fullname="Epic.OnlineServices" preserve="all" ignoreIfMissing="1" />
+</linker>

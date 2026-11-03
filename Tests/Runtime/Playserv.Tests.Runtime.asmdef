@@ -1,0 +1,29 @@
+{
+    "name": "Playserv.Tests.Runtime",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll",
+        "Playserv.Runtime.Abstractions.dll",
+        "Playserv.Runtime.Core.dll",
+        "Playserv.Runtime.Http.dll",
+        "Playserv.Runtime.Modules.DataSubscription.dll",
+        "Playserv.Runtime.Modules.Events.dll",
+        "Playserv.Runtime.Modules.dll",
+        "Playserv.Runtime.Serialization.dll",
+        "Playserv.Runtime.Transport.WebSocket.dll",
+        "Playserv.Runtime.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

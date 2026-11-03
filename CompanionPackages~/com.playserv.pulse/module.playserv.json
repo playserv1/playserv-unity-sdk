@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "pulse",
+  "order": 70,
+  "label": "Pulse",
+  "description": "Realtime config placeholder module and future feature flag surface.",
+  "minSdkVersion": "0.3.4",
+  "supportedPlatforms": [
+    "Editor",
+    "Standalone",
+    "Android",
+    "iOS",
+    "WebGL"
+  ],
+  "conflictsWith": [],
+  "capabilities": [
+    "config.realtime"
+  ],
+  "requiresPackages": [
+    "com.playserv.sdk"
+  ],
+  "disableDefine": "PLAYSERV_MODULE_DISABLED_PULSE",
+  "defaultEnabled": false,
+  "isServerModule": false,
+  "visibleInSettings": true,
+  "visibleInExport": true,
+  "assetPaths": [
+    "Runtime"
+  ],
+  "dependencyIds": [
+    "client-execution"
+  ],
+  "hiddenDependencyAssetPaths": [],
+  "hiddenDependencyModuleIds": [],
+  "profiles": [
+    "full-sdk"
+  ],
+  "rootAssemblyReference": "Playserv.Runtime.Modules.Pulse"
+}
