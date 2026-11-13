@@ -42,14 +42,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.7.2
+git@github.com:playserv1/playserv-unity-sdk.git#0.7.3
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.7.2
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.7.3
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -65,7 +65,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.7.2 is prepared in this checkout**, not asserted to be available in
+Version **0.7.3 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -91,7 +91,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.7.2"
+    "com.playserv.sdk": "0.7.3"
   }
 }
 ```
@@ -100,12 +100,12 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.7.2`).
+- A source release tag uses `unity-<version>` (for example `unity-0.7.3`).
 - Both tagged and manually dispatched releases require the source commit to be
   contained in `origin/dev` or an existing `origin/release/*` branch. The publisher
   refreshes these refs before checking; local-only or deleted branches do not qualify.
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.7.2`) atomically.
+  the matching plain-SemVer tag (for example `0.7.3`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
@@ -428,17 +428,34 @@ is unchanged. Set `GameVersion` explicitly: Connect never looks it up from V1.
 `GetLatestVersionAsync` is obsolete and returns `NotSupportedException` without a
 network request. Replace old calls with your configured version.
 
-Prod runtime defaults to `wss://platform.playserv.com/ws`. Known old Prod runtime
-and dashboard defaults migrate; custom addresses remain unchanged.
+Runtime and Dashboard defaults are paired by environment:
+
+| Environment | Backend Server Address | Dashboard Address |
+| --- | --- | --- |
+| Dev | `wss://dashboard.dev.playserv.com/ws` | `https://dashboard.dev.playserv.com` |
+| Prod | `wss://dashboard.playserv.com/ws` | `https://dashboard.playserv.com` |
+
+Dashboard settings use the origin; `/projects` is only a browser page. Previous
+standard Cloud Run Dev and `platform.playserv.com` Prod runtime endpoints, and
+the older V1 Prod runtime default, migrate when settings are read. Custom hosts,
+paths, query strings and ports are preserved. The selected environment and local
+Client/Server Token records stay unchanged; the SDK does not move keys between
+Dev and Prod.
+
+Saved player sessions are also preserved: for the exact dashboard `/ws` defaults,
+an empty session store entry falls back only to the immediately previous standard
+host in the same environment. The SDK keeps refresh/save/rollback on that stored
+record; an existing dashboard-host session takes precedence. Logout clears both
+recognized scopes, including when creating its replacement anonymous session
+fails. Custom endpoints do not import another host's session.
 
 ## External Schema Tool
 
 `com.playserv.schema-tool` is delivered through Unity Package Manager but runs
 outside the Unity managed process. It uses Unity's bundled .NET runtime, so a
 developer does not need to install a system-wide .NET runtime. The same shipped
-tool assembly supports every editor from Unity 2021.3 through Unity 6.6:
-Unity 2021-2023 use the .NET 6 target directly, while Unity 6.x rolls it forward
-to its bundled .NET 8 runtime.
+tool assembly supports Unity 2022.3.62f3 and Unity 6. It targets .NET 5 and
+rolls forward to the .NET runtime bundled with the active Editor.
 
 ### Install and initialize
 
@@ -542,7 +559,7 @@ Initialization creates `playserv.schema.json` in the project root:
     }
   ],
   "service": {
-    "endpoint": "https://platform.playserv.com",
+    "endpoint": "https://dashboard.playserv.com",
     "environment": "dev",
     "projectId": "prj_...",
     "serverKeyEnvironmentVariable": "PLAYSERV_SERVER_KEY"
@@ -842,12 +859,13 @@ The request-shape and lifecycle tests use local fixtures, not live backend integ
 ### Environment client tokens
 
 On first use without a saved project selection or a valid legacy preference,
-the environment is **Prod**, using `wss://platform.playserv.com/ws` and
+the environment is **Prod**, using `wss://dashboard.playserv.com/ws` and
 `https://dashboard.playserv.com`. Unqualified package defaults use the same
 public platform. **Dev** remains available by explicit selection. A saved
 project selection wins; a valid legacy global selection is still migrated once.
-Blank or unavailable selections fall back to Prod. Existing endpoint overrides,
-custom settings providers and explicit CI settings keep their behavior.
+Blank or unavailable selections fall back to Prod. Custom endpoint overrides,
+custom settings providers and explicit CI settings keep their behavior; known
+former standard runtime addresses migrate to the corresponding dashboard host.
 No tokens move between environments during this change. If an earlier version
 stored your prod key under Dev, select Prod and enter that key in its own slot;
 the SDK cannot detect the platform from the key.
@@ -2012,7 +2030,7 @@ roster member; new tokenless human joins fail before mutation, even disconnected
 The debug-terminal consume command is removed as well. See the companion
 README and DedicatedServer samples for game-owned cleanup integration.
 
-This breaking API removal was introduced in `0.7.0` and remains in `0.7.2`.
+This breaking API removal was introduced in `0.7.0` and remains in `0.7.3`.
 Fixture tests are not deployed-backend acceptance or completion of PSV-2570.
 
 ### Game-server uplink data (PSV-3204, 2026-10-23)
@@ -2653,7 +2671,7 @@ PlayServ.Config(new PlayServSettings
     ClientToken = "pk_...",
     GameVersion = "1.0.0",
     SdkVersion = PlayServ.SdkVersion,
-    BackendServerAddress = "wss://platform.playserv.com/ws",
+    BackendServerAddress = "wss://dashboard.playserv.com/ws",
     AllowMultipleConnections = true,
     KeepAlivePingIntervalMs = 30000,
     KeepAlivePongTimeoutMs = 10000

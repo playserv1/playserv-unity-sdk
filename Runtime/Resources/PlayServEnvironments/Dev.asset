@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   clientToken: 
   deploymentGameId:
-  backendServerAddress: wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws
+  backendServerAddress: wss://dashboard.dev.playserv.com/ws
   webRtcSignalingServerAddress: 
   webRtcDataChannelLabel: playserv
   webRtcIceServers: []

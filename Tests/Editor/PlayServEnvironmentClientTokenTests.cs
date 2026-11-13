@@ -84,7 +84,7 @@ namespace Playserv.Tests.Editor
             Assert.That(PlayServPackageEnvironmentProvider.TryApplyActiveEnvironmentDefaults(_config), Is.True);
             _config.SetClientToken("pk_first_run_fixture");
             var settings = PlayServSettingsResolver.ResolveEditorSettings(_config);
-            Assert.That(settings.BackendServerAddress, Is.EqualTo("wss://platform.playserv.com/ws"));
+            Assert.That(settings.BackendServerAddress, Is.EqualTo("wss://dashboard.playserv.com/ws"));
             Assert.That(settings.DashboardAddress, Is.EqualTo("https://dashboard.playserv.com"));
             Assert.That(settings.ClientToken, Is.EqualTo("pk_first_run_fixture"));
             Assert.That(_config.ToSettings().ClientToken, Is.EqualTo(settings.ClientToken));
@@ -100,6 +100,41 @@ namespace Playserv.Tests.Editor
             Assert.That(_config.ClientToken, Is.Empty);
             SwitchEnvironment("Prod");
             Assert.That(_config.ClientToken, Is.EqualTo("pk_first_run_fixture"));
+        }
+
+        [TestCase("Dev", "wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws", "wss://dashboard.dev.playserv.com/ws")]
+        [TestCase("Prod", "wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws")]
+        public void EndpointUpgrade_PreservesEnvironmentAndBothLocalTokensAcrossReload(string environment, string previous, string expected)
+        {
+            SwitchEnvironment(environment);
+            _config.SetClientToken("pk_upgrade_fixture");
+            PlayServDeploymentSettings.SetLocal(_config, environment, "sk_upgrade_fixture");
+            var serialized = new SerializedObject(_config);
+            serialized.FindProperty("backendServerAddress").stringValue = previous;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssetIfDirty(_config);
+            var path = AssetDatabase.GetAssetPath(_config);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            _config = AssetDatabase.LoadAssetAtPath<PlayServConfig>(path);
+
+            var settings = PlayServSettingsResolver.ResolveEditorSettings(_config);
+            Assert.That(settings.BackendServerAddress, Is.EqualTo(expected));
+            Assert.That(PlayServEnvironmentClientTokens.ActiveEnvironment, Is.EqualTo(environment));
+            Assert.That(settings.ClientToken, Is.EqualTo("pk_upgrade_fixture"));
+            Assert.That(PlayServDeploymentSettings.GetLocal(_config, environment), Is.EqualTo("sk_upgrade_fixture"));
+            StringAssert.DoesNotContain("pk_upgrade_fixture", File.ReadAllText(path));
+            StringAssert.DoesNotContain("sk_upgrade_fixture", File.ReadAllText(path));
+
+            var other = environment == "Dev" ? "Prod" : "Dev";
+            SwitchEnvironment(other);
+            Assert.That(_config.ClientToken, Is.Empty);
+            Assert.That(PlayServDeploymentSettings.GetLocal(_config, other), Is.Empty);
+            Assert.That(_config.BackendServerAddress, Is.EqualTo(other == "Dev"
+                ? "wss://dashboard.dev.playserv.com/ws" : "wss://dashboard.playserv.com/ws"));
+            SwitchEnvironment(environment);
+            Assert.That(_config.BackendServerAddress, Is.EqualTo(expected));
+            Assert.That(_config.ClientToken, Is.EqualTo("pk_upgrade_fixture"));
+            Assert.That(PlayServDeploymentSettings.GetLocal(_config, environment), Is.EqualTo("sk_upgrade_fixture"));
         }
 
         [TestCase("")]
@@ -519,7 +554,7 @@ namespace Playserv.Tests.Editor
                 return handlers.Cast<object>().SelectMany(GetTrackedEventHandlers);
             if (value == null || !value.GetType().FullName.StartsWith("UnityEditor.EventWithPerformanceTracker", StringComparison.Ordinal))
                 return Enumerable.Empty<Delegate>();
-            // Unity 2021 stores the delegate directly; Unity 6 wraps it with a profiler handle.
+            // Unity 2022 stores the delegate directly; Unity 6 wraps it with a profiler handle.
             return value.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                 .SelectMany(field => GetTrackedEventHandlers(field.GetValue(value)));
         }

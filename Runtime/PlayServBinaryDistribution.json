@@ -1,17 +1,9 @@
 {
   "schemaVersion": 1,
-  "unityVersion": "2021.3.45f2",
-  "sourceCommit": "40bf086adcec30820e7adde242b16e3852b72ccf",
-  "runtimeSourceHash": "f9c4b24e5a96bfb7f87945fe068aa582daf517684dd975d0a1a970c28aa265b9",
+  "unityVersion": "2022.3.62f3",
+  "sourceCommit": "2419562a36892b5b6f0c333d033d76b16ef937b2",
+  "runtimeSourceHash": "da49b4ce9236862f1af014a9648bcc2e5d8f80d3e8b99fa8a80634d04c29bf2f",
   "assemblies": [
-    {
-      "name": "Playserv.Runtime.Modules.DataSubscription",
-      "definition": "Runtime/Modules/DataSubscription/Implementation/Playserv.Runtime.Modules.DataSubscription.asmdef",
-      "guid": "3345d20ea9d248848dadbb9c721d9b84",
-      "constraints": [
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ]
-    },
     {
       "name": "Playserv.Runtime.Modules.Events",
       "definition": "Runtime/Modules/Events/Implementation/Playserv.Runtime.Modules.Events.asmdef",
@@ -21,9 +13,9 @@
       ]
     },
     {
-      "name": "Playserv.Runtime.Http",
-      "definition": "Runtime/Http/Playserv.Runtime.Http.asmdef",
-      "guid": "f4487b48ef6f458299a24756a5e4e906",
+      "name": "Playserv.Runtime.Core",
+      "definition": "Runtime/Proxy/Playserv.Runtime.Core.asmdef",
+      "guid": "0c3f3753168e4ea982725186a6ee5448",
       "constraints": []
     },
     {
@@ -37,24 +29,46 @@
       ]
     },
     {
+      "name": "Playserv.Runtime.Modules.RPC.Client",
+      "definition": "Runtime/Modules/RPC/Client/Implementation/Playserv.Runtime.Modules.RPC.Client.asmdef",
+      "guid": "31815590501c4c7f864bd61e8214e353",
+      "constraints": [
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC"
+      ]
+    },
+    {
+      "name": "Playserv.Runtime",
+      "definition": "Runtime/Playserv.Runtime.asmdef",
+      "guid": "5d1d5261866248298e19f5a7e76fcaf7",
+      "constraints": []
+    },
+    {
+      "name": "Playserv.Runtime.Serialization",
+      "definition": "Runtime/Serialization/Playserv.Runtime.Serialization.asmdef",
+      "guid": "558599bafc954e9eb0b852954a58e989",
+      "constraints": []
+    },
+    {
       "name": "Playserv.Runtime.Modules",
       "definition": "Runtime/Modules/Contracts/Playserv.Runtime.Modules.asmdef",
       "guid": "d56cc792bddf46f29ad15a50f1b88d20",
       "constraints": []
     },
     {
-      "name": "Playserv.Runtime.Core",
-      "definition": "Runtime/Proxy/Playserv.Runtime.Core.asmdef",
-      "guid": "0c3f3753168e4ea982725186a6ee5448",
-      "constraints": []
+      "name": "Playserv.Runtime.Modules.RPC.Core",
+      "definition": "Runtime/Modules/RPC/Core/Playserv.Runtime.Modules.RPC.Core.asmdef",
+      "guid": "9cd2395e9caf4fe08e8ddc8c51750b06",
+      "constraints": [
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE"
+      ]
     },
     {
-      "name": "Playserv.Runtime.Transport.WebSocket",
-      "definition": "Runtime/Proxy/Modules/WebSocket/Playserv.Runtime.Transport.WebSocket.asmdef",
-      "guid": "32840a50fd0547bf9538277eef7d2636",
+      "name": "Playserv.Runtime.Modules.DataSubscription",
+      "definition": "Runtime/Modules/DataSubscription/Implementation/Playserv.Runtime.Modules.DataSubscription.asmdef",
+      "guid": "3345d20ea9d248848dadbb9c721d9b84",
       "constraints": [
-        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
-        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
+        "!PLAYSERV_MODULE_DISABLED_DATA"
       ]
     },
     {
@@ -67,32 +81,9 @@
       ]
     },
     {
-      "name": "Playserv.Runtime",
-      "definition": "Runtime/Playserv.Runtime.asmdef",
-      "guid": "5d1d5261866248298e19f5a7e76fcaf7",
-      "constraints": []
-    },
-    {
-      "name": "Playserv.Runtime.Modules.RPC.Client",
-      "definition": "Runtime/Modules/RPC/Client/Implementation/Playserv.Runtime.Modules.RPC.Client.asmdef",
-      "guid": "31815590501c4c7f864bd61e8214e353",
-      "constraints": [
-        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
-        "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC"
-      ]
-    },
-    {
-      "name": "Playserv.Runtime.Modules.RPC.Core",
-      "definition": "Runtime/Modules/RPC/Core/Playserv.Runtime.Modules.RPC.Core.asmdef",
-      "guid": "9cd2395e9caf4fe08e8ddc8c51750b06",
-      "constraints": [
-        "!PLAYSERV_MODULE_DISABLED_RPC_CORE"
-      ]
-    },
-    {
-      "name": "Playserv.Runtime.Serialization",
-      "definition": "Runtime/Serialization/Playserv.Runtime.Serialization.asmdef",
-      "guid": "558599bafc954e9eb0b852954a58e989",
+      "name": "Playserv.Runtime.Http",
+      "definition": "Runtime/Http/Playserv.Runtime.Http.asmdef",
+      "guid": "f4487b48ef6f458299a24756a5e4e906",
       "constraints": []
     },
     {
@@ -100,6 +91,15 @@
       "definition": "Runtime/Abstractions/Playserv.Runtime.Abstractions.asmdef",
       "guid": "e1d5feab6d23433e845e1dae147023cd",
       "constraints": []
+    },
+    {
+      "name": "Playserv.Runtime.Transport.WebSocket",
+      "definition": "Runtime/Proxy/Modules/WebSocket/Playserv.Runtime.Transport.WebSocket.asmdef",
+      "guid": "32840a50fd0547bf9538277eef7d2636",
+      "constraints": [
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
+      ]
     }
   ],
   "scripts": [
@@ -141,104 +141,6 @@
   ],
   "binaries": [
     {
-      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
-      "guid": "a2b66b2b112dd84df283b3ac5b494aca",
-      "assembly": "Playserv.Runtime.Modules.DataSubscription",
-      "profiles": [
-        "editor-logs-normal",
-        "editor-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ],
-      "sha256": "e79da4d0e3c5375ab50d6f510bf6ca3a4a41cf5e8240eb2e6808c23799174389"
-    },
-    {
-      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/editor-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
-      "guid": "db191e65619621cad5d77f39f69a5b50",
-      "assembly": "Playserv.Runtime.Modules.DataSubscription",
-      "profiles": [
-        "editor-logs-verbose",
-        "editor-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ],
-      "sha256": "83bdd9522745aa9357b9b6a83daf57d5bfc4da50afa237e78d4da4dc913e7d3b"
-    },
-    {
-      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/native-mono-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
-      "guid": "2587b06ec5d54da696ca8281b56ee2fe",
-      "assembly": "Playserv.Runtime.Modules.DataSubscription",
-      "profiles": [
-        "native-mono-logs-normal",
-        "native-mono-quiet-normal",
-        "native-il2cpp-logs-normal",
-        "native-il2cpp-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ],
-      "sha256": "0210c5160dccf71b529f26b0166a6f2b06fdd354c7439da69b7ef89eec397e8b"
-    },
-    {
-      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/native-mono-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
-      "guid": "d3fa7391807651ccd0d3262d22afe8cb",
-      "assembly": "Playserv.Runtime.Modules.DataSubscription",
-      "profiles": [
-        "native-mono-logs-verbose",
-        "native-mono-quiet-verbose",
-        "native-il2cpp-logs-verbose",
-        "native-il2cpp-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ],
-      "sha256": "4bd11a3720ceb66737e5fb8a73ba6ad1e945084c1561a8d217c351503ba4a8bb"
-    },
-    {
-      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/webgl-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
-      "guid": "44afb74ac6d6d58021bc1f89c73039d9",
-      "assembly": "Playserv.Runtime.Modules.DataSubscription",
-      "profiles": [
-        "webgl-logs-normal",
-        "webgl-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ],
-      "sha256": "163f4492f7d1256c36f2f673d538a3e1f26618b9e7b7eeea6eafe7fce8fe3c0c"
-    },
-    {
-      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/webgl-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
-      "guid": "17ad28c6494677311e18a9854f5d4d71",
-      "assembly": "Playserv.Runtime.Modules.DataSubscription",
-      "profiles": [
-        "webgl-logs-verbose",
-        "webgl-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_DATA"
-      ],
-      "sha256": "fa61313d297a056555498ce362ead01b0a165e86be9a72de7b62be24ef53675a"
-    },
-    {
       "path": "Runtime/Modules/Events/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.Events.dll",
       "guid": "d817c7ffd4023c4d324d358b8c17eb4d",
       "assembly": "Playserv.Runtime.Modules.Events",
@@ -263,73 +165,187 @@
       "constraints": [
         "!PLAYSERV_MODULE_DISABLED_EVENTS"
       ],
-      "sha256": "e8555ef658dbd20e293a3a1d87f1ec8a2c9b48f161cfc7d0e2d088ebaadd2ead"
+      "sha256": "a4f21a85c11bf803fd000161e572b7f60cb6eb0cc65edfb8f8715e3fd2e939dc"
     },
     {
-      "path": "Runtime/Http/Binaries/editor-logs-normal/Playserv.Runtime.Http.dll",
-      "guid": "535986d6c147deebfd9395abdac18f51",
-      "assembly": "Playserv.Runtime.Http",
+      "path": "Runtime/Proxy/Binaries/editor-logs-normal/Playserv.Runtime.Core.dll",
+      "guid": "17e4d91bf2b04f6248c012ad9461709c",
+      "assembly": "Playserv.Runtime.Core",
       "profiles": [
-        "editor-logs-normal",
-        "editor-quiet-normal",
+        "editor-logs-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "!PLAYSERV_DISABLE_LOGS",
+        "UNITY_EDITOR"
+      ],
+      "sha256": "c76e539527c1ea44f5d1c9182c11499cbd1178c41a627fa44acadd524adc1ec3"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/editor-logs-verbose/Playserv.Runtime.Core.dll",
+      "guid": "e623dbe55193c8e59b46b1a2a94e7fa8",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
+        "editor-logs-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "!PLAYSERV_DISABLE_LOGS",
+        "UNITY_EDITOR"
+      ],
+      "sha256": "80d79ff817bd757542c70dce84385f5258642fe6d172e80c0f77afe07893420f"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/editor-quiet-normal/Playserv.Runtime.Core.dll",
+      "guid": "3531da8ff86357a918f052e9e4dc629f",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
+        "editor-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "PLAYSERV_DISABLE_LOGS",
+        "UNITY_EDITOR"
+      ],
+      "sha256": "e4a5635b41527379c174a45202037f519e32b02f288b3a9ce1123f69a9c1b4db"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/editor-quiet-verbose/Playserv.Runtime.Core.dll",
+      "guid": "a9e52887dd2225a028be87462d653764",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
+        "editor-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "PLAYSERV_DISABLE_LOGS",
+        "UNITY_EDITOR"
+      ],
+      "sha256": "dfd2429dcd3d1f9d5dba44d68a743492f925fcf05727a8ba028f0f7fabde9a92"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/native-mono-logs-normal/Playserv.Runtime.Core.dll",
+      "guid": "16fa09bf69843be9a8e6ecea74e437be",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
         "native-mono-logs-normal",
+        "native-il2cpp-logs-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "!PLAYSERV_DISABLE_LOGS",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "f6f263c485e54dd6d1ac8d6f52914a6382d8d8909d70e9688ea0cc1f005a31e0"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/native-mono-logs-verbose/Playserv.Runtime.Core.dll",
+      "guid": "dd3a7ec42c8f72c103e9fbf0428dac53",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
+        "native-mono-logs-verbose",
+        "native-il2cpp-logs-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "!PLAYSERV_DISABLE_LOGS",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "ad5dcbf7b352e5f2ed4820a481d230b2325ec61d9d27ab70247e2d760ee48c2d"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/native-mono-quiet-normal/Playserv.Runtime.Core.dll",
+      "guid": "7c1ac73f914b15b936a7282fb09cff56",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
         "native-mono-quiet-normal",
-        "native-il2cpp-logs-normal",
         "native-il2cpp-quiet-normal"
       ],
       "constraints": [
         "!PlayServ_Logs",
-        "UNITY_EDITOR || !UNITY_WEBGL"
+        "PLAYSERV_DISABLE_LOGS",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR"
       ],
-      "sha256": "9ac685fd69dd1ce084ebdc65771398b7302ad9e8b0814abd262e66951b524bee"
+      "sha256": "5564de770a8f715120cf189eb9c46358e3a650332d97640d7609503bae61f683"
     },
     {
-      "path": "Runtime/Http/Binaries/editor-logs-verbose/Playserv.Runtime.Http.dll",
-      "guid": "017dc5bdecc7d31f66bb4d319ddff28b",
-      "assembly": "Playserv.Runtime.Http",
+      "path": "Runtime/Proxy/Binaries/native-mono-quiet-verbose/Playserv.Runtime.Core.dll",
+      "guid": "8bcd3d3a6ddda100c0a4f1820501a083",
+      "assembly": "Playserv.Runtime.Core",
       "profiles": [
-        "editor-logs-verbose",
-        "editor-quiet-verbose",
-        "native-mono-logs-verbose",
         "native-mono-quiet-verbose",
-        "native-il2cpp-logs-verbose",
         "native-il2cpp-quiet-verbose"
       ],
       "constraints": [
         "PlayServ_Logs",
-        "UNITY_EDITOR || !UNITY_WEBGL"
+        "PLAYSERV_DISABLE_LOGS",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR"
       ],
-      "sha256": "4ca80d5db91c07ac26fe626093f065f550d3a58347e21090a35bafe298e1b4d8"
+      "sha256": "8975954bf91fb394c429827913a46aa03e80ed3ad0d594351939d3793763cb1b"
     },
     {
-      "path": "Runtime/Http/Binaries/webgl-logs-normal/Playserv.Runtime.Http.dll",
-      "guid": "2d181bd11c23cdc7ce03597ca99021d4",
-      "assembly": "Playserv.Runtime.Http",
+      "path": "Runtime/Proxy/Binaries/webgl-logs-normal/Playserv.Runtime.Core.dll",
+      "guid": "ed8ec08817ae3fa14aa598dd3712b3c3",
+      "assembly": "Playserv.Runtime.Core",
       "profiles": [
-        "webgl-logs-normal",
+        "webgl-logs-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "!PLAYSERV_DISABLE_LOGS",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "a8e43a234856e32e1d9f8ee6ad3b68e6fdfcc59d8afd8a6279464cc221eaa556"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/webgl-logs-verbose/Playserv.Runtime.Core.dll",
+      "guid": "4caa240e5ceb683a2748ee0367eae1ae",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
+        "webgl-logs-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "!PLAYSERV_DISABLE_LOGS",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "59bd9b8e02986923e294d56afb5fde6b684e0be6033d715b5443f17272f78b18"
+    },
+    {
+      "path": "Runtime/Proxy/Binaries/webgl-quiet-normal/Playserv.Runtime.Core.dll",
+      "guid": "ed5fb3700b0c46c27f5534e51ee2a9b7",
+      "assembly": "Playserv.Runtime.Core",
+      "profiles": [
         "webgl-quiet-normal"
       ],
       "constraints": [
         "!PlayServ_Logs",
+        "PLAYSERV_DISABLE_LOGS",
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "8917c2c76f684aa2157b50c99c9970f248573f3957c44905eca7844245103595"
+      "sha256": "9e28361a202e4e7a0908051d3be925729db103f4e39d4de64dc969a28d74ec16"
     },
     {
-      "path": "Runtime/Http/Binaries/webgl-logs-verbose/Playserv.Runtime.Http.dll",
-      "guid": "dcf508ceb41d1aa9979a5345c93fdd0d",
-      "assembly": "Playserv.Runtime.Http",
+      "path": "Runtime/Proxy/Binaries/webgl-quiet-verbose/Playserv.Runtime.Core.dll",
+      "guid": "b85df65b979a5c2489ec5a5c19e2fc3f",
+      "assembly": "Playserv.Runtime.Core",
       "profiles": [
-        "webgl-logs-verbose",
         "webgl-quiet-verbose"
       ],
       "constraints": [
         "PlayServ_Logs",
+        "PLAYSERV_DISABLE_LOGS",
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "64475aafbaa60781fdd7dc15241229147aee802e02dce42781e849e8f2aaf06c"
+      "sha256": "df6530230fb4d9e19fafb41f47bca0ba167d6c544dffd429a9224bb45381329d"
     },
     {
       "path": "Runtime/Modules/Spawn/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.Spawn.dll",
@@ -358,405 +374,7 @@
         "!PLAYSERV_MODULE_DISABLED_EVENTS",
         "!PLAYSERV_MODULE_DISABLED_SPAWN"
       ],
-      "sha256": "1f898cbf2501257da9844772d1af646bbd3832183e828502edf66d501689deb1"
-    },
-    {
-      "path": "Runtime/Modules/Contracts/Binaries/editor-logs-normal/Playserv.Runtime.Modules.dll",
-      "guid": "a92cdce7cef8f64eb837e1c4eb008811",
-      "assembly": "Playserv.Runtime.Modules",
-      "profiles": [
-        "editor-logs-normal",
-        "editor-logs-verbose",
-        "editor-quiet-normal",
-        "editor-quiet-verbose",
-        "native-mono-logs-normal",
-        "native-mono-logs-verbose",
-        "native-mono-quiet-normal",
-        "native-mono-quiet-verbose",
-        "native-il2cpp-logs-normal",
-        "native-il2cpp-logs-verbose",
-        "native-il2cpp-quiet-normal",
-        "native-il2cpp-quiet-verbose",
-        "webgl-logs-normal",
-        "webgl-logs-verbose",
-        "webgl-quiet-normal",
-        "webgl-quiet-verbose"
-      ],
-      "constraints": [],
-      "sha256": "c499b6b5137ebcfa6941806264d78aa0dfbaae45fc14d147364bd2a3db17babf"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/editor-logs-normal/Playserv.Runtime.Core.dll",
-      "guid": "17e4d91bf2b04f6248c012ad9461709c",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "editor-logs-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "!PLAYSERV_DISABLE_LOGS",
-        "UNITY_EDITOR"
-      ],
-      "sha256": "a24e3f8ce31f3c61f59a9540282cbbfe93e773a38462dd00d5c5ffe14d00a903"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/editor-logs-verbose/Playserv.Runtime.Core.dll",
-      "guid": "e623dbe55193c8e59b46b1a2a94e7fa8",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "editor-logs-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "!PLAYSERV_DISABLE_LOGS",
-        "UNITY_EDITOR"
-      ],
-      "sha256": "54782653aa8386f1e9143a3af8b9db476f9cdf091c94989ecde550574ccc2c91"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/editor-quiet-normal/Playserv.Runtime.Core.dll",
-      "guid": "3531da8ff86357a918f052e9e4dc629f",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "editor-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "PLAYSERV_DISABLE_LOGS",
-        "UNITY_EDITOR"
-      ],
-      "sha256": "26530f9104f3f2581284219a19204a3f6feb78330393b728fda538bbb8d36b8a"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/editor-quiet-verbose/Playserv.Runtime.Core.dll",
-      "guid": "a9e52887dd2225a028be87462d653764",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "editor-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "PLAYSERV_DISABLE_LOGS",
-        "UNITY_EDITOR"
-      ],
-      "sha256": "e9dba278d9b9a7024223965b27ac26b2faf506b2ed3cd3fd13400a4ff6dbf8ae"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/native-mono-logs-normal/Playserv.Runtime.Core.dll",
-      "guid": "16fa09bf69843be9a8e6ecea74e437be",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "native-mono-logs-normal",
-        "native-il2cpp-logs-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "!PLAYSERV_DISABLE_LOGS",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "3ed5d1070315f82d7698648bcd84ef30f186bdaa50b55b0554c72b60e745030f"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/native-mono-logs-verbose/Playserv.Runtime.Core.dll",
-      "guid": "dd3a7ec42c8f72c103e9fbf0428dac53",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "native-mono-logs-verbose",
-        "native-il2cpp-logs-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "!PLAYSERV_DISABLE_LOGS",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "e991de9525e0421d988198ee7875e793c209afeb988f241f648d7f69f5cd2fd2"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/native-mono-quiet-normal/Playserv.Runtime.Core.dll",
-      "guid": "7c1ac73f914b15b936a7282fb09cff56",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "native-mono-quiet-normal",
-        "native-il2cpp-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "PLAYSERV_DISABLE_LOGS",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "e8523c4fc45fd8ed27c8a2cd26fd3f771efeb55b332e5421647c5dc58b070e9f"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/native-mono-quiet-verbose/Playserv.Runtime.Core.dll",
-      "guid": "8bcd3d3a6ddda100c0a4f1820501a083",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "native-mono-quiet-verbose",
-        "native-il2cpp-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "PLAYSERV_DISABLE_LOGS",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "0565caaf9ccda9a2b3053da45b727a9dfda7ed0407d39d6bf1eb79c0da9b7be2"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/webgl-logs-normal/Playserv.Runtime.Core.dll",
-      "guid": "ed8ec08817ae3fa14aa598dd3712b3c3",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "webgl-logs-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "!PLAYSERV_DISABLE_LOGS",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "61f644db53d99ee3ecb1ddfd2b43e3f5757c22a1b775ce38cf090a4d9b8ae509"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/webgl-logs-verbose/Playserv.Runtime.Core.dll",
-      "guid": "4caa240e5ceb683a2748ee0367eae1ae",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "webgl-logs-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "!PLAYSERV_DISABLE_LOGS",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "4823f716abbc425b8ab2e275eff3cf54fd54820307cb5d5d7d5aedd4fee969f2"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/webgl-quiet-normal/Playserv.Runtime.Core.dll",
-      "guid": "ed5fb3700b0c46c27f5534e51ee2a9b7",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "webgl-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "PLAYSERV_DISABLE_LOGS",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "eb00b9133e1857531ec26feb34da050cb77aee7a2cdb16195a6e8341d233a370"
-    },
-    {
-      "path": "Runtime/Proxy/Binaries/webgl-quiet-verbose/Playserv.Runtime.Core.dll",
-      "guid": "b85df65b979a5c2489ec5a5c19e2fc3f",
-      "assembly": "Playserv.Runtime.Core",
-      "profiles": [
-        "webgl-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "PLAYSERV_DISABLE_LOGS",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "95f674e0342b96e9233b0d39b0045095090e5e22359cc9ecfd150ffef7349655"
-    },
-    {
-      "path": "Runtime/Proxy/Modules/WebSocket/Binaries/editor-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
-      "guid": "2f6d540ba1661cb59d9e3bf2c4e3a3f2",
-      "assembly": "Playserv.Runtime.Transport.WebSocket",
-      "profiles": [
-        "editor-logs-normal",
-        "editor-logs-verbose",
-        "editor-quiet-normal",
-        "editor-quiet-verbose"
-      ],
-      "constraints": [
-        "UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
-        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
-      ],
-      "sha256": "dd50630e12390a446bd7cc0ffdb79290d0c75c3d3690c6bf6773ebea3cbfa6c1"
-    },
-    {
-      "path": "Runtime/Proxy/Modules/WebSocket/Binaries/native-mono-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
-      "guid": "7936d0dc9e71910c1f57134fba9a796f",
-      "assembly": "Playserv.Runtime.Transport.WebSocket",
-      "profiles": [
-        "native-mono-logs-normal",
-        "native-mono-logs-verbose",
-        "native-mono-quiet-normal",
-        "native-mono-quiet-verbose",
-        "native-il2cpp-logs-normal",
-        "native-il2cpp-logs-verbose",
-        "native-il2cpp-quiet-normal",
-        "native-il2cpp-quiet-verbose"
-      ],
-      "constraints": [
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
-        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
-      ],
-      "sha256": "78490ed5c04dad9852bbb608944316b81e15d58bf7ea6213447815bf3f44a251"
-    },
-    {
-      "path": "Runtime/Proxy/Modules/WebSocket/Binaries/webgl-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
-      "guid": "bbc4c62192a0e4e51d8f858da13f37dd",
-      "assembly": "Playserv.Runtime.Transport.WebSocket",
-      "profiles": [
-        "webgl-logs-normal",
-        "webgl-logs-verbose",
-        "webgl-quiet-normal",
-        "webgl-quiet-verbose"
-      ],
-      "constraints": [
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
-        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
-      ],
-      "sha256": "663d9af66ef5f2e2a4a01c019d14346b27a02546d7e63f5fee1196dc572f5be6"
-    },
-    {
-      "path": "Runtime/Modules/Server/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.Server.dll",
-      "guid": "5f58b27a77aa8ce123bf748ed15b4f53",
-      "assembly": "Playserv.Runtime.Modules.Server",
-      "profiles": [
-        "editor-logs-normal",
-        "editor-logs-verbose",
-        "editor-quiet-normal",
-        "editor-quiet-verbose",
-        "native-mono-logs-normal",
-        "native-mono-logs-verbose",
-        "native-mono-quiet-normal",
-        "native-mono-quiet-verbose"
-      ],
-      "constraints": [
-        "UNITY_EDITOR || !ENABLE_IL2CPP",
-        "UNITY_EDITOR || !UNITY_WEBGL",
-        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
-        "!PLAYSERV_MODULE_DISABLED_SERVER"
-      ],
-      "sha256": "7be82efd16a5bbdd1ecc58c4c57e98df185a93feb2117ec12a187fc2c83190d4"
-    },
-    {
-      "path": "Runtime/Modules/Server/Implementation/Binaries/native-il2cpp-logs-normal/Playserv.Runtime.Modules.Server.dll",
-      "guid": "73d62f6ff0fa9b88a8567f8375422cc9",
-      "assembly": "Playserv.Runtime.Modules.Server",
-      "profiles": [
-        "native-il2cpp-logs-normal",
-        "native-il2cpp-logs-verbose",
-        "native-il2cpp-quiet-normal",
-        "native-il2cpp-quiet-verbose",
-        "webgl-logs-normal",
-        "webgl-logs-verbose",
-        "webgl-quiet-normal",
-        "webgl-quiet-verbose"
-      ],
-      "constraints": [
-        "UNITY_WEBGL || ENABLE_IL2CPP",
-        "!UNITY_EDITOR",
-        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
-        "!PLAYSERV_MODULE_DISABLED_SERVER"
-      ],
-      "sha256": "a7164e5e4415affa7e82761dc3d2ca826dc6f5d3bc181859b29acd022fff7f90"
-    },
-    {
-      "path": "Runtime/Binaries/editor-logs-normal/Playserv.Runtime.dll",
-      "guid": "eadf17f591eb03d5561a75719173465a",
-      "assembly": "Playserv.Runtime",
-      "profiles": [
-        "editor-logs-normal",
-        "editor-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "UNITY_EDITOR"
-      ],
-      "sha256": "c1e45e1c458bb5c65f8f308ef6ff900da3c3a2048d5a5c5fa52dd7b469426317"
-    },
-    {
-      "path": "Runtime/Binaries/editor-logs-verbose/Playserv.Runtime.dll",
-      "guid": "f4f436b2200acea412d70c42dfc5b35e",
-      "assembly": "Playserv.Runtime",
-      "profiles": [
-        "editor-logs-verbose",
-        "editor-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "UNITY_EDITOR"
-      ],
-      "sha256": "7f728389d9aaddd9de7c655cfc36d9437f83281ef93835a494192c655497821f"
-    },
-    {
-      "path": "Runtime/Binaries/native-mono-logs-normal/Playserv.Runtime.dll",
-      "guid": "5e8b868db63f881bc9737fb4e8497021",
-      "assembly": "Playserv.Runtime",
-      "profiles": [
-        "native-mono-logs-normal",
-        "native-mono-quiet-normal",
-        "native-il2cpp-logs-normal",
-        "native-il2cpp-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "3f736104fe8c38ba0d497c16bb68cadad1972e6802a5414c17f1a7aa02334858"
-    },
-    {
-      "path": "Runtime/Binaries/native-mono-logs-verbose/Playserv.Runtime.dll",
-      "guid": "20faf0ce0d15c3f404f39dd63dfdaea7",
-      "assembly": "Playserv.Runtime",
-      "profiles": [
-        "native-mono-logs-verbose",
-        "native-mono-quiet-verbose",
-        "native-il2cpp-logs-verbose",
-        "native-il2cpp-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "!UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "89838001ef3605ee15043fd07142cdaa6e9926ec0504b6a45eccee3d42f94c56"
-    },
-    {
-      "path": "Runtime/Binaries/webgl-logs-normal/Playserv.Runtime.dll",
-      "guid": "10ba9167b24f0a1f6fc2974808b7dc44",
-      "assembly": "Playserv.Runtime",
-      "profiles": [
-        "webgl-logs-normal",
-        "webgl-quiet-normal"
-      ],
-      "constraints": [
-        "!PlayServ_Logs",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "651c478875e7ed5f5e7ef45c52c64d494ae5b7e7344816e5983dbc9b77367c20"
-    },
-    {
-      "path": "Runtime/Binaries/webgl-logs-verbose/Playserv.Runtime.dll",
-      "guid": "28d6f12adb185256afd947447644abc0",
-      "assembly": "Playserv.Runtime",
-      "profiles": [
-        "webgl-logs-verbose",
-        "webgl-quiet-verbose"
-      ],
-      "constraints": [
-        "PlayServ_Logs",
-        "UNITY_WEBGL",
-        "!UNITY_EDITOR"
-      ],
-      "sha256": "7ed7b8dd0d980dd099ddcda4a575d9c9e37f9f048e63e188c0a483e267f5d88f"
+      "sha256": "006287eb2d62698da4ca0f47873827aec99a53ff56b4cfe497b55f17b38c421c"
     },
     {
       "path": "Runtime/Modules/RPC/Client/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.RPC.Client.dll",
@@ -784,7 +402,149 @@
         "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
         "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC"
       ],
-      "sha256": "67fdc09ab23de4f1c3d94f53071823260bc63b123666158a992d759e220c08bd"
+      "sha256": "5e0f77534f5aca96fa752d90cc4fff1562d22c7d10d50d896a390dc360336707"
+    },
+    {
+      "path": "Runtime/Binaries/editor-logs-normal/Playserv.Runtime.dll",
+      "guid": "eadf17f591eb03d5561a75719173465a",
+      "assembly": "Playserv.Runtime",
+      "profiles": [
+        "editor-logs-normal",
+        "editor-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "UNITY_EDITOR"
+      ],
+      "sha256": "e59003a536862dd6fe2fb58cd7d8bf1b67e75ea613c959d0710c84abc5c999bd"
+    },
+    {
+      "path": "Runtime/Binaries/editor-logs-verbose/Playserv.Runtime.dll",
+      "guid": "f4f436b2200acea412d70c42dfc5b35e",
+      "assembly": "Playserv.Runtime",
+      "profiles": [
+        "editor-logs-verbose",
+        "editor-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "UNITY_EDITOR"
+      ],
+      "sha256": "154cfeac68ad2365913add5df09954af2afa00f47c37394019d55d1beda6d67f"
+    },
+    {
+      "path": "Runtime/Binaries/native-mono-logs-normal/Playserv.Runtime.dll",
+      "guid": "5e8b868db63f881bc9737fb4e8497021",
+      "assembly": "Playserv.Runtime",
+      "profiles": [
+        "native-mono-logs-normal",
+        "native-mono-quiet-normal",
+        "native-il2cpp-logs-normal",
+        "native-il2cpp-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "fe5cf8d5067558d779baef93a62931b62cc4f1ad00e060f6f47409ccf905ba25"
+    },
+    {
+      "path": "Runtime/Binaries/native-mono-logs-verbose/Playserv.Runtime.dll",
+      "guid": "20faf0ce0d15c3f404f39dd63dfdaea7",
+      "assembly": "Playserv.Runtime",
+      "profiles": [
+        "native-mono-logs-verbose",
+        "native-mono-quiet-verbose",
+        "native-il2cpp-logs-verbose",
+        "native-il2cpp-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "d2f171f3c68a9b0698c4a9265d99c7e97a594769f6ff016c0a88e29ac5b78923"
+    },
+    {
+      "path": "Runtime/Binaries/webgl-logs-normal/Playserv.Runtime.dll",
+      "guid": "10ba9167b24f0a1f6fc2974808b7dc44",
+      "assembly": "Playserv.Runtime",
+      "profiles": [
+        "webgl-logs-normal",
+        "webgl-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "fd8f9e0e60609404c4e2e1e38f64ba561de6d911fa1d7a46cc089569a3a6de91"
+    },
+    {
+      "path": "Runtime/Binaries/webgl-logs-verbose/Playserv.Runtime.dll",
+      "guid": "28d6f12adb185256afd947447644abc0",
+      "assembly": "Playserv.Runtime",
+      "profiles": [
+        "webgl-logs-verbose",
+        "webgl-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "e980b738224226cac4a8632a2331265001b971f30b4517fbe8f366af3b902d75"
+    },
+    {
+      "path": "Runtime/Serialization/Binaries/editor-logs-normal/Playserv.Runtime.Serialization.dll",
+      "guid": "fcdc7c9832f6177612dcee748c5694cd",
+      "assembly": "Playserv.Runtime.Serialization",
+      "profiles": [
+        "editor-logs-normal",
+        "editor-logs-verbose",
+        "editor-quiet-normal",
+        "editor-quiet-verbose",
+        "native-mono-logs-normal",
+        "native-mono-logs-verbose",
+        "native-mono-quiet-normal",
+        "native-mono-quiet-verbose",
+        "native-il2cpp-logs-normal",
+        "native-il2cpp-logs-verbose",
+        "native-il2cpp-quiet-normal",
+        "native-il2cpp-quiet-verbose",
+        "webgl-logs-normal",
+        "webgl-logs-verbose",
+        "webgl-quiet-normal",
+        "webgl-quiet-verbose"
+      ],
+      "constraints": [],
+      "sha256": "a9c1eab475a66d34a436affa102bf8dbf4210c28f1f4886dde2ea32460817f2d"
+    },
+    {
+      "path": "Runtime/Modules/Contracts/Binaries/editor-logs-normal/Playserv.Runtime.Modules.dll",
+      "guid": "a92cdce7cef8f64eb837e1c4eb008811",
+      "assembly": "Playserv.Runtime.Modules",
+      "profiles": [
+        "editor-logs-normal",
+        "editor-logs-verbose",
+        "editor-quiet-normal",
+        "editor-quiet-verbose",
+        "native-mono-logs-normal",
+        "native-mono-logs-verbose",
+        "native-mono-quiet-normal",
+        "native-mono-quiet-verbose",
+        "native-il2cpp-logs-normal",
+        "native-il2cpp-logs-verbose",
+        "native-il2cpp-quiet-normal",
+        "native-il2cpp-quiet-verbose",
+        "webgl-logs-normal",
+        "webgl-logs-verbose",
+        "webgl-quiet-normal",
+        "webgl-quiet-verbose"
+      ],
+      "constraints": [],
+      "sha256": "02cb84b2bb309a0f2abb3215c6edf9853cefeb2fb4be36e4d942915ed08a761e"
     },
     {
       "path": "Runtime/Modules/RPC/Core/Binaries/editor-logs-normal/Playserv.Runtime.Modules.RPC.Core.dll",
@@ -811,12 +571,110 @@
       "constraints": [
         "!PLAYSERV_MODULE_DISABLED_RPC_CORE"
       ],
-      "sha256": "d428e6cbfcffe84c9e6fa46e16d5f245b3a61101986f5eb451984afa1484a0d9"
+      "sha256": "e1039c6e8c53d8c1de508889b7d4183891d926770874cc8281e4587cbf921572"
     },
     {
-      "path": "Runtime/Serialization/Binaries/editor-logs-normal/Playserv.Runtime.Serialization.dll",
-      "guid": "fcdc7c9832f6177612dcee748c5694cd",
-      "assembly": "Playserv.Runtime.Serialization",
+      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
+      "guid": "a2b66b2b112dd84df283b3ac5b494aca",
+      "assembly": "Playserv.Runtime.Modules.DataSubscription",
+      "profiles": [
+        "editor-logs-normal",
+        "editor-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+      ],
+      "sha256": "bda0b411ee617d96cc247272ba8668ad57f2a7d11e4c691648036e27e19f2ba4"
+    },
+    {
+      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/editor-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
+      "guid": "db191e65619621cad5d77f39f69a5b50",
+      "assembly": "Playserv.Runtime.Modules.DataSubscription",
+      "profiles": [
+        "editor-logs-verbose",
+        "editor-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+      ],
+      "sha256": "b9193b411edc5fc105d5032e2e9e9d1fcca187ea2de6dcfcfda397e1ca0da7b1"
+    },
+    {
+      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/native-mono-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
+      "guid": "2587b06ec5d54da696ca8281b56ee2fe",
+      "assembly": "Playserv.Runtime.Modules.DataSubscription",
+      "profiles": [
+        "native-mono-logs-normal",
+        "native-mono-quiet-normal",
+        "native-il2cpp-logs-normal",
+        "native-il2cpp-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+      ],
+      "sha256": "e7793c5608fc92f3835e004f090e7535aba2a203f2c395dfda7fcbe7865596d7"
+    },
+    {
+      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/native-mono-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
+      "guid": "d3fa7391807651ccd0d3262d22afe8cb",
+      "assembly": "Playserv.Runtime.Modules.DataSubscription",
+      "profiles": [
+        "native-mono-logs-verbose",
+        "native-mono-quiet-verbose",
+        "native-il2cpp-logs-verbose",
+        "native-il2cpp-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+      ],
+      "sha256": "f72c96af03fb6fdd304b38ffcaf9b9696726ae2c0309c09ba3d5f083a06e1986"
+    },
+    {
+      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/webgl-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
+      "guid": "44afb74ac6d6d58021bc1f89c73039d9",
+      "assembly": "Playserv.Runtime.Modules.DataSubscription",
+      "profiles": [
+        "webgl-logs-normal",
+        "webgl-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+      ],
+      "sha256": "b64ff707e073e855063f831dea00944ee5d8e7eff51060ff1aa199b6a756d905"
+    },
+    {
+      "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/webgl-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
+      "guid": "17ad28c6494677311e18a9854f5d4d71",
+      "assembly": "Playserv.Runtime.Modules.DataSubscription",
+      "profiles": [
+        "webgl-logs-verbose",
+        "webgl-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_DATA"
+      ],
+      "sha256": "93537d21fefc38e2b04730a33888ba3f92a401310a980bb6365280db06ec65bd"
+    },
+    {
+      "path": "Runtime/Modules/Server/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.Server.dll",
+      "guid": "5f58b27a77aa8ce123bf748ed15b4f53",
+      "assembly": "Playserv.Runtime.Modules.Server",
       "profiles": [
         "editor-logs-normal",
         "editor-logs-verbose",
@@ -825,7 +683,21 @@
         "native-mono-logs-normal",
         "native-mono-logs-verbose",
         "native-mono-quiet-normal",
-        "native-mono-quiet-verbose",
+        "native-mono-quiet-verbose"
+      ],
+      "constraints": [
+        "UNITY_EDITOR || !ENABLE_IL2CPP",
+        "UNITY_EDITOR || !UNITY_WEBGL",
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_SERVER"
+      ],
+      "sha256": "a1318af1e66e9523ae1154fefea3cbee417d5c9f669639300fd1a62f23ac1bbc"
+    },
+    {
+      "path": "Runtime/Modules/Server/Implementation/Binaries/native-il2cpp-logs-normal/Playserv.Runtime.Modules.Server.dll",
+      "guid": "73d62f6ff0fa9b88a8567f8375422cc9",
+      "assembly": "Playserv.Runtime.Modules.Server",
+      "profiles": [
         "native-il2cpp-logs-normal",
         "native-il2cpp-logs-verbose",
         "native-il2cpp-quiet-normal",
@@ -835,8 +707,79 @@
         "webgl-quiet-normal",
         "webgl-quiet-verbose"
       ],
-      "constraints": [],
-      "sha256": "7f1aa09160bc456bf8648df1ca4cd10d5b1df8788a81c6fc095ea7fc49505983"
+      "constraints": [
+        "UNITY_WEBGL || ENABLE_IL2CPP",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
+        "!PLAYSERV_MODULE_DISABLED_SERVER"
+      ],
+      "sha256": "2d03bb51ac30981d501ca37abf516c755030bc1e06512ce477f9197926bb4f66"
+    },
+    {
+      "path": "Runtime/Http/Binaries/editor-logs-normal/Playserv.Runtime.Http.dll",
+      "guid": "535986d6c147deebfd9395abdac18f51",
+      "assembly": "Playserv.Runtime.Http",
+      "profiles": [
+        "editor-logs-normal",
+        "editor-quiet-normal",
+        "native-mono-logs-normal",
+        "native-mono-quiet-normal",
+        "native-il2cpp-logs-normal",
+        "native-il2cpp-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "UNITY_EDITOR || !UNITY_WEBGL"
+      ],
+      "sha256": "fabf52b4f5792c507afc2edbe0177faaa4e203d108c89e5e7a2a3aee849e32f4"
+    },
+    {
+      "path": "Runtime/Http/Binaries/editor-logs-verbose/Playserv.Runtime.Http.dll",
+      "guid": "017dc5bdecc7d31f66bb4d319ddff28b",
+      "assembly": "Playserv.Runtime.Http",
+      "profiles": [
+        "editor-logs-verbose",
+        "editor-quiet-verbose",
+        "native-mono-logs-verbose",
+        "native-mono-quiet-verbose",
+        "native-il2cpp-logs-verbose",
+        "native-il2cpp-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "UNITY_EDITOR || !UNITY_WEBGL"
+      ],
+      "sha256": "50cc7a1667693121b725046f5c50c7cb345011fcc215ecac1d05b0c531e560f7"
+    },
+    {
+      "path": "Runtime/Http/Binaries/webgl-logs-normal/Playserv.Runtime.Http.dll",
+      "guid": "2d181bd11c23cdc7ce03597ca99021d4",
+      "assembly": "Playserv.Runtime.Http",
+      "profiles": [
+        "webgl-logs-normal",
+        "webgl-quiet-normal"
+      ],
+      "constraints": [
+        "!PlayServ_Logs",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "af0e2cd00c28d2aa9ca37c06e705fbccedfaf018738b31090e80cef41bb8b792"
+    },
+    {
+      "path": "Runtime/Http/Binaries/webgl-logs-verbose/Playserv.Runtime.Http.dll",
+      "guid": "dcf508ceb41d1aa9979a5345c93fdd0d",
+      "assembly": "Playserv.Runtime.Http",
+      "profiles": [
+        "webgl-logs-verbose",
+        "webgl-quiet-verbose"
+      ],
+      "constraints": [
+        "PlayServ_Logs",
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR"
+      ],
+      "sha256": "b591ff10a9b738ad246f598703605c918d888e699806b1a8e0ae94f155184475"
     },
     {
       "path": "Runtime/Abstractions/Binaries/editor-logs-normal/Playserv.Runtime.Abstractions.dll",
@@ -861,7 +804,64 @@
         "webgl-quiet-verbose"
       ],
       "constraints": [],
-      "sha256": "cdfaa854b025ae4fe4c60bc476067e7f1d33a905076158c1539174c82ad5d94a"
+      "sha256": "50f22a76787220aec96ea13db9bffff8e0d59a0d3542a45b876ffbef6ab42daa"
+    },
+    {
+      "path": "Runtime/Proxy/Modules/WebSocket/Binaries/editor-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
+      "guid": "2f6d540ba1661cb59d9e3bf2c4e3a3f2",
+      "assembly": "Playserv.Runtime.Transport.WebSocket",
+      "profiles": [
+        "editor-logs-normal",
+        "editor-logs-verbose",
+        "editor-quiet-normal",
+        "editor-quiet-verbose"
+      ],
+      "constraints": [
+        "UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
+      ],
+      "sha256": "e6454586f0c231e240fb9c5af7ac4b411769c0525c04de7a2546d0d31a29c36e"
+    },
+    {
+      "path": "Runtime/Proxy/Modules/WebSocket/Binaries/native-mono-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
+      "guid": "7936d0dc9e71910c1f57134fba9a796f",
+      "assembly": "Playserv.Runtime.Transport.WebSocket",
+      "profiles": [
+        "native-mono-logs-normal",
+        "native-mono-logs-verbose",
+        "native-mono-quiet-normal",
+        "native-mono-quiet-verbose",
+        "native-il2cpp-logs-normal",
+        "native-il2cpp-logs-verbose",
+        "native-il2cpp-quiet-normal",
+        "native-il2cpp-quiet-verbose"
+      ],
+      "constraints": [
+        "!UNITY_WEBGL",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
+      ],
+      "sha256": "90ccecb14b10703e9ea216b0507d417daef33f6ca4c02e304b9ce33f58d7fb3d"
+    },
+    {
+      "path": "Runtime/Proxy/Modules/WebSocket/Binaries/webgl-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
+      "guid": "bbc4c62192a0e4e51d8f858da13f37dd",
+      "assembly": "Playserv.Runtime.Transport.WebSocket",
+      "profiles": [
+        "webgl-logs-normal",
+        "webgl-logs-verbose",
+        "webgl-quiet-normal",
+        "webgl-quiet-verbose"
+      ],
+      "constraints": [
+        "UNITY_WEBGL",
+        "!UNITY_EDITOR",
+        "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
+        "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
+      ],
+      "sha256": "1e61efa05f3e6b0ae22d713c4c738ea49c4d2a51c3d959c06070628c9e2bbab0"
     }
   ]
 }

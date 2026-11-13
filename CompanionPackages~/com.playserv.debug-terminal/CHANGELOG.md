@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-12
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Changed
+
+- Synchronize package and internal PlayServ dependency versions at `0.7.3` (PSV-3578). Point the connection sample at the Prod dashboard WebSocket endpoint.
+
 ## [0.7.2] - 2026-11-03
 
 Release prepared locally; distribution tags and registry publication are separate.

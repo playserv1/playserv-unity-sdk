@@ -4,9 +4,9 @@ External schema analysis and generation companion for `com.playserv.sdk`.
 Unity downloads the tool through UPM, but runs it as a separate process on the
 Unity-bundled .NET runtime.
 
-The shipped tool supports Unity 2021.3 through Unity 6.6 on macOS, Windows, and
-Linux. It targets .NET 5, used by Unity 2021.3 on Linux, and permits runtime
-roll-forward to the .NET 6 or .NET 8 hosts bundled with newer editors. No system-wide .NET
+The shipped tool supports Unity 2022.3.62f3 and Unity 6 on macOS, Windows, and
+Linux. Its .NET 5 target permits runtime roll-forward to the .NET hosts bundled
+with supported editors. No system-wide .NET
 installation is required to use the published tool.
 
 The package provides:
@@ -64,8 +64,7 @@ these committed files and do not perform a package restore.
 
 The resulting framework-dependent assembly is launched with the .NET runtime
 bundled in the active Unity editor. The published folder also carries the
-Roslyn runtime dependencies that are newer than the Unity 2021.3 Linux base
-framework.
+required Roslyn runtime dependencies, independent of the bundled framework.
 
 ### Typed record relations (0.6.3)
 

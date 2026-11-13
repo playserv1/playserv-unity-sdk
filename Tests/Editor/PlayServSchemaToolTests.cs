@@ -69,12 +69,12 @@ namespace Playserv.Tests.Editor
 
             var result = RunTool(dotnetPath, toolPath, "version --json");
             Assert.That(result.ExitCode, Is.EqualTo(0), result.Error);
-            StringAssert.Contains("\"version\": \"0.7.2\"", result.Output);
+            StringAssert.Contains("\"version\": \"0.7.3\"", result.Output);
             StringAssert.Contains("\"protocolVersion\": 1", result.Output);
         }
 
         [Test]
-        public void ShippedTool_TargetsUnity2021LinuxRuntime()
+        public void ShippedTool_ContainsItsRuntimeAndRoslynDependencies()
         {
             var toolPath = ResolveShippedToolPath();
             var runtimeConfigPath = Path.ChangeExtension(toolPath, ".runtimeconfig.json");
@@ -330,7 +330,7 @@ namespace Playserv.Tests.Editor
         }
 
         [Test]
-        public void BundledDotNetCandidates_CoverUnity2021ThroughUnity66Layouts()
+        public void BundledDotNetCandidates_CoverUnity2022ThroughUnity6Layouts()
         {
             var macCandidates = PlayServSchemaToolRunner.BuildBundledDotNetCandidates(
                 "/Applications/Unity/Unity.app/Contents",

@@ -84,10 +84,10 @@ namespace Playserv.Tests.Editor
             }
         }
 
-        [TestCase("2021.3", null, "2021.3.45f2", true)]
-        [TestCase("2021.3", "45f2", "2021.3.45f1", false)]
-        [TestCase("2021.3", "45f2", "2021.3.45f2", true)]
-        [TestCase("6000.6", null, "2021.3.45f2", false)]
+        [TestCase("2022.3", null, "2022.3.62f3", true)]
+        [TestCase("2022.3", "62f3", "2022.3.62f2", false)]
+        [TestCase("2022.3", "62f3", "2022.3.62f3", true)]
+        [TestCase("6000.6", null, "2022.3.62f3", false)]
         [TestCase("6000.6", "0f1", "6000.6.0b9", false)]
         [TestCase("invalid", null, "6000.6.0f1", false)]
         public void GitManifest_RespectsUnityCompatibilityAndDependencies(string unity, string release, string editor, bool compatible)
@@ -103,10 +103,10 @@ namespace Playserv.Tests.Editor
         [TestCase("[]")]
         [TestCase("{}")]
         [TestCase("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":[]}")]
-        [TestCase("{\"name\":\"p\",\"version\":\"1.0.0\",\"unity\":2021}")]
+        [TestCase("{\"name\":\"p\",\"version\":\"1.0.0\",\"unity\":2022}")]
         public void GitManifest_RejectsMalformedMetadata(string json)
         {
-            Assert.Throws<InvalidOperationException>(() => PlayServSdkGitRelease.Parse(json, "2021.3.45f2"));
+            Assert.Throws<InvalidOperationException>(() => PlayServSdkGitRelease.Parse(json, "2022.3.62f3"));
         }
     }
 }

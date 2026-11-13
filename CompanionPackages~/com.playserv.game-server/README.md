@@ -171,6 +171,10 @@ reconnecting or resetting tickets. Missing renewal causes a fresh hello at expir
 An expired bearer is never sent, and ambiguous REST mutations are not retried.
 Terminal authentication/protocol refusal stops automatic reconnect and is exposed
 through `Uplink.State`, `Uplink.LastError`, `OnError` and affected room handles.
+Failure transitions publish `LastError` together with `Terminated` or `Reconnecting`,
+before pending connection attempts complete. A successful handshake clears the
+error. Notifications remain dispatched through the configured Unity context;
+their event arguments describe the transition even if getters reflect a later state.
 
 Set `EnableUplink = false` to retain REST-only hosting, without presence. Ordinary
 HTTP-only use does not implicitly connect. After explicitly disconnecting a started
@@ -394,7 +398,7 @@ human player fails locally before roster mutation or an outbound join, including
 while disconnected. `EnableUplink = false` retains supported REST-only hosting
 operations, not reservation admission. The debug-terminal consume command is
 also removed: admission belongs in the game's connection handshake.
-This checkout prepares package version `0.7.2`; publication is separate.
+This checkout prepares package version `0.7.3`; publication is separate.
 Never log reservation tokens, credentials or arbitrary offer parameters.
 
 ## Served room routes and reservation lifetime (PSV-2602)

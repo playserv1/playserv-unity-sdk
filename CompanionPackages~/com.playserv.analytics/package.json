@@ -1,8 +1,9 @@
 {
   "name": "com.playserv.analytics",
   "displayName": "PlayServ Analytics",
-  "version": "0.7.2",
-  "unity": "2021.3",
+  "version": "0.7.3",
+  "unity": "2022.3",
+  "unityRelease": "62f3",
   "description": "Optional provider-based gameplay analytics module for the PlayServ Unity SDK.",
   "author": {
     "name": "PlayServ"
@@ -13,6 +14,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "com.playserv.sdk": "0.7.2"
+    "com.playserv.sdk": "0.7.3"
   }
 }

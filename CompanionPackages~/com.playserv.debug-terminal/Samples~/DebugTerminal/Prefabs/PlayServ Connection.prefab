@@ -45,6 +45,6 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   showStartupConfigurationPopup: 1
-  backendServerAddress: wss://platform.playserv.com/ws
+  backendServerAddress: wss://dashboard.playserv.com/ws
   autoConnect: 1
   disconnectOnDestroy: 1

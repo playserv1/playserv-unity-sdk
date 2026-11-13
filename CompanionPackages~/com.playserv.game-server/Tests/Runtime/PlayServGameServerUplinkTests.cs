@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -208,6 +209,73 @@ namespace Playserv.Tests.Runtime.GameServer
             await Until(() => PlayServGameServer.Uplink.State == PlayServUplinkState.Terminated);
             Assert.That(PlayServGameServer.Uplink.LastError.SourceCode, Is.EqualTo("uplink_invalid_frame"));
         });
+
+        [UnityTest] public IEnumerator TerminalFailureHasDiagnosticWhenPendingConnectCompletes() => Run(async () =>
+        {
+            var uplink = PlayServGameServer.Uplink;
+            var socket = new Socket(null);
+            uplink.SocketFactory = () => socket;
+            var connecting = uplink.ConnectAsync();
+            try
+            {
+                await Until(() => socket.Sent.Count == 1);
+                var observed = ObservePendingConnectFailure(uplink, PlayServUplinkState.Terminated, "uplink_invalid_frame");
+                socket.Push("not JSON sk_secret");
+                Assert.That((await Error(() => connecting)).UnifiedError.SourceCode, Is.EqualTo("uplink_invalid_frame"));
+                await observed;
+                Assert.That((await Error(() => uplink.ConnectAsync())).UnifiedError.SourceCode, Is.EqualTo("uplink_invalid_frame"));
+            }
+            finally { await uplink.DisconnectAsync(); }
+        });
+
+        [UnityTest] public IEnumerator ReconnectFailureHasDiagnosticUntilSuccessfulHandshake() => Run(async () =>
+        {
+            var uplink = PlayServGameServer.Uplink;
+            var first = new Socket(null);
+            var retry = new Socket(Ack());
+            var attempts = 0;
+            var delays = 0;
+            var resume = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            uplink.SocketFactory = () => Interlocked.Increment(ref attempts) == 1 ? first : retry;
+            uplink.Delay = (ms, ct) => Interlocked.Increment(ref delays) == 1
+                ? PlayServGameServerUplink.WaitAsync(resume.Task, ct)
+                : Task.Delay(ms, ct);
+            var connecting = uplink.ConnectAsync();
+            try
+            {
+                await Until(() => first.Sent.Count == 1);
+                var observed = ObservePendingConnectFailure(uplink, PlayServUplinkState.Reconnecting, "uplink_connection_lost");
+                first.Fail(new PlayServUplinkFailure("uplink_connection_lost", false));
+                Assert.That((await Error(() => connecting)).UnifiedError.SourceCode, Is.EqualTo("uplink_connection_lost"));
+                await observed;
+                resume.TrySetResult(true);
+                await Until(() => uplink.State == PlayServUplinkState.Connected);
+                Assert.That(uplink.LastError.IsError, Is.False);
+                Assert.That(attempts, Is.EqualTo(2));
+            }
+            finally { await uplink.DisconnectAsync(); }
+        });
+
+        private static Task ObservePendingConnectFailure(PlayServGameServerUplink uplink, PlayServUplinkState state, string code)
+        {
+            // Observe the real readiness completion before its producer proceeds to Report.
+            // The inline scheduler makes this interleaving deterministic without replacing the lifecycle.
+            var field = typeof(PlayServGameServerUplink).GetField("_ready", BindingFlags.Instance | BindingFlags.NonPublic);
+            var ready = (TaskCompletionSource<bool>)field.GetValue(uplink);
+            return ready.Task.ContinueWith(task =>
+            {
+                _ = task.Exception;
+                Assert.That(uplink.State, Is.EqualTo(state));
+                Assert.That(uplink.LastError.SourceCode, Is.EqualTo(code));
+            }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, new InlineTaskScheduler());
+        }
+
+        private sealed class InlineTaskScheduler : TaskScheduler
+        {
+            protected override IEnumerable<Task> GetScheduledTasks() => Array.Empty<Task>();
+            protected override void QueueTask(Task task) => TryExecuteTask(task);
+            protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => TryExecuteTask(task);
+        }
 
         [UnityTest] public IEnumerator PreCancellationAndWrongExecutorDoNotSendRequests() => Run(async () =>
         {

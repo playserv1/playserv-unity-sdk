@@ -9,13 +9,19 @@ namespace Playserv.Tests.Editor
     public sealed class PlayServConfigEndpointOverrideTests
     {
         [Test]
-        public void ProductionDefaultsUseServingRuntime()
+        public void ProductionDefaultsUseDashboardRuntime()
         {
             Assert.That(PlayServPackageDefaultsProvider.LoadSettingsOrDefault("Prod").BackendServerAddress,
-                Is.EqualTo("wss://platform.playserv.com/ws"));
+                Is.EqualTo("wss://dashboard.playserv.com/ws"));
         }
 
-        [TestCase("wss://proxy.playserv.io/ws", "wss://platform.playserv.com/ws")]
+        [TestCase("wss://proxy.playserv.io/ws", "wss://dashboard.playserv.com/ws")]
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws")]
+        [TestCase("wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws", "wss://dashboard.dev.playserv.com/ws")]
+        [TestCase(" WSS://PLATFORM.PLAYSERV.COM/ws/ ", "wss://dashboard.playserv.com/ws")]
+        [TestCase("wss://platform.playserv.com/custom", "wss://platform.playserv.com/custom")]
+        [TestCase("wss://platform.playserv.com/ws?tenant=custom", "wss://platform.playserv.com/ws?tenant=custom")]
+        [TestCase("wss://platform.playserv.com:8443/ws", "wss://platform.playserv.com:8443/ws")]
         [TestCase("wss://custom.example.test/ws", "wss://custom.example.test/ws")]
         public void LegacyRuntimeDefaultsMigrateWithoutChangingCustomEndpoints(string oldAddress, string expected)
         {
@@ -23,7 +29,11 @@ namespace Playserv.Tests.Editor
             try
             {
                 JsonUtility.FromJsonOverwrite("{\"backendServerAddress\":\"" + oldAddress + "\",\"deployApiServerAddress\":\"https://retired.test\",\"schemaApiServerAddress\":\"https://retired.test\"}", config);
+                Assert.That(config.BackendServerAddress, Is.EqualTo(expected));
                 Assert.That(config.ToSettings().BackendServerAddress, Is.EqualTo(expected));
+                Assert.That(PlayServSettingsResolver.ResolveEditorSettings(config).BackendServerAddress, Is.EqualTo(expected));
+                config.ApplySettings(config.ToSettings());
+                Assert.That(new SerializedObject(config).FindProperty("backendServerAddress").stringValue, Is.EqualTo(expected));
                 Assert.That(config.ToSettings().DeployApiServerAddress, Is.Empty);
                 Assert.That(config.ToSettings().SchemaApiServerAddress, Is.Empty);
             }

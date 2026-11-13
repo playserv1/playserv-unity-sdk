@@ -5,6 +5,10 @@ tools and companion packages remain source. The first upgrade from a source
 package must run while the old SDK still compiles. Clean installations and later
 binary-to-binary updates do not need this preparation.
 
+Use Unity **2022.3.62f3 or newer**. If the project still uses Unity 2021, first
+upgrade its Editor while retaining the existing SDK, resolve compilation errors,
+and then prepare the package upgrade below.
+
 1. Save your project and commit or back up its current state. Finish any active
    Package Manager operation and leave Play Mode.
 2. Extract the validated binary package into a permanent directory outside

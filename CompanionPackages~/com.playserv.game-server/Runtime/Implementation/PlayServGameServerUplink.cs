@@ -263,6 +263,7 @@ namespace Playserv.GameServer
                     var error = UplinkErrors.Exception(failure?.Code ?? "uplink_connection_lost", !(failure?.Terminal ?? false)).UnifiedError;
                     lock (_sync)
                     {
+                        _lastError = error;
                         SetStateLocked(failure?.Terminal == true ? PlayServUplinkState.Terminated : PlayServUplinkState.Reconnecting);
                         _ready.TrySetException(new PlayServGameServerException(error));
                         if (failure?.Terminal == true) _session = null;

@@ -137,6 +137,182 @@ namespace Playserv.Tests.Runtime
             Assert.That(store.LastScopeKey.Split('.')[0], Has.Length.EqualTo(64));
         }
 
+        [TestCase("wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws", "wss://dashboard.dev.playserv.com/ws", true)]
+        [TestCase("wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws", "wss://dashboard.dev.playserv.com/ws", false)]
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws", true)]
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws", false)]
+        public void DashboardUpgrade_RestoresTheSamePlayerAndRotatesItsStoredRefreshToken(string previous, string current, bool hasDeploymentId)
+        {
+            WithEndpointSessions(previous, current, hasDeploymentId, (settings, store, oldScope, newScope) =>
+            {
+                var http = new FakeHttpClient();
+                store.SaveAsync(oldScope, new PlayServPlayerSessionData("player-existing", "refresh-existing")).GetAwaiter().GetResult();
+                using (var session = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current))
+                {
+                    Assert.That(session.GetTokenAsync().GetAwaiter().GetResult(), Is.EqualTo("access-refreshed"));
+                    Assert.That(session.PlayerId, Is.EqualTo("player-existing"));
+                    Assert.That(http.SignInCount, Is.Zero);
+                }
+                Assert.That(store.LoadAsync(oldScope).GetAwaiter().GetResult().RefreshToken, Is.EqualTo("refresh-rotated"));
+                Assert.That(store.LoadAsync(newScope).GetAwaiter().GetResult(), Is.Null);
+                using (var reopened = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current))
+                {
+                    reopened.GetTokenAsync().GetAwaiter().GetResult();
+                    Assert.That(reopened.PlayerId, Is.EqualTo("player-existing"));
+                    Assert.That(http.LastRefreshToken, Is.EqualTo("refresh-rotated"));
+                    reopened.LogoutAsync().GetAwaiter().GetResult();
+                }
+                using var afterLogout = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current);
+                afterLogout.GetTokenAsync().GetAwaiter().GetResult();
+                Assert.That(afterLogout.PlayerId, Is.EqualTo("player-created"));
+            });
+        }
+
+        [TestCase("wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws", "wss://dashboard.dev.playserv.com/ws")]
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws")]
+        public void DashboardUpgrade_PrefersCurrentPlayerAndLogoutCannotResurrectTheOldScope(string previous, string current)
+        {
+            WithEndpointSessions(previous, current, false, (settings, store, oldScope, newScope) =>
+            {
+                store.SaveAsync(oldScope, new PlayServPlayerSessionData("player-old", "refresh-old")).GetAwaiter().GetResult();
+                store.SaveAsync(newScope, new PlayServPlayerSessionData("player-current", "refresh-current")).GetAwaiter().GetResult();
+                var http = new FakeHttpClient();
+                using (var session = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current))
+                {
+                    session.GetTokenAsync().GetAwaiter().GetResult();
+                    Assert.That(session.PlayerId, Is.EqualTo("player-current"));
+                    Assert.That(http.LastRefreshToken, Is.EqualTo("refresh-current"));
+                    http.RejectAnonymous = true;
+                    session.LogoutAsync().GetAwaiter().GetResult();
+                    Assert.That(store.LoadAsync(oldScope).GetAwaiter().GetResult(), Is.Null);
+                    Assert.That(store.LoadAsync(newScope).GetAwaiter().GetResult(), Is.Null);
+                }
+                http.RejectAnonymous = false;
+                using var restarted = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current);
+                restarted.GetTokenAsync().GetAwaiter().GetResult();
+                Assert.That(restarted.PlayerId, Is.EqualTo("player-created"));
+            });
+        }
+
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.dev.playserv.com/ws")]
+        [TestCase("wss://platform-monolith-ag3jh77tma-ew.a.run.app/ws", "wss://dashboard.playserv.com/ws")]
+        [TestCase("wss://platform.playserv.com/ws", "wss://custom.example.test/ws")]
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws?tenant=custom")]
+        [TestCase("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com:8443/ws")]
+        public void DashboardUpgrade_DoesNotImportOtherEnvironmentsOrCustomEndpointSessions(string previous, string current)
+        {
+            WithEndpointSessions(previous, current, false, (settings, store, oldScope, newScope) =>
+            {
+                store.SaveAsync(oldScope, new PlayServPlayerSessionData("player-unrelated", "refresh-unrelated")).GetAwaiter().GetResult();
+                var http = new FakeHttpClient();
+                using var session = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current);
+                session.GetTokenAsync().GetAwaiter().GetResult();
+                Assert.That(session.PlayerId, Is.EqualTo("player-created"));
+                Assert.That(http.RefreshCount, Is.Zero);
+                Assert.That(store.LoadAsync(oldScope).GetAwaiter().GetResult().PlayerId, Is.EqualTo("player-unrelated"));
+            });
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void DashboardUpgrade_StorageFailureDoesNotCreateAReplacementPlayer(bool failLoad)
+        {
+            WithEndpointSessions("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws", false,
+                (settings, store, oldScope, newScope) =>
+            {
+                store.SaveAsync(oldScope, new PlayServPlayerSessionData("player-existing", "refresh-existing")).GetAwaiter().GetResult();
+                var http = new FakeHttpClient();
+                var failing = new FailingScopeStore(store, oldScope, failLoad);
+                using var session = new PlayServPlayerSession(settings, http, failing, SynchronizationContext.Current);
+                Assert.Throws<PlayServSessionPersistenceException>(() => session.GetTokenAsync().GetAwaiter().GetResult());
+                Assert.That(http.SignInCount, Is.Zero);
+                Assert.That(store.LoadAsync(oldScope).GetAwaiter().GetResult().RefreshToken, Is.EqualTo("refresh-existing"));
+                Assert.That(store.LoadAsync(newScope).GetAwaiter().GetResult(), Is.Null);
+            });
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DashboardUpgrade_FailedLegacyLogoutCleanupNeverSwitchesBackToTheOldPlayer(bool cancel)
+        {
+            WithEndpointSessions("wss://platform.playserv.com/ws", "wss://dashboard.playserv.com/ws", false,
+                (settings, store, oldScope, newScope) =>
+            {
+                store.SaveAsync(oldScope, new PlayServPlayerSessionData("player-old", "refresh-old")).GetAwaiter().GetResult();
+                store.SaveAsync(newScope, new PlayServPlayerSessionData("player-current", "refresh-current")).GetAwaiter().GetResult();
+                var http = new FakeHttpClient();
+                var failing = new FailingScopeStore(store, oldScope, false, failClear: true, cancel: cancel);
+                using (var session = new PlayServPlayerSession(settings, http, failing, SynchronizationContext.Current))
+                {
+                    session.GetTokenAsync().GetAwaiter().GetResult();
+                    if (cancel)
+                        Assert.Throws<OperationCanceledException>(() => session.LogoutAsync().GetAwaiter().GetResult());
+                    else
+                        Assert.That(session.LogoutAsync().GetAwaiter().GetResult().IsSuccess, Is.False);
+                }
+                Assert.That(store.LoadAsync(newScope).GetAwaiter().GetResult(), Is.Not.Null);
+                using var restarted = new PlayServPlayerSession(settings, http, store, SynchronizationContext.Current);
+                restarted.GetTokenAsync().GetAwaiter().GetResult();
+                Assert.That(restarted.PlayerId, Is.EqualTo("player-current"));
+            });
+        }
+
+        private sealed class FailingScopeStore : IPlayServPlayerSessionStore
+        {
+            private readonly IPlayServPlayerSessionStore _store;
+            private readonly string _scope;
+            private readonly bool _failLoad;
+            private readonly bool _failClear;
+            private readonly bool _cancel;
+            public FailingScopeStore(IPlayServPlayerSessionStore store, string scope, bool failLoad, bool failClear = false, bool cancel = false)
+            {
+                _store = store;
+                _scope = scope;
+                _failLoad = failLoad;
+                _failClear = failClear;
+                _cancel = cancel;
+            }
+            public Task<PlayServPlayerSessionData> LoadAsync(string scopeKey, CancellationToken cancellationToken = default)
+            {
+                if (_failLoad && scopeKey == _scope) throw new System.IO.IOException("Fixture storage failure.");
+                return _store.LoadAsync(scopeKey, cancellationToken);
+            }
+            public Task SaveAsync(string scopeKey, PlayServPlayerSessionData session, CancellationToken cancellationToken = default)
+            {
+                if (!_failLoad && !_failClear && scopeKey == _scope) throw new System.IO.IOException("Fixture storage failure.");
+                return _store.SaveAsync(scopeKey, session, cancellationToken);
+            }
+            public Task ClearAsync(string scopeKey, CancellationToken cancellationToken = default)
+            {
+                if (_failClear && scopeKey == _scope)
+                {
+                    if (_cancel) throw new OperationCanceledException();
+                    throw new System.IO.IOException("Fixture cleanup failure.");
+                }
+                return _store.ClearAsync(scopeKey, cancellationToken);
+            }
+        }
+
+        private static void WithEndpointSessions(string previous, string current, bool hasDeploymentId,
+            Action<PlayServSettings, PlayServPlayerPrefsSessionStore, string, string> test)
+        {
+            var settings = CreateSettings();
+            var id = Guid.NewGuid().ToString("N");
+            settings.ClientToken = "pk_endpoint_fixture_" + id;
+            settings.DeploymentGameId = hasDeploymentId ? "endpoint-fixture-" + id : string.Empty;
+            settings.BackendServerAddress = previous;
+            var oldScope = PlayServPlayerSession.BuildScopeKey(settings);
+            settings.BackendServerAddress = current;
+            var newScope = PlayServPlayerSession.BuildScopeKey(settings);
+            var store = new PlayServPlayerPrefsSessionStore();
+            try { test(settings, store, oldScope, newScope); }
+            finally
+            {
+                store.ClearAsync(oldScope).GetAwaiter().GetResult();
+                store.ClearAsync(newScope).GetAwaiter().GetResult();
+            }
+        }
+
         private static PlayServPlayerSession CreateSession(
             IPlayServRuntimeHttpClient httpClient,
             IPlayServPlayerSessionStore sessionStore)
@@ -221,6 +397,8 @@ namespace Playserv.Tests.Runtime
             public int RefreshCount { get; private set; }
 
             public bool RejectRefreshAsUnauthorized { get; set; }
+            public bool RejectAnonymous { get; set; }
+            public string LastRefreshToken { get; private set; }
 
             public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default)
             {
@@ -232,6 +410,7 @@ namespace Playserv.Tests.Runtime
                 CancellationToken ct = default)
             {
                 SignInCount++;
+                if (RejectAnonymous) throw new InvalidOperationException("Fixture anonymous sign-in unavailable.");
                 return Task.FromResult(new PlayerTokenBundleDto
                 {
                     player_id = "player-created",
@@ -248,6 +427,7 @@ namespace Playserv.Tests.Runtime
                 CancellationToken ct = default)
             {
                 RefreshCount++;
+                LastRefreshToken = refreshToken;
                 if (RejectRefreshAsUnauthorized)
                     throw new PlayServRuntimeHttpException(
                         "Request failed. HTTP 401.",

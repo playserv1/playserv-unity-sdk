@@ -1,5 +1,8 @@
 # PlayServ Unity SDK
 
+For responsive owner controls, see [prediction and reconciliation](Documentation~/prediction.md):
+reusable input history/replay, correction smoothing and a Unity example with 200 ms RTT.
+
 PlayServ is a modular multiplayer SDK for Unity. The core package provides
 runtime connection management, data subscriptions, typed events, RPC, HTTP cloud functions,
 read-only catalog/storefront and public platform-status access, spawning,
@@ -15,18 +18,6 @@ explicit initial marker. Collection observers use a selected stable wire key
 whole-view `Changed` remains available. See [field observation](Documentation~/playserv-sdk.md#field-observation-psv-3207)
 for coalescing, reconnect, threading and removal semantics.
 
-## Binary runtime distribution (prepared 0.7.2)
-
-Release tooling now builds the core runtime into DLLs. Editor tools and the
-12 companion packages remain C# source. Assembly names and the public runtime API
-stay unchanged. This does not republish or replace the existing `0.7.1` release.
-
-Before upgrading a project that currently uses the source package, follow
-[Prepare a binary upgrade](Documentation~/binary-upgrade.md). Run the preparation
-**before** changing the package version so Unity can still compile the migration
-code. Clean installations and later binary-to-binary updates use Package Manager
-normally.
-
 ## Install with OpenUPM (recommended for Package Manager updates)
 
 See [Rooms runtime integration](Documentation~/rooms-runtime-parity.md) for admission parameters and dedicated-server integration helpers.
@@ -35,7 +26,7 @@ The core package is available on [OpenUPM](https://openupm.com/packages/com.play
 Install it from the registry to browse and select published versions in Unity
 Package Manager. No GitHub credentials or SSH key are needed for this method.
 
-This checkout prepares **0.7.2**. The examples below target that version, but do
+This checkout prepares **0.7.3**. The examples below target that version, but do
 not mean it has been published to OpenUPM or GitHub yet. Until the distribution
 tag and OpenUPM build are published, select an already published version or use
 this checkout as a local package. Version preparation does not publish a release.
@@ -50,7 +41,7 @@ this checkout as a local package. Version preparation does not publish a release
 3. Click `Save` / `Apply`.
 4. Open `Window` -> `Package Manager`, choose `+` -> `Add package by name`
    (`Install package by name` in some Unity versions), enter `com.playserv.sdk`
-   and version `0.7.2`, then install. You can also find it under `My Registries`.
+   and version `0.7.3`, then install. You can also find it under `My Registries`.
 
 Alternatively, merge this configuration into the game project's
 `Packages/manifest.json`. Keep existing dependencies and scoped registries; do
@@ -66,7 +57,7 @@ not replace the whole file:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.7.2"
+    "com.playserv.sdk": "0.7.3"
   }
 }
 ```
@@ -75,7 +66,7 @@ not replace the whole file:
 
 Adding the registry alone does not convert an existing Git dependency. After
 adding the registry above, replace the **existing** `com.playserv.sdk` Git URL
-in `Packages/manifest.json` with the version string `"0.7.2"`; do not add a
+in `Packages/manifest.json` with the version string `"0.7.3"`; do not add a
 second entry. A local or embedded copy must also be removed from the resolution
 path before the registry package can be used (back up any local edits first).
 Let Unity resolve packages, then commit `Packages/manifest.json` and
@@ -98,7 +89,7 @@ lock file in version control after the update.
 project stays on its selected version until you choose another. Git-tag installs
 remain pinned to their tag and do not gain registry version selection just
 because OpenUPM is configured. Unity requires an exact version here, not
-`latest`, `^0.7.2`, or `*`.
+`latest`, `^0.7.3`, or `*`.
 
 The scope above covers only the core package. It does not publish or migrate
 the optional companion packages. Until a companion has its own OpenUPM listing,
@@ -160,21 +151,21 @@ remove Unity's unsigned-package warning.
 
 ## Install from GitHub (alternative)
 
-This checkout targets SDK `0.7.2`. In Unity, open `Window` ->
+This checkout targets SDK `0.7.3`. In Unity, open `Window` ->
 `Package Manager`, choose `Add package from git URL`, and paste this pinned core
 package URL:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.7.2
+git@github.com:playserv1/playserv-unity-sdk.git#0.7.3
 ```
 
-The Git URLs below require the `0.7.2` distribution tag to be published first;
+The Git URLs below require the `0.7.3` distribution tag to be published first;
 changing the version in the source repository does not publish that tag.
 
 The distribution repository is public. The SSH URLs shown here still require
 GitHub SSH authentication on the operating-system account running Unity; verify
 it with `ssh -T git@github.com`. To clone without SSH credentials, use
-`https://github.com/playserv1/playserv-unity-sdk.git#0.7.2` instead. The same
+`https://github.com/playserv1/playserv-unity-sdk.git#0.7.3` instead. The same
 HTTPS substitution works for companion URLs, retaining `?path=...#<version>`.
 Unity uses the machine's Git credentials; PlayServ does not read or store them.
 
@@ -184,7 +175,7 @@ The same dependency can be added directly to the game project's
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.7.2"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.7.3"
   }
 }
 ```
@@ -211,7 +202,7 @@ branches are not used.
 
 ## Requirements
 
-- Unity 2021.3 or newer.
+- Unity 2022.3.62f3 or newer.
 - A PlayServ public runtime client token (`pk_*`).
 - `com.unity.nuget.newtonsoft-json` 3.2.2. Unity Package Manager installs this
   dependency automatically for UPM installations.
@@ -224,19 +215,19 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.7.2",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.7.2",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.7.2",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.7.2",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.7.2",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.7.2",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.7.2",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.7.2",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.7.2",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.7.2",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.7.2",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.7.2",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.7.2"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.7.3",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.7.3",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.7.3",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.7.3",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.7.3",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.7.3",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.7.3",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.7.3",
+    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.7.3",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.7.3",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.7.3",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.7.3",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.7.3"
   }
 }
 ```
@@ -298,10 +289,17 @@ public client token, game version, and backend endpoint. The token selects the
 project; automatic authentication creates or restores the player session.
 
 New projects without a saved environment or a valid legacy preference start on
-**Prod**: `wss://platform.playserv.com/ws` and `https://dashboard.playserv.com`.
+**Prod**: `wss://dashboard.playserv.com/ws` and `https://dashboard.playserv.com`.
 Package defaults without an explicit environment also use Prod. Select **Dev**
-explicitly when working on the internal dev platform. Upgrading preserves your
-saved environment, valid legacy selection and explicit endpoint overrides.
+explicitly to use `wss://dashboard.dev.playserv.com/ws` and
+`https://dashboard.dev.playserv.com`. Dashboard settings use the origin, without
+`/projects`. Upgrading migrates the former standard Cloud Run Dev and
+`platform.playserv.com` Prod endpoints to these hosts. Your saved environment,
+valid legacy selection, custom endpoint overrides and local tokens are preserved.
+When the new host has no saved player session, the SDK restores the matching
+previous standard host's session, preserving the player's identity. It continues
+rotating that record in place; a session already saved for the dashboard host wins.
+Logout clears both recognized scopes so a previous login cannot reappear.
 An empty or unavailable environment preference falls back to Prod; it does not
 move tokens. If a prod key was previously entered under Dev, select Prod and
 enter it there yourself. The SDK does not infer a key's platform.

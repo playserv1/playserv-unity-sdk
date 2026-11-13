@@ -12,7 +12,7 @@ testing. It does not replace production game UI or backend integration tests.
 ## Requirements
 
 - PlayServ Unity SDK `0.4.0` or newer.
-- Unity `2021.3` or newer, within the compatibility range of the core SDK.
+- Unity `2022.3.62f3` or newer, within the compatibility range of the core SDK.
 - A PlayServ project with a public `pk_*` client token, game version,
   and reachable backend endpoint.
 - `com.playserv.analytics` installed at the same version as the core SDK.

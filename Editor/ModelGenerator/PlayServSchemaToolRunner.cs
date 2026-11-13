@@ -110,7 +110,7 @@ namespace Playserv.Editor
             if (string.IsNullOrWhiteSpace(dotnetPath) || !File.Exists(dotnetPath))
             {
                 error =
-                    "Unity's bundled .NET runtime was not found. Use Unity 2021.3 or newer.";
+                    "Unity's bundled .NET runtime was not found. Use Unity 2022.3.62f3 or newer.";
                 return false;
             }
 

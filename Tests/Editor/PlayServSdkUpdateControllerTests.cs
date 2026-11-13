@@ -343,7 +343,7 @@ namespace Playserv.Tests.Editor
         });
 
         private PlayServSdkUpdateController Controller() =>
-            new PlayServSdkUpdateController(_client, _store, _gate, () => _idle, () => _now, "2021.3");
+            new PlayServSdkUpdateController(_client, _store, _gate, () => _idle, () => _now, "2022.3.62f3");
 
         internal static PlayServPackageSnapshot Package(string name, string version = "0.6.1") =>
             new PlayServPackageSnapshot { Name = name, Version = version, Source = PackageSource.Registry,

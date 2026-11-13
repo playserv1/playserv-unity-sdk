@@ -181,8 +181,10 @@ namespace Playserv.Editor.Tests
                 window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 0 });
                 window.SendEvent(new Event { type = EventType.MouseUp, mousePosition = point, button = 0 });
                 window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "SelectAll" });
-                window.SendEvent(new Event { type = EventType.KeyDown, keyCode = KeyCode.X, character = 'x' });
-                Assert.That(PlayServDeploymentSettings.GetLocal(_first, "Dev"), Is.EqualTo("x"), "Typing must save without a Save button.");
+                // ExecuteCommand exercises real IMGUI editing without requiring OS keyboard focus in batchmode.
+                EditorGUIUtility.systemCopyBuffer = "x";
+                window.SendEvent(new Event { type = EventType.ExecuteCommand, commandName = "Paste" });
+                Assert.That(PlayServDeploymentSettings.GetLocal(_first, "Dev"), Is.EqualTo("x"), "Pasting must save without a Save button.");
                 window.Repaint(); yield return null;
                 window.Focus();
                 window.SendEvent(new Event { type = EventType.MouseDown, mousePosition = point, button = 0 });

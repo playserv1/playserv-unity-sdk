@@ -6,6 +6,48 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-12
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Changed
+
+- Use `wss://dashboard.dev.playserv.com/ws` for Dev and
+  `wss://dashboard.playserv.com/ws` for Prod. Migrate the former standard
+  Cloud Run/Prod runtime addresses while preserving custom endpoints, the
+  selected environment and local Client/Server Tokens (PSV-3578).
+- Synchronize core, all twelve companions, runtime metadata and the rebuilt
+  Schema Tool at `0.7.3` (PSV-3578).
+
+- **Breaking:** the minimum supported Editor is Unity **2022.3.62f3** for core
+  and all twelve companion packages. Runtime DLLs are built with that exact
+  Editor; CI covers source and binary consumers, native and WebGL builds, and
+  retains the Unity 6 consumer gate. Unity 2021 is no longer supported (PSV-3530).
+
+### Removed
+
+- Retire the Unity 2021.3.45f2-only CI Bee shutdown workaround and its obsolete
+  fixtures. General timeout, process cleanup and finalizer diagnostics remain
+  active (PSV-3530).
+
+### Fixed
+
+- Preserve saved player identities across the standard-host upgrade: restore the
+  matching previous host's session only when the dashboard scope is empty, keep
+  refresh rotation on that record, and clear both scopes on logout (PSV-3578).
+
+- Publish game-server uplink failure state and `LastError` together, so callers
+  observing `Terminated` or `Reconnecting` receive the failure diagnostic immediately.
+  A successful reconnect still clears the error (PSV-3570).
+
+### Added
+
+- Opt-in owner input prediction and authoritative reconciliation, with bounded
+  history, replay metadata, generation fencing, detached state/input copies and
+  separate position/rotation smoothing. Includes a 200 ms Unity example and
+  protocol guide; games supply their simulation and applied-input acknowledgements
+  (PSV-3124).
+
 ## [0.7.2] - 2026-11-03
 
 Release prepared locally; distribution tags and registry publication are separate.
