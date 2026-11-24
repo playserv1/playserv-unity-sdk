@@ -6,6 +6,103 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+For upgrade requirements, see [Upgrading to 0.8.0](Documentation~/binary-upgrade.md#upgrading-to-080).
+
+### Changed
+
+- Synchronize core, all eleven companions, runtime metadata and the rebuilt
+  Schema Tool at `0.8.0` (PSV-3791).
+
+- Single-record subscriptions apply complete versioned dataflow pushes without an
+  extra REST GET, preserving conditional saves and managed field callbacks.
+  Incomplete/invalid frames, ambiguous timestamps and reconnect/reset recovery
+  retain canonical reads. Initialization waits for its baseline, queued work is
+  fenced by subscription generation/epoch, and timestamp-derived ETags preserve
+  date precision and truncate to milliseconds (PSV-3734).
+
+- Managed Records now execute Save/Reload/Delete in per-handle FIFO order and
+  coalesce adjacent pending calls of the same kind. Public caller cancellation
+  stops waiting without aborting an already dispatched shared operation; successful
+  responses still update the handle. Realtime work shares the ordering and ignores
+  late responses after subscription cancellation (PSV-3728).
+
+- **Breaking, 2026-11-20 (PSV-3643):** rename the unreleased `OwnedItem` / `OwnedItems`
+  API to `PurchasedItem` / `PurchasedItems`, including read and subscribe methods.
+  Requests use `/catalog/purchased-items` and `_PurchasedItems`; the retired
+  `/catalog/owned-items` and `_OwnedItems` names have no compatibility aliases.
+  Player-owned studio records are unchanged.
+
+### Removed
+
+- **Breaking:** remove the Pulse companion package, its runtime identifiers and
+  its entry in the Editor and Full SDK profile. Before upgrading an existing
+  project, remove `com.playserv.pulse` from Package Manager and remove application
+  references to its API. Old Pulse module selections and disable symbols are
+  cleared automatically; other module choices are preserved (PSV-3633).
+
+### Added
+
+- Opt-in generated entity serialization metadata, typed accessors and runtime
+  registration consumed by the Newtonsoft codec. Editor/Player generation honors
+  compilation context, rejects stale output, preserves IL2CPP fallback members
+  and retains existing wire semantics. Includes equivalence/regression tests,
+  an IL2CPP High-stripping browser fixture and reproducible time/allocation
+  comparisons against the cached reflection path (PSV-3735).
+
+- Managed record field observers and `Changed` notifications cover explicit
+  reload, live refresh and reference rehydration. References retain their
+  canonical handle, and active record wrappers receive explicit reload changes
+  before completion; legacy shared observer ordering is preserved (PSV-3733).
+
+- Optional managed live collections retain record handles and root values through
+  updates and saves, with versioned synchronization, conflict notifications,
+  membership reasons and subscription-scoped lifetime (PSV-3732).
+
+- Typed saves now route declared inclusions and relations through dedicated
+  endpoints, retain accepted state after partial completion, and expose recovery
+  handles and reconciliation without recreating the parent (PSV-3731).
+
+- Default-off automatic runtime schema advisory after player authentication,
+  including entity discovery, stripping preservation, once-per-session execution,
+  cancellation and safe visibility/singleton diagnostics. Manual client/server
+  checks remain available and expose observed metadata compatibility (PSV-3730).
+
+- Automatic offline entity-contract validation in Editor and batch-mode Player
+  builds, plus `Tools > PlayServ > Validate Build Contracts`. Invalid contracts,
+  missing Schema Tool installations and tool failures stop the build with
+  actionable diagnostics. CI verifies valid/invalid builds on both supported
+  Unity versions and source/binary package layouts (PSV-3729).
+
+- Game Server companion: optional automatic forwarding of Unity engine logs with
+  severity filters, credential redaction, bounded buffering/rate, lifecycle cleanup
+  and local diagnostics (PSV-3727).
+
+- Game Server companion: optional room network lifecycle adapter with verified
+  player bindings, reconnect grace and exact-connection cleanup; includes an
+  importable TCP server/client example with scene persistence (PSV-3726).
+
+- Game Server companion: start a platform-assigned dedicated room with
+  `StartHostedRoomAsync`, validated launch metadata, a game-owned listener and
+  bounded cleanup. Includes deployment-token file support, protocol-aware public
+  endpoints and a dedicated-server example (PSV-3725).
+
+- Read the current player's purchased catalog items and counts with
+  `PlayServCatalog.GetPurchasedItemsAsync`. Observe full inventory updates with
+  `PlayServData.SubscribePurchasedItemsAsync`, using the existing connection and
+  reconnect lifecycle. Includes archived item metadata and a purchased-items sample
+  scene; purchasing remains outside this client API (PSV-3616).
+
+### Fixed
+
+- Preserve reflected handshake and subscription wire properties in stripped
+  IL2CPP builds so purchased-item reads and realtime updates also work in binary
+  WebGL consumers (PSV-3616).
+- Restore data subscriptions after reconnect in WebGL without relying on
+  thread-backed timers for authority negotiation or retry delays (PSV-3616).
+
 ## [0.7.3] - 2026-11-12
 
 Release prepared locally; distribution tags and registry publication are separate.

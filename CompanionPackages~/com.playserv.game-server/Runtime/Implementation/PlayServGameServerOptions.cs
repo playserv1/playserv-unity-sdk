@@ -7,6 +7,12 @@ namespace Playserv.GameServer
     /// <summary>Configuration for the process-wide Unity Dedicated Server client.</summary>
     public sealed class PlayServGameServerOptions
     {
+        internal PlayServGameServerOptions Copy()
+        {
+            var copy = (PlayServGameServerOptions)MemberwiseClone();
+            copy.EngineLogs = EngineLogs?.Copy();
+            return copy;
+        }
         /// <summary>Opt-in operator removal, on Unity's context. Return true only after actual game disconnection (or if already absent). Budget: five seconds from receipt, including dispatch.</summary>
         public Func<PlayServParticipantRemoveContext, CancellationToken, Task<bool>> ParticipantRemoveHandler { get; set; }
         /// <summary>Opt-in operator close, on Unity's context. End gameplay and disconnect all room connections before returning true. Absence is success; do not reopen automatically.</summary>
@@ -46,7 +52,9 @@ namespace Playserv.GameServer
         /// <summary>Default request timeout. Matchmaking long polls derive their own deadline.</summary>
         public TimeSpan HttpTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
-        /// <summary>Maximum queued structured logs, including an in-flight entry. No global Unity log interception.</summary>
+        /// <summary>Optional engine capture into the structured queue; disabled by default.</summary>
+        public PlayServEngineLogOptions EngineLogs { get; set; } = new PlayServEngineLogOptions();
+        /// <summary>Maximum queued structured logs, including captured engine logs and an in-flight entry.</summary>
         public int LogQueueCapacity { get; set; } = 256;
         /// <summary>Maximum retained UTF-8 log frame bytes. A single frame must also fit the 1 MiB uplink limit.</summary>
         public int LogQueueMaxBytes { get; set; } = 1024 * 1024;

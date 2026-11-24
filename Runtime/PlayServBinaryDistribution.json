@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "unityVersion": "2022.3.62f3",
-  "sourceCommit": "2419562a36892b5b6f0c333d033d76b16ef937b2",
-  "runtimeSourceHash": "da49b4ce9236862f1af014a9648bcc2e5d8f80d3e8b99fa8a80634d04c29bf2f",
+  "sourceCommit": "e245a235c8aafac215d70c08d5419d30c84f2bfa",
+  "runtimeSourceHash": "fc4a59c2339df9f5d9881e3bc21f8d6d068c4b05bbc66a274d26136e05be78d1",
   "assemblies": [
     {
       "name": "Playserv.Runtime.Modules.Events",
@@ -165,7 +165,7 @@
       "constraints": [
         "!PLAYSERV_MODULE_DISABLED_EVENTS"
       ],
-      "sha256": "a4f21a85c11bf803fd000161e572b7f60cb6eb0cc65edfb8f8715e3fd2e939dc"
+      "sha256": "50c2e447148e952a3512ccf53af30ba50a9ad1a817a05701b0f57269c4a9fafa"
     },
     {
       "path": "Runtime/Proxy/Binaries/editor-logs-normal/Playserv.Runtime.Core.dll",
@@ -179,7 +179,7 @@
         "!PLAYSERV_DISABLE_LOGS",
         "UNITY_EDITOR"
       ],
-      "sha256": "c76e539527c1ea44f5d1c9182c11499cbd1178c41a627fa44acadd524adc1ec3"
+      "sha256": "4f9e8581b9c947770e1d3ab62827a502f1596c959b9baae6d3dffca9277cc80e"
     },
     {
       "path": "Runtime/Proxy/Binaries/editor-logs-verbose/Playserv.Runtime.Core.dll",
@@ -193,7 +193,7 @@
         "!PLAYSERV_DISABLE_LOGS",
         "UNITY_EDITOR"
       ],
-      "sha256": "80d79ff817bd757542c70dce84385f5258642fe6d172e80c0f77afe07893420f"
+      "sha256": "8e59cd12b8e11d8e4ffbbfa0ecfd21c9a7678a3364d1a756f1105f90ba56c7ce"
     },
     {
       "path": "Runtime/Proxy/Binaries/editor-quiet-normal/Playserv.Runtime.Core.dll",
@@ -207,7 +207,7 @@
         "PLAYSERV_DISABLE_LOGS",
         "UNITY_EDITOR"
       ],
-      "sha256": "e4a5635b41527379c174a45202037f519e32b02f288b3a9ce1123f69a9c1b4db"
+      "sha256": "875e29bb3ac1d59ea2f6d161eed91be5e0c83c9c19a391dbfb11523b2670015c"
     },
     {
       "path": "Runtime/Proxy/Binaries/editor-quiet-verbose/Playserv.Runtime.Core.dll",
@@ -221,7 +221,7 @@
         "PLAYSERV_DISABLE_LOGS",
         "UNITY_EDITOR"
       ],
-      "sha256": "dfd2429dcd3d1f9d5dba44d68a743492f925fcf05727a8ba028f0f7fabde9a92"
+      "sha256": "00fda04e8f280bc7c86c09fd5ef1ea83fee51f8c47b4a36546dd35caea7fef50"
     },
     {
       "path": "Runtime/Proxy/Binaries/native-mono-logs-normal/Playserv.Runtime.Core.dll",
@@ -237,7 +237,7 @@
         "!UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "f6f263c485e54dd6d1ac8d6f52914a6382d8d8909d70e9688ea0cc1f005a31e0"
+      "sha256": "dbeb1140aeab165c4ebc3e4612d9fdf530ca0b8936a87dbab3498e8f210690d7"
     },
     {
       "path": "Runtime/Proxy/Binaries/native-mono-logs-verbose/Playserv.Runtime.Core.dll",
@@ -253,7 +253,7 @@
         "!UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "ad5dcbf7b352e5f2ed4820a481d230b2325ec61d9d27ab70247e2d760ee48c2d"
+      "sha256": "3d3a3f1a9cefde6687ed5943589d329dd3131ed3635da4d049d36b1c8b027001"
     },
     {
       "path": "Runtime/Proxy/Binaries/native-mono-quiet-normal/Playserv.Runtime.Core.dll",
@@ -269,7 +269,7 @@
         "!UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "5564de770a8f715120cf189eb9c46358e3a650332d97640d7609503bae61f683"
+      "sha256": "398568a5a0776de0c30fab044e38ddda914a52ea6b5a142a68aeee16905816bf"
     },
     {
       "path": "Runtime/Proxy/Binaries/native-mono-quiet-verbose/Playserv.Runtime.Core.dll",
@@ -285,7 +285,7 @@
         "!UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "8975954bf91fb394c429827913a46aa03e80ed3ad0d594351939d3793763cb1b"
+      "sha256": "9b407c591ce336057410b4052e43842751a4be9cad4af0dcf2d5b56ea0dd8770"
     },
     {
       "path": "Runtime/Proxy/Binaries/webgl-logs-normal/Playserv.Runtime.Core.dll",
@@ -300,7 +300,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "a8e43a234856e32e1d9f8ee6ad3b68e6fdfcc59d8afd8a6279464cc221eaa556"
+      "sha256": "547410ed3a9d5fb8d93fb2c62bca13e14f47905c67dfe1b9f1f91a7aee3a3bf3"
     },
     {
       "path": "Runtime/Proxy/Binaries/webgl-logs-verbose/Playserv.Runtime.Core.dll",
@@ -315,7 +315,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "59bd9b8e02986923e294d56afb5fde6b684e0be6033d715b5443f17272f78b18"
+      "sha256": "605f1c0ddfecba95247740a26673669028a4c14a2ab5e63b9f77c27300be1ea4"
     },
     {
       "path": "Runtime/Proxy/Binaries/webgl-quiet-normal/Playserv.Runtime.Core.dll",
@@ -330,7 +330,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "9e28361a202e4e7a0908051d3be925729db103f4e39d4de64dc969a28d74ec16"
+      "sha256": "961256fed829c999562fe424a6b8631fa85023ced0b605ce6e8959b08bd12ec9"
     },
     {
       "path": "Runtime/Proxy/Binaries/webgl-quiet-verbose/Playserv.Runtime.Core.dll",
@@ -345,7 +345,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "df6530230fb4d9e19fafb41f47bca0ba167d6c544dffd429a9224bb45381329d"
+      "sha256": "ecbb978fce5c8adaa005b26f39bb83e75c0f1f0b4c6f1e3d047928bd45f68f20"
     },
     {
       "path": "Runtime/Modules/Spawn/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.Spawn.dll",
@@ -374,7 +374,7 @@
         "!PLAYSERV_MODULE_DISABLED_EVENTS",
         "!PLAYSERV_MODULE_DISABLED_SPAWN"
       ],
-      "sha256": "006287eb2d62698da4ca0f47873827aec99a53ff56b4cfe497b55f17b38c421c"
+      "sha256": "6c884881ddd77f8550d8110d3e3da40a09692a56def5635716f31df5dd41ae6c"
     },
     {
       "path": "Runtime/Modules/RPC/Client/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.RPC.Client.dll",
@@ -402,7 +402,7 @@
         "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
         "!PLAYSERV_MODULE_DISABLED_CLIENT_RPC"
       ],
-      "sha256": "5e0f77534f5aca96fa752d90cc4fff1562d22c7d10d50d896a390dc360336707"
+      "sha256": "f5a583e44d1075da0071e440acf99fb5f156a0538648f09617c4f14e6bcc5373"
     },
     {
       "path": "Runtime/Binaries/editor-logs-normal/Playserv.Runtime.dll",
@@ -416,7 +416,7 @@
         "!PlayServ_Logs",
         "UNITY_EDITOR"
       ],
-      "sha256": "e59003a536862dd6fe2fb58cd7d8bf1b67e75ea613c959d0710c84abc5c999bd"
+      "sha256": "4133550319e9f1a84e2bfba90211d417ed7d4b6b571fda7320c0787a513e9c7e"
     },
     {
       "path": "Runtime/Binaries/editor-logs-verbose/Playserv.Runtime.dll",
@@ -430,7 +430,7 @@
         "PlayServ_Logs",
         "UNITY_EDITOR"
       ],
-      "sha256": "154cfeac68ad2365913add5df09954af2afa00f47c37394019d55d1beda6d67f"
+      "sha256": "51e0f6a9bb961999286141d60df58a2bf15545ec8610e13f8953d7573ac74899"
     },
     {
       "path": "Runtime/Binaries/native-mono-logs-normal/Playserv.Runtime.dll",
@@ -447,7 +447,7 @@
         "!UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "fe5cf8d5067558d779baef93a62931b62cc4f1ad00e060f6f47409ccf905ba25"
+      "sha256": "3888bc75faf0ed4bd677dd2e11f4f37341fa80c3b7ea5ae194ba6f779f2471bd"
     },
     {
       "path": "Runtime/Binaries/native-mono-logs-verbose/Playserv.Runtime.dll",
@@ -464,7 +464,7 @@
         "!UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "d2f171f3c68a9b0698c4a9265d99c7e97a594769f6ff016c0a88e29ac5b78923"
+      "sha256": "9e31c2b2a850c21510384d1e8adf7ffc52d7b1e600a0a422c34644cd81a7fd58"
     },
     {
       "path": "Runtime/Binaries/webgl-logs-normal/Playserv.Runtime.dll",
@@ -479,7 +479,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "fd8f9e0e60609404c4e2e1e38f64ba561de6d911fa1d7a46cc089569a3a6de91"
+      "sha256": "827046356e638b2bf5559eef36ea45fb2dbc0a630b82149d04ecdc8668c83393"
     },
     {
       "path": "Runtime/Binaries/webgl-logs-verbose/Playserv.Runtime.dll",
@@ -494,7 +494,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "e980b738224226cac4a8632a2331265001b971f30b4517fbe8f366af3b902d75"
+      "sha256": "ea97322e85a678b6ab7a5f12c180f81a72dcd86b95184c04ca4e4093e9b2c152"
     },
     {
       "path": "Runtime/Serialization/Binaries/editor-logs-normal/Playserv.Runtime.Serialization.dll",
@@ -519,7 +519,7 @@
         "webgl-quiet-verbose"
       ],
       "constraints": [],
-      "sha256": "a9c1eab475a66d34a436affa102bf8dbf4210c28f1f4886dde2ea32460817f2d"
+      "sha256": "ef3965d3fc57b750fb0a00687a8d27ec71cc75eba372231966f0b9b2efefc4d3"
     },
     {
       "path": "Runtime/Modules/Contracts/Binaries/editor-logs-normal/Playserv.Runtime.Modules.dll",
@@ -544,7 +544,7 @@
         "webgl-quiet-verbose"
       ],
       "constraints": [],
-      "sha256": "02cb84b2bb309a0f2abb3215c6edf9853cefeb2fb4be36e4d942915ed08a761e"
+      "sha256": "196599a457764f20c4e4d314a3440c060b66afc5950acb6d79e7a2ad12f1cc7a"
     },
     {
       "path": "Runtime/Modules/RPC/Core/Binaries/editor-logs-normal/Playserv.Runtime.Modules.RPC.Core.dll",
@@ -571,7 +571,7 @@
       "constraints": [
         "!PLAYSERV_MODULE_DISABLED_RPC_CORE"
       ],
-      "sha256": "e1039c6e8c53d8c1de508889b7d4183891d926770874cc8281e4587cbf921572"
+      "sha256": "dc8c217a467362985fbec1b1d2cc0028e9e55096a78f7f1eadb01ae90e81735f"
     },
     {
       "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
@@ -586,7 +586,7 @@
         "UNITY_EDITOR",
         "!PLAYSERV_MODULE_DISABLED_DATA"
       ],
-      "sha256": "bda0b411ee617d96cc247272ba8668ad57f2a7d11e4c691648036e27e19f2ba4"
+      "sha256": "d17da1c341e6dd22d033c153db2634f4795d5fe72f208a6f524d7ffbc8043df4"
     },
     {
       "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/editor-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
@@ -601,7 +601,7 @@
         "UNITY_EDITOR",
         "!PLAYSERV_MODULE_DISABLED_DATA"
       ],
-      "sha256": "b9193b411edc5fc105d5032e2e9e9d1fcca187ea2de6dcfcfda397e1ca0da7b1"
+      "sha256": "0efbe0451ccf3c5db3cf9783225c3d2d2bcc309dee2ebea5de5567eaa5b68f9c"
     },
     {
       "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/native-mono-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
@@ -619,7 +619,7 @@
         "!UNITY_EDITOR",
         "!PLAYSERV_MODULE_DISABLED_DATA"
       ],
-      "sha256": "e7793c5608fc92f3835e004f090e7535aba2a203f2c395dfda7fcbe7865596d7"
+      "sha256": "a70caffe92e01d2390bb4a652ec866d65a438623237caf9be7320c9b1dde6abe"
     },
     {
       "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/native-mono-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
@@ -637,7 +637,7 @@
         "!UNITY_EDITOR",
         "!PLAYSERV_MODULE_DISABLED_DATA"
       ],
-      "sha256": "f72c96af03fb6fdd304b38ffcaf9b9696726ae2c0309c09ba3d5f083a06e1986"
+      "sha256": "7ba6a40f57bbb09e23ab4dec463373ce3b633f3b71475f8379c9ed1f97d8fee3"
     },
     {
       "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/webgl-logs-normal/Playserv.Runtime.Modules.DataSubscription.dll",
@@ -653,7 +653,7 @@
         "!UNITY_EDITOR",
         "!PLAYSERV_MODULE_DISABLED_DATA"
       ],
-      "sha256": "b64ff707e073e855063f831dea00944ee5d8e7eff51060ff1aa199b6a756d905"
+      "sha256": "e1e58d17b542e75374360fbbfe2540cbf5514060b53f07a5d1815273f8aba9e7"
     },
     {
       "path": "Runtime/Modules/DataSubscription/Implementation/Binaries/webgl-logs-verbose/Playserv.Runtime.Modules.DataSubscription.dll",
@@ -669,7 +669,7 @@
         "!UNITY_EDITOR",
         "!PLAYSERV_MODULE_DISABLED_DATA"
       ],
-      "sha256": "93537d21fefc38e2b04730a33888ba3f92a401310a980bb6365280db06ec65bd"
+      "sha256": "4ab7937755db8cd3f70558b1aed069971fb4126d957e7cfd34a2e49a2fb4e8d2"
     },
     {
       "path": "Runtime/Modules/Server/Implementation/Binaries/editor-logs-normal/Playserv.Runtime.Modules.Server.dll",
@@ -691,7 +691,7 @@
         "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
         "!PLAYSERV_MODULE_DISABLED_SERVER"
       ],
-      "sha256": "a1318af1e66e9523ae1154fefea3cbee417d5c9f669639300fd1a62f23ac1bbc"
+      "sha256": "7b33934a3550a1913d6421f929732e0ac9d30d329728329111b2eb997539f5e4"
     },
     {
       "path": "Runtime/Modules/Server/Implementation/Binaries/native-il2cpp-logs-normal/Playserv.Runtime.Modules.Server.dll",
@@ -713,7 +713,7 @@
         "!PLAYSERV_MODULE_DISABLED_RPC_CORE",
         "!PLAYSERV_MODULE_DISABLED_SERVER"
       ],
-      "sha256": "2d03bb51ac30981d501ca37abf516c755030bc1e06512ce477f9197926bb4f66"
+      "sha256": "bd08e3c50cfe50b475ec6dc3a210c168e2532f44010eb3c13af39712d5b27698"
     },
     {
       "path": "Runtime/Http/Binaries/editor-logs-normal/Playserv.Runtime.Http.dll",
@@ -731,7 +731,7 @@
         "!PlayServ_Logs",
         "UNITY_EDITOR || !UNITY_WEBGL"
       ],
-      "sha256": "fabf52b4f5792c507afc2edbe0177faaa4e203d108c89e5e7a2a3aee849e32f4"
+      "sha256": "e9cbe7c330b7deb5ab6cc2c95ede9473dfbbc678fb3a3f944fca76cd62631849"
     },
     {
       "path": "Runtime/Http/Binaries/editor-logs-verbose/Playserv.Runtime.Http.dll",
@@ -749,7 +749,7 @@
         "PlayServ_Logs",
         "UNITY_EDITOR || !UNITY_WEBGL"
       ],
-      "sha256": "50cc7a1667693121b725046f5c50c7cb345011fcc215ecac1d05b0c531e560f7"
+      "sha256": "c781b886446feef9c0a3b0d09804725e43dc09f362b8534a8bf33234e80909d1"
     },
     {
       "path": "Runtime/Http/Binaries/webgl-logs-normal/Playserv.Runtime.Http.dll",
@@ -764,7 +764,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "af0e2cd00c28d2aa9ca37c06e705fbccedfaf018738b31090e80cef41bb8b792"
+      "sha256": "e42464c47a384e8deb137d6365fca57663b815459f5d39d25c8636adc246fcdb"
     },
     {
       "path": "Runtime/Http/Binaries/webgl-logs-verbose/Playserv.Runtime.Http.dll",
@@ -779,7 +779,7 @@
         "UNITY_WEBGL",
         "!UNITY_EDITOR"
       ],
-      "sha256": "b591ff10a9b738ad246f598703605c918d888e699806b1a8e0ae94f155184475"
+      "sha256": "7de5500d527c596d5b404da30df19d5aa41367b66bc1561143717e10003f1fd9"
     },
     {
       "path": "Runtime/Abstractions/Binaries/editor-logs-normal/Playserv.Runtime.Abstractions.dll",
@@ -804,7 +804,7 @@
         "webgl-quiet-verbose"
       ],
       "constraints": [],
-      "sha256": "50f22a76787220aec96ea13db9bffff8e0d59a0d3542a45b876ffbef6ab42daa"
+      "sha256": "37342d9204e7349651cc71e129f7cc5c1b4df1b96cf8a83a252ea17fcddd4c0d"
     },
     {
       "path": "Runtime/Proxy/Modules/WebSocket/Binaries/editor-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
@@ -821,7 +821,7 @@
         "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
         "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
       ],
-      "sha256": "e6454586f0c231e240fb9c5af7ac4b411769c0525c04de7a2546d0d31a29c36e"
+      "sha256": "acf7c94c01c85d6c34813b3cab87d93ff2f68e725fe1a16aa2c41b4237ce2de6"
     },
     {
       "path": "Runtime/Proxy/Modules/WebSocket/Binaries/native-mono-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
@@ -843,7 +843,7 @@
         "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
         "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
       ],
-      "sha256": "90ccecb14b10703e9ea216b0507d417daef33f6ca4c02e304b9ce33f58d7fb3d"
+      "sha256": "e2885852ced6171bba90b7a4c5b067dd3cdd1b6d441abc77780b5fb85ea569bc"
     },
     {
       "path": "Runtime/Proxy/Modules/WebSocket/Binaries/webgl-logs-normal/Playserv.Runtime.Transport.WebSocket.dll",
@@ -861,7 +861,7 @@
         "!PLAYSERV_MODULE_DISABLED_CLIENT_EXECUTION",
         "!PLAYSERV_MODULE_DISABLED_TRANSPORT_WEBSOCKET"
       ],
-      "sha256": "1e61efa05f3e6b0ae22d713c4c738ea49c4d2a51c3d959c06070628c9e2bbab0"
+      "sha256": "4b36390d052d4532f8cbe2af080cb14ac4ab7bcd1fe799feec7e5b396099b25a"
     }
   ]
 }

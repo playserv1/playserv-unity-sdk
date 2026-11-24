@@ -71,15 +71,18 @@ namespace Playserv.Tests.Runtime.GameServer
             Assert.That(_transports[1].SentJson.Any(x => x.Contains("Bearer sk_second")), Is.True);
         }
 
-        [Test]
-        public void RecordsSubscriptionBeforeConnect_ReturnsRetryableUnifiedFailure()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RecordsSubscriptionBeforeConnect_ReturnsRetryableUnifiedFailure(bool managed)
         {
             Configure(new KeyProvider("sk_catalogue"), new CatalogueHttpTransport());
 
             var exception = Assert.Throws<Playserv.DataSubscription.Exceptions.DataSubscriptionException>(() =>
-                PlayServGameServer.Records<RealtimeRecord>()
-                    .SubscribeAsync()
-                    .GetAwaiter().GetResult());
+            {
+                var records = PlayServGameServer.Records<RealtimeRecord>();
+                if (managed) records.SubscribeManagedAsync().GetAwaiter().GetResult();
+                else records.SubscribeAsync().GetAwaiter().GetResult();
+            });
 
             Assert.That(exception.UnifiedError.Retryable, Is.True);
             Assert.That(exception.UnifiedError.SourceCode, Is.EqualTo("subscription_connection_unavailable"));

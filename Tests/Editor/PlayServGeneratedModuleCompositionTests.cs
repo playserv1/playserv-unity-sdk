@@ -103,6 +103,7 @@ namespace Playserv.Tests.Editor
                     "    \"references\": [\n" +
                     "        \"Playserv.Runtime.Modules\",\n" +
                     "        \"Playserv.Runtime.Modules.Events\",\n" +
+                    "        \"Playserv.Runtime.Modules.Pulse\",\n" +
                     "        \"External.Unrelated\"\n" +
                     "    ]\n" +
                     "}\n");

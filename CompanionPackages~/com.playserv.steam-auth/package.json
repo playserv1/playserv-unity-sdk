@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.steam-auth",
   "displayName": "PlayServ Steam Auth",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "unity": "2022.3",
   "unityRelease": "62f3",
   "description": "Optional Steamworks.NET Web API ticket integration for the PlayServ Unity SDK.",
@@ -14,7 +14,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "com.playserv.sdk": "0.7.3"
+    "com.playserv.sdk": "0.8.0"
   },
   "samples": [
     {

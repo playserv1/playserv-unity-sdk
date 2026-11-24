@@ -8,6 +8,11 @@ namespace PlayServ.Schema.Tool;
 
 internal static class SchemaGenerator
 {
+    internal static void ValidateMemberType(SchemaMember member, IReadOnlyDictionary<string, SchemaContract> byType)
+    {
+        MapType(member.TypeName, byType);
+    }
+
     public static GenerationSnapshot Build(
         string projectRoot,
         SchemaToolConfiguration configuration)
@@ -420,7 +425,7 @@ internal static class SchemaGenerator
         return target;
     }
 
-    private static Dictionary<string, SchemaContract> BuildContractTypeIndex(
+    internal static Dictionary<string, SchemaContract> BuildContractTypeIndex(
         IReadOnlyList<SchemaContract> contracts)
     {
         var result = new Dictionary<string, SchemaContract>(StringComparer.Ordinal);

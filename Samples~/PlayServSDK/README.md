@@ -32,6 +32,10 @@ compatible/coercing. Unsupported converters/codecs fail before a request is sent
   for individual record handles.
   `LoadSavedViewAsync` demonstrates paged saved-View reads; `RenameViewItemAsync`
   reloads the partial View handle before editing so hidden fields are not lost.
+- `5_PurchasedItems.unity` - read the signed-in player's purchased items and counts,
+  then observe whole-list updates through the existing connection. Uses the
+  active project configuration; sign in with the same account as the web shop.
+  **Stop / cancel** disposes the subscription. No purchase or polling is performed.
 - `Commerce/PlayServCommerceSample.cs` - paged live storefront discovery and
   typed catalog item loading over the runtime HTTP API.
 - `Status/PlayServStatusSample.cs` - credential-free current health, daily

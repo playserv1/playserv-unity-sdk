@@ -30,7 +30,6 @@ namespace Playserv.Editor
         internal const string DefineDisableServer = PlayServModuleManifest.DefineDisableServer;
         internal const string DefineDisableClientExecution = PlayServModuleManifest.DefineDisableClientExecution;
         internal const string DefineDisableSpawn = PlayServModuleManifest.DefineDisableSpawn;
-        internal const string DefineDisablePulse = PlayServModuleManifest.DefineDisablePulse;
         internal const string DefineDisableEditorDeployment = "PLAYSERV_DISABLE_EDITOR_DEPLOYMENT";
         internal const string DefineDisableEditorModelSync = "PLAYSERV_DISABLE_EDITOR_MODEL_SYNC";
         internal const string DefineDisableEditorCodegen = "PLAYSERV_DISABLE_EDITOR_DTO_CODEGEN";

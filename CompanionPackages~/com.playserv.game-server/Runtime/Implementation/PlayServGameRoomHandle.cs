@@ -40,6 +40,7 @@ namespace Playserv.GameServer
             lock (_sync)
             {
                 ThrowIfClosedOrTerminated();
+                if (!CanAdmit || _closeTask != null) throw new InvalidOperationException("Cannot attach networking while the room is closing.");
                 if (_connectionTracker != null) throw new InvalidOperationException("A connection tracker already exists for this room.");
                 if (PlayServGameServer.Uplink.AdmissionMode != PlayServAdmissionMode.Push)
                     throw UplinkErrors.Exception("admission_mode_mismatch");

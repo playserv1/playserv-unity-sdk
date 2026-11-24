@@ -29,6 +29,7 @@ internal sealed class ToolApplication
             "analyze" => Analyze("analyze", writeHumanDiagnostics: true),
             "generate" => Generate("generate", _options.Check),
             "validate" => Generate("validate", checkOnly: true),
+            "validate-contracts" => ValidateContracts(),
             "sync" => Generate("sync", _options.Check),
             "push" => Push(),
             "watch" => Watch(),
@@ -61,6 +62,16 @@ internal sealed class ToolApplication
             $"Analyzed {analysis.SourceFiles.Count} C# files and found " +
             $"{analysis.Contracts.Count} PlayServ schemas.";
         WriteResult(result, writeHumanDiagnostics);
+        return result.Success ? 0 : 1;
+    }
+
+    private int ValidateContracts()
+    {
+        var analysis = BuildContractValidation.Analyze(_options.ProjectRoot, _options.BuildInputsPath);
+        var result = ResultFromAnalysis("validate-contracts", analysis);
+        result.Success = !HasErrors(analysis.Diagnostics);
+        result.Message = $"Validated {analysis.Contracts.Count} build contracts; {analysis.Diagnostics.Count} diagnostics.";
+        WriteResult(result, writeHumanDiagnostics: true);
         return result.Success ? 0 : 1;
     }
 
@@ -282,6 +293,7 @@ internal sealed class ToolApplication
               analyze    Analyze C# schema contracts without writing files.
               generate   Generate configured outputs and lock file.
               validate   Fail when generated outputs differ from source.
+              validate-contracts  Validate Unity build contracts without generating files.
               sync       Generate locally; remote sync activates with the service protocol.
               push       Atomically push attributed schemas through the Schema Service.
               watch      Watch C# sources and regenerate incrementally.
@@ -291,6 +303,7 @@ internal sealed class ToolApplication
             Options:
               --project <path>   Project root. Defaults to the current directory.
               --changed <path>   IDE hint for a changed file.
+              --build-inputs <path>  Explicit Unity compilation inputs for validate-contracts.
               --json             Emit machine-readable JSON.
               --check            Do not write; fail when outputs are stale.
               --dry-run          Validate a push bundle without credentials or network I/O.

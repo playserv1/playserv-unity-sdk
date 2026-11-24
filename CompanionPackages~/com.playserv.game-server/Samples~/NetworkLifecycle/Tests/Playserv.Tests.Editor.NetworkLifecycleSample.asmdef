@@ -1,0 +1,8 @@
+{
+  "name": "Playserv.Tests.Editor.NetworkLifecycleSample",
+  "references": ["Playserv.Samples.NetworkLifecycle", "Playserv.Runtime.Modules.GameServer"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false,
+  "defineConstraints": ["!PLAYSERV_MODULE_DISABLED_GAME_SERVER"]
+}

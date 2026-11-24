@@ -116,6 +116,10 @@ namespace Playserv.GameServer
             CancellationToken cancellationToken) =>
             GetDataFacade().SelectTypedCollection<T>(query, variables, cancellationToken);
 
+        internal Task<IPlayServManagedCollection<T>> SubscribeManagedCollectionAsync<T>(
+            PlayServRecordSet<T> owner, string query, Dictionary<string, object> variables, CancellationToken ct) =>
+            GetDataFacade().SelectManagedCollection(owner, query, variables, ct);
+
         internal Task<IPlayServRecordSubscription<T>> SubscribeRecordAsync<T>(
             PlayServRecord<T> record,
             string query,

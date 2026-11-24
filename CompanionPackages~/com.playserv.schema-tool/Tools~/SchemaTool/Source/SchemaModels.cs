@@ -4,7 +4,7 @@ namespace PlayServ.Schema.Tool;
 
 internal static class ToolConstants
 {
-    public const string Version = "0.7.3";
+    public const string Version = "0.8.0";
     public const int ProtocolVersion = 1;
     public const int ConfigurationVersion = 1;
     public const int LockVersion = 1;
@@ -75,6 +75,9 @@ internal sealed class SchemaContract
 
 internal sealed class SchemaMember
 {
+    public string SourcePath { get; init; } = string.Empty;
+    public int SourceLine { get; init; }
+    public int SourceColumn { get; init; }
     public string Name { get; init; } = string.Empty;
     public string SourceName { get; init; } = string.Empty;
     public string TypeName { get; init; } = string.Empty;
@@ -98,6 +101,9 @@ internal sealed class SchemaDiagnostic
     public string Message { get; init; } = string.Empty;
     public string Path { get; init; } = string.Empty;
     public int Line { get; init; }
+    public int Column { get; init; }
+    public string Type { get; init; } = string.Empty;
+    public string Member { get; init; } = string.Empty;
 }
 
 internal sealed class AnalysisSnapshot

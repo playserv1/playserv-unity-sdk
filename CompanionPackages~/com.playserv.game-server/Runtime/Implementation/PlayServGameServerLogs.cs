@@ -24,23 +24,33 @@ namespace Playserv.GameServer
         public bool IsSuccess => !Error.IsError;
     }
 
-    /// <summary>Memory-only bounded FIFO of pre-redacted frames. Explicit opt-in, no timer or global log hook.</summary>
+    /// <summary>Memory-only bounded FIFO of pre-redacted frames. Manual writes and optional engine capture share one queue.</summary>
     public sealed class PlayServGameServerLogs
     {
         private readonly object _gate = new object();
+        private readonly object _lifecycle = new object();
         private State _state;
         internal PlayServGameServerLogs() { }
         public int PendingCount { get { lock (_gate) return _state?.Queue.Count ?? 0; } }
         public long PendingBytes { get { lock (_gate) return _state?.Bytes ?? 0; } }
         public long DroppedCount { get { lock (_gate) return _state?.Dropped ?? 0; } }
+        public PlayServEngineLogDiagnostics EngineCapture => Capture()?.Snapshot() ?? new PlayServEngineLogDiagnostics();
+        private PlayServEngineLogCapture Capture() { lock (_gate) return _state?.Capture; }
+        internal void StopEngineCapture() { lock (_lifecycle) Capture()?.Dispose(); }
 
         /// <summary>
         /// Freezes and redacts a structured entry before retaining it. Returns false if it exceeds
         /// queue/frame bounds. Does not connect or send; serialization errors are typed and secret-safe.
         /// </summary>
         public bool TryWrite(string message, PlayServServerLogLevel level = PlayServServerLogLevel.Info, object data = null)
+            => TryWriteCore(GameServerUplinkServices.Context(default), message, level, data, false);
+
+        internal bool TryWriteEngine(PlayServGameServerContext context, string message, PlayServServerLogLevel level, string stack)
+            => TryWriteCore(context, message, level, stack == null ? null : new { stack_trace = stack }, true);
+
+        private bool TryWriteCore(PlayServGameServerContext context, string message, PlayServServerLogLevel level, object data, bool redacted)
         {
-            var context = GameServerUplinkServices.Context(default);
+            using var suppression = EngineLogSuppression.Enter();
             if (message == null) throw new ArgumentNullException(nameof(message));
             if (level < PlayServServerLogLevel.Debug || level > PlayServServerLogLevel.Error)
                 throw new ArgumentOutOfRangeException(nameof(level));
@@ -50,8 +60,12 @@ namespace Playserv.GameServer
                 var frame = new { type = "log", level = LevelName(level), message, data };
                 // ToPlainValue has a compatibility fallback to the original object on serialization
                 // failure. Logs must fail closed instead of ever retaining an unredacted object.
-                var plain = GameServerServiceValues.Codec.ParseToPlainValue(PlayServGameServerJson.Serialize(frame));
-                bytes = Encoding.UTF8.GetBytes(PlayServGameServerJson.Serialize(Redact(plain, 0)));
+                if (redacted) bytes = Encoding.UTF8.GetBytes(PlayServGameServerJson.Serialize(frame));
+                else
+                {
+                    var plain = GameServerServiceValues.Codec.ParseToPlainValue(PlayServGameServerJson.Serialize(frame));
+                    bytes = Encoding.UTF8.GetBytes(PlayServGameServerJson.Serialize(Redact(plain, 0)));
+                }
             }
             catch
             {
@@ -78,7 +92,12 @@ namespace Playserv.GameServer
         public Task<PlayServServerLogFlushResult> FlushAsync(CancellationToken ct = default)
         {
             PlayServGameServer.EnsureSupportedBuildForServices(); ct.ThrowIfCancellationRequested();
-            var context = PlayServGameServer.GetContextForServices();
+            return FlushForContextAsync(PlayServGameServer.GetContextForServices(), ct);
+        }
+
+        internal Task<PlayServServerLogFlushResult> FlushForContextAsync(PlayServGameServerContext context, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
             Task<PlayServServerLogFlushResult> task;
             lock (_gate)
             {
@@ -100,6 +119,7 @@ namespace Playserv.GameServer
 
         private async Task<PlayServServerLogFlushResult> FlushCoreAsync(State state, int count)
         {
+            using var suppression = EngineLogSuppression.Enter();
             var sent = 0; var dropped = 0;
             var error = PlayServError.None;
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(state.Stop.Token);
@@ -151,11 +171,49 @@ namespace Playserv.GameServer
         internal async Task<PlayServError> FlushForShutdownAsync(CancellationToken ct)
         {
             if (PendingCount == 0) return PlayServError.None;
-            return (await FlushAsync(ct).ConfigureAwait(false)).Error;
+            var context = PlayServGameServer.GetContextForServices();
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(context.HttpTimeout);
+            try
+            {
+                // A shared flight may predate the last captured lines. Drain those in the same total budget.
+                while (PendingCount != 0)
+                {
+                    var result = await FlushForContextAsync(context, deadline.Token).ConfigureAwait(false);
+                    if (result.Error.IsError) return result.Error;
+                }
+                return PlayServError.None;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return TimeoutError(); }
         }
 
         internal void ResetForConfiguration(PlayServGameServerContext context = null)
         {
+            lock (_lifecycle)
+            {
+                if (context != null)
+                {
+                    if (!PlayServGameServer.IsCurrentLogContext(context)) return;
+                    PlayServEngineLogCapture.ValidateConfigurationThread(context.EngineLogs);
+                }
+                ResetCore(context);
+            }
+        }
+
+        internal void ClearForContext(PlayServGameServerContext context)
+        {
+            lock (_lifecycle)
+            {
+                lock (_gate) if (!ReferenceEquals(_state?.Context, context)) return;
+                ResetCore(null);
+            }
+        }
+
+        private void ResetCore(PlayServGameServerContext context)
+        {
+            // Never acquire the capture lock while holding the queue lock: the engine callback writes into the queue.
+            StopEngineCapture();
+            State current;
             lock (_gate)
             {
                 var previous = _state;
@@ -167,16 +225,49 @@ namespace Playserv.GameServer
                     if (pending == null || pending.IsCompleted) previous.Stop.Dispose();
                     else _ = pending.ContinueWith(_ => previous.Stop.Dispose(), TaskScheduler.Default);
                 }
-                _state = context == null ? null : new State(context, PlayServGameServer.Uplink);
+                current = _state = context == null ? null : new State(context, PlayServGameServer.Uplink);
             }
+            if (context?.EngineLogs?.Enabled != true) return;
+            try { PlayServGameServer.EnsureSupportedBuildForServices(); }
+            catch (PlatformNotSupportedException) { return; }
+            var capture = new PlayServEngineLogCapture(context, this);
+            lock (_gate)
+            {
+                if (!ReferenceEquals(_state, current)) { capture.Dispose(); return; }
+                current.Capture = capture;
+            }
+            capture.Start();
         }
 
         private static PlayServError TimeoutError() => new PlayServError(PlayServErrorCode.Timeout,
             "request_timeout", "The structured log flush timed out.", retryable: true);
-        private static string LevelName(PlayServServerLogLevel level) => level == PlayServServerLogLevel.Warning ? "warning" : level.ToString().ToLowerInvariant();
-        private static readonly Regex Reservation = new Regex(@"\brsv_[A-Za-z0-9._~-]+", RegexOptions.CultureInvariant);
-        internal static string Text(string value) => Reservation.Replace(GameServerServiceValues.SafeText(
-            new PlayServError(PlayServErrorCode.Unknown, "", "", rawDetails: value).RawDetails) ?? "", "[REDACTED]");
+        private static string LevelName(PlayServServerLogLevel level) => level == PlayServServerLogLevel.Warning ? "warn" : level.ToString().ToLowerInvariant();
+        private static readonly Regex Reservation = new Regex(@"(?<![A-Za-z0-9_])(?:rsv|rt)_[A-Za-z0-9._~-]+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        private static readonly Regex LaunchCredential = new Regex(
+            "(\\b(?:rsv|reservation[_-]?token|deployment[_-]?token|server[_-]?key|api[_-]?key)\\b[\\\"']?\\s*[=:]\\s*[\\\"']?)[^\\s&?,;\\\"'}]+",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        internal static string Text(string value) => Reservation.Replace(LaunchCredential.Replace(GameServerServiceValues.SafeText(
+            new PlayServError(PlayServErrorCode.Unknown, "", "", rawDetails: value).RawDetails) ?? "", "$1[REDACTED]"), "[REDACTED]");
+        internal static string EngineText(string value)
+        {
+            var trimmed = value?.TrimStart() ?? "";
+            if (trimmed.StartsWith("{", StringComparison.Ordinal) || trimmed.StartsWith("[", StringComparison.Ordinal))
+            {
+                try
+                {
+                    var plain = GameServerServiceValues.Codec.ParseToPlainValue(value);
+                    if (plain is IDictionary<string, object> || plain is IList)
+                        return PlayServGameServerJson.Serialize(Redact(plain, 0));
+                }
+                catch
+                {
+                    // Preserve ordinary [category] prefixes; malformed JSON-shaped text fails closed.
+                    if (trimmed.StartsWith("{", StringComparison.Ordinal) || Regex.IsMatch(trimmed, "^\\[\\s*(?:[\\\"{\\[\\]\\d-]|null\\b|true\\b|false\\b)"))
+                        return "[REDACTED]";
+                }
+            }
+            return Text(value);
+        }
         private static bool Sensitive(string key)
         {
             var normalized = Regex.Replace(key, "[^a-zA-Z0-9]", "").ToLowerInvariant();
@@ -219,6 +310,7 @@ namespace Playserv.GameServer
             internal volatile bool Active = true;
             internal long Bytes, Dropped;
             internal Task<PlayServServerLogFlushResult> Flush;
+            internal PlayServEngineLogCapture Capture;
             internal State(PlayServGameServerContext context, PlayServGameServerUplink uplink) { Context = context; Uplink = uplink; }
         }
     }

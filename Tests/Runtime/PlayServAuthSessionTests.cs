@@ -1819,6 +1819,10 @@ namespace Playserv.Tests.Runtime
             public List<PlayServRuntimeDataRequest> DataRequests { get; } =
                 new List<PlayServRuntimeDataRequest>();
 
+            public Task<PlayServRuntimeDataResponse> DataTask { get; set; }
+            public CancellationToken LastDataCancellation { get; private set; }
+            public int LastDataThread { get; private set; }
+
             public Task<string> GetLatestVersionAsync(string gameId, CancellationToken ct = default) =>
                 Task.FromResult("1.0.0");
 
@@ -1943,6 +1947,9 @@ namespace Playserv.Tests.Runtime
             {
                 ct.ThrowIfCancellationRequested();
                 DataRequests.Add(request);
+                LastDataCancellation = ct;
+                LastDataThread = Thread.CurrentThread.ManagedThreadId;
+                if (DataTask != null) return DataTask;
                 if (DataResponses.Count > 0)
                     return Task.FromResult(DataResponses.Dequeue());
                 if (DataExceptions.Count > 0)

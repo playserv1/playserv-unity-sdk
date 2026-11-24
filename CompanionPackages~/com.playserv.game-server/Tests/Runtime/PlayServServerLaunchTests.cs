@@ -7,6 +7,16 @@ namespace Playserv.Tests.Runtime.GameServer
 {
     public sealed class PlayServServerLaunchTests
     {
+        [Test]
+        public void ProvisionedPublicHostIsUsedWithoutLegacyPublicIp()
+        {
+            var result = PlayServServerLaunch.ResolveConnect(30123, null,
+                name => name == "PLAYSERV_PUBLIC_HOST" ? "machine.example.test" : null);
+            Assert.That(result, Is.Not.Null, "A provisioned launch supplies PUBLIC_HOST, not PUBLIC_IP.");
+            Assert.That(result.Host, Is.EqualTo("machine.example.test"));
+            Assert.That(result.Port, Is.EqualTo(30123));
+        }
+
         [TestCase("{\"7777\":9000}", "udp")]
         [TestCase("{\"7777/udp\":\"9000\"}", "udp")]
         [TestCase("{\"7777/tcp\":{\"external_port\":9000}}", "tcp")]
@@ -15,16 +25,16 @@ namespace Playserv.Tests.Runtime.GameServer
         {
             var read = new List<string>();
             var result = PlayServServerLaunch.ResolveConnect(7777, null, name =>
-            { read.Add(name); return name == "PLAYSERV_PUBLIC_IP" ? "game.example.test" : mapping; });
+            { read.Add(name); return name == "PLAYSERV_PUBLIC_IP" ? "game.example.test" : name == "PLAYSERV_PORTS_MAPPING" ? mapping : null; });
             Assert.That(result.Host, Is.EqualTo("game.example.test")); Assert.That(result.Port, Is.EqualTo(9000));
             Assert.That(result.Transport, Is.EqualTo(protocol));
-            Assert.That(read, Is.EqualTo(new[] { "PLAYSERV_PUBLIC_IP", "PLAYSERV_PORTS_MAPPING" }));
+            Assert.That(read, Is.EqualTo(new[] { "PLAYSERV_PUBLIC_HOST", "PLAYSERV_PUBLIC_IP", "PLAYSERV_PORTS_MAPPING" }));
         }
         [TestCase("not-json")][TestCase("{\"7777\":1.5}")][TestCase("{\"7777\":65536}")][TestCase("true")]
         public void InvalidMappingFailsWithoutPrintingInput(string mapping)
         {
             var error = Assert.Throws<ArgumentException>(() => PlayServServerLaunch.ResolveConnect(7777, null,
-                name => name == "PLAYSERV_PUBLIC_IP" ? "host" : mapping));
+                name => name == "PLAYSERV_PUBLIC_IP" ? "host" : name == "PLAYSERV_PORTS_MAPPING" ? mapping : null));
             Assert.That(error.Message, Does.Not.Contain(mapping));
         }
         [Test] public void ExplicitValuesWinAndMissingEnvironmentIsNormal()

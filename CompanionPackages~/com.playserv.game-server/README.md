@@ -7,13 +7,98 @@ player-profile lookup over the existing PlayServ runtime API. It also exposes
 typed Records and Cloud Functions using the same rotating server credential.
 Server Analytics, Catalog, and Storefront reads use that credential as well.
 
-## Online player session verification
+## Launch metadata
 
-Launch metadata is opt-in: `PlayServServerLaunch.GetRoomName()` reads `PLAYSERV_ROOM_NAME`; `ResolveConnect(listenPort)` reads only `PLAYSERV_PUBLIC_IP` and `PLAYSERV_PORTS_MAPPING`. Explicit arguments win. Missing metadata returns null, malformed metadata throws, and neither helper starts a room or networking transport.
+Launch metadata is opt-in: `PlayServServerLaunch.GetRoomName()` reads `PLAYSERV_ROOM_NAME`; `ResolveConnect(listenPort)` prefers `PLAYSERV_PUBLIC_HOST`, then `PLAYSERV_PUBLIC_IP`, and reads `PLAYSERV_PORTS_MAPPING`. Explicit arguments win. Missing metadata returns null, malformed metadata throws, and neither helper starts a room or networking transport.
+
+## A platform-launched room
+
+For one server process assigned one room, call `StartHostedRoomAsync` on Unity's main thread, before manual `Configure`. It validates the launch, connects the uplink, waits for the game's listener to be ready and registers the room. The returned handle means registration was acknowledged, not merely that the socket opened.
+
+```csharp
+var hosted = await PlayServGameServer.StartHostedRoomAsync(gameTransport,
+    new PlayServHostedRoomOptions { Transport = "udp" }, startupCancellation);
+var room = hosted.Room;
+// Use the existing pushed-ticket admission API before accepting gameplay.
+await hosted.StopAsync();
+```
+
+`gameTransport` implements `IPlayServHostedRoomTransport`:
+
+- `StartAsync(launch, ct)` starts the game's listener on `launch.ListenPort` and completes only when it is ready. `launch.Connect` is the advertised endpoint; its mapped public port can differ from the local listen port.
+- `StopAsync(ct)` must be idempotent, stop any partial startup and honor cancellation. Both callbacks run on the Unity context captured at startup. If Start ignores cancellation and completes late, the SDK invokes Stop again before allowing another launch.
+
+The SDK captures `PLAYSERV_API_URL`, `PLAYSERV_EXECUTOR_SLUG`, `PLAYSERV_ROOM_NAME`, `PLAYSERV_ROOM_LISTEN_PORT` and the room's JSON `PLAYSERV_ROOM_ATTRIBUTES` (absent means `{}`). It prefers `PLAYSERV_PUBLIC_HOST` over legacy `PLAYSERV_PUBLIC_IP`. Attributes must be a single-level object of scalar values, at most 2048 UTF-8 bytes. The listener receives an immutable launch snapshot with copied attributes. Capacity and heartbeat configuration remain platform-authoritative.
+
+The credential comes from `PLAYSERV_DEPLOYMENT_TOKEN`, or, when absent, `/run/playserv/deployment-token`. Hosted startup never falls back to a studio key. The token's deployment identity supplies `instance_id`; `PLAYSERV_DEPLOYMENT_ID`, if present, must agree. This local shape check does not authenticate the token: the platform validates it on upgrade and issues the session bearer used for registration and heartbeats. Reconnect reads the credential source again and rejects a changed deployment identity. No credential is serialized into the launch snapshot, an Asset or a log.
+
+`Transport` is the game's actual advertised protocol (`udp`, `tcp`, `ws` or `wss`; default `udp`). A matching protocol mapping takes precedence; WebSockets can also use TCP mappings. Selecting `wss` does not create a TLS listener or certificate. `ServerOptions` can supply the existing RPC, admission and operator handlers; conflicting identity settings, an alternate uplink credential, a disabled uplink or a multi-room factory are rejected.
+
+Startup has a 60-second default deadline. Cancellation applies to startup; after success, await `hosted.StopAsync()` or `PlayServGameServer.ShutdownAsync()`. Stop uses a fresh cleanup budget (default five seconds for each cleanup phase), independent of the cancelled startup token. Room close, terminal removal and process shutdown also stop the owned listener. Keep the handle and listener alive across scene changes.
+
+Only one hosted operation owns the process. Concurrent starts, manual reconfiguration and another managed room start are refused. A lost registration response is reported as `room_registration_outcome_unknown`; it never produces a success handle or an automatic retry. Restart the process after that outcome or an unconfirmed cleanup. A new process is also required if a listener never settles after cancellation. Server-side expiry still applies when a remote close cannot be confirmed.
+
+See `Samples~/DedicatedServer/PlayServHostedServerSample.cs` for a minimal UDP binding example to replace with your game's transport.
+
+## Room helpers and player session verification
 
 Configuration preflight: `await PlayServGameServer.GetRoomConfigurationAsync("arena", ct)` uses server-authorized REST without changing live room facts. Subscribe to `Uplink.StateChanged` and `Uplink.ConfigurationChanged` for ordered Unity-context notifications; configuration may become null on disconnect. Event arguments describe the transition, while getters can already reflect a later state.
 
 Optional connection tracking: create `room.CreateConnectionTracker()` (30-second grace), call `TryAdmit(connectionGenerationId, ticket)`, then `ReportDisconnected(connectionGenerationId)` on a transient drop. Use a new ID for every connection generation. `RemovePlayer(playerId)` is an immediate quit/kick. Handle `ConnectionRemoved` by disconnecting that exact connection in your game transport. Never combine manual presence with tracker-owned players. All reservation admission uses pushed tickets, with or without this tracker.
+
+### Optional game network adapter
+
+`PlayServRoomNetworkAdapter` subscribes to a game's `IPlayServRoomNetworkLifecycle`
+and owns the existing tracker for one room. Attach it on Unity's main thread after
+`StartHostedRoomAsync` or `StartRoomAsync` returns:
+
+```csharp
+var adapter = new PlayServRoomNetworkAdapter(room, gameNetwork,
+    reconnectGrace: TimeSpan.FromSeconds(30));
+adapter.Error += error => HandleNetworkingFailure(error.SourceCode);
+```
+
+The lifecycle source raises `Authenticating(connection, ticket)` and
+`Disconnected(connection)`. A connection implements `IPlayServRoomNetworkConnection`:
+`Accept(verifiedPlayerId)` enables gameplay, while `Close(reason)` disables gameplay
+and closes **that exact connection** before returning. Keep gameplay disabled while
+waiting for Accept, including before an adapter is attached. Allocate a new connection
+object for each physical connection; never recycle it for a reconnect. The adapter
+generates its own connection ID, obtains PlayerId from the verified ticket, and
+ignores duplicate callbacks for the same object. It does not retain ticket strings.
+
+Network events may originate on workers; Accept, Close and Error are delivered on
+the captured Unity thread. Call the adapter's public methods on that thread.
+`TryGetPlayerId(connection, out playerId)` reads the current active binding.
+Local admission permits gameplay without waiting for `join_ack`, as the wire
+contract specifies. A late platform refusal closes only the matching admission.
+
+A disconnect parks the existing seat for grace; repeated disconnects do not extend
+it. Reconnect uses a fresh ticket and a new connection object. An old disconnect or
+refusal cannot remove the replacement. `RemovePlayer(playerId)` removes presence
+immediately and closes the live connection; its bool reports presence removal,
+not transport confirmation. An exception from Accept rolls back that admission,
+even if Accept re-entered a disconnect callback. A callback failure exposes only a
+safe code through `Error` and `LastError`; a `network_close_failed` must be handled
+by the game and is not a confirmed disconnect. One failing Close does not prevent
+cleanup of other connections.
+
+Keep the adapter and transport with the room, for example on a root object using
+`DontDestroyOnLoad`. A scene change that preserves the connection needs no new
+admission and sends no extra join/leave. A real network loss uses the same grace and
+fresh-ticket reconnect policy. `Dispose` detaches subscriptions, removes tracked
+presence and closes live connections; room close and module shutdown also detach
+an empty adapter. Do not create a second tracker or mutate presence manually for
+these players. The manual tracker API remains available when no adapter is attached.
+
+Existing operator handlers still own actual game disconnection/room teardown and
+their confirmation. Operator room close detaches the adapter without a second
+transport close; the configured handler must still close all real connections.
+Do not use the adapter's removal bool as an operator cleanup acknowledgement.
+
+Import **TCP Network Lifecycle** from Package Manager for a runnable, bounded TCP
+example, client component and loopback tests. Its wire format is sample-specific;
+the adapter itself adds no networking-library dependency.
 
 Named-room reservation: `await PlayServGameServer.JoinRoomForPlayerAsync("arena", "room-one", playerId, new { team = "blue" }, ct)`.
 This sends one `/rooms/...:join` request with server authorization. It does not find, launch or connect a room; admission params are snapshotted and must not contain secrets.
@@ -58,25 +143,89 @@ ranking. These wrappers do not strengthen the backend's storage/idempotency guar
 
 ## Structured logs
 
-Logging is opt-in: call `PlayServGameServer.Logs.TryWrite(message, level, data)`
-and explicitly `await PlayServGameServer.Logs.FlushAsync(ct)`. There is no global
-`Debug.Log` capture, timer, reconnect replay or Analytics forwarding.
+Manual logging uses `PlayServGameServer.Logs.TryWrite(message, level, data)`
+and `await PlayServGameServer.Logs.FlushAsync(ct)`. Engine capture is disabled by
+default. Enable it in the process configuration (also accepted through hosted
+`ServerOptions`):
+
+```csharp
+PlayServGameServer.Configure(new PlayServGameServerOptions
+{
+    ExecutorSlug = "arena",
+    EngineLogs = new PlayServEngineLogOptions
+    {
+        Enabled = true,
+        MinimumLevel = PlayServServerLogLevel.Info,
+        IncludeStackTrace = true
+    }
+});
+```
+
+Configure the server on Unity's main thread. The explicit server configuration
+enables capture in `UNITY_SERVER` and Editor server tests; an ordinary player build
+never installs the log subscription or delivery loop, even with `Enabled = true`.
+The options are copied at configuration time. To change them, use the existing
+reconfiguration lifecycle: close rooms and disconnect the uplink, then Configure.
+An invalid replacement configuration leaves the current capture intact.
+Enabling capture from a worker is rejected before changing the configuration.
+
+Capture listens to `Application.logMessageReceivedThreaded`, so worker-thread
+messages need no main-thread dispatch queue. `Debug.Log` maps to `info`, warnings
+to `warn`, and Error/Exception/Assert to `error`. A minimum severity filters before
+queueing. Error stacks are included when requested, within the same text budget.
+The forwarder never writes its failures to `Debug.Log`; an async-flow guard also
+excludes diagnostics emitted by its serialization/send path without suppressing
+unrelated gameplay logs.
+
 Entries are frozen and credential-redacted **before** enqueue. This is a credential
 filter, not a general privacy filter: do not supply unrelated secrets or personal data.
+Engine messages and stacks use the existing credential filters, extended for `rsv=`
+query values, reservation/refresh tokens and named launch credentials. Text is cut
+only after redaction, at a valid UTF-8 boundary. Raw engine text is not retained in
+an intermediate queue.
+
+| Engine capture setting | Default | Meaning |
+| --- | --- | --- |
+| `Enabled` | `false` | Subscribe and automatically flush while this server configuration is active |
+| `MinimumLevel` | `Info` | Lowest captured severity |
+| `IncludeStackTrace` | `true` | Include error/exception/assert stacks |
+| `FlushInterval` | 250 ms | At least 1 ms; interval between attempts, never overlapping automatic flights |
+| `RateWindow` / `MaxEntriesPerWindow` | 10 s / 200 | Monotonic fixed window opened by the first eligible entry; excess entries are dropped |
+| `MaxTextBytes` | 16 KiB | Combined UTF-8 message and stack budget, with message taking priority |
 
 `LogQueueCapacity` (default 256) and `LogQueueMaxBytes` (default 1 MiB) bound retained
 UTF-8 frames, including the in-flight entry. A full queue rejects the new entry
 with `false`; inspect `PendingCount`, `PendingBytes` and `DroppedCount`.
 A frame must also fit the 1 MiB transport limit.
+Captured and manually written entries share this FIFO and its limits. When capture
+is enabled, its periodic flush sends both kinds. No connection is opened by the
+logger: normal server startup owns the uplink, and retained entries can be sent
+after it connects or reconnects.
+
+Inspect `Logs.EngineCapture` for `IsCapturing`, `AcceptedCount`, `FilteredCount`,
+`RateLimitedCount`, `QueueRejectedCount`, `FailedCount` and the secret-safe `LastError`.
+`AcceptedCount` means enqueued, not delivered. `FailedCount` counts capture/loop
+failures; transport failures are in `LastError`, while ambiguous-send and FIFO
+overflow drops for both manual/captured entries are in `Logs.DroppedCount`.
+Counters are cumulative within the configuration. Read these diagnostics directly;
+printing every counter update to the engine log would itself create more log traffic.
 
 Concurrent flushes share one flight. Each caller can cancel its own wait; the
 shared flush uses `HttpTimeout` as its total budget and includes only entries
 queued at its start. The result reports sent, dropped, pending and a normalized
 error. Without a connection, entries remain queued. An ambiguous attempted write
 is dropped, not automatically retried; successful send is not a storage acknowledgement.
-Shutdown makes a bounded best-effort flush before disconnect and reports additive
+Graceful shutdown detaches capture before flushing. It drains even entries added
+after an earlier shared flush began, within one total `HttpTimeout` budget (or the
+caller's shorter cancellation deadline), before disconnect, and reports additive
 `LogsError` separately from room-close/Analytics outcomes. Reset/shutdown clears
-the queue and counters.
+the queue and counters. Module shutdown, Editor assembly reload and leaving Play
+mode stop capture synchronously; a worker-initiated stop dispatches native event
+unsubscription onto Unity's thread while already refusing further callbacks.
+These paths do not wait for network delivery.
+Await `ShutdownAsync` / hosted `StopAsync` before an intentional process exit;
+Unity does not await its quitting callback. The Dedicated Server sample has an
+Inspector opt-in for engine log forwarding.
 
 ## Installation
 
@@ -398,7 +547,7 @@ human player fails locally before roster mutation or an outbound join, including
 while disconnected. `EnableUplink = false` retains supported REST-only hosting
 operations, not reservation admission. The debug-terminal consume command is
 also removed: admission belongs in the game's connection handshake.
-This checkout prepares package version `0.7.3`; publication is separate.
+This checkout prepares package version `0.8.0`; publication is separate.
 Never log reservation tokens, credentials or arbitrary offer parameters.
 
 ## Served room routes and reservation lifetime (PSV-2602)
@@ -547,6 +696,19 @@ Fixtures exercise this ordering together with `room_create` and renewed REST cre
 
 ## Server Records and Cloud Functions
 
+`PlayServGameServer.Records<T>().SubscribeManagedAsync(query, ct)` opens a live
+collection of stable, saveable record handles after connecting Records realtime.
+It shares the core [managed collection behavior](../../Documentation~/managed-collections.md),
+including server credentials, conflicts and membership/disposal rules.
+
+Retained server records support `record.ObserveField(...)` and `record.Changed`
+for reload and live updates, using the core
+[managed observer contract](../../Documentation~/managed-record-observers.md).
+
+A single server record's `SubscribeAsync()` also uses the core direct-push path:
+complete versioned overwrites update state and `If-Match` without an extra GET;
+incomplete frames and reconnect/reset recovery still read canonical state.
+
 Server Records reuse the core typed handles, ETags, query builder, projections,
 expansion, and singleton API. Access checks use `acl.server`, and server reads
 are not restricted to the current player-owner scope:
@@ -562,6 +724,12 @@ var job = await jobs.LoadAsync("rec_01...");
 job.Value.State = "assigned";
 await job.SaveAsync(); // sends the handle's current ETag
 ```
+
+Declared parts and relations use the core split-save implementation, including
+partial-failure recovery handles and `ReconcileAsync`. Parent patches use ETags;
+nested PUT routes do not enforce `If-Match`. See
+[saving parts and relations](../../Documentation~/split-saves.md) for required
+schema setup, accepted partial writes and retry behavior.
 
 Use an explicit schema ID when the CLR name differs from the PlayServ table:
 
@@ -794,7 +962,12 @@ backend admission remain authoritative.
 `GetPlayerAsync` returns only ID, name, status, SSO providers, country, joined,
 and timestamps. IP addresses, fingerprints, and moderation details are never
 exposed by this package.
-Runtime schema presence can be checked explicitly with `PlayServGameServer.CheckSchemaAsync(types, ct)`. A table missing from the caller-visible catalogue may be ACL-hidden; this does not validate field compatibility or modify schema.
+Runtime schema presence can be checked explicitly with `PlayServGameServer.CheckSchemaAsync(types, ct)`.
+The result also compares singleton/table kind for attributed entity contracts;
+missing kind metadata stays unknown. A table missing from the caller-visible
+catalogue may be ACL-hidden. This does not validate field types or modify schema.
+The core SDK's automatic opt-in advisory runs on player authentication; dedicated
+servers keep using this explicit API with server credentials.
 ### Explicit inbound RPC
 
 Set `PlayServGameServerOptions.RpcRegistry` before `Configure` to advertise `rpc`.

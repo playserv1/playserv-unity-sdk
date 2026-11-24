@@ -68,3 +68,24 @@ reopening. A successful transaction has a `completed.txt` marker.
 Once the binary release is available in your chosen registry or Git tag, you may
 switch the local paths to that **same** release. Keep core and installed companion
 versions aligned. Do not replace existing release tags with different contents.
+
+## Upgrading to 0.8.0
+
+Version 0.8.0 is prepared in this checkout; publication is a separate step. Keep
+core and every installed companion on 0.8.0. The supported Editor floor remains
+Unity 2022.3.62f3.
+
+- Remove `com.playserv.pulse` from Package Manager and remove application references
+  to its API before upgrading. Pulse is no longer part of the SDK; the other eleven
+  companions remain available. Stale Pulse module selections are cleared automatically.
+- If upgrading from a source package, follow the preparation steps above while
+  the previous SDK still compiles. Existing binary installations can update normally.
+- If you used the unreleased `OwnedItem` / `OwnedItems` API, migrate to
+  `PurchasedItem` / `PurchasedItems`, including read and subscription methods.
+  The retired names have no compatibility aliases.
+- Player builds now validate entity contracts offline. Install the matching Schema
+  Tool companion and resolve reported contract errors before rebuilding. Runtime
+  schema checks and generated entity serialization remain opt-in.
+
+See the [0.8.0 changelog](../CHANGELOG.md#080---2026-11-24) for the complete release
+changes. This upgrade does not change studio-defined record ownership.

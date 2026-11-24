@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Added
+
+- Offline `validate-contracts` command with explicit Unity build inputs, semantic
+  attribute discovery, partial-type validation and structured source/member
+  diagnostics. Reuses existing schema and typed-reference checks without writing
+  generated files or requiring credentials (PSV-3729).
+
+### Changed
+
+- Synchronize package and internal PlayServ dependency versions at `0.8.0` (PSV-3791). Rebuild the shipped Schema Tool with matching assembly and version output.
+
 ## [0.7.3] - 2026-11-12
 
 Release prepared locally; distribution tags and registry publication are separate.

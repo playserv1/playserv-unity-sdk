@@ -13,6 +13,7 @@ namespace Playserv.Editor
             "deploymentGameId",
             "gameVersion",
             "allowMultipleConnections",
+            "enableAutomaticSchemaAdvisory",
             "keepAlivePingIntervalMs",
             "keepAlivePongTimeoutMs",
             "networkTransformSyncIntervalMs",

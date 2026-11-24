@@ -54,12 +54,6 @@ namespace Playserv.Editor
                 description: "Provider-based gameplay analytics and PlayServ ingestion.",
                 gitPath: "CompanionPackages~/com.playserv.analytics"),
             new PlayServCompanionPackageDefinition(
-                packageId: "com.playserv.pulse",
-                moduleIds: new[] { "pulse" },
-                displayName: "Pulse",
-                description: "Optional realtime configuration and feature flag surface.",
-                gitPath: "CompanionPackages~/com.playserv.pulse"),
-            new PlayServCompanionPackageDefinition(
                 packageId: "com.playserv.debug-terminal",
                 moduleIds: new[] { "debug-terminal" },
                 displayName: "Debug Terminal",

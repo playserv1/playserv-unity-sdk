@@ -60,6 +60,7 @@ namespace Playserv.Editor
                     EditorGUILayout.PropertyField(context.DeploymentGameIdProperty);
                     EditorGUILayout.PropertyField(context.GameVersionProperty);
                     EditorGUILayout.PropertyField(context.AllowMultipleConnectionsProperty);
+                    EditorGUILayout.PropertyField(context.SerializedObject.FindProperty("enableAutomaticSchemaAdvisory"));
 
                     if (context.SerializedObject.ApplyModifiedProperties())
                     {

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Changed
+
+- Synchronize package and internal PlayServ dependency versions at `0.8.0` (PSV-3791).
+
 ## [0.7.3] - 2026-11-12
 
 Release prepared locally; distribution tags and registry publication are separate.

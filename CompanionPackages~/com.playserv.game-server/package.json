@@ -1,7 +1,7 @@
 {
   "name": "com.playserv.game-server",
   "displayName": "PlayServ Game Server",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "unity": "2022.3",
   "unityRelease": "62f3",
   "description": "Dedicated-server matchmaking, Records, Cloud Functions, Analytics, Commerce, room lifecycle, reservation admission, and player lookup for PlayServ.",
@@ -14,14 +14,19 @@
   },
   "license": "MIT",
   "dependencies": {
-    "com.playserv.sdk": "0.7.3",
-    "com.playserv.analytics": "0.7.3"
+    "com.playserv.sdk": "0.8.0",
+    "com.playserv.analytics": "0.8.0"
   },
   "samples": [
     {
       "displayName": "Dedicated Game Server",
       "description": "Registers a room, admits reservations, and shuts down gracefully.",
       "path": "Samples~/DedicatedServer"
+    },
+    {
+      "displayName": "TCP Network Lifecycle",
+      "description": "Optional room network adapter with a TCP server/client, scene persistence and loopback tests.",
+      "path": "Samples~/NetworkLifecycle"
     }
   ]
 }

@@ -9,7 +9,7 @@ using Playserv.Serialization;
 namespace Playserv.GameServer
 {
     /// <summary>Explicit, provider-neutral launch metadata. Does not start rooms, resolve DNS or open a game transport.</summary>
-    public static class PlayServServerLaunch
+    public static partial class PlayServServerLaunch
     {
         public static string GetRoomName(string roomName = null) => GetRoomName(roomName, Environment.GetEnvironmentVariable);
         internal static string GetRoomName(string roomName, Func<string, string> environment)
@@ -25,13 +25,18 @@ namespace Playserv.GameServer
         public static PlayServGameRoomConnect ResolveConnect(int listenPort, PlayServGameRoomConnect connect = null) =>
             ResolveConnect(listenPort, connect, Environment.GetEnvironmentVariable);
 
-        internal static PlayServGameRoomConnect ResolveConnect(int listenPort, PlayServGameRoomConnect connect, Func<string, string> environment)
+        internal static PlayServGameRoomConnect ResolveConnect(int listenPort, PlayServGameRoomConnect connect, Func<string, string> environment,
+            string transportOverride = null)
         {
             if (connect != null) return connect;
             if (listenPort < 1 || listenPort > 65535) throw new ArgumentOutOfRangeException(nameof(listenPort));
-            var host = environment("PLAYSERV_PUBLIC_IP");
+            var host = environment("PLAYSERV_PUBLIC_HOST");
+            if (string.IsNullOrWhiteSpace(host)) host = environment("PLAYSERV_PUBLIC_IP");
             var mapping = environment("PLAYSERV_PORTS_MAPPING");
             var port = listenPort; var transport = "udp";
+            var protocols = transportOverride == null ? null :
+                transportOverride == "ws" || transportOverride == "wss" ? new[] { transportOverride, "tcp" } :
+                new[] { transportOverride };
             try
             {
                 if (!string.IsNullOrWhiteSpace(mapping))
@@ -39,26 +44,35 @@ namespace Playserv.GameServer
                     var root = new NewtonsoftJsonCodec().ParseToPlainValue(mapping);
                     if (root is IDictionary<string, object> keyed)
                     {
-                        foreach (var suffix in new[] { "", "/udp", "/tcp" })
+                        var suffixes = protocols == null ? new[] { "", "/udp", "/tcp", "/ws", "/wss" } :
+                            protocols.Select(protocol => "/" + protocol).Concat(new[] { "" }).ToArray();
+                        foreach (var suffix in suffixes)
                         {
                             if (!keyed.TryGetValue(listenPort.ToString(CultureInfo.InvariantCulture) + suffix, out var value)) continue;
-                            port = ReadPort(value); transport = suffix == "/tcp" ? "tcp" : "udp"; break;
+                            port = ReadPort(value); transport = suffix.Length == 0 ? "udp" : suffix.Substring(1); break;
                         }
                     }
                     else if (root is IList entries)
                     {
+                        var bestMatch = int.MaxValue;
                         foreach (var item in entries)
                         {
                             if (!(item is IDictionary<string, object> entry) || !entry.TryGetValue("internal_port", out var inside)) throw new FormatException();
                             if (ReadPort(inside) != listenPort) continue;
                             if (!entry.TryGetValue("external_port", out var outside)) throw new FormatException();
-                            port = ReadPort(outside);
+                            var candidatePort = ReadPort(outside);
+                            var candidateTransport = "udp";
                             if (entry.TryGetValue("protocol", out var protocol))
                             {
-                                if (!(protocol is string text) || text != "udp" && text != "tcp") throw new FormatException();
-                                transport = text;
+                                if (!(protocol is string text) || text != "udp" && text != "tcp" && text != "ws" && text != "wss") throw new FormatException();
+                                candidateTransport = text;
                             }
-                            break;
+                            var match = protocols == null ? 0 : Array.IndexOf(protocols, candidateTransport);
+                            if (match < 0 || match >= bestMatch) continue;
+                            bestMatch = match;
+                            port = candidatePort;
+                            transport = candidateTransport;
+                            if (match == 0) break;
                         }
                     }
                     else throw new FormatException();
@@ -67,7 +81,7 @@ namespace Playserv.GameServer
                 host = host.Trim();
                 if (host.Length > 253 || host.Any(c => char.IsControl(c) || char.IsWhiteSpace(c)) ||
                     host.IndexOfAny(new[] { '/', '?', '#', '@', '\\' }) >= 0) throw new FormatException();
-                return new PlayServGameRoomConnect(host, port, transport);
+                return new PlayServGameRoomConnect(host, port, transportOverride ?? transport);
             }
             catch { throw new ArgumentException("Launch endpoint metadata is invalid.", nameof(environment)); }
         }

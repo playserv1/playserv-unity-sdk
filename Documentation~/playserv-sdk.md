@@ -24,6 +24,10 @@ account-switch semantics and platform requirements.
 See [WebSocket room sessions](room-session.md) for a reusable Host/Join lifecycle
 and an example game protocol.
 
+See [Generated serialization metadata](generated-serialization.md) for opt-in DTO
+registration, typed accessors, Editor/CI generation, stripping preservation and
+the explicit reflection fallback used by `NewtonsoftJsonCodec` (PSV-3735).
+
 See [Typed record references](record-references.md) for relation DTOs, canonical
 loading, batch reads and authorization-context lifetime.
 
@@ -42,14 +46,14 @@ GitHub SSH access for the operating-system account that runs Unity, open
 prepared core package after its distribution tag has been published:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.7.3
+git@github.com:playserv1/playserv-unity-sdk.git#0.8.0
 ```
 
 Pin every PlayServ dependency to the same plain-SemVer distribution tag. A
 companion package uses `?path` before the tag fragment:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.7.3
+git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.8.0
 ```
 
 See the package [README](../README.md#install-from-github) for the complete
@@ -65,7 +69,7 @@ When the SDK is imported under `Assets/playserv-unity-sdk`, Unity does not read 
 
 ### OpenUPM
 
-Version **0.7.3 is prepared in this checkout**, not asserted to be available in
+Version **0.8.0 is prepared in this checkout**, not asserted to be available in
 the registry. The examples below require its separate publication. Until then,
 select an existing published release; the unpinned CLI installs a published version.
 
@@ -91,7 +95,7 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.7.3"
+    "com.playserv.sdk": "0.8.0"
   }
 }
 ```
@@ -100,12 +104,12 @@ Add OpenUPM registry in your project `Packages/manifest.json`:
 
 - Package version is defined in `package.json` (`version`).
 - Use Semantic Versioning: `MAJOR.MINOR.PATCH`.
-- A source release tag uses `unity-<version>` (for example `unity-0.7.3`).
+- A source release tag uses `unity-<version>` (for example `unity-0.8.0`).
 - Both tagged and manually dispatched releases require the source commit to be
   contained in `origin/dev` or an existing `origin/release/*` branch. The publisher
   refreshes these refs before checking; local-only or deleted branches do not qualify.
 - The publisher writes a complete snapshot to distribution `main` and creates
-  the matching plain-SemVer tag (for example `0.7.3`) atomically.
+  the matching plain-SemVer tag (for example `0.8.0`) atomically.
 - Distribution tags are immutable and retain historical releases. Production
   UPM dependencies must use `#<version>` instead of following unpinned `main`.
 - Core and every installed companion package must use the same version tag.
@@ -279,7 +283,6 @@ and other developers use the same SDK profile and module set.
     "data-subscription",
     "events",
     "google-sign-in",
-    "pulse",
     "rpc-core",
     "server",
     "spawn",
@@ -353,7 +356,7 @@ composition assembly unless the game moves those types into its own asmdef.
 
 Open `Tools > PlayServ > Settings > SDK module settings` to install or remove
 Apple Sign In, Google Sign In, Steam Auth, Epic Auth, Facebook Login,
-Analytics, Pulse, Native Transports, WebRTC, and Game Server through Unity Package Manager.
+Analytics, Native Transports, WebRTC, and Game Server through Unity Package Manager.
 Package state and module state are intentionally separate:
 
 - `Install` adds the companion UPM package to the project.
@@ -478,7 +481,74 @@ For a Git installation, the package may also be declared directly:
 
 Use the same revision for core and Schema Tool.
 
+### Automatic build validation
+
+Normal Player and Dedicated Server builds validate active `[PlayServSchema]`
+contracts before producing the build (PSV-3729). `BuildPipeline.BuildPlayer`
+uses the same check in the Editor and in batch mode. Projects with contracts
+must install `com.playserv.schema-tool` at the same revision as core; projects
+without contracts do not need this optional package.
+
+Build validation does not require `Initialize Local Schema`, a
+`playserv.schema.json`, generated schema files, platform credentials, or network
+access. It reads the build's C# sources and compilation symbols and leaves
+schemas and lock files unchanged. Temporary build inputs are written under
+`Library/PlayServ/ContractValidation` and removed after the check. It uses the
+.NET runtime shipped with Unity, including on machines without a system `dotnet`.
+
+To check the current target without producing a Player, select
+`Tools > PlayServ > Validate Build Contracts`, or run:
+
+```sh
+Unity -batchmode -nographics -quit -projectPath /path/to/game \
+  -buildTarget StandaloneLinux64 \
+  -executeMethod Playserv.Editor.PlayServContractBuildValidator.ValidateActiveBuild \
+  -logFile contract-validation.log
+```
+
+Select the target before validation. Custom build scripts pass their additional
+symbols through `BuildPlayerOptions.extraScriptingDefines`; normal builds also
+provide the selected server subtarget. The standalone validation command uses
+the active project's settings. Test and Editor assemblies are excluded from
+Player validation. Partial declarations, qualified attributes, attribute aliases
+and constant attribute arguments are resolved with Roslyn.
+
+| Rule | Build error |
+| --- | --- |
+| `PSSCHEMA001` | More than one contract has the same stable schema ID. |
+| `PSSCHEMA002` | A source has a C# syntax error. |
+| `PSSCHEMA003` | Members of a contract, including its partial declarations, use the same serialized field name. |
+| `PSSCHEMA004` | A typed record reference has an invalid target or conflicting target/type/cardinality metadata. |
+| `PSSCHEMA005` | Attribute metadata cannot be resolved as a supported constant in the build's assembly context. |
+
+Errors identify the source file, line/column, rule and affected type/member where
+available. Rename conflicting IDs/fields, correct the typed reference, or mark a
+local-only member `[PlayServIgnore]`. Repeated builds report the same diagnostics
+in the same order. Missing/incompatible tool packages, invalid tool responses,
+process failures and a two-minute execution timeout fail the build explicitly.
+For a setup error, install matching core/Schema Tool revisions and allow Unity
+to finish importing and compiling before retrying.
+
+The supported CI matrix is Unity **2022.3.62f3** and **6000.6.0f1**. The SDK's
+consuming project builds valid contracts and verifies that invalid contracts
+stop a real Player build, with source and binary SDK packages. CI requires this
+fixture to pass; missing or skipped execution fails the job.
+
 ### Declare contracts in C#
+
+[Managed collections](managed-collections.md) expose stable, saveable record
+handles through `SubscribeManagedAsync`, with explicit local-edit and lifetime rules.
+
+Typed saves use separate requests for declared inclusions and relations. Read
+[saving parts and relations](split-saves.md) before handling partial failures or
+retrying a create; the recovery handle retains the server-assigned parent ID.
+
+For a read-only check against the live, caller-visible catalog after sign-in,
+enable `EnableAutomaticSchemaAdvisory` in `PlayServSettings` or the config asset.
+It defaults to off and runs once without delaying authentication. It checks
+visibility and singleton/table kind; local build validation above checks source
+contract rules. See [runtime schema advisory](rooms-runtime-parity.md#runtime-schema-advisory)
+for discovery, stripping, lifecycle, manual checks and permission-aware diagnostics.
 
 Only explicitly attributed types become schemas:
 
@@ -1268,20 +1338,49 @@ ETag. `HasPendingChanges` compares the current top-level value to that snapshot.
 `If-Match` returns `PlayServRecordConflictException` with
 `Kind == StaleVersion`.
 
-Each save captures its patch before asynchronous access checks and HTTP. Changes to
-serialized fields made while it is pending are preserved over the successful server
+Each save captures its patch when execution starts, before asynchronous access checks
+and HTTP. Changes to serialized fields made during that request are preserved over the successful server
 response and remain visible through `HasPendingChanges`. The snapshot, ETag and
-timestamps still advance to the acknowledged server state; a subsequent (including
-already queued) save sends the remaining changes using the new ETag.
+timestamps still advance to the acknowledged server state; the next save operation
+to execute sends the remaining changes using the new ETag. Calls folded into the
+same operation do not trigger another write for edits made during its request:
+those edits remain pending until another save operation runs.
 
 This reconciliation uses top-level fields, just like Save: nested objects and arrays
 are retained as whole fields when edited during the request. Server-normalized fields
 without newer local edits are accepted. `Value` can still be replaced, so read it from
 the handle after awaiting Save rather than retaining an old DTO reference. Modify DTOs
 on the owning Unity context; arbitrary simultaneous multi-threaded mutation is not supported.
-Failed or cancelled saves leave the existing snapshot/ETag and local edits unchanged.
-Singleton saves use the same behavior. Explicit reload and realtime synchronization
+Failed requests leave the existing snapshot/ETag and local edits unchanged.
+Singleton saves use the same reconciliation behavior. Explicit reload and realtime synchronization
 continue to use backend-wins semantics and may intentionally replace pending edits.
+
+Each `PlayServRecord<T>` has its own FIFO for `SaveAsync`, `ReloadAsync`, and
+`DeleteAsync`, with one operation active at a time. Different handles, even for the
+same ID, run independently. Only adjacent **pending** operations of the same kind
+share execution and completion: five reloads queued behind an active save produce
+one GET, with all five callers receiving the result. An active operation never
+absorbs a later call, and `Save → Reload → Save` keeps all three boundaries. A save
+collects dirty fields when its turn starts; a clean save succeeds without HTTP.
+Bulk save/delete calls on handles use this same queue. Realtime synchronization and
+deletion are separate ordered operations, preserving their backend-wins semantics.
+
+Cancellation belongs to the caller, not to a shared public operation. A cancelled
+token enqueues nothing; cancelling one folded caller does not cancel its peers.
+Pending work with no remaining callers is skipped, while its kind remains a boundary
+for coalescing. After an operation starts, cancellation ends that caller's wait;
+the HTTP request continues with the transport's configured timeout, keeps its queue
+slot until it finishes, and still applies a successful response. Cancellation is
+therefore not proof that a write was rejected or that the handle will stay unchanged.
+Transport failures are not automatically retried by this queue. Internal realtime
+requests retain subscription-lifetime cancellation.
+
+A confirmed delete sets `IsDeleted`; remaining and future public operations fail
+with `InvalidOperationException` without HTTP. Callers folded into the successful
+delete all succeed unless individually cancelled. A failed delete leaves the handle
+usable and the next queued operation runs. Obtain and edit handles on the owning
+Unity context; scheduled operations return to that context, and arbitrary concurrent
+DTO mutation remains unsupported.
 
 Use selectors or string fields for dynamic schemas:
 
@@ -1374,16 +1473,39 @@ recordLive.Conflict += conflict =>
 recordLive.SynchronizationError += error =>
     UnityEngine.Debug.LogError(error.UnifiedError.ToString());
 
-// Completes after the canonical REST reload updates Value, snapshot and ETag.
+// Completes after the accepted snapshot updates Value and ETag, with REST fallback when needed.
 await recordLive.RefreshAsync(cancellationToken);
 ```
 
-The dataflow snapshot contains record fields but not REST metadata. For that
-reason each changed push triggers a canonical `GET /records/{id}` before the
-handle is mutated. `Value`, the canonical snapshot, `UpdatedAt`, owner, and
-`ETag` therefore move to one authoritative version, and repeated push frames
-are coalesced. Partial handles are fully reloaded before the transport opens;
-handles with existing unsaved changes must first call `SaveAsync` or
+A complete row `Overwrite` on this keyed all-fields subscription updates `Value`,
+the canonical snapshot, `UpdatedAt` and `ETag` directly, without a record GET.
+The pushed `updated_at` supplies the conditional-write token using the platform's
+UTC ticks/hex contract, truncated to milliseconds. Initial and explicit refresh
+snapshots use the same path; subscription initialization is silent and waits for
+its baseline. Absent optional business fields reset to DTO defaults.
+
+The push is not a full REST envelope: `Id` comes from the subscribed handle;
+REST-only `CreatedAt` and `Owner` retain their last loaded values when absent.
+`ReloadAsync` refreshes those metadata too. Player-owned pushes must retain the
+fixed `player_id`, are checked against the bound identity, and use the already
+validated owner if the frame does not carry one.
+
+A canonical `GET /records/{id}` is still required for a patch-only (including a
+shared cached snapshot reconstructed from patches), malformed or
+unversioned frame, recovery after reconnect/reset, uncertain save state, or
+different fields sharing the handle's timestamp (ambiguous against a REST write).
+No incomplete DTO or fabricated version is published if that read fails.
+Governed frames are checked for completeness, epoch and strictly increasing
+`Sequence`; `Revision` is not a frame-ordering key. Reset holds the last good
+state until a fresh baseline, and the first recovered snapshot uses REST.
+Old epochs, obsolete queued work, older timestamps and duplicate state cannot
+overwrite an accepted version or emit duplicate changes. Timestamp ordering
+retains the platform's clock and millisecond-collision limits.
+
+Pushes coalesce and share the record's FIFO with saves/reloads/deletes. A refresh
+invalidated by reconnect/reset fails its wait rather than claiming installation;
+retry it after recovery. Partial handles are fully reloaded before the transport
+opens; handles with existing unsaved changes must first call `SaveAsync` or
 `ReloadAsync`.
 
 Edits made after subscription are allowed. If a remote update arrives while
@@ -1395,6 +1517,10 @@ found frame sets `IsDeleted`, retains the last valid value, emits the standard
 failure sequence once, and leaves the handle in `Terminated` state. Explicit
 `CloseAsync`/`Dispose`, refcounting, reconnect replay, and main-thread event
 delivery reuse the normal managed-subscription lifecycle.
+
+A failed conditional save remains caller-visible and is never automatically
+retried. Use `ReconcileAsync` to obtain a canonical version while retaining edits
+for an explicit retry, or `ReloadAsync` to replace local edits with server state.
 
 `ISharedCollection<T>`, `IPlayServRecordSubscription<T>`,
 `IPlayServSingletonSubscription<T>`, and the legacy
@@ -1502,9 +1628,10 @@ termination/close itself does not invent removal notifications.
 
 Custom subscription implementations remain source-compatible and are not forced
 to implement field observation; unsupported implementations throw
-`NotSupportedException`. Editable record subscriptions and
-`IPlayServSingletonSubscription<T>` keep their existing APIs; this increment does
-not add per-field registration to those wrappers. Coverage uses local serializer/
+`NotSupportedException`. Managed `PlayServRecord<T>` handles additionally support
+[field observers across reload and rehydration](managed-record-observers.md)
+(PSV-3733), using silent registration and field-before-record notification order.
+`IPlayServSingletonSubscription<T>` keeps its existing API. Coverage uses local serializer/
 transport fixtures, not deployed-backend acceptance.
 
 ### Governed client data (PSV-3203)
@@ -1784,8 +1911,8 @@ anonymous fallback; a changed identity/configuration invalidates reads, saves an
 subscription updates, including delayed responses. Dispose subscriptions and acquire
 new handles after sign-out, account switch or reconfiguration. Do not retain copied
 DTOs across account changes. Save preserves in-flight business edits, ETags and
-backend conflict errors. Existing realtime record behavior remains a push-triggered
-canonical REST refresh (not a second player-key query or polling); initialization
+backend conflict errors. Complete versioned record pushes apply directly;
+incomplete frames and reconnect recovery use a canonical record GET. Initialization
 and realtime never automatically Save. Cancellation after a seed/write may leave
 that accepted mutation on the server. These SDK fixtures are not live backend acceptance.
 
@@ -2030,7 +2157,7 @@ roster member; new tokenless human joins fail before mutation, even disconnected
 The debug-terminal consume command is removed as well. See the companion
 README and DedicatedServer samples for game-owned cleanup integration.
 
-This breaking API removal was introduced in `0.7.0` and remains in `0.7.3`.
+This breaking API removal was introduced in `0.7.0` and remains in `0.8.0`.
 Fixture tests are not deployed-backend acceptance or completion of PSV-2570.
 
 ### Game-server uplink data (PSV-3204, 2026-10-23)
@@ -2236,8 +2363,57 @@ platform mappings, storefront audiences, schedules, and 30-day statistics.
 
 HTTP Problem Details become `PlayServCommerceException.UnifiedError`, while
 caller cancellation and invalid arguments remain exceptions. The facade does
-not fabricate purchase or receipt-validation calls: the currently shipped
-runtime commerce endpoints are read-only.
+not fabricate purchase or receipt-validation calls: these SDK facades remain
+read-only.
+
+## Purchased items
+
+After player sign-in, `PlayServCatalog.GetPurchasedItemsAsync(ct)` reads
+`GET /catalog/purchased-items` with the public client token and current player JWT.
+There is no player-ID argument or server-key override. The result contains
+`PlayerId` and the complete `Items` array, ordered by SKU, without pagination.
+Each `PlayServPurchasedItem` includes `ItemId`, `Sku`, `Name`, nullable `ImageUrl`,
+`ProductType`, `Status`, `Count`, and optional first/last purchase timestamps.
+Archived items are still included; counts are purchase-ledger balances, not
+mutable studio inventory records.
+
+For live updates, enable the Data module and use the existing platform connection:
+
+```csharp
+using Playserv.Commerce;
+using Playserv.DataSubscription;
+using Playserv.Wrapper;
+
+PlayServPurchasedItemList purchased = await PlayServCatalog.GetPurchasedItemsAsync(ct);
+ShowPurchasedItems(purchased.Items);
+
+ISharedCollection<PlayServPurchasedItem> live =
+    await PlayServData.SubscribePurchasedItemsAsync(ct);
+live.Changed += ShowPurchasedItems;
+ShowPurchasedItems(live.Items);
+// Retain live for the screen lifetime; dispose it when leaving the screen.
+```
+
+`ShowPurchasedItems` is the game's callback accepting
+`IReadOnlyList<PlayServPurchasedItem>`. The subscription sends `_PurchasedItems { * }`
+without arguments. `Items` holds the latest received snapshot and can initially
+be empty until the first push. Each `Changed` callback replaces the whole list,
+including an empty list after a refund removes the last item. There is no timer,
+HTTP polling, catalog-table lookup, or write method on this handle.
+
+The normal subscription registry reopens the query after reconnect and ignores
+old subscription IDs. Observe `State`, `Failure`, and `Terminated`; retained
+items during `Reconnecting` are the last known snapshot. An identity change
+terminates the old subscription: clear its UI and subscribe for the new player.
+Cancellation cancels opening; after success, `Dispose` or `CloseAsync` stops
+updates. A player session is required (the subscription reports `30001` if absent).
+Purchasing, consuming items and receipt validation are not exposed here.
+
+Import the **PlayServ SDK** sample and open `5_PurchasedItems.unity`. Connect using
+the same player identity as the web shop, then choose **Read once** or
+**Subscribe**. With the ownership backend deployed, complete a sandbox web
+purchase for that player and watch the count change without restarting the scene.
+An anonymous sample login is a different player from an existing web account.
 
 ## Public platform status
 

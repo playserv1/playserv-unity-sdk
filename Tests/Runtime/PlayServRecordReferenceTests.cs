@@ -26,10 +26,14 @@ namespace Playserv.Tests.Runtime
             Assert.That(parent.Value.Children.Select(r => r.Id), Is.EqualTo(new[] { "rec_child", "rec_other" }));
             Assert.That(parent.Value.Child.State, Is.EqualTo(PlayServRecordRefState.Unloaded));
             fake.EnqueueJson(201, ParentJson("\"rec_child\""), "\"parent-2\"");
+            fake.EnqueueJson(200, "{\"child_ids\":[\"rec_child\"]}");
+            fake.EnqueueJson(200, "{\"child_ids\":[\"rec_child\",\"rec_other\"]}");
+            fake.EnqueueJson(200, ParentJson("\"rec_child\""), "\"parent-3\"");
             parents.CreateAsync(parent.Value).GetAwaiter().GetResult();
-            var body = new NewtonsoftJsonCodec().Deserialize<System.Collections.Generic.Dictionary<string,object>>(fake.Requests.Last().JsonBody);
-            Assert.That(body["child"], Is.EqualTo("rec_child"));
-            Assert.That(fake.Requests.Last().JsonBody, Does.Not.Contain("State").And.Not.Contain("Value"));
+            var writes = fake.Requests.Where(request => request.Method == "PUT").ToArray();
+            Assert.That(writes.Select(request => request.JsonBody), Is.EqualTo(new[] {
+                "{\"child_ids\":[\"rec_child\"]}", "{\"child_ids\":[\"rec_child\",\"rec_other\"]}" }));
+            Assert.That(writes.All(request => !request.JsonBody.Contains("State") && !request.JsonBody.Contains("Value")), Is.True);
         }
         [Test]
         public void Expanded_reference_requires_canonical_load_and_hydration_never_patches_parent()
@@ -165,10 +169,14 @@ namespace Playserv.Tests.Runtime
             Assert.That(parent.HasPendingChanges, Is.False);
             parent.Value.Children[0].Value.Name = "preview edit";
             parent.Value.Child = new PlayServRecordRef<RefChild>("rec_new");
+            fake.EnqueueJson(200, response, "\"p1\"");
+            fake.EnqueueJson(200, "{\"child_ids\":[\"rec_new\"]}");
             fake.EnqueueJson(200, ParentJson("\"rec_new\""), "\"p2\"");
             parent.SaveAsync().GetAwaiter().GetResult();
-            Assert.That(fake.Requests.Last().JsonBody, Is.EqualTo("{\"child\":\"rec_new\"}"));
-            Assert.That(fake.Requests.Count, Is.EqualTo(2));
+            var write = fake.Requests.Single(request => request.Method == "PUT");
+            Assert.That(write.RelativePath, Does.EndWith("/records/rec_parent/links/child"));
+            Assert.That(write.JsonBody, Is.EqualTo("{\"child_ids\":[\"rec_new\"]}"));
+            Assert.That(fake.Requests.All(request => !request.RelativePath.Contains("ent_children")), Is.True);
         }
 
         [Test]

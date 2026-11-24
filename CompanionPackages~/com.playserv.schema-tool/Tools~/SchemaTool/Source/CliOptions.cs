@@ -5,6 +5,7 @@ internal sealed class CliOptions
     public string Command { get; private set; } = "status";
     public string ProjectRoot { get; private set; } = Directory.GetCurrentDirectory();
     public string ChangedPath { get; private set; } = string.Empty;
+    public string BuildInputsPath { get; private set; } = string.Empty;
     public string Endpoint { get; private set; } = string.Empty;
     public int TimeoutSeconds { get; private set; } = 30;
     public bool Json { get; private set; }
@@ -27,6 +28,9 @@ internal sealed class CliOptions
                     break;
                 case "--changed":
                     options.ChangedPath = RequireValue(args, ref index, argument);
+                    break;
+                case "--build-inputs":
+                    options.BuildInputsPath = RequireValue(args, ref index, argument);
                     break;
                 case "--endpoint":
                     options.Endpoint = RequireValue(args, ref index, argument);
@@ -73,6 +77,8 @@ internal sealed class CliOptions
         }
 
         options.ProjectRoot = Path.GetFullPath(options.ProjectRoot);
+        if (options.BuildInputsPath.Length > 0 && options.Command != "validate-contracts")
+            throw new ArgumentException("--build-inputs is only supported by validate-contracts.");
         return options;
     }
 

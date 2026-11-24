@@ -32,11 +32,14 @@ namespace Playserv.Editor.Tests
         });
         [Test] public void DockerResolutionPrefersPathAndFallsBackToDesktopWithoutChangingEnvironment()
         {
+            var custom = Path.GetFullPath("/custom/bin/docker");
+            var desktop = Path.GetFullPath("/Applications/Docker.app/Contents/Resources/bin/docker");
+            var home = Path.GetFullPath("/Users/fixture/.docker/bin/docker");
             Assert.That(DockerExecutable.Resolve("/custom/bin", true, "/Users/fixture", false,
-                p => p == "/custom/bin/docker" || p == "/Applications/Docker.app/Contents/Resources/bin/docker", _ => true),
-                Is.EqualTo("/custom/bin/docker"));
+                p => Path.GetFullPath(p) == custom || Path.GetFullPath(p) == desktop, _ => true),
+                Is.EqualTo(custom));
             Assert.That(DockerExecutable.Resolve("/usr/bin:/bin", true, "/Users/fixture", false,
-                p => p == "/Users/fixture/.docker/bin/docker", _ => true), Is.EqualTo("/Users/fixture/.docker/bin/docker"));
+                p => Path.GetFullPath(p) == home, _ => true), Is.EqualTo(home));
         }
         [Test] public void DockerResolutionDistinguishesMissingAndNonExecutableFiles()
         {

@@ -50,7 +50,7 @@ namespace Playserv.Tests.Runtime.GameServer
             var frame = _socket.Sent.Last();
             foreach (var secret in new[] { "sk_secret", "pk_secret", "a.b.c", "rsv_secret", "sk_bad", "sk_keysecret", "opaque-secret", "opaque-token", "opaque-password" })
                 Assert.That(frame, Does.Not.Contain(secret));
-            Assert.That(frame, Does.Contain("\"type\":\"log\"").And.Contain("\"level\":\"warning\"").And.Contain("\"round\":1").And.Contain("[REDACTED]"));
+            Assert.That(frame, Does.Contain("\"type\":\"log\"").And.Contain("\"level\":\"warn\"").And.Contain("\"round\":1").And.Contain("[REDACTED]"));
             Assert.That(PlayServGameServer.Logs.PendingBytes, Is.Zero);
         });
         [Test] public void CountByteAndFrameBoundsAndReset()

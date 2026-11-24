@@ -130,6 +130,18 @@ namespace Playserv.Tests.Runtime
             Assert.That(http.Requests, Is.Empty);
         }
 
+        [TestCase(null)]
+        [TestCase("plr_other")]
+        public void ManagedFields_reload_repairs_a_locally_changed_fixed_player_key(string changed)
+        {
+            var http = new Http();
+            var record = Load(Set<KeyedProfile>(http)).GetAwaiter().GetResult().Record;
+            record.Value.PlayerId = changed;
+            record.ReloadAsync().GetAwaiter().GetResult();
+            Assert.That(record.Value.PlayerId, Is.EqualTo("plr_own"));
+            Assert.That(record.HasPendingChanges, Is.False);
+        }
+
         [Test]
         public void Precancellation_does_not_load_catalogue_or_create_a_row()
         {
@@ -179,6 +191,26 @@ namespace Playserv.Tests.Runtime
             Assert.Throws<InvalidOperationException>(() => record.ReloadAsync().GetAwaiter().GetResult());
             Assert.That(http.Requests.Count, Is.EqualTo(count));
         }
+
+        [UnityTest]
+        public IEnumerator Queued_record_operations_reject_an_identity_change_before_dispatch() => Run(async () =>
+        {
+            var http = new Http(); var settings = Settings();
+            var record = (await Load(Set<Profile>(http, settings))).Record;
+            var response = new TaskCompletionSource<PlayServRuntimeDataResponse>();
+            http.Handler = (_, __) => response.Task;
+            var active = record.ReloadAsync();
+            record.Value.Name = "pending edit";
+            var save1 = record.SaveAsync(); var save2 = record.SaveAsync();
+            var reload = record.ReloadAsync(); var delete = record.DeleteAsync();
+            var count = http.Requests.Count;
+            settings.PlayerId = "plr_new";
+            response.SetResult(Response(http.Row));
+            foreach (var task in new[] { active, save1, save2, reload, delete })
+                await Throws<InvalidOperationException>(async () => await task);
+            Assert.That(http.Requests.Count, Is.EqualTo(count));
+            Assert.That(record.IsDeleted, Is.False);
+        });
 
         [UnityTest]
         public IEnumerator Concurrent_missing_loads_use_seed_and_converge_without_overwrite() => Run(async () =>
@@ -324,6 +356,35 @@ namespace Playserv.Tests.Runtime
             Assert.That(http.Requests.Count, Is.EqualTo(count)); Assert.That(change, Is.Null);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RecordPush_owned_record_checks_key_without_reading_on_valid_push(bool foreignKey)
+        {
+            var http = new Http(); var settings = Settings(); var bus = new Bus();
+            using var adapter = new PlayServDataSubscriptionAdapter(bus, new Logger(), new NewtonsoftJsonCodec());
+            var set = new PlayServRecordSet<Profile>(new PlayServRecordsClient(settings, http, new NewtonsoftJsonCodec()), "ent_profiles", subscribeRecordAsync: adapter.SelectTypedRecordAsync);
+            var record = Load(set).GetAwaiter().GetResult().Record;
+            using var live = record.SubscribeAsync().GetAwaiter().GetResult(); http.Requests.Clear();
+            bus.UpdateVersioned("Direct", foreignKey ? "plr_other" : "plr_own");
+            Assert.That(http.Rows.Count, Is.EqualTo(foreignKey ? 1 : 0));
+            Assert.That(record.Value.Name, Is.EqualTo(foreignKey ? "Stored" : "Direct"));
+            Assert.That(record.Owner, Is.EqualTo("plr_own")); Assert.That(record.HasPendingChanges, Is.False);
+        }
+
+        [Test]
+        public void RecordPush_owned_refresh_repairs_locally_corrupted_fixed_key()
+        {
+            var http = new Http(); var settings = Settings(); var bus = new Bus();
+            using var adapter = new PlayServDataSubscriptionAdapter(bus, new Logger(), new NewtonsoftJsonCodec());
+            var set = new PlayServRecordSet<KeyedProfile>(new PlayServRecordsClient(settings, http, new NewtonsoftJsonCodec()), "ent_profiles", subscribeRecordAsync: adapter.SelectTypedRecordAsync);
+            var record = Load(set).GetAwaiter().GetResult().Record;
+            using var live = record.SubscribeAsync().GetAwaiter().GetResult(); http.Requests.Clear();
+            record.Value.PlayerId = "corrupted";
+            bus.UpdateVersioned("Direct", "plr_own");
+            Assert.That(record.Value.PlayerId, Is.EqualTo("plr_own"));
+            Assert.That(record.HasPendingChanges, Is.False); Assert.That(http.Rows, Is.Empty);
+        }
+
         [Test]
         public void Identity_change_during_matching_subscription_baseline_releases_lease()
         {
@@ -456,14 +517,17 @@ namespace Playserv.Tests.Runtime
         }
 
         [UnityTest]
-        public IEnumerator Cancelled_save_preserves_unsent_changes_and_never_retries() => Run(async () =>
+        public IEnumerator Cancelled_save_wait_applies_the_successful_response_without_retry() => Run(async () =>
         {
             var http = new Http(); var record = (await Load(Set<Profile>(http))).Record; record.Value.Name = "Pending";
             var response = new TaskCompletionSource<PlayServRuntimeDataResponse>(); http.Handler = (request, ct) => response.Task;
             using var cancellation = new CancellationTokenSource(); var save = record.SaveAsync(cancellation.Token);
-            cancellation.Cancel(); response.SetResult(Response(Row(name: "Server")));
+            cancellation.Cancel();
             await Throws<OperationCanceledException>(async () => await save);
             Assert.That(record.Value.Name, Is.EqualTo("Pending")); Assert.That(record.HasPendingChanges, Is.True);
+            response.SetResult(Response(Row(name: "Server")));
+            await record.SaveAsync();
+            Assert.That(record.Value.Name, Is.EqualTo("Server")); Assert.That(record.HasPendingChanges, Is.False);
             Assert.That(http.Rows.Count(request => request.Method == "PATCH"), Is.EqualTo(1));
         });
 
@@ -593,6 +657,8 @@ namespace Playserv.Tests.Runtime
                 return Task.CompletedTask;
             }
             internal void Update(string name) => Emit(new DataSubscriptionUpdate { DataSubscriptionId = 91, UpdateType = "Overwrite", IsCollection = false, Data = new Dictionary<string, object> { ["player_id"] = "plr_own", ["name"] = name } });
+            internal void UpdateVersioned(string name, string key) => Emit(new DataSubscriptionUpdate { DataSubscriptionId = 91, UpdateType = "Overwrite",
+                Data = new Dictionary<string, object> { ["player_id"] = key, ["name"] = name, ["updated_at"] = "2026-11-22T00:00:00Z" } });
             private void Emit<T>(T value)
             {
                 if (_listeners.TryGetValue(typeof(T), out var callbacks)) foreach (var callback in callbacks.ToArray()) ((Action<T>)callback)(value);

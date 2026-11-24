@@ -1,0 +1,10 @@
+{
+    "name": "Playserv.Samples.NetworkLifecycle",
+    "references": [
+        "Playserv.Runtime.Modules.GameServer"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "!PLAYSERV_MODULE_DISABLED_GAME_SERVER"
+    ]
+}

@@ -434,6 +434,11 @@ namespace Playserv.Editor
                 }
             }
 
+            changed |= knownModuleIds.Remove("pulse");
+            changed |= baseEnabledModuleIds.Remove("pulse");
+            foreach (var enabledModuleIds in platformEnabledModuleIds.Values)
+                changed |= enabledModuleIds.Remove("pulse");
+
             foreach (var module in PlayServModuleManifest.RuntimeModules)
             {
                 if (knownModuleIds.Contains(module.Id))

@@ -596,6 +596,9 @@ namespace Playserv.Tests.Editor
         {
             if (Environment.GetEnvironmentVariable("PLAYSERV_RUN_TOKEN_BUILD_TESTS") != "1")
                 Assert.Ignore("Set PLAYSERV_RUN_TOKEN_BUILD_TESTS=1 to build the environment-token smoke player.");
+            var target = EditorUserBuildSettings.activeBuildTarget;
+            if (BuildPipeline.GetBuildTargetGroup(target) != BuildTargetGroup.Standalone)
+                Assert.Ignore("The environment-token smoke player requires an active Standalone target.");
             SwitchEnvironment("Prod");
             _config.SetClientToken("pk_not_in_player_build_fixture");
             SwitchEnvironment("Dev");
@@ -603,7 +606,8 @@ namespace Playserv.Tests.Editor
             PlayServDeploymentSettings.SetLocal(_config, "Dev", "sk_never_in_player_dev_fixture");
             PlayServDeploymentSettings.SetLocal(_config, "Prod", "sk_never_in_player_prod_fixture");
             var setup = EditorSceneManager.GetSceneManagerSetup();
-            var output = Path.GetFullPath("Temp/PlayServTokenSmoke/Player.app");
+            var outputRoot = Path.GetFullPath("Temp/PlayServTokenSmoke/" + Guid.NewGuid().ToString("N"));
+            var output = Path.Combine(outputRoot, target == BuildTarget.StandaloneOSX ? "Player.app" : "Player.exe");
             try
             {
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -612,12 +616,12 @@ namespace Playserv.Tests.Editor
                 var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
                     scenes = new[] { scenePath },
-                    target = BuildTarget.StandaloneOSX,
+                    target = target,
                     locationPathName = output,
                     options = BuildOptions.Development
                 });
                 Assert.That(report.summary.result, Is.EqualTo(BuildResult.Succeeded));
-                var assets = Directory.GetFiles(output, "*.assets", SearchOption.AllDirectories);
+                var assets = Directory.GetFiles(outputRoot, "*.assets", SearchOption.AllDirectories);
                 var containsActive = false;
                 foreach (var asset in assets)
                 {

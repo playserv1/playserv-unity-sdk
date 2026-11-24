@@ -7,8 +7,14 @@ PlayServ is a modular multiplayer SDK for Unity. The core package provides
 runtime connection management, data subscriptions, typed events, RPC, HTTP cloud functions,
 read-only catalog/storefront and public platform-status access, spawning,
 and the built-in HTTP/WebSocket transport. Analytics, identity providers,
-native transports, WebRTC, Pulse, schema tooling, and Dedicated Server runtime
+native transports, WebRTC, schema tooling, and Dedicated Server runtime
 operations are optional companion packages.
+
+Pulse has been removed from this checkout (PSV-3633, unreleased). Before upgrading
+an existing project, uninstall `com.playserv.pulse` through Package Manager (or
+remove its entry from `Packages/manifest.json`) and remove application references
+to its API. The Editor clears old Pulse module selections and disable symbols
+automatically, while preserving other module choices. Other companions are unaffected.
 
 Subscribed entities and collections support disposable, top-level field callbacks:
 `using var watch = live.ObserveField("health", change => UpdateHealth(change.Current));`.
@@ -18,6 +24,10 @@ explicit initial marker. Collection observers use a selected stable wire key
 whole-view `Changed` remains available. See [field observation](Documentation~/playserv-sdk.md#field-observation-psv-3207)
 for coalescing, reconnect, threading and removal semantics.
 
+Managed records also support `record.ObserveField(...)` across reload, live
+updates and reference rehydration, with silent registration and field callbacks
+before `record.Changed`. See [managed record observers](Documentation~/managed-record-observers.md).
+
 ## Install with OpenUPM (recommended for Package Manager updates)
 
 See [Rooms runtime integration](Documentation~/rooms-runtime-parity.md) for admission parameters and dedicated-server integration helpers.
@@ -26,10 +36,13 @@ The core package is available on [OpenUPM](https://openupm.com/packages/com.play
 Install it from the registry to browse and select published versions in Unity
 Package Manager. No GitHub credentials or SSH key are needed for this method.
 
-This checkout prepares **0.7.3**. The examples below target that version, but do
+This checkout prepares **0.8.0**. The examples below target that version, but do
 not mean it has been published to OpenUPM or GitHub yet. Until the distribution
 tag and OpenUPM build are published, select an already published version or use
 this checkout as a local package. Version preparation does not publish a release.
+
+Before updating an existing project, read the
+[0.8.0 upgrade requirements](Documentation~/binary-upgrade.md#upgrading-to-080).
 
 1. Open `Edit` -> `Project Settings` -> `Package Manager`.
 2. Add a scoped registry, or add the scope to your existing OpenUPM entry:
@@ -41,7 +54,7 @@ this checkout as a local package. Version preparation does not publish a release
 3. Click `Save` / `Apply`.
 4. Open `Window` -> `Package Manager`, choose `+` -> `Add package by name`
    (`Install package by name` in some Unity versions), enter `com.playserv.sdk`
-   and version `0.7.3`, then install. You can also find it under `My Registries`.
+   and version `0.8.0`, then install. You can also find it under `My Registries`.
 
 Alternatively, merge this configuration into the game project's
 `Packages/manifest.json`. Keep existing dependencies and scoped registries; do
@@ -57,7 +70,7 @@ not replace the whole file:
     }
   ],
   "dependencies": {
-    "com.playserv.sdk": "0.7.3"
+    "com.playserv.sdk": "0.8.0"
   }
 }
 ```
@@ -66,7 +79,7 @@ not replace the whole file:
 
 Adding the registry alone does not convert an existing Git dependency. After
 adding the registry above, replace the **existing** `com.playserv.sdk` Git URL
-in `Packages/manifest.json` with the version string `"0.7.3"`; do not add a
+in `Packages/manifest.json` with the version string `"0.8.0"`; do not add a
 second entry. A local or embedded copy must also be removed from the resolution
 path before the registry package can be used (back up any local edits first).
 Let Unity resolve packages, then commit `Packages/manifest.json` and
@@ -89,7 +102,7 @@ lock file in version control after the update.
 project stays on its selected version until you choose another. Git-tag installs
 remain pinned to their tag and do not gain registry version selection just
 because OpenUPM is configured. Unity requires an exact version here, not
-`latest`, `^0.7.3`, or `*`.
+`latest`, `^0.8.0`, or `*`.
 
 The scope above covers only the core package. It does not publish or migrate
 the optional companion packages. Until a companion has its own OpenUPM listing,
@@ -151,21 +164,21 @@ remove Unity's unsigned-package warning.
 
 ## Install from GitHub (alternative)
 
-This checkout targets SDK `0.7.3`. In Unity, open `Window` ->
+This checkout targets SDK `0.8.0`. In Unity, open `Window` ->
 `Package Manager`, choose `Add package from git URL`, and paste this pinned core
 package URL:
 
 ```text
-git@github.com:playserv1/playserv-unity-sdk.git#0.7.3
+git@github.com:playserv1/playserv-unity-sdk.git#0.8.0
 ```
 
-The Git URLs below require the `0.7.3` distribution tag to be published first;
+The Git URLs below require the `0.8.0` distribution tag to be published first;
 changing the version in the source repository does not publish that tag.
 
 The distribution repository is public. The SSH URLs shown here still require
 GitHub SSH authentication on the operating-system account running Unity; verify
 it with `ssh -T git@github.com`. To clone without SSH credentials, use
-`https://github.com/playserv1/playserv-unity-sdk.git#0.7.3` instead. The same
+`https://github.com/playserv1/playserv-unity-sdk.git#0.8.0` instead. The same
 HTTPS substitution works for companion URLs, retaining `?path=...#<version>`.
 Unity uses the machine's Git credentials; PlayServ does not read or store them.
 
@@ -175,7 +188,7 @@ The same dependency can be added directly to the game project's
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.7.3"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.8.0"
   }
 }
 ```
@@ -215,19 +228,18 @@ repository, install core first and add only the required packages:
 ```json
 {
   "dependencies": {
-    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.7.3",
-    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.7.3",
-    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.7.3",
-    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.7.3",
-    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.7.3",
-    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.7.3",
-    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.7.3",
-    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.7.3",
-    "com.playserv.pulse": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.pulse#0.7.3",
-    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.7.3",
-    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.7.3",
-    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.7.3",
-    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.7.3"
+    "com.playserv.sdk": "git@github.com:playserv1/playserv-unity-sdk.git#0.8.0",
+    "com.playserv.apple-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.apple-signin#0.8.0",
+    "com.playserv.google-signin": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.google-signin#0.8.0",
+    "com.playserv.facebook-login": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.facebook-login#0.8.0",
+    "com.playserv.epic-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.epic-auth#0.8.0",
+    "com.playserv.steam-auth": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.steam-auth#0.8.0",
+    "com.playserv.webrtc": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.webrtc#0.8.0",
+    "com.playserv.analytics": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.analytics#0.8.0",
+    "com.playserv.debug-terminal": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.debug-terminal#0.8.0",
+    "com.playserv.transports-native": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.transports-native#0.8.0",
+    "com.playserv.game-server": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.game-server#0.8.0",
+    "com.playserv.schema-tool": "git@github.com:playserv1/playserv-unity-sdk.git?path=/CompanionPackages~/com.playserv.schema-tool#0.8.0"
   }
 }
 ```
@@ -419,6 +431,22 @@ the client `/ws` connection.
 
 ## Typed records
 
+For live, saveable records with stable object references, use
+`Records<T>().SubscribeManagedAsync(query, ct)`. See
+[managed collections](Documentation~/managed-collections.md) for retained values,
+conflict notifications and membership semantics.
+
+Typed saves of declared parts and relations use their dedicated write routes.
+See [saving parts and relations](Documentation~/split-saves.md) for recovery after
+partial completion and the nested endpoints' concurrency limits.
+
+Each `PlayServRecord<T>` orders Save/Reload/Delete calls in a per-handle FIFO.
+Adjacent pending calls of the same kind share one operation; every caller receives
+completion, and active operations never absorb later calls. Cancellation ends only
+that caller's wait after dispatch, so a successful write may still update the handle.
+See the [Records guide](Documentation~/playserv-sdk.md#typed-v2-records) for ordering,
+local-edit preservation, realtime interaction and terminal deletion semantics.
+
 For the current authenticated player's one owned row, use
 `PlayServData.LoadPlayerOwnedAsync<Profile>(() => new Profile { Nickname = "Guest" })`
 or `PlayServData.Records<Profile>(entityId).LoadPlayerOwnedAsync(...)`. The result's
@@ -458,6 +486,12 @@ Projection loads and queries with hidden columns are partial and must call
 For client-side bulk work, `LoadAllAsync` walks cursors up to an explicit
 record limit, while `LoadManyAsync`, `BulkSaveAsync`, and `BulkDeleteAsync` use
 bounded parallel requests and return an ordered result for every item.
+Optional [generated serialization metadata](Documentation~/generated-serialization.md)
+provides compiled DTO accessors and runtime registration for `NewtonsoftJsonCodec`.
+Mark supported types with `[PlayServGeneratedSerialization]`, generate from the
+Tools menu, then compile. Unsupported types keep the complete cached reflection
+path; the guide covers names, nulls, references, IL2CPP and performance measurement.
+
 Optional [`PlayServRecordRef<T>`](Documentation~/record-references.md) values add lazy,
 scoped relation loading and expanded previews while writing only IDs. Load children
 explicitly before editing; saving a parent never saves its children.
@@ -483,8 +517,10 @@ recordLive.Conflict += conflict =>
 await recordLive.RefreshAsync(cancellationToken);
 ```
 
-Realtime pushes trigger a canonical record GET so `Value`, its snapshot,
-`UpdatedAt`, and `ETag` advance atomically. Unsaved edits made while subscribed
+Complete versioned record pushes update `Value`, its snapshot, `UpdatedAt` and
+`ETag` without an extra GET. Incomplete frames, ambiguous timestamps and
+reconnect/reset recovery retain canonical reads. REST-only metadata absent from
+a push keeps its last loaded value until a canonical read. Unsaved edits made while subscribed
 use an explicit backend-wins policy: `Conflict` is raised before `Changed` and
 includes both values and their changed top-level wire fields. Server deletion
 sets `IsDeleted`, retains the last value, and terminates the handle. Record
@@ -1014,7 +1050,13 @@ them with Unity Test Framework. The complete guide contains batch-mode commands.
 
 PlayServ SDK is available under the [MIT License](LICENSE.md). Third-party
 components are listed in [Third Party Notices](Third%20Party%20Notices.md).
-Runtime schema presence can be checked explicitly with `PlayServData.CheckSchemaAsync(types, ct)`. A table missing from the caller-visible catalogue may be ACL-hidden; this does not validate field compatibility or modify schema.
+
+Runtime schema presence can be checked explicitly with `PlayServData.CheckSchemaAsync(types, ct)`.
+Enable `PlayServSettings.EnableAutomaticSchemaAdvisory` (default `false`) or the
+matching config checkbox to discover entity contracts and check them once after
+sign-in without delaying authentication. Visible singleton/table mismatches are
+reported; an absent table may be ACL-hidden. Field types are not validated and
+schemas are never changed. See [runtime schema advisory](Documentation~/rooms-runtime-parity.md#runtime-schema-advisory).
 The optional Game Server companion now supports explicit typed inbound uplink RPC;
 see its `RpcRegistry` guide and preserved dedicated-server sample. Client RPC APIs
 and room creation remain independent and unchanged.

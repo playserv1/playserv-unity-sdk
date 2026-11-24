@@ -4,6 +4,11 @@ namespace PlayServ.Schema.Tool;
 
 internal static class SchemaPushPayloadBuilder
 {
+    internal static void ValidateField(SchemaContract owner, SchemaMember member, IReadOnlyDictionary<string, SchemaContract> byType)
+    {
+        BuildField(owner, member, byType);
+    }
+
     public static JsonObject Build(
         IReadOnlyList<SchemaContract> contracts,
         string expectedRevision)

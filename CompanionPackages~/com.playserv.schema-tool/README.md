@@ -1,5 +1,17 @@
 # PlayServ Schema Tool
 
+Normal Unity Player/Server builds now run offline contract validation automatically
+when the target contains `[PlayServSchema]` contracts (PSV-3729). Install this
+companion at the same revision as core. Validation needs neither initialization
+nor generated schemas, credentials or network access; it never writes schemas or
+lock files. The existing `validate` command continues checking generated output
+freshness; the build pipeline uses `validate-contracts --build-inputs <json>` with
+the target's sources, references and scripting symbols instead.
+
+See core `Documentation~/playserv-sdk.md`, **Automatic build validation**, for the
+supported rules, source diagnostics, headless entry point and troubleshooting.
+The CI matrix runs the shipped tool and integration on Unity 2022.3.62f3 and 6000.6.0f1.
+
 External schema analysis and generation companion for `com.playserv.sdk`.
 Unity downloads the tool through UPM, but runs it as a separate process on the
 Unity-bundled .NET runtime.

@@ -16,7 +16,7 @@ namespace Playserv.Tests.Editor
                 .SelectMany(package => package.ModuleIds)
                 .ToArray();
 
-            Assert.That(packages.Count, Is.EqualTo(11));
+            Assert.That(packages.Count, Is.EqualTo(10));
             Assert.That(
                 packages.Select(package => package.PackageId).Distinct().Count(),
                 Is.EqualTo(packages.Count));
@@ -32,7 +32,6 @@ namespace Playserv.Tests.Editor
         [TestCase("com.playserv.steam-auth", "steam-auth")]
         [TestCase("com.playserv.webrtc", "transport-webrtc")]
         [TestCase("com.playserv.analytics", "analytics")]
-        [TestCase("com.playserv.pulse", "pulse")]
         [TestCase("com.playserv.debug-terminal", "debug-terminal")]
         [TestCase("com.playserv.transports-native", "transport-udp")]
         [TestCase("com.playserv.transports-native", "transport-rudp")]

@@ -10,7 +10,7 @@ namespace Playserv.Tests.Editor
 {
     public sealed class PlayServReleaseVersionTests
     {
-        private const string ExpectedVersion = "0.7.3";
+        private const string ExpectedVersion = "0.8.0";
 
         [Test]
         public void CoreAndEveryCompanion_ReportReleaseVersion()
@@ -26,7 +26,7 @@ namespace Playserv.Tests.Editor
             var manifests = Directory.GetFiles(companionRoot, "package.json", SearchOption.AllDirectories)
                 .OrderBy(path => path)
                 .ToArray();
-            Assert.That(manifests.Length, Is.EqualTo(12));
+            Assert.That(manifests.Length, Is.EqualTo(11));
             foreach (var manifest in manifests)
                 AssertPackageVersion(manifest, requireCoreDependency: true);
 

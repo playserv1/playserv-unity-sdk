@@ -10,6 +10,10 @@ var connect = PlayServServerLaunch.ResolveConnect(listenPort, explicitConnect);
 
 Only neutral `PLAYSERV_*` launch variables are read. Mapping supports port-keyed objects (plain port, `/udp`, `/tcp`) and entries with `internal_port`, `external_port`, `protocol`. No matching mapping uses the known listen port. Invalid values are rejected; no guessed localhost/LAN endpoint or vendor-specific discovery is used. The game still owns room preparation and transport startup.
 
+For a process assigned one room, `PlayServGameServer.StartHostedRoomAsync(transport, options, ct)` composes this lifecycle. It reads the platform launch, authenticates the uplink, waits for the game-owned `IPlayServHostedRoomTransport` listener, then registers the room. `PlayServServerLaunch.ReadHosted()` exposes a validated immutable metadata snapshot without starting networking. The current provisioning path uses `PLAYSERV_PUBLIC_HOST` and `/run/playserv/deployment-token`; legacy `PLAYSERV_PUBLIC_IP`, port mappings and the deployment-token environment variable remain supported. The deployment identity is used in both hello and room registration.
+
+The returned `PlayServHostedRoom` owns cleanup through `StopAsync`; global shutdown and room removal also stop its listener. An uncertain registration or unconfirmed cleanup prevents a new hosted start in that process. See the [companion hosted-room guide](../CompanionPackages~/com.playserv.game-server/README.md#a-platform-launched-room) for callback ownership, deadlines and credential precedence. The explicit manual room API retains its existing configuration and shared-uplink behavior.
+
 ## Configuration and lifecycle
 
 ```csharp
@@ -70,6 +74,20 @@ companion README and requested-room sample for a map/mode allowlist example.
 
 ## Game connection lifecycle
 
+For event-driven integration, attach `PlayServRoomNetworkAdapter(room, network)`
+on Unity's main thread. The optional adapter owns the tracker and subscribes to
+`IPlayServRoomNetworkLifecycle.Authenticating` / `Disconnected`; the game implements
+`Accept(verifiedPlayerId)` and `Close(reason)` on each unique physical connection.
+The source must gate gameplay until Accept and close the exact connection on Close.
+Callbacks are dispatched onto Unity's context, late refusals are admission-specific,
+and explicit disposal or room shutdown detaches the source. Scene changes preserve
+bindings while the network connection survives; actual reconnects use fresh tickets.
+See the [adapter guide](../CompanionPackages~/com.playserv.game-server/README.md#optional-game-network-adapter)
+and importable **TCP Network Lifecycle** sample for the full callback contract,
+error handling and existing operator-handler ownership.
+
+The lower-level manual integration remains:
+
 ```csharp
 var tracker = room.CreateConnectionTracker(TimeSpan.FromSeconds(30));
 tracker.ConnectionRemoved += removal => DisconnectExactConnection(removal.ConnectionId);
@@ -111,7 +129,7 @@ var serverMatch = await PlayServGameServer.JoinRoomForPlayerAsync(
 ```
 
 Client identity always comes from its authenticated session. Only the trusted server call includes `player_id`. Parameters must be a JSON object; they are copied before awaiting credentials. The admission hook decides whether their contents are acceptable. Both calls perform one request only. The original string-based client overload still sends no body.
-## Explicit development schema advisory
+## Runtime schema advisory
 
 ```csharp
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
@@ -121,7 +139,38 @@ foreach (var check in checks) Debug.Log($"{check.EntityName}: {check.Availabilit
 #endif
 ```
 
-This reads `/data/tables` only. `NotVisible` is not proof of physical absence: catalogue ACL applies. `Unavailable` includes failed reads and ambiguous type names. Matching follows Records CLR-name resolution (exact first, then unique case-insensitive); explicitly ID-bound Records with different names are outside this advisory. No assembly scan, field compatibility validation, schema push or production initialization block occurs.
+This reads `/data/tables` only. `NotVisible` is not proof of physical absence: catalogue ACL applies. `Unavailable` includes failed reads and ambiguous type names. Matching follows Records CLR-name resolution (exact first, then unique case-insensitive); explicitly ID-bound Records with different names are outside this advisory. The manual API keeps accepting an explicit type list without scanning assemblies. For attributed entities, `Compatibility` compares the observed singleton/table kind; missing kind metadata stays `Unknown`. It does not verify field types or change schemas.
+
+To opt into automatic checks, enable **Enable Automatic Schema Advisory** on the
+PlayServ config asset (also available in the Settings window), or set
+`PlayServSettings.EnableAutomaticSchemaAdvisory = true` before `PlayServ.Config`.
+The default is `false`. Disabled sessions perform neither discovery nor a catalog
+request. No Schema Tool process or platform server key is needed at runtime.
+
+After the first successful anonymous, restored, external or browser sign-in, the
+optional Data module queues discovery and one catalog read without awaiting them
+in the sign-in operation. An unmanaged token becomes eligible after a successful
+connection handshake. Discovery includes closed `[PlayServSchema]` classes with
+`Kind = Auto` or `Entity`, and structs explicitly marked `Entity`; Part, Enum,
+Editor-only and test assemblies are excluded. Partial assembly loads retain the usable types.
+Builds generate linker roots under `Library/PlayServ/SchemaAdvisory` for active
+entity contracts, including player-only declarations and referenced DLL contracts,
+so runtime discovery can work with managed stripping and IL2CPP. These roots are
+generated even if the config asset disables the check, because code can opt in later.
+
+One check is attempted per SDK runtime session/configuration scope. Token refresh,
+reconnect and repeated auth notifications do not retry it. Explicit reconfiguration
+or a new Play session allows a new attempt. Identity replacement, logout and shutdown
+cancel obsolete work; late results from another identity/configuration are discarded.
+Catalog reads are bounded by `TimeoutSeconds` (clamped to 1–120 seconds). Check again
+manually after correcting a transient failure.
+
+Matching visible entities produce no warning. A `singleton_mismatch` names the
+entity and expected/observed kind. `not_in_visible_catalogue` asks you to check the
+environment and read permissions before modifying schema. Failed or ambiguous
+catalog reads and missing kind metadata report that compatibility is unknown.
+Diagnostics use the Unity context and never include HTTP bodies or credentials;
+advisory failure does not change authentication success or block gameplay.
 ## Typed server RPC (opt-in)
 
 ```csharp

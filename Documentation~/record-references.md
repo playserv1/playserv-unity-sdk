@@ -60,10 +60,18 @@ parent changes only its relation IDs and other edited parent fields; there is no
 cascade save. Save an explicitly loaded child record separately. An expanded
 preview can be incomplete, so load before editing it.
 
+Parent saves route changed references through the dedicated link endpoints.
+See [saving parts and relations](split-saves.md) for partial completion, recovery
+handles, version checks and the concurrency limits of these multi-request saves.
+
 ## Loading, errors and lifetime
 
 States are `Unloaded`, `Expanded`, `Loading`, `Loaded`, `Missing` and `Faulted`.
 `LoadAsync` caches a loaded or missing result; `ReloadAsync` fetches again.
+Once canonically loaded, successful reloads reuse the same record handle and its
+operation queue. [Field observers](managed-record-observers.md) attached to that
+handle survive rehydration and recovery after a failed read. First hydration is
+silent; later effective changes notify before the reference reload completes.
 Concurrent calls on one reference share I/O. Cancelling a caller's wait does not
 cancel the shared request or another caller. HTTP transport timeouts still apply.
 

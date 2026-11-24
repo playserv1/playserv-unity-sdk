@@ -188,6 +188,21 @@ namespace Playserv.Samples.DataSubscription
             return PlayServData.Records<SampleInventoryItem>().SubscribeAsync(query, ct);
         }
 
+        public async Task RepairFirstLiveItemAsync(CancellationToken ct = default)
+        {
+            using var live = await PlayServData.Records<SampleInventoryItem>().SubscribeManagedAsync(
+                new PlayServRecordQuery<SampleInventoryItem>().Where(item => item.Durability < 25), ct);
+            if (live.Items.Count == 0) return;
+            var record = live.Items[0];
+            var retainedValue = record.Value;
+            using var watch = record.ObserveField("durability", change =>
+                Debug.Log($"Durability refreshed: {change.Previous} -> {change.Current}"));
+            live.Conflict += conflict => Debug.LogWarning("Server update replaced unsaved inventory edits.");
+            await live.RefreshAsync(ct);
+            retainedValue.Durability = 100;
+            await record.SaveAsync(ct);
+        }
+
         public Task<ISharedCollection<SampleInventoryItem>> SubscribeToRegionalGuildsAsync(
             CancellationToken ct = default)
         {

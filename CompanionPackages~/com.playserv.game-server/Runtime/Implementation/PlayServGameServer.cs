@@ -24,6 +24,7 @@ namespace Playserv.GameServer
         private const string ApiUrlEnvironmentVariable = "PLAYSERV_API_URL";
 
         private static readonly object Sync = new object();
+        private static readonly object ConfigurationGate = new object();
         private static readonly Dictionary<string, PlayServGameRoomHandle> Rooms =
             new Dictionary<string, PlayServGameRoomHandle>(StringComparer.Ordinal);
         private static readonly HashSet<string> StartingRooms =
@@ -162,9 +163,15 @@ namespace Playserv.GameServer
         public static async Task<PlayServGameRoomHandle> StartRoomAsync(
             PlayServStartRoomRequest request,
             CancellationToken cancellationToken = default)
+            => await StartRoomCoreAsync(request, cancellationToken, false);
+
+        internal static async Task<PlayServGameRoomHandle> StartRoomCoreAsync(
+            PlayServStartRoomRequest request, CancellationToken cancellationToken, bool hosted)
         {
             EnsureSupportedBuild();
             cancellationToken.ThrowIfCancellationRequested();
+            lock (Sync)
+                if (_hostedRoom != null && !hosted) throw new InvalidOperationException("The hosted launch owns room registration.");
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
             if (request.Snapshot == null)
@@ -525,7 +532,19 @@ namespace Playserv.GameServer
         {
             EnsureSupportedBuild();
             cancellationToken.ThrowIfCancellationRequested();
-            lock (Sync) { if (_context != null) _context.ShuttingDown = true; }
+            PlayServHostedRoom hosted;
+            lock (Sync) hosted = _hostedRoom;
+            if (hosted == null) return await ShutdownCoreAsync(cancellationToken);
+            var shutdown = hosted.StopWithResultAsync();
+            await PlayServGameServerUplink.WaitAsync(shutdown, cancellationToken);
+            return await shutdown;
+        }
+
+        internal static async Task<PlayServGameServerShutdownResult> ShutdownCoreAsync(CancellationToken cancellationToken)
+        {
+            EnsureSupportedBuild();
+            cancellationToken.ThrowIfCancellationRequested();
+            StopEngineCaptureForShutdown();
             Uplink.CancelRoomCreation();
             Uplink.CancelOperatorActions();
             await Uplink.DrainRoomCreationAsync();
@@ -566,7 +585,7 @@ namespace Playserv.GameServer
             }
 
             Analytics.ResetForConfiguration();
-            Logs.ResetForConfiguration();
+            Logs.ClearForContext(context);
 
             return new PlayServGameServerShutdownResult(results, analyticsError, logsError);
         }
@@ -779,6 +798,15 @@ namespace Playserv.GameServer
 
         internal static void CancelForModuleShutdown()
         {
+            lock (ConfigurationGate) CancelForModuleShutdownCore();
+        }
+
+        private static void CancelForModuleShutdownCore()
+        {
+            lock (Sync) { if (_context != null) _context.ShuttingDown = true; }
+            PlayServHostedRoom hosted;
+            lock (Sync) hosted = _hostedRoom;
+            hosted?.CancelForModuleShutdown();
             Logs.ResetForConfiguration();
             Uplink.CancelForModuleShutdown();
             Realtime.CancelForModuleShutdown();
@@ -800,6 +828,10 @@ namespace Playserv.GameServer
 
         internal static void OnApplicationQuitting()
         {
+            StopEngineCaptureForShutdown();
+            PlayServHostedRoom hosted;
+            lock (Sync) hosted = _hostedRoom;
+            if (hosted != null) { ObserveBestEffort(hosted.StopAsync()); return; }
             Uplink.CancelRoomCreation();
             PlayServGameRoomHandle[] handles;
             lock (Sync)
@@ -840,7 +872,14 @@ namespace Playserv.GameServer
             PlayServGameServerOptions options,
             IPlayServGameServerTransport transport,
             Func<DateTimeOffset> utcNow,
-            Func<TimeSpan, CancellationToken, Task> delay)
+            Func<TimeSpan, CancellationToken, Task> delay,
+            bool hosted = false)
+        {
+            lock (ConfigurationGate) ConfigureLocked(options, transport, utcNow, delay, hosted);
+        }
+
+        private static void ConfigureLocked(PlayServGameServerOptions options, IPlayServGameServerTransport transport,
+            Func<DateTimeOffset> utcNow, Func<TimeSpan, CancellationToken, Task> delay, bool hosted)
         {
             if (options == null)
                 throw new ArgumentNullException(nameof(options));
@@ -855,6 +894,8 @@ namespace Playserv.GameServer
                 throw new ArgumentOutOfRangeException(nameof(options), "HttpTimeout must be a positive supported duration.");
             if (options.LogQueueCapacity < 1 || options.LogQueueMaxBytes < 1)
                 throw new ArgumentOutOfRangeException(nameof(options), "Log queue limits must be positive.");
+            var engineLogs = (options.EngineLogs ?? new PlayServEngineLogOptions()).Snapshot();
+            PlayServEngineLogCapture.ValidateConfigurationThread(engineLogs);
             if (options.AdmissionEntryLimit < 1 || options.AdmissionByteLimit < 1)
                 throw new ArgumentOutOfRangeException(nameof(options), "Admission limits must be positive.");
             if (options.RoomCreateTimeout <= TimeSpan.Zero || options.RoomCreateTimeout.TotalMilliseconds > int.MaxValue)
@@ -885,14 +926,15 @@ namespace Playserv.GameServer
                 ExecutorSlug = NormalizeOptional(options.ExecutorSlug) ?? NormalizeOptional(Environment.GetEnvironmentVariable("PLAYSERV_EXECUTOR_SLUG")),
                 UplinkCredentialProvider = options.UplinkCredentialProvider,
                 RoomFactory = options.RoomFactory, RoomCreateTimeout = options.RoomCreateTimeout,
-                LogQueueCapacity = options.LogQueueCapacity, LogQueueMaxBytes = options.LogQueueMaxBytes
+                LogQueueCapacity = options.LogQueueCapacity, LogQueueMaxBytes = options.LogQueueMaxBytes,
+                EngineLogs = engineLogs
             };
             var delivery = SynchronizationContext.Current;
             context.Dispatch = action => { if (delivery == null) action(); else delivery.Post(_ => action(), null); };
 
             lock (Sync)
             {
-                if (Rooms.Count != 0 || StartingRooms.Count != 0)
+                if ((_hostedRoom != null && !hosted) || Rooms.Count != 0 || StartingRooms.Count != 0)
                     throw new InvalidOperationException("Close all active PlayServ rooms before reconfiguring the game server client.");
                 if (Uplink.State != PlayServUplinkState.Disconnected)
                     throw new InvalidOperationException("Disconnect the uplink before reconfiguring the game server.");
@@ -1058,6 +1100,7 @@ namespace Playserv.GameServer
                     }
                     else Generations.Remove(key);
                 }
+                _hostedRoom?.RoomRemoved(handle);
             }
         }
 
@@ -1190,7 +1233,8 @@ namespace Playserv.GameServer
                 client,
                 entityId,
                 Realtime.SubscribeCollectionAsync<T>,
-                Realtime.SubscribeRecordAsync<T>);
+                Realtime.SubscribeRecordAsync<T>,
+                subscribeManagedAsync: Realtime.SubscribeManagedCollectionAsync<T>);
         }
 
         private static PlayServRecordsClient CreateRecordsClient(
@@ -1211,6 +1255,17 @@ namespace Playserv.GameServer
         internal static PlayServGameServerContext GetContextForRealtime() => GetContext();
 
         internal static PlayServGameServerContext GetContextForServices() => GetContext();
+        internal static bool IsCurrentLogContext(PlayServGameServerContext context) =>
+            ReferenceEquals(Volatile.Read(ref _context), context) && !context.ShuttingDown;
+
+        private static void StopEngineCaptureForShutdown()
+        {
+            lock (ConfigurationGate)
+            {
+                lock (Sync) { if (_context != null) _context.ShuttingDown = true; }
+                Logs.StopEngineCapture();
+            }
+        }
 
         internal static void ReplaceUplinkForShutdown(PlayServGameServerUplink previous)
         {
@@ -1387,6 +1442,7 @@ namespace Playserv.GameServer
         internal Dictionary<string, PlayServServerRpcRegistry.Method> RpcMethods;
         internal TimeSpan RoomCreateTimeout;
         internal int LogQueueCapacity, LogQueueMaxBytes;
+        internal PlayServEngineLogOptions EngineLogs;
         internal volatile bool ShuttingDown;
         internal Action<Action> Dispatch;
         internal Func<double> MonotonicSeconds = () => (double)System.Diagnostics.Stopwatch.GetTimestamp() / System.Diagnostics.Stopwatch.Frequency;

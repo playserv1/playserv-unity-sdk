@@ -46,6 +46,20 @@ namespace Playserv.Editor
         public bool dryRun;
         public string message;
         public string[] outputs;
+        public PlayServSchemaDiagnostic[] diagnostics;
+    }
+
+    [Serializable]
+    internal sealed class PlayServSchemaDiagnostic
+    {
+        public string severity;
+        public string code;
+        public string message;
+        public string path;
+        public int line;
+        public int column;
+        public string type;
+        public string member;
     }
 
     [Serializable]
@@ -189,6 +203,55 @@ namespace Playserv.Editor
             {
                 return Failed(exception.GetBaseException().Message);
             }
+        }
+
+        internal static PlayServSchemaToolResult RunContractValidation(string dotnet, string tool,
+            string projectRoot, string inputsPath, int timeoutMilliseconds = CommandTimeoutMilliseconds)
+        {
+            try
+            {
+                var start = new ProcessStartInfo
+                {
+                    FileName = dotnet,
+                    Arguments = $"{Quote(tool)} validate-contracts --project {Quote(projectRoot)} --build-inputs {Quote(inputsPath)} --json",
+                    WorkingDirectory = projectRoot, UseShellExecute = false, CreateNoWindow = true,
+                    RedirectStandardOutput = true, RedirectStandardError = true
+                };
+                using (var process = Process.Start(start))
+                {
+                    if (process == null) return Failed("Could not start Schema Tool.");
+                    var output = process.StandardOutput.ReadToEndAsync();
+                    var error = process.StandardError.ReadToEndAsync();
+                    if (!process.WaitForExit(timeoutMilliseconds))
+                    {
+                        TryKill(process);
+                        return Failed("Schema Tool contract validation timed out.");
+                    }
+                    if (!Task.WaitAll(new Task[] { output, error }, timeoutMilliseconds))
+                        return Failed("Schema Tool contract validation output timed out.");
+                    return ParseContractValidationResult(process.ExitCode, output.Result, error.Result);
+                }
+            }
+            catch (Exception exception) { return Failed(exception.GetBaseException().Message); }
+        }
+
+        internal static PlayServSchemaToolResult ParseContractValidationResult(int exitCode, string output, string error)
+        {
+            var response = ParseResponse(output);
+            if (response == null || response.command != "validate-contracts" || response.protocolVersion != 1 ||
+                response.diagnostics == null || (response.success && exitCode != 0) ||
+                (!response.success && exitCode == 0) || Array.Exists(response.diagnostics, diagnostic =>
+                    diagnostic == null || string.IsNullOrWhiteSpace(diagnostic.code) || string.IsNullOrWhiteSpace(diagnostic.message) ||
+                    (diagnostic.severity != "error" && diagnostic.severity != "warning" && diagnostic.severity != "info")))
+                return Failed("Schema Tool returned an invalid contract-validation response. Ensure core and companion use the same SDK revision. " + error);
+            var hasErrors = Array.Exists(response.diagnostics, diagnostic => diagnostic == null || diagnostic.severity == "error");
+            if (response.success && hasErrors)
+                return Failed("Schema Tool returned inconsistent contract-validation diagnostics.");
+            return new PlayServSchemaToolResult
+            {
+                Success = exitCode == 0 && response.success, ExitCode = exitCode,
+                Output = output, Error = error, Response = response
+            };
         }
 
         public static bool StartWatch(out string error)

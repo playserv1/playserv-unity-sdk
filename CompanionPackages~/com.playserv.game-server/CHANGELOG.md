@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-24
+
+Release prepared locally; distribution tags and registry publication are separate.
+
+### Added
+
+- Opt-in engine log capture through the structured server logger: threaded Unity
+  callbacks, severity filtering, pre-queue credential redaction, rate/size bounds,
+  periodic delivery and passive diagnostics. Includes configuration, shutdown and
+  Editor cleanup, with client-build isolation (PSV-3727).
+
+- Opt-in `PlayServRoomNetworkAdapter` for game-owned authentication/disconnect
+  callbacks, exact-connection cleanup, verified player binding and room-scoped
+  scene persistence. Includes TCP server/client sample and lifecycle/socket tests
+  (PSV-3726).
+
+- Opt-in `StartHostedRoomAsync` for a single platform-assigned room: validated launch
+  metadata, deployment-token file fallback, deployment-bound uplink identity,
+  game-owned listener readiness and acknowledged room registration. Includes bounded
+  startup/cleanup, process ownership fencing, a UDP binding sample and launch-fixture
+  coverage (PSV-3725).
+
+### Fixed
+
+- Serialize warning logs as the contract's `warn`, redact reservation query values
+  and refresh/launch credentials, and drain logs beyond an existing flush snapshot
+  during bounded graceful shutdown (PSV-3727).
+
+- Reject tracker attachment after room closing starts, and clean up the exact
+  parked admission when a networking Accept callback disconnects then throws
+  (PSV-3726).
+
+- Resolve current `PLAYSERV_PUBLIC_HOST` and protocol-specific public port mappings,
+  including platform WSS mappings, while preserving legacy public IP launches
+  and manual room hosting (PSV-3725).
+
+### Changed
+
+- Synchronize package and internal PlayServ dependency versions at `0.8.0` (PSV-3791).
+
 ## [0.7.3] - 2026-11-12
 
 Release prepared locally; distribution tags and registry publication are separate.

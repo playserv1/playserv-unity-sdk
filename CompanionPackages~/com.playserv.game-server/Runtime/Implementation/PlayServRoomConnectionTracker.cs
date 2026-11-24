@@ -36,6 +36,7 @@ namespace Playserv.GameServer
         }
         public TimeSpan ReconnectGrace { get; }
         public event Action<PlayServConnectionRemoval> ConnectionRemoved;
+        internal event Action<bool> Closed;
 
         /// <summary>Consumes a fresh ticket; same-player replacement is allowed only during reconnect grace. Never log token.</summary>
         public PlayServRoomAdmissionResult TryAdmit(string connectionId, string token)
@@ -85,6 +86,16 @@ namespace Playserv.GameServer
             }
             Notify(removed, "player_removed"); return true;
         }
+        internal bool RemoveConnection(string connectionId)
+        {
+            Entry removed;
+            lock (_room.AdmissionLock)
+            {
+                if (_disposed || !_connections.TryGetValue(connectionId, out removed)) return false;
+                Remove(removed, true);
+            }
+            Notify(removed, "player_removed"); return true;
+        }
         internal void Evaluate()
         {
             Entry[] expired;
@@ -130,10 +141,12 @@ namespace Playserv.GameServer
         {
             lock (_room.AdmissionLock)
             {
+                if (_disposed) return;
                 _disposed = true; _players.Clear(); _connections.Clear();
                 _room.Admission.AdmissionRejected -= OnRejected;
                 _room.Terminated -= OnTerminated;
             }
+            _context.Post(() => Closed?.Invoke(true));
         }
         private void OnTerminated(PlayServGameRoomHandle room, PlayServError error) => Dispose();
         public void Dispose()
@@ -148,6 +161,7 @@ namespace Playserv.GameServer
                 _room.Terminated -= OnTerminated;
             }
             foreach (var entry in entries) Notify(entry, "tracker_closed");
+            _context.Post(() => Closed?.Invoke(false));
         }
         private static PlayServRoomAdmissionResult Failure(string reason) =>
             new PlayServRoomAdmissionResult(false, null, null, new PlayServError(PlayServErrorCode.Transport, reason, "The game connection could not be admitted."));
